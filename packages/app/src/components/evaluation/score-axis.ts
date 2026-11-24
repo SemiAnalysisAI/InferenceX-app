@@ -120,5 +120,11 @@ export function evaluationScoreAxis(spans: readonly EvalScoreSpan[]): EvalScoreA
   return lo > hi - lo ? brokenAxis(lo, hi) : linearAxis(hi);
 }
 
-/** Two decimals, or three when a zoomed tick needs them. */
-export const formatScoreTick = (score: number) => score.toFixed(3).replace(/(?<=\.\d\d)0$/u, '');
+/**
+ * At least two decimals, and more only when a tick needs them. A nice tick is a whole multiple
+ * of its step, so dropping the trailing zeros keeps exactly the step's decimals and neighbouring
+ * ticks stay distinct. Six decimals cover any step: a span of at least 0.02 at the chart's 20x
+ * zoom limit still steps by 0.0001 or more.
+ */
+export const formatScoreTick = (score: number) =>
+  score.toFixed(6).replace(/(?<=\.\d\d\d*?)0+$/u, '');

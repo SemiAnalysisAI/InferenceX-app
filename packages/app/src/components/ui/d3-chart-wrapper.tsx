@@ -9,7 +9,6 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { CHART_TOOLTIP_Z_INDEX } from '@/lib/d3-chart/tooltip-placement';
 import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
-import { TOP_AXIS_BAND_PX } from '@/lib/d3-chart/sticky-top-axis';
 import { cn } from '@/lib/shared/utils';
 
 const ZOOM_HINT_SETTLE_MS = 400;
@@ -254,7 +253,8 @@ export function D3ChartWrapper({
       const xDomain = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
       const yDomain = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
       // The hint sits above a top axis band rather than over its tick labels.
-      const topAxisBand = svg.querySelector('.x-axis-top') ? TOP_AXIS_BAND_PX : 0;
+      const topAxis = svg.querySelector<SVGGElement>('.x-axis-top');
+      const topAxisBand = Number(topAxis?.dataset.bandHeight ?? 0);
       const topMargin = Math.round((yDomain?.top ?? bounds.top) - bounds.top) - topAxisBand;
       const plotWidth = xDomain?.width ?? bounds.width;
       const next =

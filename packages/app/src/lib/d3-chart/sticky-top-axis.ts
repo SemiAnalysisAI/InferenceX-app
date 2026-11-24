@@ -7,6 +7,13 @@ import type { ChartLayout } from './types';
 
 /** Height of the x-axis band at the top of a tall chart. Reserve it plus 4px as the top margin. */
 export const TOP_AXIS_BAND_PX = 28;
+/** y of the line under the band, which reads as the axis line while the axis is pinned. */
+const TOP_AXIS_EDGE_Y = 4.5;
+/**
+ * Marks on the axis line (an axis break) carry this class. At rest they sit on the plot's top
+ * border at y = 0, and `stickTopAxis` moves them onto the edge line while the axis is pinned.
+ */
+export const TOP_AXIS_LINE_MARK_CLASS = 'x-axis-top-line-mark';
 
 /**
  * Draw an x-axis above the plot that `stickTopAxis` pins under the site header while the plot
@@ -43,7 +50,11 @@ export function renderTopAxis(
     .tickSize(0)
     .tickPadding(8);
   if (options.tickValues) generator.tickValues(options.tickValues);
-  axis.attr('data-plot-top', layout.margin.top).attr('data-plot-height', layout.height);
+  // The chart wrapper reads the band height here to keep its zoom hint above the axis.
+  axis
+    .attr('data-plot-top', layout.margin.top)
+    .attr('data-plot-height', layout.height)
+    .attr('data-band-height', TOP_AXIS_BAND_PX);
   axis
     .select('.x-axis-top-band')
     .attr('x', -layout.margin.left)
@@ -54,8 +65,8 @@ export function renderTopAxis(
     .select('.x-axis-top-edge')
     .attr('x1', -layout.margin.left)
     .attr('x2', layout.width + layout.margin.right)
-    .attr('y1', 4.5)
-    .attr('y2', 4.5);
+    .attr('y1', TOP_AXIS_EDGE_Y)
+    .attr('y2', TOP_AXIS_EDGE_Y);
   axis
     .select<SVGGElement>('.x-axis-top-ticks')
     .call(generator)
@@ -74,12 +85,15 @@ export function stickTopAxis(svg: SVGSVGElement | null | undefined) {
   const opacity = offset > 0 ? '1' : '0';
   for (const el of axis.querySelectorAll('.x-axis-top-band, .x-axis-top-edge'))
     setAttrIfChanged(el, 'opacity', opacity);
+  for (const el of axis.querySelectorAll(`.${TOP_AXIS_LINE_MARK_CLASS}`))
+    setAttrIfChanged(el, 'transform', offset > 0 ? `translate(0,${TOP_AXIS_EDGE_Y})` : null);
 }
 
 /** An exported image shows the top axis at rest above the plot. */
 export function unstickTopAxis(layout: ChartLayout) {
   const axis = layout.g.select('.x-axis-top').attr('transform', null);
   axis.selectAll('.x-axis-top-band, .x-axis-top-edge').attr('opacity', 0);
+  axis.selectAll(`.${TOP_AXIS_LINE_MARK_CLASS}`).attr('transform', null);
 }
 
 /** Re-pin the top axis on every scroll and resize frame. */

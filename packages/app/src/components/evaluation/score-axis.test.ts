@@ -103,10 +103,32 @@ describe('evaluationScoreAxis', () => {
 });
 
 describe('formatScoreTick', () => {
-  it('shows two decimals, and a third only when the tick needs it', () => {
+  it('shows two decimals, and more only when the tick needs them', () => {
     expect(formatScoreTick(0)).toBe('0.00');
     expect(formatScoreTick(0.97)).toBe('0.97');
     expect(formatScoreTick(0.965)).toBe('0.965');
+    expect(formatScoreTick(0.9605)).toBe('0.9605');
+    expect(formatScoreTick(0.1 + 0.2)).toBe('0.30');
     expect(formatScoreTick(1)).toBe('1.00');
+  });
+
+  it('gives every tick a distinct label anywhere on the axis at the 20x zoom limit', () => {
+    const axes = [
+      evaluationScoreAxis([span(0), ...cluster]),
+      evaluationScoreAxis(Array.from({ length: 20 }, () => span(1, 0))),
+      evaluationScoreAxis([0.3, 0.5, 0.7, 0.9, 0.98].map((score) => span(score))),
+    ];
+    for (const axis of axes) {
+      const [start, end] = axis.domain;
+      const width = (end - start) / 20;
+      for (let left = start; left + width <= end + 1e-9; left += width / 4) {
+        for (const count of [5, 10]) {
+          const labels = axis
+            .ticks([left, left + width], count)
+            .map((plot) => formatScoreTick(axis.fromPlot(plot)!));
+          expect(new Set(labels).size).toBe(labels.length);
+        }
+      }
+    }
   });
 });

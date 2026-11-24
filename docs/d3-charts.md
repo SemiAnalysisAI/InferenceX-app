@@ -387,6 +387,8 @@ Accuracy scores cluster near the top of 0 to 1, so the evaluation chart (`evalua
 
 Charts with one row per config grow taller than the screen. `renderTopAxis`, `stickTopAxis` and `useStickyTopAxis` in `src/lib/d3-chart/sticky-top-axis.ts` repeat the x-axis above the plot and pin it under the site header while the plot scrolls past. The throughput calculator and evaluation charts use it. Reserve `TOP_AXIS_BAND_PX + 4 + HINT_MIN_TOP_MARGIN_PX` as the top margin so the zoom hint sits above the axis instead of over its tick labels.
 
+At rest the top axis shows no line of its own, so marks on it sit on the plot's top border at y = 0. While it is pinned, a line under its band reads as the axis line. Give a mark that belongs on the axis line (such as the evaluation chart's break slashes) the `TOP_AXIS_LINE_MARK_CLASS` class, and `stickTopAxis` moves it onto that line.
+
 ## Zoom Transform Preservation
 
 When Effect 2 rebuilds the SVG (data shape change), the current zoom transform is saved at the start and re-applied after rebuild. Without this, users would lose their zoom position every time comparison dates are added or overlay data loads.

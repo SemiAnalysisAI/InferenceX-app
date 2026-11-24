@@ -25,6 +25,7 @@ import { ChartPointDetails, type ChartPointDetailsRow } from '@/components/ui/ch
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import {
   TOP_AXIS_BAND_PX,
+  TOP_AXIS_LINE_MARK_CLASS,
   renderTopAxis,
   stickTopAxis,
   unstickTopAxis,
@@ -335,9 +336,10 @@ function updateUnofficialScoreLabels(
 /**
  * The axis break: a card-coloured gap across the plot (hiding gridlines) and, on both x-axes,
  * a gap in the axis line capped by two parallel slashes, as on the CollectiveX chart. The marks
- * live in the axis groups because the plot group is clipped. Draw it after the top axis.
+ * live in the axis groups because the plot group is clipped. The top axis mark follows the
+ * pinned axis line. Draw it after the top axis.
  */
-function drawScoreAxisBreak(
+export function drawScoreAxisBreak(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: d3.ScaleLinear<number, number>,
   height: number,
@@ -367,6 +369,9 @@ function drawScoreAxisBreak(
       mark.append('rect').attr('fill', 'var(--card)');
       mark.append('path').attr('fill', 'none').attr('stroke-width', 1.25);
       return mark;
+    })
+    .classed(TOP_AXIS_LINE_MARK_CLASS, function () {
+      return (this.parentNode as Element).classList.contains('x-axis-top');
     });
   marks
     .select('rect')
