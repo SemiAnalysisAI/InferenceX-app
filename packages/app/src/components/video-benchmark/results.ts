@@ -379,17 +379,30 @@ export interface ResultsRun {
   date: string;
 }
 
-/** Runs ordered by first observation, ties broken by GitHub run ID. */
-function workloadRuns(points: readonly VideoPoint[]): ResultsRun[] {
-  const first = new Map<string, string>();
-  for (const point of points) {
-    const observed = point.observedAt ?? '';
-    const seen = first.get(point.runId);
-    if (seen === undefined || observed < seen) first.set(point.runId, observed);
-  }
-  return [...first]
-    .toSorted(([a, aAt], [b, bAt]) => aAt.localeCompare(bAt) || Number(a) - Number(b))
-    .map(([id, observed]) => ({ id, date: observed.slice(0, 10) }));
+// Preserve sub-millisecond precision in Python's ISO timestamps while comparing UTC instants.
+function executionTime(observedAt: string | null): string {
+  if (!observedAt) return '';
+  const millis = Date.parse(observedAt);
+  if (!Number.isFinite(millis)) return '';
+  const subMillis = observedAt.match(/\.\d{3}(?<subMillis>\d+)/u)?.groups?.subMillis ?? '';
+  return new Date(millis).toISOString().slice(0, -1) + subMillis.replace(/0+$/u, '');
+}
+
+/** A run may measure multiple workloads at different times. Order each within its own workload. */
+function runTimeline(points: VideoPoint[]) {
+  return [...Map.groupBy(points, (p) => p.runId)]
+    .flatMap(([id, members]) =>
+      [...Map.groupBy(members, (p) => p.workloadKey)].map(([workload, cells]) => {
+        const starts = cells.map((p) => executionTime(p.observedAt)).filter(Boolean);
+        const start = starts.toSorted()[0] ?? '';
+        return { id, date: start.slice(0, 10), start, workload, cells };
+      }),
+    )
+    .toSorted(compareRunTime);
+}
+
+function compareRunTime(a: { start: string; id: string }, b: { start: string; id: string }) {
+  return a.start.localeCompare(b.start) || Number(a.id) - Number(b.id);
 }
 
 function qualifies(p: VideoPoint): boolean {
@@ -472,7 +485,18 @@ export function resultProjection(
   const official = matches.filter(
     (p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun,
   );
-  const runs = workloadRuns(official);
+  const timeline = runTimeline(
+    qualified.filter((p) => {
+      if (p.runId === state.unofficialRun) return false;
+      if (p.workloadKey === workloadKey) return matchesFilters(p);
+      const m = resultMetadata(p);
+      return (
+        (!state.model || m.model === state.model) && (!state.engine || m.engine === state.engine)
+      );
+    }),
+  );
+  const workloadTimeline = timeline.filter((r) => r.workload === workloadKey);
+  const runs: ResultsRun[] = workloadTimeline.map(({ id, date }) => ({ id, date }));
   const chipConfigs = [...new Map(official.map((p) => [chipConfigKey(p), p]))]
     .map(([key, point]) => ({ key, point }))
     .toSorted((a, b) => compareDeployments(a.point, b.point) || a.key.localeCompare(b.key));
@@ -497,20 +521,23 @@ export function resultProjection(
       ),
     ),
   ].map((p) => resultCell(p, state));
-  const asOf = state.date === null ? runs : runs.filter((r) => r.date <= state.date!);
-  const day = asOf.at(-1)?.date ?? runs[0]?.date ?? null;
-  const dayRuns = runs.filter((r) => r.date === day);
-  const run = dayRuns.find((r) => r.id === state.run) ?? dayRuns.at(-1) ?? null;
-  const shownRuns = new Set(
-    runs.slice(0, run === null ? 0 : runs.indexOf(run) + 1).map((r) => r.id),
-  );
-  const common = matches.filter(
-    (p) =>
-      p.workloadKey === workloadKey &&
-      !state.hidden.includes(p.hardwareKey ?? '') &&
-      (p.runId === state.unofficialRun || shownRuns.has(p.runId)),
-  );
-  const deploymentCells = latest(common.filter((p) => p.runId !== state.unofficialRun)).map((p) =>
+  const date = state.date;
+  const asOf = date === null ? timeline : timeline.filter((r) => r.date !== '' && r.date <= date);
+  const day = asOf.findLast((r) => r.workload === workloadKey)?.date;
+  const dayRuns = workloadTimeline.filter((r) => r.date === day);
+  const selected = dayRuns.find((r) => r.id === state.run) ?? dayRuns.at(-1);
+  const run: ResultsRun | null = selected ? { id: selected.id, date: selected.date } : null;
+  // Backfills arrive in publication order. Visit the newest execution first across runs,
+  // preserving publication order inside a run for corrected exports of the same deployment.
+  const bounded =
+    selected && (date !== null || state.run !== null)
+      ? asOf.filter((r) => compareRunTime(r, selected) <= 0)
+      : asOf;
+  const snapshot = bounded
+    .toReversed()
+    .flatMap((r) => r.cells)
+    .filter((p) => !state.hidden.includes(p.hardwareKey ?? ''));
+  const deploymentCells = latest(snapshot.filter((p) => p.workloadKey === workloadKey)).map((p) =>
     resultCell(p, state),
   );
   const cells = deploymentCells.filter(
@@ -525,20 +552,8 @@ export function resultProjection(
     (cell) => state.gpuCount === null || cell.point.participating === state.gpuCount,
   );
   const workloadMix = latest(
-    qualified.filter((point) => {
-      const m = resultMetadata(point);
-      return (
-        (!state.model || m.model === state.model) &&
-        (!state.engine || m.engine === state.engine) &&
-        (point.workloadKey === workloadKey
-          ? shownRuns.has(point.runId)
-          : state.date === null || day === null || (m.date !== null && m.date <= day)) &&
-        (state.gpuCount === null || point.participating === state.gpuCount) &&
-        !state.hidden.includes(point.hardwareKey ?? '') &&
-        point.runId !== state.unofficialRun
-      );
-    }),
-  ).map((point) => resultCell(point, state));
+    snapshot.filter((p) => state.gpuCount === null || p.participating === state.gpuCount),
+  ).map((p) => resultCell(p, state));
   return {
     state: {
       ...state,

@@ -303,7 +303,8 @@ describe('VideoGenX results contract', () => {
     const republished = run('h200:stale', '300', '2026-11-03T05:00:00Z');
     const b200 = run('b200', '200', '2026-11-03T01:00:00Z', 'b200');
     const first = run('h200:old', '100', '2026-11-01T06:00:00Z');
-    const input = [rerun, republished, b200, first];
+    // The oldest measurement was backfilled after the newer measurements.
+    const input = [first, rerun, republished, b200];
     const shown = (selection: Partial<ResultsState>) => {
       const result = resultProjection(input, { ...state(), ...selection });
       return [result.run?.id, ids(result.cells), ids(result.workloadMix)];
@@ -319,6 +320,29 @@ describe('VideoGenX results contract', () => {
     ]);
     expect(shown({ date: '2026-11-01' })).toEqual(['100', ['h200:old'], ['h200:old']]);
     expect(shown({ date: '2026-11-02', run: '300' })).toEqual(['100', ['h200:old'], ['h200:old']]);
+    expect(shown({ date: '2026-10-31' })).toEqual([undefined, [], []]);
+
+    // A second workload measured at the same time is ordered by run ID.
+    const plan = JSON.parse(eligible.workloadKey!);
+    plan.plan.generation.height = 512;
+    const peer = { ...b200, id: 'peer:c1', runId: '201', workloadKey: JSON.stringify(plan) };
+    const laterInRun = {
+      ...peer,
+      id: 'peer:later',
+      runId: '200',
+      observedAt: '2026-11-04T00:00:00Z',
+    };
+    const peerMix = (runId: string) =>
+      ids(
+        resultProjection([laterInRun, peer, ...input], {
+          ...state(),
+          date: '2026-11-03',
+          run: runId,
+        }).workloadMix,
+      );
+    expect(peerMix('200')).toEqual(['b200', 'h200:old']);
+    expect(peerMix('300')).toEqual(['b200', 'h200:new', 'peer:c1']);
+
     const h200 = latest.chipConfigs.find(({ point }) => point.hardwareKey === 'h200')!.key;
     expect(latest.chipConfigs.map(({ point }) => point.hardwareKey)).toEqual(['b200', 'h200']);
     const history = (selection: Partial<ResultsState>) =>
