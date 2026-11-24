@@ -10,7 +10,7 @@ import {
   useSetPowerXCompareTarget,
 } from './powerx-surface';
 import { usePowerLayerHighlight } from './power-layer-highlight';
-import { LAYER_STROKE_OPACITY, layerStyle } from './power-layer-style';
+import { joinHatchPatterns, LAYER_STROKE_OPACITY, layerStyle } from './power-layer-style';
 import PowerBreakdownReadout, { type PowerBreakdownReadoutSource } from './PowerBreakdownReadout';
 import PowerPartsList from './PowerPartsList';
 
@@ -60,12 +60,10 @@ import {
   GPU_POOL_DASH,
   GPU_POOL_DIMMED_OPACITY,
   gpuPoolSegments,
-  HATCH_ANGLE,
   isHatchedBand,
   MEASURED_POWER_BANDS,
   nearestBreakdownPoint,
   POWER_BAND_OPACITY,
-  powerBandFillOpacity,
   powerBandsOf,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
@@ -773,35 +771,11 @@ function BreakdownChart({
   };
 
   const drawDefs: NonNullable<CustomLayerConfig['render']> = (group) => {
-    const pattern = group
-      .selectAll<SVGPatternElement, PowerBand>('pattern.breakdown-hatch')
-      .data(hatchedBands)
-      .join((enter) => {
-        const created = enter
-          .append('pattern')
-          .attr('class', 'breakdown-hatch')
-          .attr('patternUnits', 'userSpaceOnUse')
-          .attr('width', 6)
-          .attr('height', 6);
-        created.append('rect').attr('class', 'hatch-bg').attr('width', 6).attr('height', 6);
-        created
-          .append('line')
-          .attr('class', 'hatch-line')
-          .attr('x1', 0)
-          .attr('y1', 0)
-          .attr('x2', 0)
-          .attr('y2', 6)
-          .attr('stroke-width', 2);
-        return created;
-      })
-      .attr('id', (band) => hatchId(sectionId, band))
-      .attr('data-band', (band) => band)
-      .attr('patternTransform', (band) => `rotate(${HATCH_ANGLE[band]})`);
-    pattern
-      .select('.hatch-bg')
-      .attr('fill', color)
-      .attr('fill-opacity', (band) => powerBandFillOpacity(band));
-    pattern.select('.hatch-line').attr('stroke', color);
+    joinHatchPatterns(group, 'breakdown-hatch', hatchedBands, {
+      id: (band) => hatchId(sectionId, band),
+      band: (band) => band,
+      color: () => color,
+    }).attr('data-band', (band) => band);
   };
 
   /** Concurrency + total labels for a column, unless they would sit under a reference label. */

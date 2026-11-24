@@ -1,5 +1,8 @@
+import type { Selection } from 'd3';
+
 import {
   cssHatchAngle,
+  HATCH_ANGLE,
   isHatchedBand,
   POWER_BAND_OPACITY,
   POWER_LAYER_FADED_OPACITY,
@@ -76,6 +79,53 @@ export function swatchStyle(
     border: `1px solid ${color}`,
     opacity,
   };
+}
+
+/**
+ * The modeled layers' SVG hatches, one `<pattern>` per datum for fills to reference as
+ * `url(#id)`: a 6 px tile at the layer's step under one stripe at its angle, both in the
+ * datum's colour.
+ */
+export function joinHatchPatterns<Datum>(
+  group: Selection<SVGGElement, unknown, null, undefined>,
+  className: string,
+  data: readonly Datum[],
+  hatch: {
+    key?: (d: Datum) => string;
+    id: (d: Datum) => string;
+    band: (d: Datum) => PowerBand;
+    color: (d: Datum) => string;
+  },
+) {
+  const pattern = group
+    .selectAll<SVGPatternElement, Datum>(`pattern.${className}`)
+    .data(data, hatch.key)
+    .join((enter) => {
+      const created = enter
+        .append('pattern')
+        .attr('class', className)
+        .attr('patternUnits', 'userSpaceOnUse')
+        .attr('width', 6)
+        .attr('height', 6);
+      created.append('rect').attr('class', 'hatch-bg').attr('width', 6).attr('height', 6);
+      created
+        .append('line')
+        .attr('class', 'hatch-line')
+        .attr('x1', 0)
+        .attr('y1', 0)
+        .attr('x2', 0)
+        .attr('y2', 6)
+        .attr('stroke-width', 2);
+      return created;
+    })
+    .attr('id', hatch.id)
+    .attr('patternTransform', (d) => `rotate(${HATCH_ANGLE[hatch.band(d)]})`);
+  pattern
+    .select('.hatch-bg')
+    .attr('fill', hatch.color)
+    .attr('fill-opacity', (d) => powerBandFillOpacity(hatch.band(d)));
+  pattern.select('.hatch-line').attr('stroke', hatch.color);
+  return pattern;
 }
 
 export { LAYER_STROKE_OPACITY };

@@ -24,7 +24,7 @@ import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { AggDataEntry, InferenceData } from '../types';
-import { layerStyle } from './power-layer-style';
+import { joinHatchPatterns, layerStyle } from './power-layer-style';
 import { usePowerLayerHighlight } from './power-layer-highlight';
 import {
   bandPartsAt,
@@ -543,37 +543,17 @@ export default function PowerChipCompare({
     type: 'custom',
     key: 'hatch-defs',
     render: (group) => {
-      const hatches = chipRows.flatMap((row) =>
-        bands.filter(isHatchedBand).map((band) => ({ row, band })),
+      joinHatchPatterns(
+        group,
+        'chip-compare-hatch',
+        chipRows.flatMap((row) => bands.filter(isHatchedBand).map((band) => ({ row, band }))),
+        {
+          key: (d) => `${d.row.key}|${d.band}`,
+          id: (d) => safeId(`${chartId}-${d.row.key}-${d.band}`),
+          band: (d) => d.band,
+          color: (d) => d.row.color,
+        },
       );
-      const pattern = group
-        .selectAll<SVGPatternElement, (typeof hatches)[number]>('pattern.chip-compare-hatch')
-        .data(hatches, (d) => `${d.row.key}|${d.band}`)
-        .join((enter) => {
-          const created = enter
-            .append('pattern')
-            .attr('class', 'chip-compare-hatch')
-            .attr('patternUnits', 'userSpaceOnUse')
-            .attr('width', 6)
-            .attr('height', 6);
-          created.append('rect').attr('class', 'hatch-bg').attr('width', 6).attr('height', 6);
-          created
-            .append('line')
-            .attr('class', 'hatch-line')
-            .attr('x1', 0)
-            .attr('y1', 0)
-            .attr('x2', 0)
-            .attr('y2', 6)
-            .attr('stroke-width', 2);
-          return created;
-        })
-        .attr('id', (d) => safeId(`${chartId}-${d.row.key}-${d.band}`))
-        .attr('patternTransform', (d) => `rotate(${HATCH_ANGLE[d.band]})`);
-      pattern
-        .select('.hatch-bg')
-        .attr('fill', (d) => d.row.color)
-        .attr('fill-opacity', (d) => powerBandFillOpacity(d.band));
-      pattern.select('.hatch-line').attr('stroke', (d) => d.row.color);
     },
   };
 
