@@ -1,4 +1,5 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
+import { OVERVIEW_SEARCH_ORDER } from '@/lib/overview/overview-links';
 import {
   dashboardRouteForPathname,
   getDashboardRoute,
@@ -398,6 +399,17 @@ function collectTabParams(): URLSearchParams {
 }
 
 export function buildShareUrl(): string {
+  const { origin, pathname, hash } = window.location;
+  if (/^(?:\/zh)?\/overview\/?$/u.test(pathname)) {
+    const live = new URLSearchParams(window.location.search);
+    const shared = new URLSearchParams();
+    for (const key of OVERVIEW_SEARCH_ORDER) {
+      const value = live.get(key);
+      if (value) shared.set(key, value);
+    }
+    const search = shared.toString();
+    return `${origin}${pathname}${search ? `?${search}` : ''}${hash}`;
+  }
   const params = collectTabParams();
   const profitPath = profitRoutePathname(window.location.pathname, params);
   if (profitPath !== null) {

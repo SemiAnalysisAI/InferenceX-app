@@ -377,10 +377,10 @@ describe('history projection version', () => {
       // data_query_failed stopped reporting failed background refetches that keep their data,
       // dashboard-routes gained the default Inference model slug, inference topology labels
       // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey),
-      // the inference setSelectedGPUs action type now returns whether picks applied, and the
-      // unofficial run provider gained a requested-overlay flag. None of these feed recorded
-      // entries, so they are unchanged.
-      sources: '9ed1467c433c994d3a2d8a58b1387e15afc78dadeaec8ad2320f233caf884011',
+      // the inference setSelectedGPUs action type now returns whether picks applied, the
+      // unofficial run provider gained a requested-overlay flag, and buildShareUrl now carries
+      // the overview search params. None of these feed recorded entries, so they are unchanged.
+      sources: 'e57058918010b9da08e5e6e63f4137bd5cd9e780329534cf52a314975b31d9bf',
     });
   });
 });
