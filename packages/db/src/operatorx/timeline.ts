@@ -5,7 +5,7 @@ const TIMELINE_NAME_MAX = 115;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-export const TIMELINE_VERSION = 4;
+export const TIMELINE_VERSION = 5;
 
 export const KERNEL_CATEGORIES = [
   { id: 'gemm', label: 'GEMM' },
@@ -134,8 +134,64 @@ function timelineRanks(metrics: Obj): TimelineRanks | null {
 const dims = (v: unknown): number[] | null =>
   Array.isArray(v) && v.every((x) => typeof x === 'number') ? (v as number[]) : null;
 
+const round3 = (v: number) => Math.round(v * 1000) / 1000;
+
+/** Span, device time (lanes that overlap count once), idle and doubly counted time. */
+function replayStats(timeline: Obj[]): Obj {
+  const spans = timeline
+    .map((e) => [num(e.start_us) ?? 0, (num(e.start_us) ?? 0) + (num(e.dur_us) ?? 0)])
+    .sort((a, b) => a[0] - b[0]);
+  let busy = 0;
+  let end = -Infinity;
+  for (const [a, b] of spans) {
+    if (b <= end) continue;
+    busy += b - Math.max(a, end);
+    end = b;
+  }
+  const span = spans.length > 0 ? end - spans[0][0] : 0;
+  const total = spans.reduce((sum, [a, b]) => sum + b - a, 0);
+  return {
+    span_us: round3(span),
+    busy_us: round3(busy),
+    gap_us: round3(span - busy),
+    overlap_us: round3(total - busy),
+  };
+}
+
+/**
+ * The profile without the harness's cache flush, which runs before each replay and is
+ * not part of the op. The profiler finds the flush by the fill kernel that `zero_()`
+ * launched up to torch 2.14. From torch 2.15 `zero_()` is a device memset, which the
+ * profiler leaves in: once per call in the kernel list, and as the last event of every
+ * replay but the final one. Such a profile reports fewer excluded flushes than replays.
+ */
+export function withoutHarnessFlush(profile: Obj): Obj {
+  const kernels = (Array.isArray(profile.kernels) ? profile.kernels : []).filter(isObj);
+  const memset = kernels.find((k) => k.cat === 'gpu_memset');
+  const missed = (num(profile.flush_kernels_excluded) ?? 0) < (num(profile.iters) ?? 0);
+  if (!memset || !missed || !Array.isArray(profile.timeline)) return profile;
+
+  const timeline = profile.timeline.filter(isObj);
+  const closesReplay = timeline.at(-1)?.name === memset.name;
+  if (closesReplay) timeline.pop();
+  // The memsets left are the op's own: one fewer per call, timed from the shown replay.
+  const count = (num(memset.count_per_call) ?? 0) - 1;
+  const ownUs = timeline
+    .filter((e) => e.name === memset.name)
+    .reduce((sum, e) => sum + (num(e.dur_us) ?? 0), 0);
+  const rest = kernels.filter((k) => k !== memset);
+  if (count > 0) rest.push({ ...memset, count_per_call: count, us_per_call: round3(ownUs) });
+  rest.sort((a, b) => (num(b.us_per_call) ?? 0) - (num(a.us_per_call) ?? 0));
+  return {
+    ...profile,
+    kernels: rest,
+    timeline,
+    ...(closesReplay ? replayStats(timeline) : {}),
+  };
+}
+
 export function compactTimeline(metrics: Obj | null | undefined): OperatorXTimeline | null {
-  const p = metrics && isObj(metrics.profile) ? metrics.profile : null;
+  const p = metrics && isObj(metrics.profile) ? withoutHarnessFlush(metrics.profile) : null;
   if (!p || !Array.isArray(p.timeline) || p.timeline.length === 0) return null;
   const names: string[] = [];
   const nameIndex = new Map<string, number>();

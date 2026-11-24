@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { compactTimeline, kernelCategory } from './timeline';
+import { compactTimeline, kernelCategory, withoutHarnessFlush } from './timeline';
 
 describe('kernelCategory', () => {
   it('keeps GPU kernel names on their name rules', () => {
@@ -91,5 +91,82 @@ describe('compactTimeline on an XLA profile', () => {
       timeline!.categories[timeline!.names.findIndex((n) => n.startsWith(prefix))];
     expect(category('%fusion.28 = bf16[16,3584]')).toBe('gemm');
     expect(category('%copy-start.2')).toBe('memory');
+  });
+});
+
+describe('withoutHarnessFlush', () => {
+  const gemm = 'nvjet_sm103_tst_64x8_64x16_4x1_v_bz_splitK_TNT';
+  const reduce = 'cublasLt::splitKreduce_kernel<32, 16, int, float, __nv_bfloat16>';
+  const memset = 'Memset (Device)';
+  // A B300 GEMM case on torch 2.16: 12.3 us latency, an 84 us flush closing the replay.
+  const leaked = {
+    iters: 3,
+    span_us: 94.369,
+    busy_us: 92.161,
+    gap_us: 2.208,
+    overlap_us: 1.024,
+    kernels: [
+      { name: memset, cat: 'gpu_memset', count_per_call: 1, us_per_call: 84.875 },
+      { name: gemm, cat: 'kernel', count_per_call: 1, us_per_call: 6.304 },
+      { name: reduce, cat: 'kernel', count_per_call: 1, us_per_call: 3.307 },
+    ],
+    timeline: [
+      { name: gemm, stream: 7, start_us: 0, dur_us: 5.76 },
+      { name: reduce, stream: 7, start_us: 4.736, dur_us: 3.136 },
+      { name: memset, stream: 7, start_us: 10.08, dur_us: 84.289 },
+    ],
+  };
+
+  it('drops a flush the profiler left in and re-times the replay', () => {
+    const timeline = compactTimeline({ profile: leaked })!;
+    expect(timeline.names).toEqual([gemm, reduce]);
+    expect(timeline.events).toEqual([
+      [0, 0, 0, 5.76],
+      [1, 0, 4.736, 3.136],
+    ]);
+    expect(timeline.kernels.map((k) => k.usPerCall)).toEqual([6.304, 3.307]);
+    expect(timeline).toMatchObject({
+      spanUs: 7.872,
+      busyUs: 7.872,
+      gapUs: 0,
+      overlapUs: 1.024,
+      truncated: false,
+    });
+  });
+
+  it("keeps the op's own memsets when the profiler took its fills for the flush", () => {
+    // A B200 attention case: two of the op's fill kernels were excluded instead.
+    const profile = withoutHarnessFlush({
+      ...leaked,
+      flush_kernels_excluded: 2,
+      kernels: [
+        { name: memset, cat: 'gpu_memset', count_per_call: 2, us_per_call: 91.712 },
+        { name: gemm, cat: 'kernel', count_per_call: 1, us_per_call: 6.304 },
+      ],
+      timeline: [
+        { name: gemm, stream: 7, start_us: 0, dur_us: 5.76 },
+        { name: memset, stream: 7, start_us: 21.856, dur_us: 2.24 },
+        { name: memset, stream: 7, start_us: 45.663, dur_us: 89.44 },
+      ],
+    });
+    expect(profile.kernels).toEqual([
+      { name: gemm, cat: 'kernel', count_per_call: 1, us_per_call: 6.304 },
+      { name: memset, cat: 'gpu_memset', count_per_call: 1, us_per_call: 2.24 },
+    ]);
+    expect(profile).toMatchObject({ span_us: 24.096, busy_us: 8, gap_us: 16.096 });
+  });
+
+  it('drops the flush from the kernels when the final replay is the one shown', () => {
+    const profile = withoutHarnessFlush({ ...leaked, timeline: leaked.timeline.slice(0, 2) });
+    expect(profile.kernels).toEqual(leaked.kernels.slice(1));
+    expect(profile.span_us).toBe(leaked.span_us);
+  });
+
+  it('leaves a profile alone when every flush was excluded or it has no memset', () => {
+    // torch 2.14: the fill kernel was excluded, and the memset is the op's own.
+    const clean = { ...leaked, flush_kernels_excluded: 3 };
+    expect(withoutHarnessFlush(clean)).toBe(clean);
+    const xla = { iters: 20, kernels: [{ name: '%fusion.1', count_per_call: 1 }], timeline: [] };
+    expect(withoutHarnessFlush(xla)).toBe(xla);
   });
 });
