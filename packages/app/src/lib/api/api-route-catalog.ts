@@ -1413,10 +1413,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/hardware.ts',
-    sourceSha256: 'b21086382cdb3b7b84715ab629a2f47699906c00f158bbcbdacdf60a9b25c504',
+    sourceSha256: 'dcf3fd4b293cea66d409302980da5b2c93de3872fdb3997f49ec9164356335a6',
     reviewArea: {
-      en: 'OperatorX Ascend reference values, provenance and assumed bandwidth shared with UI normalization.',
-      zh: 'OperatorX Ascend 参考值、来源及假定带宽，与 UI 归一化共用。',
+      en: 'OperatorX Ascend and TPU7x reference values, provenance and assumed bandwidth shared with UI normalization.',
+      zh: 'OperatorX Ascend 与 TPU7x 参考值、来源及假定带宽，与 UI 归一化共用。',
     },
   },
 

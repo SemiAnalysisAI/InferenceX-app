@@ -22,7 +22,10 @@ export type KernelCategory = (typeof KERNEL_CATEGORIES)[number]['id'];
 
 const CATEGORY_RULES: [KernelCategory, RegExp][] = [
   ['gemm', /^bmm_/],
-  ['expert-gemm', /fused_moe|fmoe|moe_gemm|gemm_moe|marlin_moe|moe_wna16|mfma_moe|^_matmul_/i],
+  [
+    'expert-gemm',
+    /fused_moe|fmoe|moe_gemm|gemm_moe|marlin_moe|moe_wna16|mfma_moe|^_matmul_|^gmm_/i,
+  ],
   ['reduce', /reduce|moe_sum|combine|finalize/i],
   ['quantize', /quant(?!gemm)|cvt_fp\d+_to_fp\d|scale_1x128/i],
   ['activation', /act_and_mul|activation|silu|gelu|sigmoid|swiglu|situ_and_mul/i],
@@ -34,8 +37,47 @@ const CATEGORY_RULES: [KernelCategory, RegExp][] = [
   ['memory', /elementwise|copy|fill|memset|memcpy|rocclr|ragged_tensor|triton_poi/i],
 ];
 
-export function kernelCategory(name: string): KernelCategory {
-  return CATEGORY_RULES.find(([, re]) => re.test(name))?.[0] ?? 'other';
+/** XLA's HLO categories (TPU profiles), for ops whose own name says nothing (`%fusion.3`). */
+const HLO_CATEGORY_RULES: [KernelCategory, RegExp][] = [
+  ['gemm', /convolution|dot/],
+  ['reduce', /reduce/],
+  ['routing', /sort|gather|scatter/],
+  ['memory', /fusion|elementwise|copy|formatting|async|slice|pad|broadcast|iota|transpose/],
+];
+
+/** An XLA op's own name: `%fusion.3 = bf16[...] fusion(%a, %b)` -> `fusion.3`. */
+function xlaOp(name: string): string | null {
+  return /^%(?<op>[^\s=]+)/u.exec(name)?.groups?.op ?? null;
+}
+
+/**
+ * An XLA op is matched by its own name, since the rest of its text names its operands,
+ * then by its HLO category. Other kernels are matched by their full name.
+ */
+export function kernelCategory(name: string, hloCategory?: string): KernelCategory {
+  const match = (rules: [KernelCategory, RegExp][], text: string) =>
+    rules.find(([, re]) => re.test(text))?.[0];
+  return (
+    match(CATEGORY_RULES, xlaOp(name) ?? name) ??
+    match(HLO_CATEGORY_RULES, hloCategory ?? '') ??
+    'other'
+  );
+}
+
+/**
+ * HLO category by op name. Timeline events can cut an op's text shorter than the kernel
+ * list does, so the op name is the key; an op that runs every call (not a 1-in-N cache
+ * flush in another module with the same op name) wins.
+ */
+function hloCategories(kernels: Obj[]): Map<string, string> {
+  const best = new Map<string, { category: string; count: number }>();
+  for (const k of kernels) {
+    const op = typeof k.name === 'string' ? xlaOp(k.name) : null;
+    const count = num(k.count_per_call) ?? 0;
+    if (op && typeof k.hlo_category === 'string' && count >= (best.get(op)?.count ?? -1))
+      best.set(op, { category: k.hlo_category, count });
+  }
+  return new Map([...best].map(([op, { category }]) => [op, category]));
 }
 
 export interface TimelineKernel {
@@ -125,18 +167,18 @@ export function compactTimeline(metrics: Obj | null | undefined): OperatorXTimel
   }
   if (events.length === 0) return null;
   events.sort((a, b) => a[2] - b[2]);
-  const kernels: TimelineKernel[] = (Array.isArray(p.kernels) ? p.kernels : [])
-    .filter(isObj)
-    .map((k) => ({
-      name: intern(k.name),
-      usPerCall: num(k.us_per_call) ?? 0,
-      countPerCall: num(k.count_per_call) ?? 0,
-      grid: dims(k.grid),
-      block: dims(k.block),
-      regs: num(k.regs),
-      smemBytes: num(k.smem),
-      occupancyPct: num(k.occupancy_pct),
-    }));
+  const rawKernels = (Array.isArray(p.kernels) ? p.kernels : []).filter(isObj);
+  const hlo = hloCategories(rawKernels);
+  const kernels: TimelineKernel[] = rawKernels.map((k) => ({
+    name: intern(k.name),
+    usPerCall: num(k.us_per_call) ?? 0,
+    countPerCall: num(k.count_per_call) ?? 0,
+    grid: dims(k.grid),
+    block: dims(k.block),
+    regs: num(k.regs),
+    smemBytes: num(k.smem),
+    occupancyPct: num(k.occupancy_pct),
+  }));
   const launched = kernels.reduce((n, k) => n + k.countPerCall, 0);
   const spanUs = num(p.span_us) ?? Math.max(...events.map((e) => e[2] + e[3]));
   return {
@@ -146,7 +188,7 @@ export function compactTimeline(metrics: Obj | null | undefined): OperatorXTimel
     overlapUs: num(p.overlap_us) ?? 0,
     lanes,
     names,
-    categories: names.map(kernelCategory),
+    categories: names.map((name) => kernelCategory(name, hlo.get(xlaOp(name) ?? ''))),
     events,
     kernels,
     truncated: launched > events.length + 0.5,

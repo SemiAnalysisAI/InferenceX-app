@@ -703,6 +703,11 @@ for FP8; Y is achieved TFLOPS divided by 378 or 756 respectively. FP8 activation
 quantization remains inside the measured latency. Peak bandwidth is 1.6384 TB/s (8 HBM stacks × 256 bits × 6.4 Gbps), which Huawei rounds to 1.6 TB/s. Apply these references to the returned measurements; do not substitute
 the older matmul sweep for the ingested F.linear results. Missing measurements stay
 missing. The 950PR crimson color is presentation-only; the stored key remains `ascend950pr`.
+`tpuv7` (TPU7x) carries a reference too: `peakTflops.bf16=1153.5`, `peakTflops.fp8=2307`,
+`peakTflops.fp4=null`, `memoryBandwidthTBs=3.69`, `memoryBandwidthAssumed=true`. These are half of
+Google's per-chip TPU7x figures, because a TPU7x device is one of the chip's two chiplets and
+OperatorX measures per device. TPU7x has no scale-up reference, so its split cases with
+collectives have no roofline time.
 The response also returns workload-resolved `defaults`: `metricVsSizeSlice` prefers
 an existing ranked slice with successful positive finite 950PR latency at two or
 more distinct positive sizes, falling back to the existing largest slice.

@@ -120,6 +120,20 @@ at the current `TIMELINE_VERSION` load raw documents. A GEMM case previously loa
 
 中文：`opx_run_timelines`（迁移 004）为每个结果存储一行精简的 kernel 时间线（未 profiling 时为 null），与比较数据在同一事务中写入。时间线接口通过一次查询读取；只有缺少当前版本记录的运行才回退读取原始文档。
 
+TPU profiles name XLA ops by their HLO text (`%fusion.3 = bf16[...] fusion(%a, %b)`), so a
+kernel's category comes from the op's own name (`gmm_v2...` is the routed experts,
+`router_topk` routing, `all-reduce` reduce), then from the profile's `hlo_category`
+(`convolution fusion` is GEMM; loop fusions, copies and data formatting are elementwise/memory).
+That category is looked up by op name, because timeline events can cut the op text shorter than
+the kernel list does. GPU kernel names keep their rules, so stored timelines are unchanged and
+`TIMELINE_VERSION` stays 4.
+
+中文：TPU profile 以 HLO 文本命名 XLA 算子（如 `%fusion.3 = bf16[...] fusion(%a, %b)`），因此 kernel
+类别先按算子自身名称判断（`gmm_v2...` 为路由 expert，`router_topk` 为路由，`all-reduce` 为归约），
+再按 profile 中的 `hlo_category` 判断（`convolution fusion` 为 GEMM，loop fusion、拷贝和数据格式转换
+归为逐元素/访存）。时间线事件中的算子文本可能比 kernel 列表截得更短，所以按算子名称查找类别。
+GPU kernel 名称的规则不变，已存储的时间线不受影响，`TIMELINE_VERSION` 仍为 4。
+
 ### Rollout and backfill
 
 1. Apply the migration: `bun run admin:db:migrate:operatorx -- --yes`.
@@ -326,6 +340,29 @@ Ascend 在浅色和深色图表中使用偏冷的深红色，与 AMD 的暖红�
 Roofline 在 BF16 有 FLOP/byte 计数时默认选择 BF16，否则选择数据点最多的受支持精度；
 Normalized 默认开启。用户主动选择的形状、精度和 Normalized 开关仍优先生效，不修改数据、硬件选择或测量值。
 
+## TPU7x normalization
+
+`tpuv7` (label `TPU7x`, Google Ironwood) uses an OperatorX-only reference in
+`packages/db/src/operatorx/hardware.ts`. Google's
+[TPU7x documentation](https://docs.cloud.google.com/tpu/docs/tpu7x) lists 2,307 dense BF16
+and 4,614 FP8 TFLOPS and 7,380 GB/s of HBM bandwidth per chip, and JAX exposes each chip as
+two devices, one per chiplet (one TensorCore, 96 GiB HBM). OperatorX times one device, so the
+reference is half a chip: 1153.5 BF16 TFLOPS, 2307 FP8 TFLOPS and 3.69 TB/s, assuming the
+bandwidth splits evenly between chiplets (`memoryBandwidthAssumed` is true). FP4 is null, since
+TPU7x has no native FP4. The best measured GEMMs reach 1,042 BF16 TFLOPS, 2,005 FP8 TFLOPS and
+3.29 TB/s, 87-90% of these peaks; against per-chip peaks they would read below 46%. No ICI
+bandwidth is registered, so TPU7x split cases with collectives have no roofline bound. Its
+color is the site's Google blue and its sort order comes from `HW_REGISTRY`.
+
+中文：`tpuv7`（显示名称 `TPU7x`，即 Google Ironwood）使用仅用于 OperatorX 的参考值。Google 的
+TPU7x 文档列出每颗芯片 2,307 TFLOPS 稠密 BF16、4,614 TFLOPS FP8 和 7,380 GB/s HBM 带宽；JAX
+将每颗芯片暴露为两个设备，每个 chiplet 一个（含一个 TensorCore 和 96 GiB HBM）。OperatorX 按单个
+设备计时，因此参考值取半颗芯片：BF16 1153.5 TFLOPS、FP8 2307 TFLOPS、带宽 3.69 TB/s，其中带宽
+假设在两个 chiplet 间平均分配（`memoryBandwidthAssumed` 为 true）。TPU7x 没有原生 FP4，FP4 峰值
+为 null。实测最佳 GEMM 达到 BF16 1,042 TFLOPS、FP8 2,005 TFLOPS 和 3.29 TB/s，约为上述峰值的
+87-90%；若按整颗芯片计算，则不足 46%。由于未登记 ICI 带宽，TPU7x 上含集合通信的切分用例没有
+roofline 上界。颜色沿用站点的 Google 蓝，排序取自 `HW_REGISTRY`。
+
 ## Roofline
 
 MoE and attention ops run several stages (projections, the attention core or
@@ -474,10 +511,11 @@ The normalizer runs once during ingest to prepare compact comparisons; detail an
 legacy reads still normalize raw documents on demand. A run that cannot be read is
 never stored. Runs arrive by push:
 
-- `bun run admin:db:ingest:operatorx -- --download <run-url-or-id>` stores a completed
-  `operatorx-sweep.yml` run (any branch), downloading its manifest and shard artifacts.
+- `bun run admin:db:ingest:operatorx -- --download <run-url-or-id> [owner/repo]` stores a
+  completed `operatorx-sweep.yml` run (any branch), downloading its manifest and shard
+  artifacts. The repository defaults to `INGEST_REPO`.
 - `admin:db:ingest:operatorx:ci` (no flag) reads pre-downloaded artifacts from
-  `INGEST_ARTIFACTS_PATH` for `INGEST_RUN_ID`.
+  `INGEST_ARTIFACTS_PATH` for `INGEST_RUN_ID` of `INGEST_REPO`.
 - `bun run admin:db:ingest:operatorx -- --bundle <file.json> ...` stores raw bundles
   as they are, for runs collected outside a sweep.
 

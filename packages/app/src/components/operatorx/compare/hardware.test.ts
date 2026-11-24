@@ -3,22 +3,27 @@ import { describe, expect, it } from 'bun:test';
 import { buildComparison, comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
 import {
   hardwareLabel,
   peakBandwidthTBs,
   peakTflops,
   removeHardwareSelection,
   restoresAllHardware,
+  scaleUpTBs,
+  sortHardware,
   toggleHardwareSelection,
 } from './hardware';
 import { metricById } from './metrics';
+import { rooflineBound } from './roofline-bound';
 
-function comparison(dtype = 'bf16') {
+function comparison(dtype = 'bf16', runner = 'ascend950pr-external', backend = 'torch_npu_linear') {
   const op = {
     type: 'gemm',
     args: { m: 1024, n: 1024, k: 1024, a: { dtype }, b: { dtype }, out: 'bf16' },
     sources: ['deepseek-ai/DeepSeek-V4-Pro/mlp'],
-    backend: 'torch_npu_linear',
+    backend,
   };
   const dataset = normalizeBundle({
     run: {
@@ -33,9 +38,9 @@ function comparison(dtype = 'bf16') {
       include: [
         {
           id: 's1',
-          runner: 'cluster:ascend950pr-external',
+          runner: `cluster:${runner}`,
           mode: 'timing',
-          backends: ['torch_npu_linear'],
+          backends: [backend],
           cases: [{ testlist: 'gemm_deepseek_v4', shape: op }],
         },
       ],
@@ -52,7 +57,7 @@ function comparison(dtype = 'bf16') {
       },
     ],
   });
-  return buildComparison('gemm', [{ runner: 'ascend950pr-external', dataset }]);
+  return buildComparison('gemm', [{ runner, dataset }]);
 }
 
 describe('Ascend OperatorX reference', () => {
@@ -122,6 +127,34 @@ describe('Ascend OperatorX reference', () => {
     );
     expect(filtered.hardware).toEqual([]);
     expect(filtered.cases).toEqual([]);
+  });
+});
+
+describe('TPU7x OperatorX reference', () => {
+  it('normalizes a TPU7x device by half of the per-chip peaks, one chiplet', () => {
+    const view = comparisonView(comparison('e4m3', 'tpuv7', 'vllm'), 'gemm:DeepSeek-V4-Pro');
+    const reference = view.hardware[0].reference!;
+    expect(view.hardware[0].id).toBe('tpuv7');
+    expect(reference).toMatchObject({
+      label: 'TPU7x',
+      peakTflops: { bf16: 1153.5, fp8: 2307, fp4: null },
+      memoryBandwidthTBs: 3.69,
+    });
+    expect(reference.source).toContain('TPU7x');
+    expect(hardwareLabel('tpuv7')).toBe(HW_REGISTRY.tpuv7.label);
+    expect(peakTflops('tpuv7', 'fp4')).toBeNull();
+    const c = view.cases[0];
+    expect(metricById('computeUtil').value(c, 10, 'tpuv7')).toBeCloseTo(214.7483648 / 2307, 12);
+    expect(metricById('bandwidthUtil').value(c, 10, 'tpuv7')).toBeCloseTo(
+      c.bytes! / (10 * 1e6) / 3.69,
+      12,
+    );
+    expect(rooflineBound(c, 'tpuv7')?.us).toBeGreaterThan(0);
+  });
+
+  it('sorts after the GPUs and has no scale-up reference', () => {
+    expect(sortHardware(['tpuv7', 'mi355x', 'b200'])).toEqual(['b200', 'mi355x', 'tpuv7']);
+    expect(scaleUpTBs('tpuv7')).toBeNull();
   });
 });
 
