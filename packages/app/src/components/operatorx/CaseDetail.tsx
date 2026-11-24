@@ -1,7 +1,6 @@
 'use client';
 
 import { ticks } from 'd3';
-import { Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
 import { useMemo, useState } from 'react';
@@ -22,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useOperatorXTimelines } from '@/hooks/api/use-operatorx';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -422,11 +422,7 @@ function CaseTimelines({
       />
     );
   if (isLoading || !data)
-    return (
-      <div className="flex min-h-40 items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <Skeleton aria-busy="true" className="h-40" data-testid="operatorx-timeline-loading" />;
   const longest = Math.max(...refs.map((r) => data[r.ref]?.spanUs ?? 0), 0);
   const timelines = refs.flatMap((r) => data[r.ref] ?? []);
   return (
