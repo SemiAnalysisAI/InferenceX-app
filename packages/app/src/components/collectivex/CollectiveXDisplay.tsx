@@ -116,6 +116,8 @@ const STRINGS = {
         Compare EP communication and vLLM <SwapBlocksName /> latency and payload bandwidth
       </>
     ),
+    intent:
+      'The intent is to benchmark what production does: each library runs the configuration a serving engine selects for it. Configurations no engine can select today are marked †',
     source: 'Source',
     methodology: 'Methodology',
     refresh: 'Refresh',
@@ -201,6 +203,8 @@ const STRINGS = {
         对比 EP 通信及 vLLM <SwapBlocksName /> 的延迟与有效载荷带宽
       </>
     ),
+    intent:
+      '目标是测试生产环境实际运行的配置：每个库都按推理引擎为其选择的配置运行。目前没有引擎可选的配置以 † 标注',
     source: '源代码',
     methodology: '测试方法',
     refresh: '刷新',
@@ -653,6 +657,14 @@ export default function CollectiveXDisplay() {
             <p data-testid="collectivex-description" className="mt-1 text-sm text-muted-foreground">
               {t.description}
             </p>
+            {shownSuite === 'ep' && (
+              <p
+                data-testid="collectivex-intent"
+                className="mt-1 max-w-3xl text-sm text-muted-foreground"
+              >
+                {t.intent}
+              </p>
+            )}
           </div>
           <div className="flex shrink-0 flex-wrap items-end gap-2">
             {datasets.length > 0 && (
