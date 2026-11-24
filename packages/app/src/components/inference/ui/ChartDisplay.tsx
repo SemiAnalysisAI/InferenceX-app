@@ -1282,6 +1282,26 @@ export default function ChartDisplay({
                     base in costAssumptions.values || costAssumptions.blankedBases.includes(base),
                 )
               : [];
+            // Breakdown's chip comparison and parts from the plotted rows (official and overlay),
+            // drawn in place of the chart (powerXWherePanelsOnly) or under it.
+            const renderBreakdownPanels = () => {
+              const { officialRows, overlayRows } = isGpuComparison
+                ? visibleDateComparisonRows(graph.data, footerOverlay)
+                : visibleComparisonRows(graph.data, footerOverlay);
+              return (
+                <PowerAnalysisPanels
+                  chartId={`chart-${graphIndex}`}
+                  contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
+                  data={[...officialRows, ...overlayRows]}
+                  overlayData={overlayRows}
+                  xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
+                  xLabel={resolvedXLabel}
+                  role={powerRole}
+                  placement="before"
+                  breakdownView={powerXLayout ? powerXBreakdownView : undefined}
+                />
+              );
+            };
             return (
               <section key={graphIndex}>
                 <figure data-testid="chart-figure" className="relative min-w-0">
@@ -1668,25 +1688,10 @@ export default function ChartDisplay({
                       if (powerXWherePanelsOnly) {
                         // Breakdown: the caption, the chip comparison, then the same footer as
                         // the other tabs (run context and one ATOM note).
-                        const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
-                        const { officialRows, overlayRows } = visibleComparisonRows(
-                          graph.data,
-                          overlay,
-                        );
                         return (
                           <>
                             <div className="order-first">{chartCaption}</div>
-                            <PowerAnalysisPanels
-                              chartId={`chart-${graphIndex}`}
-                              contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
-                              data={[...officialRows, ...overlayRows]}
-                              overlayData={overlayRows}
-                              xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
-                              xLabel={resolvedXLabel}
-                              role={powerRole}
-                              placement="before"
-                              breakdownView={powerXBreakdownView}
-                            />
+                            {renderBreakdownPanels()}
                             {chartFooter}
                           </>
                         );
@@ -1729,27 +1734,7 @@ export default function ChartDisplay({
                       powerXTab === 'breakdown' &&
                       !powerXWherePanelsOnly &&
                       getViewMode(graphIndex) !== 'table' &&
-                      (() => {
-                        const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
-                        const { officialRows, overlayRows } = isGpuComparison
-                          ? visibleDateComparisonRows(graph.data, overlay)
-                          : visibleComparisonRows(graph.data, overlay);
-                        return (
-                          <>
-                            <PowerAnalysisPanels
-                              chartId={`chart-${graphIndex}`}
-                              contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
-                              data={[...officialRows, ...overlayRows]}
-                              overlayData={overlayRows}
-                              xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
-                              xLabel={resolvedXLabel}
-                              role={powerRole}
-                              placement="before"
-                              breakdownView={powerXLayout ? powerXBreakdownView : undefined}
-                            />
-                          </>
-                        );
-                      })()}
+                      renderBreakdownPanels()}
                     <ChartNotices chartId={`chart-${graphIndex}`} notices={footerNotices} />
                     {replayAvailable && !minimalChrome && (
                       <ReplayLauncher
