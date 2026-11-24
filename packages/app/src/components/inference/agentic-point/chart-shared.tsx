@@ -2,7 +2,7 @@
 
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { chartFont, computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import type { ChartMargin } from '@/lib/d3-chart/types';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -29,12 +29,11 @@ export function chartPadForYTicks(
   base: ChartMargin,
 ): ChartMargin {
   if (typeof document === 'undefined') return base;
-  const left = computeLeftMargin([...labels], {
-    split: 'newline',
-    primaryFont: chartFont(10),
-    minMargin: base.left,
-    padding: TICK_LABEL_GAP + (hasAxisTitle ? AXIS_TITLE_SPACE : 4),
-  });
+  const font = chartFont(10);
+  let widest = 0;
+  for (const label of labels) widest = Math.max(widest, measureTextWidth(label, font));
+  const padding = TICK_LABEL_GAP + (hasAxisTitle ? AXIS_TITLE_SPACE : 4);
+  const left = Math.max(base.left, Math.ceil(widest) + padding);
   return left === base.left ? base : { ...base, left };
 }
 

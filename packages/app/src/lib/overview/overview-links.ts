@@ -16,27 +16,7 @@ import {
   type OverviewRowScope,
   type OverviewTier,
 } from './overview-data';
-
-export type OverviewSearchKey =
-  | 'tier'
-  | 'engine'
-  | 'ref'
-  | 'compare'
-  | 'models'
-  | 'rows'
-  | 'hwrows'
-  | 'present';
-
-export const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
-  'tier',
-  'engine',
-  'ref',
-  'compare',
-  'models',
-  'rows',
-  'hwrows',
-  'present',
-];
+import { OVERVIEW_SEARCH_ORDER, type OverviewSearchKey } from './overview-search-keys';
 
 export const OVERVIEW_CLIENT_ONLY_KEYS = ['ref', 'present'] as const;
 

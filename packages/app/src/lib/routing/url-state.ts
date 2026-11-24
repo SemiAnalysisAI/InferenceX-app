@@ -1,5 +1,5 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
-import { OVERVIEW_SEARCH_ORDER } from '@/lib/overview/overview-links';
+import { OVERVIEW_SEARCH_ORDER } from '@/lib/overview/overview-search-keys';
 import {
   dashboardRouteForPathname,
   getDashboardRoute,
