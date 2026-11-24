@@ -2869,6 +2869,7 @@ const ScatterGraph = React.memo(
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
             occluders: showLineLabels ? pillOccluders(xScale, yScale) : [],
+            labelEverySeries: ctx.surface === 'export',
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup

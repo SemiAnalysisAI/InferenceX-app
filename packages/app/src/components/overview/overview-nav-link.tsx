@@ -3,7 +3,7 @@
 import { type ComponentPropsWithoutRef, type MouseEvent, useEffect, useRef } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
-import type { OverviewSearchKey } from '@/lib/overview/overview-links';
+import type { OverviewSearchKey } from '@/lib/overview/overview-search-keys';
 
 import { useOverviewNavigation } from './overview-navigation';
 

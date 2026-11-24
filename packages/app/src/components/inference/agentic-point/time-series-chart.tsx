@@ -10,6 +10,7 @@ import {
   ChartEmpty,
   ChartLegend,
   LEGEND_BASELINE_OFFSET,
+  chartPadForYTicks,
   fmtCount,
   fmtSeconds,
   type ChartLegendEntry,
@@ -39,8 +40,6 @@ interface TimeSeriesChartProps {
 
 const NO_REF_LINES: readonly ReferenceLine[] = [];
 
-const PAD = CHART_PAD;
-
 export function TimeSeriesChart({
   series,
   durationS,
@@ -62,32 +61,39 @@ export function TimeSeriesChart({
     [series],
   );
 
+  const axis = useMemo(() => {
+    let refMax = 0;
+    for (const refLine of refLines) refMax = Math.max(refMax, refLine.value);
+    return yMaxOpt
+      ? { top: yMaxOpt, ticks: Array.from({ length: 5 }, (_, i) => (yMaxOpt * i) / 4) }
+      : niceAxis(maxTimeSeriesValue(series, Math.max(1e-9, refMax)));
+  }, [series, yMaxOpt, refLines]);
+  const PAD = useMemo(
+    () => chartPadForYTicks(axis.ticks.map(yFmt), Boolean(yAxisLabel), CHART_PAD),
+    [axis, yFmt, yAxisLabel],
+  );
+
   const legend = useMemo(
     () =>
       layoutChartLegend(
         legendEntries.map((e) => e.label),
         W - PAD.left - PAD.right,
       ),
-    [legendEntries, W],
+    [legendEntries, W, PAD],
   );
   const H = height + legend.extraHeight;
   const padBottom = PAD.bottom + legend.extraHeight;
-  const pad = useMemo(() => ({ ...PAD, bottom: padBottom }), [padBottom]);
+  const pad = useMemo(() => ({ ...PAD, bottom: padBottom }), [PAD, padBottom]);
 
   const layout = useMemo(() => {
     const innerW = W - PAD.left - PAD.right;
     const innerH = H - PAD.top - padBottom;
     const xMax = Math.max(durationS, 1);
-    let refMax = 0;
-    for (const refLine of refLines) refMax = Math.max(refMax, refLine.value);
-    const axis = yMaxOpt
-      ? { top: yMaxOpt, ticks: Array.from({ length: 5 }, (_, i) => (yMaxOpt * i) / 4) }
-      : niceAxis(maxTimeSeriesValue(series, Math.max(1e-9, refMax)));
     const yMax = axis.top;
     const xScale = (t: number) => PAD.left + (t / xMax) * innerW;
     const yScale = (v: number) => PAD.top + (1 - v / yMax) * innerH;
     return { innerW, innerH, xMax, yMax, yTickVals: axis.ticks, xScale, yScale };
-  }, [series, durationS, yMaxOpt, refLines, W, H, padBottom]);
+  }, [axis, durationS, W, H, PAD, padBottom]);
 
   const { innerW, innerH, xMax, yMax, yTickVals, xScale, yScale } = layout;
 
@@ -319,6 +325,7 @@ export function StackedAreaChart({
   width?: number;
   height?: number;
 }) {
+  const PAD = CHART_PAD;
   const locale = useLocale();
   const sourceLabels = SOURCE_LABELS[locale];
   const W = width;

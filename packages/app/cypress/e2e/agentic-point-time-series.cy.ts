@@ -412,6 +412,31 @@ describe('Agentic point request metric time series', () => {
     });
   });
 
+  it('keeps eight-digit in-flight Y tick labels inside the chart', () => {
+    const requests = [0, 1, 2, 3].map((index) =>
+      timelineRequest(index, 100, 10, { isl: 58_000_000 }),
+    );
+    cy.intercept('GET', '/api/v1/request-chart-data*', {
+      body: requestChartPayload(requests),
+    }).as('largeRequestChartData');
+    cy.reload();
+    cy.wait('@largeRequestChartData');
+    cy.get('[data-testid="isl-metric-chart"]').within(() => {
+      cy.get('[data-testid="isl-metric-inflight"]').click();
+      cy.contains('svg text', '60,000,000').then(($tick) => {
+        const svg = $tick[0]!.closest('svg')!;
+        const svgLeft = svg.getBoundingClientRect().left;
+        const ticks = [...svg.querySelectorAll('text[text-anchor="end"]')].filter((text) =>
+          /^[\d,]+$/u.test(text.textContent ?? ''),
+        );
+        expect(ticks.length).to.be.greaterThan(1);
+        for (const tick of ticks) {
+          expect(tick.getBoundingClientRect().left, tick.textContent ?? '').to.be.at.least(svgLeft);
+        }
+      });
+    });
+  });
+
   it('switches the TTFT chart to E2E request latency over time', () => {
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.get('[data-testid="latency-metric-e2e"]').click();

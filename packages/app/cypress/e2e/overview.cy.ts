@@ -181,6 +181,25 @@ describe('Overview page', () => {
   }
 
   for (const locale of ['', '/zh']) {
+    it(`shares the current overview selections in ${locale || 'en'}`, () => {
+      const search = '?tier=50&engine=all&compare=hardware&models=all';
+      cy.visit(`${locale}/overview${search}`);
+      cy.get('[data-testid="share-button"]').first().click();
+      cy.get('[data-testid="share-url-input"]')
+        .invoke('val')
+        .then((value) => {
+          const shared = new URL(String(value));
+          expect(shared.pathname).to.eq(`${locale}/overview`);
+          expect(shared.search).to.eq(search);
+          cy.visit(shared.pathname + shared.search);
+        });
+      cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '50');
+      cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
+      cy.location('search').should('eq', search);
+    });
+  }
+
+  for (const locale of ['', '/zh']) {
     it(`gates the Flash matrix row through unlock, reload, and relock in ${locale || 'en'}`, () => {
       cy.viewport(1280, 900);
       cy.visit(`${locale}/overview?tier=50&compare=hardware`, {

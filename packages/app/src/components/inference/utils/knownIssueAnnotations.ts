@@ -58,6 +58,7 @@ export function createKnownIssueLayer(
     const options = resolveOptions();
     renderKnownIssueAnnotations(ctx.layout.g, ctx.layout.defs, {
       ...options,
+      onDismiss: ctx.surface === 'export' ? undefined : options.onDismiss,
       width: ctx.width,
       height: ctx.height,
       xScale,

@@ -733,6 +733,7 @@ const GPUGraph = React.memo(
             seriesAttribute: 'data-graph-id',
             opacity: showLineLabels ? 0.95 : 0,
             occluders,
+            labelEverySeries: ctx.surface === 'export',
           });
         },
         onDisplayUpdate: (zoomGroup, ctx) => {

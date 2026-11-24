@@ -365,6 +365,22 @@ describe('writeUrlParams + buildShareUrl', () => {
     },
   );
 
+  it.each(['/overview', '/zh/overview'])(
+    'carries the overview selections into share links from %s',
+    async (pathname) => {
+      setupWindow('?tier=150&engine=all&compare=90d&models=all&unrelated=1', pathname);
+      const { buildShareUrl } = await importUrlState();
+      const url = new URL(buildShareUrl());
+      expect(url.pathname).toBe(pathname);
+      expect(Object.fromEntries(url.searchParams)).toEqual({
+        tier: '150',
+        engine: 'all',
+        compare: '90d',
+        models: 'all',
+      });
+    },
+  );
+
   it.each(['/opx', '/zh/opx/moe', '/opx/model'])(
     'carries the OperatorX selections in the address bar into share links from %s',
     async (pathname) => {
