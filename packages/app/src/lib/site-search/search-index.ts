@@ -211,10 +211,12 @@ export class SiteSearchIndex {
     const scores = new Map<number, number>();
     const coverage = new Map<number, number>();
     const matchedTerms = new Map<number, Set<string>>();
+    const titleHits = new Map<number, number>();
 
     for (const weights of expanded) {
       const best = new Map<number, number>();
       const credit = new Map<number, number>();
+      const inTitle = new Set<number>();
       for (const [term, weight] of weights) {
         const byDoc = this.postings.get(term);
         if (!byDoc) continue;
@@ -230,6 +232,7 @@ export class SiteSearchIndex {
             (BODY_WEIGHT * posting.body) / (1 - B + (B * doc.bodyLength) / avgBody);
           const score = weight * idf * ((tf * (K1 + 1)) / (tf + K1));
           if (score > (best.get(id) ?? 0)) best.set(id, score);
+          if (weight >= PREFIX_WEIGHT && posting.title > 0) inTitle.add(id);
           const c = weight > CONCEPT_WEIGHT ? 1 : CONCEPT_COVERAGE;
           if (c > (credit.get(id) ?? 0)) credit.set(id, c);
           const matched = matchedTerms.get(id) ?? new Set();
@@ -237,6 +240,7 @@ export class SiteSearchIndex {
           matchedTerms.set(id, matched);
         }
       }
+      for (const id of inTitle) titleHits.set(id, (titleHits.get(id) ?? 0) + 1);
       for (const [id, score] of best) {
         scores.set(id, (scores.get(id) ?? 0) + score);
         coverage.set(id, (coverage.get(id) ?? 0) + (credit.get(id) ?? 1));
@@ -266,11 +270,16 @@ export class SiteSearchIndex {
 
     const floor = (picked[0]?.score ?? 0) * RELEVANCE_FLOOR;
     const tierOrdered = picked
-      .map((entry) => ({ ...entry, tier: this.tierOf(this.docs[entry.id].page) }))
+      .map((entry) => ({
+        ...entry,
+        tier: this.tierOf(this.docs[entry.id].page),
+        fullTitle: titleHits.get(entry.id) === expanded.length,
+      }))
       .sort((a, b) => {
         const aRelevant = a.score >= floor;
         const bRelevant = b.score >= floor;
         if (aRelevant !== bRelevant) return aRelevant ? -1 : 1;
+        if (aRelevant && a.fullTitle !== b.fullTitle) return a.fullTitle ? -1 : 1;
         if (aRelevant && a.tier !== b.tier) return a.tier - b.tier;
         return b.score - a.score;
       });
