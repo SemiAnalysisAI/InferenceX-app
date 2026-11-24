@@ -217,7 +217,7 @@ export const Footer = () => {
             >
               <Image
                 width={140}
-                height={58}
+                height={42}
                 src="/brand/logo-color.webp"
                 alt={t.logoAlt}
                 className="h-auto"
