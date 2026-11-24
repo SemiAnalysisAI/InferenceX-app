@@ -161,6 +161,9 @@ function selectTargetModel(): void {
   cy.get('[data-testid="model-selector"]').click();
   cy.contains('[role="option"]', TARGET_MODEL_LABEL).click();
   cy.get('[data-testid="model-selector"]').should('contain.text', TARGET_MODEL_LABEL);
+  // The selector shows the pick at once, while the chart still shows the old model. The heading
+  // reads the committed model, so the chart has switched once it names the pick.
+  cy.get('[data-testid="inference-page-heading"]').should('contain.text', TARGET_MODEL_LABEL);
 }
 
 function soloLegendSeries(): void {

@@ -708,6 +708,10 @@ export function InferenceProvider({
   const [requestedHwSelection, setRequestedHwSelection] = useState<Set<string> | null>(null);
   // The keys the page asked for, kept while that request is still the reader's selection.
   const requestedHwKeysRef = useRef<ReadonlySet<string> | null>(null);
+  // Model, sequence and precision picks render as transitions, and the hardware reset below runs
+  // only once one lands. Until then the legend still shows the old scope, and a click there commits
+  // first. Holds the pick until its reset, with the hardware the reader chose since, which wins.
+  const scopePickRef = useRef<{ hardware: Set<string> | null } | null>(null);
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
@@ -897,6 +901,7 @@ export function InferenceProvider({
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
       if (v !== selectedModel) {
+        scopePickRef.current = { hardware: null };
         if (activeTab === 'inference' && v === Model.Qwen3_5) {
           setRequestedXAxisMode(null);
         }
@@ -921,20 +926,28 @@ export function InferenceProvider({
   );
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
+      if (v !== effectiveSequence) scopePickRef.current = { hardware: null };
       setSelectedSequence(v);
       clearScopedSelectionOnChange();
     },
-    [setSelectedSequence, clearScopedSelectionOnChange],
+    [effectiveSequence, setSelectedSequence, clearScopedSelectionOnChange],
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
+      if (v.join(',') !== effectivePrecisions.join(',')) scopePickRef.current = { hardware: null };
       if (activeTab === 'inference' && selectedModel === Model.Qwen3_5) {
         setRequestedXAxisMode(null);
       }
       setSelectedPrecisions(v);
       clearScopedSelectionOnChange();
     },
-    [activeTab, selectedModel, setSelectedPrecisions, clearScopedSelectionOnChange],
+    [
+      activeTab,
+      selectedModel,
+      effectivePrecisions,
+      setSelectedPrecisions,
+      clearScopedSelectionOnChange,
+    ],
   );
   const setSelectedYAxisMetricAndClear = useCallback(
     (v: string) => {
@@ -1288,6 +1301,7 @@ export function InferenceProvider({
         return;
       const next = toggleComparisonSelection(activeHwTypes, hw, selectableHwTypes);
       if (!next) return;
+      if (scopePickRef.current) scopePickRef.current.hardware = next;
       setHardwareDefaultsOverridden(true);
       setActiveHwTypes(next);
       setBestPerSku(false);
@@ -1305,6 +1319,11 @@ export function InferenceProvider({
 
   const removeHwType = useCallback(
     (hw: string) => {
+      if (scopePickRef.current) {
+        const next = new Set(activeHwTypesRef.current);
+        next.delete(hw);
+        scopePickRef.current.hardware = next;
+      }
       setHardwareDefaultsOverridden(true);
       removeHwRaw(hw);
       setBestPerSku(false);
@@ -1337,6 +1356,8 @@ export function InferenceProvider({
       })
     )
       return;
+    // Every chip of the old scope means every chip of a pending one, which its reset then picks.
+    if (scopePickRef.current) scopePickRef.current.hardware = null;
     setHardwareDefaultsOverridden(true);
     setBestPerSku(false);
     if (exclusion) {
@@ -1446,6 +1467,15 @@ export function InferenceProvider({
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
     if (modelChanged) preferredHwTypesRef.current = new Set();
+    const pickedHardware = scopeChanged ? scopePickRef.current?.hardware : null;
+    if (scopeChanged) scopePickRef.current = null;
+    if (pickedHardware && !bestPerSku) {
+      const kept = new Set([...pickedHardware].filter((key) => selectableHwTypes.has(key)));
+      if (kept.size > 0) {
+        setActiveHwTypes(exclusion ? resolveHwSelection(kept, previousSelection).result : kept);
+        return;
+      }
+    }
     // Loading an overlay changes the scope; keep the page's request instead of the defaults.
     const request = requestedHwKeysRef.current;
     if (request && requestedHwActiveRef.current && !bestPerSku) {

@@ -85,6 +85,14 @@ four independently memoized domains: `useInferenceData`, `useInferenceFilters`,
 domains they read. Display changes stay in `useInferenceDisplay`, so a contrast or label
 toggle does not notify filter-only or data-only consumers.
 
+A model, sequence or precision pick gives the legend the new scope's default hardware
+once it lands. The selectors show the pick at once and render the chart for it as a
+transition, so until then the legend still shows the old scope, and a legend click there
+commits before the pick. That click is the reader's newer choice, so the reset keeps it,
+limited to hardware the new scope has, instead of the defaults. Tests that act on the
+chart after a model pick wait for `inference-page-heading`, which renders from the
+committed model, rather than for the selector label.
+
 GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
 annotations are independent. Agentic and fixed-sequence charts default to curve
 labels on and point annotations off. Parallelism is available outside Advanced.
