@@ -175,3 +175,109 @@ describe('pickPairDefaults', () => {
     });
   });
 });
+
+const AGENTIC = { benchmark_type: 'agentic_traces', isl: null, osl: null } as const;
+
+/** One measured row per interactivity, with concurrency shared across chips so the variants match. */
+function curve(
+  hardware: string,
+  interactivities: number[],
+  overrides: Partial<BenchmarkRow> = {},
+): BenchmarkRow[] {
+  return interactivities.map((intvty, i) =>
+    makeRow({
+      hardware,
+      conc: 16 * (i + 1),
+      metrics: { tput_per_gpu: 1000 - intvty * 10, median_intvty: intvty },
+      ...overrides,
+    }),
+  );
+}
+
+function agenticCurve(hardware: string, itls: number[]): BenchmarkRow[] {
+  return itls.map((itl, i) =>
+    makeRow({
+      hardware,
+      ...AGENTIC,
+      conc: 16 * (i + 1),
+      metrics: { tput_per_gpu: 1000 - i * 100, p90_itl: itl },
+    }),
+  );
+}
+
+describe('pickPairDefaults interactivity coverage', () => {
+  it('passes over a preferred scenario only one chip ran for one where both chips overlap', () => {
+    const rows = [
+      ...agenticCurve('h100', [0.1, 0.05, 0.025]),
+      ...curve('h100', [10, 20, 30]),
+      ...curve('gb200', [15, 25, 35]),
+    ];
+
+    expect(pickPairDefaults(rows, 'h100', 'gb200', 'agentic-traces')).toEqual({
+      sequence: '8k/1k',
+      precision: 'fp8',
+    });
+  });
+
+  it('tries the preferred sequence at its other precisions before other sequences', () => {
+    const rows = [
+      // Both chips ran fp4 at the same concurrencies, but never at the same interactivity.
+      ...curve('h100', [10, 20, 30], { precision: 'fp4' }),
+      ...curve('gb200', [50, 60, 70], { precision: 'fp4' }),
+      ...curve('h100', [10, 20]),
+      ...curve('gb200', [15, 25]),
+      ...curve('h100', [10, 20, 30, 40], { isl: 1024, osl: 1024 }),
+      ...curve('gb200', [10, 20, 30, 40], { isl: 1024, osl: 1024 }),
+    ];
+
+    expect(pickPairDefaults(rows, 'h100', 'gb200', '8k/1k')).toEqual({
+      sequence: '8k/1k',
+      precision: 'fp8',
+    });
+  });
+
+  it('keeps the preferred scenario when no combination has a shared span', () => {
+    const rows = [
+      ...agenticCurve('h100', [0.1, 0.05]),
+      ...curve('h100', [10, 20]),
+      ...curve('gb200', [40, 50]),
+    ];
+
+    expect(pickPairDefaults(rows, 'h100', 'gb200', 'agentic-traces')).toEqual({
+      sequence: 'agentic-traces',
+      precision: 'fp8',
+    });
+  });
+
+  it('picks a precision of the required sequence even when another sequence ranks higher', () => {
+    const rows = [
+      ...agenticCurve('h100', [0.1, 0.05]),
+      ...agenticCurve('gb200', [0.1, 0.05]),
+      ...curve('h100', [10, 20, 30, 40, 50], { precision: 'fp4' }),
+      ...curve('h100', [10, 20], { precision: 'bf16' }),
+      ...curve('gb200', [15, 25], { precision: 'bf16' }),
+    ];
+
+    expect(pickPairDefaults(rows, 'h100', 'gb200', 'agentic-traces', '8k/1k')).toEqual({
+      sequence: '8k/1k',
+      precision: 'bf16',
+    });
+  });
+
+  it('does not count rows without total throughput as data', () => {
+    const rows = [
+      ...curve('b200', [10, 20, 30, 40], { precision: 'fp4' }),
+      ...curve('vr200', [10, 20, 30, 40], { precision: 'fp4' }).map((row) => ({
+        ...row,
+        metrics: { output_tput_per_gpu: 4000, median_intvty: row.metrics.median_intvty },
+      })),
+      ...curve('b200', [10, 20]),
+      ...curve('vr200', [15, 25]),
+    ];
+
+    expect(pickPairDefaults(rows, 'b200', 'vr200', '8k/1k')).toEqual({
+      sequence: '8k/1k',
+      precision: 'fp8',
+    });
+  });
+});
