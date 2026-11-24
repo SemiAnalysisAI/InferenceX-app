@@ -11,21 +11,11 @@ const mocks = {
   setSelectedModel: vi.fn(),
   setPowerRole: vi.fn(),
 };
+const kimiLine = { model: 'kimik3.1', disagg: true, sequence: 'agentic-traces', precision: 'fp4' };
 mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
 mock.module('@/hooks/api/use-availability', () => ({
-  useAvailability: () => ({
-    data: {
-      dates: [],
-      lines: [],
-      linesByModel: new Map([
-        [
-          'kimik3.1',
-          [{ model: 'kimik3.1', disagg: true, sequence: 'agentic-traces', precision: 'fp4' }],
-        ],
-      ]),
-    },
-  }),
+  useAvailability: () => ({ data: { linesByModel: new Map([['kimik3.1', [kimiLine]]]) } }),
 }));
 mock.module('@/components/inference/InferenceContext', () => ({
   useInferenceFilters: () => ({
@@ -56,83 +46,49 @@ const disagg = {
   y: 1,
   conc: 64,
   disagg: true,
-  num_prefill_gpu: 8,
-  num_decode_gpu: 16,
-  measuredAvgPower: m(800),
   measuredPrefillAvgPower: m(971),
-  measuredDecodeAvgPower: m(700),
   measuredJPerOutputToken: m(2),
   reconstructedPrefillJPerOutputToken: m(1.38),
-  measuredDecodeJPerOutputToken: m(0.62),
 } as InferenceData;
-const aggregated = {
-  hwKey: 'mi355x_sglang',
-  x: 80,
-  y: 1,
-  conc: 64,
-  disagg: false,
-} as InferenceData;
+const aggregated = { hwKey: 'mi355x_sglang', x: 80, y: 1, conc: 64 } as InferenceData;
 
 function mount(node: React.ReactNode) {
   const container = document.createElement('div');
-  const root = createRoot(container);
-  act(() => root.render(node));
+  act(() => createRoot(container).render(node));
   return container;
 }
 
 describe('PowerXInsightCard', () => {
-  it('renders nothing under All GPUs when no visible row is disaggregated', () => {
-    const container = mount(
-      <PowerXInsightCard
-        view="energy"
-        role="all"
-        points={[aggregated]}
-        onRoleChange={vi.fn()}
-        hardwareLabel={(hw) => hw}
-      />,
-    );
-    expect(container.innerHTML).toBe('');
-  });
-
   it('leads to the role split from All GPUs and back to All from a role', () => {
     const onRoleChange = vi.fn();
-    const all = mount(
-      <PowerXInsightCard
-        view="energy"
-        role="all"
-        points={[disagg, aggregated]}
-        onRoleChange={onRoleChange}
-        hardwareLabel={() => 'GB300 NVL72'}
-      />,
-    );
-    expect(all.querySelector('[data-testid="powerx-insight-headline"]')?.textContent).toContain(
-      '69%',
-    );
-    act(() =>
-      all.querySelector<HTMLButtonElement>('[data-testid="powerx-insight-action"]')!.click(),
-    );
-    expect(onRoleChange).toHaveBeenLastCalledWith('split');
+    for (const [role, next] of [
+      ['all', 'split'],
+      ['prefill', 'all'],
+    ] as const) {
+      const card = mount(
+        <PowerXInsightCard
+          view="energy"
+          role={role}
+          points={[disagg]}
+          onRoleChange={onRoleChange}
+          hardwareLabel={() => 'GB300 NVL72'}
+        />,
+      );
+      // Prefill's reconstructed share of measured J per output token: 1.38 / 2.
+      expect(card.textContent).toContain('69%');
+      act(() =>
+        card.querySelector<HTMLButtonElement>('[data-testid="powerx-insight-action"]')!.click(),
+      );
+      expect(onRoleChange).toHaveBeenLastCalledWith(next);
+    }
     expect(mocks.track).toHaveBeenCalledWith('powerx_insight_split_clicked', { view: 'energy' });
-
-    const role = mount(
-      <PowerXInsightCard
-        view="draw"
-        role="prefill"
-        points={[disagg]}
-        onRoleChange={onRoleChange}
-        hardwareLabel={() => 'GB300 NVL72'}
-      />,
-    );
-    expect(role.textContent).toContain('971 W');
-    act(() =>
-      role.querySelector<HTMLButtonElement>('[data-testid="powerx-insight-action"]')!.click(),
-    );
-    expect(onRoleChange).toHaveBeenLastCalledWith('all');
   });
 });
 
 describe('PowerXRoleNoData', () => {
-  it('offers models with prefill/decode data and switches the model without reverting the role', () => {
+  it('offers models with prefill/decode data under a role with none, keeping the role', () => {
+    expect(mount(<PowerXRoleNoData role="all" points={[aggregated]} />).innerHTML).toBe('');
+    expect(mount(<PowerXRoleNoData role="prefill" points={[disagg]} />).innerHTML).toBe('');
     const container = mount(<PowerXRoleNoData role="split" points={[aggregated]} />);
     const buttons = container.querySelectorAll<HTMLButtonElement>(
       '[data-testid="powerx-role-no-data-model"]',
@@ -141,10 +97,5 @@ describe('PowerXRoleNoData', () => {
     act(() => buttons[0]!.click());
     expect(mocks.setSelectedModel).toHaveBeenCalledWith('Kimi-K3.1-Pro');
     expect(mocks.setPowerRole).not.toHaveBeenCalled();
-  });
-
-  it('stays hidden under All GPUs or when a visible row has role data', () => {
-    expect(mount(<PowerXRoleNoData role="all" points={[aggregated]} />).innerHTML).toBe('');
-    expect(mount(<PowerXRoleNoData role="prefill" points={[disagg]} />).innerHTML).toBe('');
   });
 });

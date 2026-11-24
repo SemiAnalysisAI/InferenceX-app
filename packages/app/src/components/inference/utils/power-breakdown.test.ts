@@ -144,10 +144,7 @@ describe('buildPowerBreakdowns', () => {
 describe('powerBreakdownInteractivity', () => {
   it('places points on the chart interactivity axis, ordered by it, and drops points without one', () => {
     const interactivity = powerBreakdownInteractivity('p90_intvty');
-    expect(interactivity).toMatchObject({
-      field: 'p90_intvty',
-      fromChart: true,
-    });
+    expect(interactivity).toMatchObject({ field: 'p90_intvty', fromChart: true });
     const [series] = buildPowerBreakdowns(
       [
         point(600, { conc: 64, p90_intvty: 20 }),
@@ -213,10 +210,7 @@ function fakeSeries(label: string, points: [interactivity: number, total: number
     allInProvisionedWattsPerGpu: null,
     points: points.map(
       ([interactivity, total]) =>
-        ({
-          interactivity,
-          totalWattsPerGpu: total,
-        }) as unknown as PowerBreakdownPoint,
+        ({ interactivity, totalWattsPerGpu: total }) as unknown as PowerBreakdownPoint,
     ),
   } as PowerBreakdownSeries;
 }
@@ -275,9 +269,7 @@ describe('cross-chip comparison', () => {
   ]);
 
   it('compares a pinned chip at its pinned point, in place, whatever the slider reads', () => {
-    const { rows, outOfRange } = compareBreakdownsAt([c, d], 56, undefined, {
-      C: 64,
-    });
+    const { rows, outOfRange } = compareBreakdownsAt([c, d], 56, undefined, { C: 64 });
     expect(outOfRange).toEqual([]);
     expect(rows.map((r) => [r.series.label, r.entry.concurrency, r.pinned])).toEqual([
       ['C', 64, true],

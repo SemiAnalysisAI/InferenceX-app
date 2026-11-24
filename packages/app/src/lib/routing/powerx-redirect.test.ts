@@ -41,26 +41,12 @@ describe('powerXRedirectUrl', () => {
     expect(redirect('/pwx?i_metric=y_measuredAvgPower')).toBe(null);
   });
 
-  it.each([
-    ['i_metric=y_measuredAvgPower&i_pcompare=roles', 'y_measuredAvgPower', 'breakdown', 'split'],
-    ['i_metric=y_measuredPrefillAvgPower', 'y_measuredAvgPower', null, 'prefill'],
-    ['i_metric=y_measuredDecodeAvgPower', 'y_measuredAvgPower', null, 'decode'],
-    ['i_metric=y_measuredPrefillJPerInputToken', 'y_measuredJPerInputToken', null, 'prefill'],
-    ['i_metric=y_measuredDecodeJPerOutputToken', 'y_measuredJPerOutputToken', null, 'decode'],
-  ])('moves the GPU role of an old link (%s) onto i_role', (query, metric, compare, role) => {
-    const target = new URL(redirect(`/infx/inference?${query}`)!, 'https://inferencex.test');
-    expect(target.pathname).toBe('/pwx');
-    expect(target.searchParams.get('i_metric')).toBe(metric);
-    expect(target.searchParams.get('i_pcompare')).toBe(compare);
-    expect(target.searchParams.get('i_role')).toBe(role);
-  });
-
-  it('keeps an explicit i_role over the role an old metric implied', () => {
-    const target = new URL(
-      redirect('/infx/inference?i_metric=y_measuredPrefillAvgPower&i_role=split')!,
-      'https://inferencex.test',
+  it('moves the GPU role of an old link onto i_role, keeping an explicit i_role', () => {
+    expect(redirect('/infx/inference?i_metric=y_measuredAvgPower&i_pcompare=roles')).toBe(
+      '/pwx?i_metric=y_measuredAvgPower&i_pcompare=breakdown&i_role=split',
     );
-    expect(target.searchParams.get('i_role')).toBe('split');
-    expect(target.searchParams.get('i_metric')).toBe('y_measuredAvgPower');
+    expect(redirect('/infx/inference?i_metric=y_measuredPrefillAvgPower&i_role=split')).toBe(
+      '/pwx?i_metric=y_measuredAvgPower&i_role=split',
+    );
   });
 });

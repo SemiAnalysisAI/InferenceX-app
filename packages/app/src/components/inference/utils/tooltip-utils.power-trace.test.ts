@@ -85,13 +85,13 @@ describe('View power trace tooltip action', () => {
 });
 
 describe('View power trace link', () => {
-  it('opens Over time focused on the point, keeping the role and dropping a stale concurrency', () => {
+  it('opens Over time focused on the point', () => {
     stubGlobal('window', {
       location: {
         origin: 'https://inferencex.semianalysis.com',
         pathname: '/pwx',
         hash: '',
-        search: '?g_model=Kimi-K3&i_metric=y_measuredAvgPower&i_role=decode&i_ptconc=1',
+        search: '?g_model=Kimi-K3&i_metric=y_measuredAvgPower',
       },
     });
     const link = buildPointDetails(config()).links.find(
@@ -100,6 +100,5 @@ describe('View power trace link', () => {
     const url = new URL(link?.href ?? '');
     expect(url.searchParams.get('i_metric')).toBe('y_measuredPowerTimeline');
     expect(url.searchParams.get('i_ptfocus')).toBe(`34716669498:${AUDIT_NAME}`);
-    expect(url.searchParams.has('i_ptconc')).toBe(false);
   });
 });

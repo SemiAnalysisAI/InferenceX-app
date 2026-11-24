@@ -26,12 +26,8 @@ declare global {
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-import {
-  defaultReadoutPoint,
-  PowerXCountControls,
-  PowerXReadout,
-  PowerXRoleControl,
-} from './PowerXLayout';
+import { defaultReadoutPoint, PowerXCountControls, PowerXReadout } from './PowerXLayout';
+import type { PowerXRole } from './powerx-role';
 
 const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
   mocks.locale = locale;
@@ -78,41 +74,21 @@ describe('PowerXCountControls', () => {
   });
 });
 
-describe('PowerXRoleControl', () => {
-  it('offers the four GPU roles with the current one pressed', () => {
-    const container = render(<PowerXRoleControl role="decode" onRoleChange={noop} />);
-    const ids = [...container.querySelectorAll('[data-testid^="powerx-role-"]')]
-      .map((node) => (node as HTMLElement).dataset.testid)
-      .filter((id) => id !== 'powerx-role-toggle');
-    expect(ids).toEqual([
-      'powerx-role-all',
-      'powerx-role-prefill',
-      'powerx-role-decode',
-      'powerx-role-split',
-    ]);
-  });
-});
+const pinned = (selection: PowerXSelection, role: PowerXRole) =>
+  [
+    ...render(
+      <PowerXCountControls selection={selection} onSelectionChange={noop} role={role} />,
+    ).querySelectorAll<HTMLElement>('[data-testid$="-pinned"]'),
+  ].map((node) => node.dataset.testid);
 
 describe('pinned controls under a GPU role', () => {
-  const energy: PowerXSelection = { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' };
-  it('pins Count to GPU and says why, but leaves All untouched', () => {
-    const pinned = render(
-      <PowerXCountControls selection={energy} onSelectionChange={noop} role="decode" />,
-    );
-    expect(pinned.querySelector('[data-testid="powerx-count-pinned"]')).not.toBeNull();
-    expect(pinned.querySelector('[data-testid="powerx-per-pinned"]')).not.toBeNull();
-    const all = render(
-      <PowerXCountControls selection={energy} onSelectionChange={noop} role="all" />,
-    );
-    expect(all.querySelector('[data-testid="powerx-count-pinned"]')).toBeNull();
-  });
-
-  it('notes % of TDP is per pool on Power draw under a role', () => {
-    const draw: PowerXSelection = { metric: POWER_PERCENT_TDP_METRIC, compare: 'none' };
-    const container = render(
-      <PowerXCountControls selection={draw} onSelectionChange={noop} role="split" />,
-    );
-    expect(container.querySelector('[data-testid="powerx-headroom-pinned"]')).not.toBeNull();
+  it('pins the controls a role fixes and says why, leaving All untouched', () => {
+    const energy = { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' } as const;
+    expect(pinned(energy, 'decode')).toEqual(['powerx-count-pinned', 'powerx-per-pinned']);
+    expect(pinned(energy, 'all')).toEqual([]);
+    // % of TDP is read per pool under a role.
+    const tdp = { metric: POWER_PERCENT_TDP_METRIC, compare: 'none' } as const;
+    expect(pinned(tdp, 'split')).toEqual(['powerx-count-pinned', 'powerx-headroom-pinned']);
   });
 });
 

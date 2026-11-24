@@ -2,9 +2,19 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import {
+  POWERX_ROLES,
+  powerXRolePools,
+  resolvePowerXRole,
+  type PowerXRole,
+} from '@/components/inference/powerx/powerx-role';
+import type { AggDataEntry } from '@/components/inference/types';
+import {
   buildEqualServiceComparison,
   getEqualServiceSources,
 } from '@/components/inference/utils/equal-service-comparison';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { remapInferencePoint } from '@/lib/charts/chart-utils';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -43,10 +53,15 @@ function request(path: string): NextRequest {
 }
 
 interface RoleEntry {
-  series: { hwKey: string; powerRole: string; points: { y: number }[] }[];
+  series: { hwKey: string; powerRole?: string; points: { x: number; y: number }[] }[];
 }
+/** Every drawn point as [hwKey, GPU pool, x, y]. */
 const drawn = (entry: RoleEntry) =>
-  entry.series.map(({ hwKey, powerRole, points }) => [hwKey, powerRole, points[0].y]);
+  entry.series.flatMap(({ hwKey, powerRole, points }) =>
+    points.map(({ x, y }) => [hwKey, powerRole ?? null, x, y]),
+  );
+const sorted = (points: unknown[][]) => points.map(String).toSorted();
+const viewsUrl = (params: string) => `/api/v1/views/inference?model=DeepSeek-R1-0528&${params}`;
 
 async function getResponse(path: string, as: 'json' | 'text' = 'json') {
   const response = await GET(request(path));
@@ -348,7 +363,18 @@ describe('GET /api/v1/views/inference', () => {
     expect(body.overlays[0]).not.toHaveProperty('observedPoints');
   });
 
-  it('draws the GPU role per pool for official and overlay rows, listing aggregated chips', async () => {
+  describe('GPU role', () => {
+    const POWER = {
+      ...makeRow().metrics,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 900,
+      p90_power_w: 1080,
+      joules_per_output_token: 4,
+      joules_per_input_token: 0.5,
+      joules_per_total_token: 0.45,
+    };
+    // A disaggregated GB200 with pool telemetry and an aggregated MI355X (every GPU does both).
     const disagg = makeRow({
       hardware: 'gb200',
       framework: 'dynamo-sglang',
@@ -359,65 +385,93 @@ describe('GET /api/v1/views/inference', () => {
       prefill_num_workers: 1,
       decode_num_workers: 1,
       metrics: {
-        ...makeRow().metrics,
-        avg_power_w: 900,
+        ...POWER,
         prefill_avg_power_w: 700,
         decode_avg_power_w: 960,
-        power_valid: 1,
-        power_metric_schema_version: 2,
+        prefill_joules_per_input_token: 0.2,
+        // Reconstructed prefill J/output = 0.2 × (4 ÷ 0.5) = 1.6, so 1.6 + 2.4 = 4.
+        decode_joules_per_output_token: 2.4,
       },
     });
-    const aggregated = makeRow({
-      hardware: 'mi355x',
-      framework: 'sglang',
-      metrics: { ...makeRow().metrics, avg_power_w: 1100, power_valid: 1 },
-    });
-    mockGetLatestBenchmarks.mockResolvedValue([disagg, aggregated]);
-    mockUnofficialRun.mockImplementation(() =>
-      Response.json({
-        benchmarks: [
-          { ...disagg, id: 991, run_url: 'https://github.com/org/repo/actions/runs/991' },
-          { ...aggregated, id: 992, run_url: 'https://github.com/org/repo/actions/runs/991' },
-        ],
-        evaluations: [],
-      }),
-    );
-    const response = await GET(
-      request(
-        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=y_measuredP90Power&role=split&unofficialrun=991',
-      ),
-    );
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    // P90 is fleet-wide: a role pins the average, and the pinned metric is echoed.
-    expect(body.params).toMatchObject({ role: 'split', metric: 'y_measuredAvgPower' });
-    expect(drawn(body)).toEqual([
-      ['gb200_dynamo-sglang', 'prefill', 700],
-      ['gb200_dynamo-sglang', 'decode', 960],
-    ]);
-    expect(body.roleAggregated).toMatchObject([{ hwKey: 'mi355x_sglang', reason: 'aggregated' }]);
-    expect(drawn(body.overlays[0])).toEqual(drawn(body));
-    expect(body.overlays[0].roleAggregated).toMatchObject([{ hwKey: 'mi355x_sglang' }]);
+    const aggregated = makeRow({ hardware: 'mi355x', framework: 'sglang', metrics: POWER });
+    beforeEach(() => mockGetLatestBenchmarks.mockResolvedValue([disagg, aggregated]));
 
-    const legacy = await getResponse(
-      '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=y_measuredDecodeAvgPower',
-    );
-    expect(legacy.params).toMatchObject({ role: 'decode', metric: 'y_measuredAvgPower' });
-    expect(drawn(legacy)).toEqual([['gb200_dynamo-sglang', 'decode', 960]]);
-
-    const csv = await getResponse(
-      '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&role=prefill&format=csv',
-      'text',
-    );
-    const [header, line] = csv.trim().split(/\r?\n/u);
-    expect(line.split(',')[header.split(',').indexOf('powerRole')]).toBe('prefill');
-
-    for (const query of ['role=roles', 'role=prefill&metric=y_tpPerGpu']) {
-      const invalid = await GET(request(`/api/v1/views/inference?model=DeepSeek-R1-0528&${query}`));
-      expect(invalid.status).toBe(400);
-      const error = await invalid.json();
-      expect(error.param).toBe('role');
+    /** The page's path: remap, pin the role's metric, expand per pool, keep the role's pools. */
+    function pagePoints(metric: string, role: PowerXRole, xField: string) {
+      const selection = resolvePowerXRole({ metric, compare: 'none' }, role);
+      const key = selection.metric.slice(2) as Parameters<typeof remapInferencePoint>[1];
+      const pools = new Set<string>(powerXRolePools(role));
+      const remapped = transformBenchmarkRows([disagg, aggregated], 'p90')
+        .chartData[0].filter((point) => key in point)
+        .map((point) => remapInferencePoint(point, key, xField as keyof AggDataEntry));
+      return expandPowerCompareSeries(remapped, selection.metric, selection.compare)
+        .filter((point) =>
+          role === 'all' ? !point.powerVariant : pools.has(point.powerVariant?.id ?? ''),
+        )
+        .map((point) => [point.hwKey, point.powerVariant?.id ?? null, point.x, point.y]);
     }
+
+    it.each(
+      [
+        'y_measuredJPerOutputToken',
+        'y_measuredJPerTotalToken',
+        'y_measuredJPerInputToken',
+        'y_measuredAvgPower',
+        'y_measuredP90Power',
+        'y_measuredPowerPercentTdp',
+      ].flatMap((metric) => POWERX_ROLES.map((role) => [metric, role] as const)),
+    )('draws the same points as the page for %s under role=%s', async (metric, role) => {
+      const body = await getResponse(viewsUrl(`metric=${metric}&role=${role}`));
+      expect(drawn(body).length).toBeGreaterThan(0);
+      expect(sorted(drawn(body))).toEqual(sorted(pagePoints(metric, role, body.xAxis.field)));
+      // The aggregated MI355X row is listed under a role, never drawn as a 0 W / 0 J pool.
+      if (role !== 'all') {
+        expect(body.roleAggregated).toMatchObject([
+          { hwKey: 'mi355x_sglang', reason: 'aggregated' },
+        ]);
+      }
+    });
+
+    it('pins and echoes the metric for official and overlay rows, rewrites old role metrics and rejects bad roles', async () => {
+      mockUnofficialRun.mockImplementation(() =>
+        Response.json({
+          benchmarks: [
+            { ...disagg, id: 991, run_url: 'https://github.com/org/repo/actions/runs/991' },
+            { ...aggregated, id: 992, run_url: 'https://github.com/org/repo/actions/runs/991' },
+          ],
+          evaluations: [],
+        }),
+      );
+      const body = await getResponse(
+        viewsUrl('metric=y_measuredJPerTotalToken&role=split&unofficialrun=991'),
+      );
+      // Per total token has no pools: a role pins J per output token, so prefill + decode = 4.
+      expect(body.params).toMatchObject({ role: 'split', metric: 'y_measuredJPerOutputToken' });
+      expect(drawn(body).map(([hwKey, pool, , y]) => [hwKey, pool, y])).toEqual([
+        ['gb200_dynamo-sglang', 'prefill', 1.6],
+        ['gb200_dynamo-sglang', 'decode', 2.4],
+      ]);
+      expect(drawn(body.overlays[0])).toEqual(drawn(body));
+      expect(body.overlays[0].roleAggregated).toMatchObject([{ hwKey: 'mi355x_sglang' }]);
+
+      const legacy = await getResponse(viewsUrl('metric=y_measuredDecodeAvgPower'));
+      expect(legacy.params).toMatchObject({ role: 'decode', metric: 'y_measuredAvgPower' });
+      expect(drawn(legacy).map(([, pool, , y]) => [pool, y])).toEqual([['decode', 960]]);
+
+      const csv = await getResponse(
+        viewsUrl('metric=measuredAvgPower&role=prefill&format=csv'),
+        'text',
+      );
+      const [header, line] = csv.trim().split(/\r?\n/u);
+      expect(line.split(',')[header.split(',').indexOf('powerRole')]).toBe('prefill');
+
+      for (const params of ['role=roles', 'role=prefill&metric=y_tpPerGpu']) {
+        const invalid = await GET(request(viewsUrl(params)));
+        expect(invalid.status).toBe(400);
+        const error = await invalid.json();
+        expect(error.param).toBe('role');
+      }
+    });
   });
 
   it('applies chipBasis to official and unofficial disaggregated rows and rejects unknown values', async () => {

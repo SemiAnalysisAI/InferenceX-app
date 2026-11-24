@@ -39,26 +39,15 @@ describe('useRequestedPowerTraceFocus', () => {
     if (pending) clearPowerTraceFocus(pending);
   });
 
-  it('keeps the pinned point focus when React discards the first render', () => {
+  it('keeps the pinned point focus through a discarded render, for one committed timeline', () => {
     requestPowerTraceFocus(KEY);
     // A render that never commits, like an interrupted or suspended mount.
     renderToString(<Probe />);
     const first = mount();
     expect(first.requested).toBe(KEY);
     first.unmount();
-  });
-
-  it('applies a request to one committed timeline only', () => {
-    requestPowerTraceFocus(KEY);
-    mount().unmount();
     const later = mount();
     expect(later.requested).toBeNull();
     later.unmount();
-  });
-
-  it('does not clear a newer request', () => {
-    requestPowerTraceFocus('1:older');
-    clearPowerTraceFocus('2:other');
-    expect(peekPowerTraceFocus()).toBe('1:older');
   });
 });

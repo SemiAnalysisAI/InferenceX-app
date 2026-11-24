@@ -149,13 +149,7 @@ describe('GET /api/v1/gpu-metrics-point/stats', () => {
   });
 
   it('rejects bad ids, formats and scales without touching the database', async () => {
-    for (const query of [
-      'id=0',
-      'id=1.5',
-      'id=7&format=xml',
-      'id=7&scale=rack',
-      'id=7&role=roles',
-    ]) {
+    for (const query of ['id=0', 'id=1.5', 'id=7&format=xml', 'id=7&scale=rack']) {
       const response = await GET(request(query));
       expect(response.status).toBe(400);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
@@ -181,11 +175,7 @@ describe('GET /api/v1/gpu-metrics-point/stats', () => {
       ...series,
       gpus: [0, 1, 2],
       power: [samples, samples.map((v) => v - 20), samples.map((v) => v + 40)],
-      devices: [
-        { role: 'prefill' },
-        { role: 'decode' },
-        { role: 'decode' },
-      ] as GpuPowerSeries['devices'],
+      devices: (['prefill', 'decode', 'decode'] as const).map((role) => ({ id: role, role })),
     };
 
     it('computes each pool from only its GPU rows, with the same function as the lanes', async () => {
@@ -217,6 +207,8 @@ describe('GET /api/v1/gpu-metrics-point/stats', () => {
     });
 
     it('returns 404 for a role on an aggregated trace instead of the all-GPU numbers', async () => {
+      const badRole = await GET(request('id=7&role=roles'));
+      expect(badRole.status).toBe(400);
       readRevision.mockResolvedValue('rev-1');
       readCached.mockResolvedValue(payload);
       const response = await GET(request('id=7&role=prefill'));

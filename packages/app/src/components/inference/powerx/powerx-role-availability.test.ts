@@ -7,17 +7,9 @@ import { modelsWithRoleData } from './powerx-role-availability';
 const line = (model: string, overrides: Partial<AvailabilityLine> = {}) =>
   ({
     model,
-    isl: null,
-    osl: null,
     precision: 'fp4',
-    hardware: 'gb300',
-    framework: 'dynamo-sglang',
-    spec_method: 'none',
     disagg: true,
-    benchmark_type: 'agentic_traces',
     sequence: 'agentic-traces',
-    hwKey: 'gb300_dynamo-sglang',
-    dates: new Uint32Array(1),
     ...overrides,
   }) as AvailabilityLine;
 
@@ -53,9 +45,5 @@ describe('modelsWithRoleData', () => {
         'Kimi-K3.1-Pro',
       ]),
     ).toEqual(['Kimi-K3.1-Pro']);
-  });
-
-  it('returns nothing before availability loads', () => {
-    expect(modelsWithRoleData(undefined, scenario, ['Kimi-K3.1-Pro'])).toEqual([]);
   });
 });

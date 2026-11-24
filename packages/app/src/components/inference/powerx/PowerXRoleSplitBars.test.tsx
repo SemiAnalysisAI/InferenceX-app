@@ -1,8 +1,8 @@
 // @test-environment jsdom
 
 import React, { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { createRoot } from 'react-dom/client';
+import { describe, expect, it, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 
@@ -18,24 +18,15 @@ import PowerXRoleSplitBars from './PowerXRoleSplitBars';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-function point(overrides: Partial<InferenceData>): InferenceData {
-  return {
+const point = (overrides: Partial<InferenceData>) =>
+  ({
     x: 220,
     y: 1,
     hwKey: 'gb300_dynamo-trt',
-    date: '2026-04-07',
-    tp: 8,
     conc: 16,
     precision: 'fp4',
-    tpPerGpu: { y: 1, roof: false },
-    tpPerMw: { y: 1, roof: false },
-    costh: { y: 1, roof: false },
-    costr: { y: 1, roof: false },
-    costhi: { y: 1, roof: false },
-    costri: { y: 1, roof: false },
     ...overrides,
-  } as InferenceData;
-}
+  }) as InferenceData;
 
 const split = (extra: Partial<InferenceData> = {}) =>
   point({
@@ -48,22 +39,11 @@ const split = (extra: Partial<InferenceData> = {}) =>
     ...extra,
   });
 
-let container: HTMLDivElement;
-let root: Root;
-beforeEach(() => {
-  container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-});
-afterEach(() => {
-  act(() => root.unmount());
-  container.remove();
-});
-
 describe('PowerXRoleSplitBars', () => {
   it('draws prefill + decode per point and lists aggregated chips, dimmed, without a bar', () => {
+    const container = document.createElement('div');
     act(() =>
-      root.render(
+      createRoot(container).render(
         <PowerXRoleSplitBars
           points={[split(), point({ hwKey: 'mi355x_sglang', disagg: false, num_decode_gpu: 0 })]}
           overlayPoints={[split({ run_url: 'https://github.com/o/r/actions/runs/9' })]}
