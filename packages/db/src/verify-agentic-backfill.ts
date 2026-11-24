@@ -4,7 +4,12 @@ import { CHART_SERIES_VERSION } from './etl/compute-chart-series.js';
 import { STATS_VERSION } from './etl/compute-aggregate-stats.js';
 import { REQUEST_TIMELINE_VERSION } from './etl/compute-request-timeline.js';
 import { parseLimitForceFlags, parseRunIdFlag, runBackfillMain } from './lib/backfill-runner.js';
-import { verifyBackfillState, type BackfillState } from './lib/agentic-backfill-integrity.js';
+import {
+  assertManifestDatabase,
+  databaseFingerprint,
+  verifyBackfillState,
+  type BackfillState,
+} from './lib/agentic-backfill-integrity.js';
 
 const flags = parseLimitForceFlags();
 const runId = parseRunIdFlag();
@@ -69,6 +74,8 @@ async function states(ids: string[]): Promise<BackfillState[]> {
 }
 
 async function main(): Promise<void> {
+  const databaseUrl = process.env.DATABASE_WRITE_URL;
+  if (!databaseUrl) throw new Error('DATABASE_WRITE_URL is not set');
   if (snapshotIndex !== -1) {
     const runFilter = runId ? sql`and w.github_run_id=${runId}` : sql``;
     const ids = await sql<{ id: string }[]>`
@@ -81,11 +88,15 @@ async function main(): Promise<void> {
     `;
     if (ids.length === 0 && runId) throw new Error('No AgentX points matched the audit scope');
     const rows = await states(ids.map((row) => row.id));
-    await writeFile(file!, JSON.stringify({ rows }));
+    await writeFile(file!, JSON.stringify({ database: databaseFingerprint(databaseUrl), rows }));
     console.log(`Saved immutable-data fingerprints for ${rows.length} points`);
     return;
   }
-  const manifest = JSON.parse(await readFile(file!, 'utf8')) as { rows: BackfillState[] };
+  const manifest = JSON.parse(await readFile(file!, 'utf8')) as {
+    database: unknown;
+    rows: BackfillState[];
+  };
+  assertManifestDatabase(manifest.database, databaseUrl);
   const after = await states(manifest.rows.map((row) => row.id));
   const versions = {
     chart: CHART_SERIES_VERSION,
