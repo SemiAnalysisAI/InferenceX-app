@@ -116,6 +116,8 @@ export interface PillOccluder {
 const NARROW_PLOT_WIDTH = 360;
 const NARROW_PILL_LIMIT = 3;
 const NARROW_PILL_SHARE = 0.45;
+/** Up to this many curves, an exported pill may cover another line rather than leave a curve unnamed. */
+const FEW_SERIES_LABEL_LIMIT = 8;
 
 export function pillWidthBudget(plotWidth: number): number {
   return plotWidth < NARROW_PLOT_WIDTH ? plotWidth * NARROW_PILL_SHARE : Infinity;
@@ -313,12 +315,15 @@ function layoutPills(
   bounds: RectBounds | null,
   obstacles: readonly RectBounds[],
   occluders: readonly PillOccluder[],
+  labelEverySeries: boolean,
 ): void {
   const placed: RectBounds[] = [...obstacles];
   const narrow = bounds !== null && bounds.right - bounds.left < NARROW_PLOT_WIDTH;
   const limit = narrow ? NARROW_PILL_LIMIT : Infinity;
   const maxLeader = narrow ? NARROW_LEADER_MAX_LENGTH : LEADER_MAX_LENGTH;
   const lines = occluders.filter((occluder) => occluder.points.length > 0).map(boundOccluder);
+  const fewSeries =
+    labelEverySeries && items.filter(({ label }) => label.visible).length <= FEW_SERIES_LABEL_LIMIT;
   let shown = 0;
 
   for (const { node, label } of items) {
@@ -339,7 +344,7 @@ function layoutPills(
       const ty = cy + shift.y;
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
     };
-    const placeNear = (anchor: CartesianPoint) => {
+    const placeNear = (anchor: CartesianPoint, avoidLines = true) => {
       const ax = anchor.x + offsetX;
       const ay = anchor.y + offsetY;
       const mirrorX = 2 * anchor.x - ax - local.left - local.right;
@@ -394,9 +399,10 @@ function layoutPills(
           const length = Math.hypot(end.x - anchor.x, end.y - anchor.y);
           if (length > maxLeader) continue;
           if (placed.some((other) => rectsStrictlyOverlap(box, other))) continue;
-          if (coversOtherPath(box, label.key, lines)) continue;
+          if (avoidLines && coversOtherPath(box, label.key, lines)) continue;
           const moved = Math.hypot(candidate.tx - ax, candidate.ty - ay) > LEADER_MIN_SHIFT;
           if (
+            avoidLines &&
             moved &&
             length >= LEADER_MIN_GAP &&
             leaderCrossesOtherPath(anchor, end, label.key, lines)
@@ -414,6 +420,13 @@ function layoutPills(
     if (shown < limit && !chosen) {
       for (const anchor of alternateAnchors(label.key, primary, lines, bounds)) {
         chosen = placeNear(anchor);
+        if (chosen) break;
+      }
+    }
+    // A PNG has no legend, so with few series an unlabelled curve is unidentifiable.
+    if (shown < limit && !chosen && fewSeries) {
+      for (const anchor of [primary, ...alternateAnchors(label.key, primary, lines, bounds)]) {
+        chosen = placeNear(anchor, false);
         if (chosen) break;
       }
     }
@@ -642,6 +655,8 @@ export function renderLineLabels(
       label: LineLabelPlacement,
     ) => void;
     bounds?: RectBounds | null;
+    /** Static exports have no legend, so few-series charts name every curve. */
+    labelEverySeries?: boolean;
     occluders?: readonly PillOccluder[];
   },
 ): void {
@@ -732,6 +747,7 @@ export function renderLineLabels(
     bounds,
     bounds ? pillObstacles(group, '.parallelism-label') : [],
     options.occluders ?? [],
+    options.labelEverySeries ?? false,
   );
 }
 
@@ -771,6 +787,7 @@ export function updateRenderedLineLabels(
     bounds,
     bounds ? pillObstacles(group, '.parallelism-label') : [],
     options.occluders ?? [],
+    false,
   );
 }
 

@@ -107,6 +107,7 @@ function renderExportChart<T>(
     width: layout.width,
     height: layout.height,
     transitionDuration: 0,
+    surface: 'export',
     tooltipElement: document.createElement('div'),
   };
   const group = clipContent ? layout.zoomGroup : layout.g;
