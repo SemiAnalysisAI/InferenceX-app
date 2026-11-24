@@ -29,6 +29,27 @@ describe('Evaluation Chart — Content & Interactions', () => {
       cy.get('#evaluation-chart svg .score-label').should('have.length.greaterThan', 0);
     });
   });
+
+  it('zooms the score axis to the data behind a marked break and repeats it above the plot', () => {
+    const chart = '#evaluation-chart [data-testid="d3-chart-svg"]';
+    cy.get(`${chart} [data-testid="evaluation-axis-break"]`).should('have.length', 1);
+    cy.get(`${chart} .x-axis .evaluation-axis-break-mark`).should('have.length', 1);
+    cy.get(`${chart} .x-axis .tick text`).then(($ticks) => {
+      const labels = [...$ticks].map((tick) => tick.textContent);
+      expect(labels[0]).to.equal('0.00');
+      expect(Number(labels[1])).to.be.greaterThan(0.8);
+    });
+    cy.get(`${chart} .x-axis-top .tick text`).should('have.length.greaterThan', 2);
+    // Every fixture score sits between 0.93 and 0.98: on a 0 to 1 axis they all crowd the last
+    // few percent of the plot, so a spread over a third of its width proves the zoom.
+    cy.get(`${chart} .x-axis .domain`).then(($domain) => {
+      const plotWidth = $domain[0].getBoundingClientRect().width;
+      cy.get(`${chart} .point`).then(($points) => {
+        const xs = [...$points].map((point) => Number(point.getAttribute('cx')));
+        expect(Math.max(...xs) - Math.min(...xs)).to.be.greaterThan(plotWidth / 3);
+      });
+    });
+  });
 });
 
 describe('Evaluation sample sharing', () => {

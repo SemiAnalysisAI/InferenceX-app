@@ -5,7 +5,13 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
 import { getModelSortIndex } from '@/lib/catalog/constants';
-import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3Chart';
+import {
+  D3Chart,
+  type D3ChartHandle,
+  type LayerConfig,
+  type RenderContext,
+} from '@/lib/d3-chart/D3Chart';
+import { widthTickCount } from '@/lib/d3-chart/chart-update';
 import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
@@ -17,11 +23,19 @@ import {
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { ChartPointDetails, type ChartPointDetailsRow } from '@/components/ui/chart-point-details';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
+import {
+  TOP_AXIS_BAND_PX,
+  renderTopAxis,
+  stickTopAxis,
+  unstickTopAxis,
+  useStickyTopAxis,
+} from '@/lib/d3-chart/sticky-top-axis';
 import { svgBBox } from '@/lib/d3-chart/svg-measure';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { parallelismPills } from '@/components/evaluation/chart-data';
+import { evaluationScoreAxis, formatScoreTick } from '@/components/evaluation/score-axis';
 import {
   type EvalBenchmark,
   type Precision,
@@ -34,15 +48,19 @@ import type { Locale } from '@/lib/i18n/i18n';
 import ChartLegend from '@/components/ui/chart-legend';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HINT_MIN_TOP_MARGIN_PX } from '@/components/ui/d3-chart-wrapper';
 import {
   useOverlayScopeReconciliation,
   useUnofficialRun,
 } from '@/providers/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 
-const BASE_MARGIN = { top: 24, right: 24, bottom: 52 };
+const BASE_MARGIN = { top: TOP_AXIS_BAND_PX + 4 + HINT_MIN_TOP_MARGIN_PX, right: 24, bottom: 52 };
+const SCORE_TICK_COUNT = 5;
+const MIN_PLOT_WIDTH_PX = 240;
 const OVERLAY_X_SIZE = 6;
 const OVERLAY_X_HOVER_SIZE = 8;
 const OVERLAY_HIT_RADIUS = 10;
@@ -261,7 +279,7 @@ function renderScoreLabels(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: EvaluationChartData[],
   showLabels: boolean,
-  xScale: d3.ScaleLinear<number, number>,
+  xScale: (score: number) => number,
   yScale: d3.ScaleBand<string>,
 ): void {
   const labelGroups = group
@@ -314,6 +332,61 @@ function updateUnofficialScoreLabels(
     });
 }
 
+/**
+ * The axis break: a card-coloured gap across the plot (hiding gridlines) and, on both x-axes,
+ * a gap in the axis line capped by two parallel slashes, as on the CollectiveX chart. The marks
+ * live in the axis groups because the plot group is clipped. Draw it after the top axis.
+ */
+function drawScoreAxisBreak(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  xScale: d3.ScaleLinear<number, number>,
+  height: number,
+  gap: [number, number] | null,
+): void {
+  const spans = gap ? [{ left: xScale(gap[0]), right: xScale(gap[1]) }] : [];
+  group
+    .selectAll<SVGRectElement, (typeof spans)[number]>('rect.evaluation-axis-break')
+    .data(spans)
+    .join('rect')
+    .attr('class', 'evaluation-axis-break')
+    .attr('data-testid', 'evaluation-axis-break')
+    .attr('x', (span) => span.left)
+    .attr('width', (span) => span.right - span.left)
+    .attr('y', 0)
+    .attr('height', height)
+    .attr('fill', 'var(--card)');
+  const svg = group.node()?.ownerSVGElement;
+  if (!svg) return;
+  const marks = d3
+    .select(svg)
+    .selectAll<SVGGElement, unknown>('g.x-axis, g.x-axis-top')
+    .selectAll<SVGGElement, (typeof spans)[number]>('g.evaluation-axis-break-mark')
+    .data(spans)
+    .join((enter) => {
+      const mark = enter.append('g').attr('class', 'evaluation-axis-break-mark');
+      mark.append('rect').attr('fill', 'var(--card)');
+      mark.append('path').attr('fill', 'none').attr('stroke-width', 1.25);
+      return mark;
+    });
+  marks
+    .select('rect')
+    .attr('x', (span) => span.left)
+    .attr('width', (span) => span.right - span.left)
+    .attr('y', -4)
+    .attr('height', 8);
+  marks
+    .select('path')
+    .attr('stroke', 'currentColor')
+    .attr(
+      'd',
+      (span) =>
+        `M${span.left - 2.5},5L${span.left + 2.5},-5M${span.right - 2.5},5L${span.right + 2.5},-5`,
+    );
+}
+
+const stickRenderedTopAxis = (ctx: RenderContext) => stickTopAxis(ctx.layout.svg.node());
+const unstickExportedTopAxis = (ctx: RenderContext) => unstickTopAxis(ctx.layout);
+
 const EVAL_STRINGS = {
   en: {
     showLabels: 'Show Labels',
@@ -333,6 +406,9 @@ const EVAL_STRINGS = {
     tryDate: 'Try selecting a different date',
     combinationEmpty: 'No evaluation data available for selected model and benchmark combination',
     tryCombination: 'Try selecting a different combination',
+    scrollHint: 'Scroll horizontally to view the full chart',
+    axisBreak: (score: string) =>
+      `Scores below ${score} sit on a compressed scale left of the axis break.`,
   },
   zh: {
     showLabels: '显示标签',
@@ -352,6 +428,8 @@ const EVAL_STRINGS = {
     tryDate: '请尝试选择其他日期',
     combinationEmpty: '所选模型与基准测试组合暂无评估数据',
     tryCombination: '请尝试选择其他组合',
+    scrollHint: '横向滚动查看完整图表',
+    axisBreak: (score: string) => `低于 ${score} 的得分位于坐标轴断点左侧的压缩刻度上。`,
   },
 } as const;
 
@@ -564,6 +642,9 @@ export default function EvalBarChartD3({
     }),
     [yLabels],
   );
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions();
+  // Long config labels leave a phone almost no plot, so the plot scrolls sideways instead.
+  const plotMinWidth = chartMargin.left + chartMargin.right + MIN_PLOT_WIDTH_PX;
 
   const sortedConfigLabels = useMemo(
     () => [...configurations, ...unofficialConfigurations].map((c) => c.configLabel),
@@ -689,14 +770,39 @@ export default function EvalBarChartD3({
     ],
   );
 
-  const xDomain = useMemo((): [number, number] => {
-    const allData = [...chartData, ...unofficialChartData];
-    if (allData.length === 0) return [0, 1];
-    const xMin = d3.min(allData, (d) => d.score - (d.scoreError || 0)) || 0;
-    const xMax = d3.max(allData, (d) => d.score + (d.scoreError || 0)) || 1;
-    const xPadding = (xMax - xMin) * 0.3;
-    return [Math.max(0, xMin - xPadding), Math.min(1, xMax + xPadding)];
-  }, [chartData, unofficialChartData]);
+  const scoreAxis = useMemo(
+    () =>
+      evaluationScoreAxis(
+        [...chartData, ...unofficialChartData].map((d) => ({
+          score: d.score,
+          low: d.errorMin ?? d.score - (d.scoreError || 0),
+          high: d.errorMax ?? d.score + (d.scoreError || 0),
+        })),
+      ),
+    [chartData, unofficialChartData],
+  );
+  const scoreX = useCallback(
+    (scale: unknown) => {
+      const plotScale = scale as d3.ScaleLinear<number, number>;
+      return (score: number) => plotScale(scoreAxis.toPlot(score));
+    },
+    [scoreAxis],
+  );
+  const scoreTicks = useCallback(
+    (scale: unknown) => {
+      const plotScale = scale as d3.ScaleLinear<number, number>;
+      const [start, end] = plotScale.range();
+      return scoreAxis.ticks(
+        plotScale.domain() as [number, number],
+        widthTickCount(Math.abs(end - start), SCORE_TICK_COUNT),
+      );
+    },
+    [scoreAxis],
+  );
+  const formatPlotTick = useCallback(
+    (plot: d3.AxisDomain) => formatScoreTick(scoreAxis.fromPlot(Number(plot)) ?? Number(plot)),
+    [scoreAxis],
+  );
 
   const chartHeight = Math.max(400, yLabels.length * 40 + chartMargin.top + chartMargin.bottom);
 
@@ -725,6 +831,12 @@ export default function EvalBarChartD3({
       </div>
     </div>
   ) : null;
+  const axisBreakNote =
+    scoreAxis.breakAt === null ? null : (
+      <div className="mt-2 text-3xs text-muted-foreground leading-tight">
+        {legendT.axisBreak(formatScoreTick(scoreAxis.breakAt))}
+      </div>
+    );
   const unofficialErrorData = useMemo(
     () => unofficialChartData.filter((d) => d.errorMin !== undefined && d.errorMax !== undefined),
     [unofficialChartData],
@@ -766,10 +878,11 @@ export default function EvalBarChartD3({
             ]),
           )
           .toSorted(),
-        xDomain,
+        scoreDomain: scoreAxis.domain,
+        breakAt: scoreAxis.breakAt,
         yLabels,
       }),
-    [chartData, unofficialChartData, xDomain, yLabels],
+    [chartData, unofficialChartData, scoreAxis, yLabels],
   );
   const officialPaletteIdentity = useMemo(
     () =>
@@ -800,7 +913,10 @@ export default function EvalBarChartD3({
     [runIndexByUrl, unofficialChartData],
   );
   const displayIdentity = `${showLabels}:${officialPaletteIdentity}:${unofficialPaletteIdentity}`;
-  const xScaleConfig = useMemo(() => ({ type: 'linear' as const, domain: xDomain }), [xDomain]);
+  const xScaleConfig = useMemo(
+    () => ({ type: 'linear' as const, domain: scoreAxis.domain, nice: false }),
+    [scoreAxis],
+  );
   const yScaleConfig = useMemo(
     () => ({ type: 'band' as const, domain: yLabels, padding: 0.1 }),
     [yLabels],
@@ -808,10 +924,11 @@ export default function EvalBarChartD3({
   const xAxisConfig = useMemo(
     () => ({
       label: `${getEvalBenchmarkLabel(selectedBenchmark as EvalBenchmark)} ${legendT.score}`,
-      tickFormat: (datum: d3.AxisDomain) => Number(datum).toFixed(2),
-      tickCount: 5,
+      tickFormat: formatPlotTick,
+      tickValues: scoreTicks,
+      tickCount: SCORE_TICK_COUNT,
     }),
-    [selectedBenchmark, legendT.score],
+    [selectedBenchmark, legendT.score, formatPlotTick, scoreTicks],
   );
   const yAxisConfig = useMemo(() => ({ customize: formatYAxisLabels }), []);
   const zoomConfig = useMemo(
@@ -820,20 +937,15 @@ export default function EvalBarChartD3({
       axes: 'x' as const,
       scaleExtent: [1, 20] as [number, number],
       resetEventName: 'evaluation_zoom_reset_evaluation-chart',
-      constrain: (transform: d3.ZoomTransform) => {
+      constrain: (transform: d3.ZoomTransform, extent: [[number, number], [number, number]]) => {
         const k = transform.k;
-        const innerWidth =
-          (typeof window === 'undefined' ? 800 : window.innerWidth) -
-          chartMargin.left -
-          chartMargin.right;
-        const xScale = d3.scaleLinear().domain(xDomain).range([0, innerWidth]);
-        const minTx = -xScale(1) * k + innerWidth;
-        const maxTx = -xScale(0) * k;
-        const tx = minTx < maxTx ? Math.max(minTx, Math.min(maxTx, transform.x)) : transform.x;
+        const innerWidth = extent[1][0] - extent[0][0];
+        // Panning stays inside the score domain, which fills [0, innerWidth] at k = 1.
+        const tx = Math.max(innerWidth * (1 - k), Math.min(0, transform.x));
         return d3.zoomIdentity.translate(tx, transform.y).scale(k);
       },
     }),
-    [chartMargin.left, chartMargin.right, xDomain],
+    [],
   );
   const pointColor = useCallback(
     (datum: EvaluationChartData, isOverlay: boolean) =>
@@ -864,10 +976,7 @@ export default function EvalBarChartD3({
           | d3.ScaleBand<string>
           | d3.ScaleLinear<number, number>
           | d3.ScaleLogarithmic<number, number>,
-      ) => {
-        const xScale = scale as unknown as d3.ScaleLinear<number, number>;
-        return xScale(datum.score);
-      },
+      ) => scoreX(scale)(datum.score),
       getRulerY: (
         datum: EvaluationChartData,
         scale: d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>,
@@ -883,7 +992,7 @@ export default function EvalBarChartD3({
       ) => selection.attr('r', 6),
       attachToLayer: 1,
     }),
-    [locale, pointColor],
+    [locale, pointColor, scoreX],
   );
 
   const layers = useMemo(
@@ -892,7 +1001,7 @@ export default function EvalBarChartD3({
         type: 'custom',
         key: 'error-bars',
         render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
+          const xScale = scoreX(xs);
           const yScale = ys as d3.ScaleBand<string>;
           renderErrorBars(group, errorData, {
             getCx: (d: EvaluationChartData) =>
@@ -924,7 +1033,7 @@ export default function EvalBarChartD3({
             .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
         },
         onZoom: (group, ctx) => {
-          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          const newXScale = scoreX(ctx.newXScale);
           const yScale = ctx.yScale as d3.ScaleBand<string>;
           const bars = group.selectAll<SVGGElement, EvaluationChartData>('.error-bar');
           bars
@@ -953,7 +1062,7 @@ export default function EvalBarChartD3({
         key: 'mean-points',
         displayIdentity: officialPaletteIdentity,
         render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
+          const xScale = scoreX(xs);
           const yScale = ys as d3.ScaleBand<string>;
           return renderPoints(group, chartData, {
             getCx: (d: EvaluationChartData) => xScale(d.score),
@@ -974,7 +1083,7 @@ export default function EvalBarChartD3({
             );
         },
         onZoom: (group, ctx) => {
-          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          const newXScale = scoreX(ctx.newXScale);
           const yScale = ctx.yScale as d3.ScaleBand<string>;
           updatePointsOnZoom<EvaluationChartData>(
             group,
@@ -987,7 +1096,7 @@ export default function EvalBarChartD3({
         type: 'custom',
         key: 'unofficial-error-bars',
         render: (group, { xScale: xs, yScale: ys }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
+          const xScale = scoreX(xs);
           const yScale = ys as d3.ScaleBand<string>;
           const capH = yScale.bandwidth() / 6;
 
@@ -1042,7 +1151,7 @@ export default function EvalBarChartD3({
             .attr('y2', (d) => (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2 + capH);
         },
         onZoom: (group, { newXScale, yScale: ys }) => {
-          const xScale = newXScale as d3.ScaleLinear<number, number>;
+          const xScale = scoreX(newXScale);
           const yScale = ys as d3.ScaleBand<string>;
           const capH = yScale.bandwidth() / 6;
           const bars = group.selectAll<SVGGElement, EvaluationChartData>('.unofficial-error-bar');
@@ -1074,13 +1183,7 @@ export default function EvalBarChartD3({
         key: 'score-labels',
         displayIdentity: showLabels ? 'visible' : 'hidden',
         render: (group, { xScale: xs, yScale: ys }) => {
-          renderScoreLabels(
-            group,
-            chartData,
-            showLabels,
-            xs as d3.ScaleLinear<number, number>,
-            ys as d3.ScaleBand<string>,
-          );
+          renderScoreLabels(group, chartData, showLabels, scoreX(xs), ys as d3.ScaleBand<string>);
         },
         onDisplayUpdate: (group, ctx) => {
           const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
@@ -1092,13 +1195,13 @@ export default function EvalBarChartD3({
             group,
             chartData,
             showLabels,
-            currentXScale,
+            scoreX(currentXScale),
             ctx.yScale as d3.ScaleBand<string>,
           );
         },
         onZoom: (group, ctx) => {
           if (!showLabels) return;
-          const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          const newXScale = scoreX(ctx.newXScale);
           const yScale = ctx.yScale as d3.ScaleBand<string>;
           group
             .selectAll<SVGGElement, EvaluationChartData>('.score-label-group')
@@ -1116,7 +1219,7 @@ export default function EvalBarChartD3({
         key: 'unofficial-overlay',
         displayIdentity: `${showLabels}:${unofficialPaletteIdentity}`,
         render: (group, { xScale: xs, yScale: ys, layout, tooltipElement }) => {
-          const xScale = xs as d3.ScaleLinear<number, number>;
+          const xScale = scoreX(xs);
           const yScale = ys as d3.ScaleBand<string>;
           const svgNode = layout.svg.node();
           const container = svgNode?.parentElement as HTMLDivElement | null;
@@ -1199,7 +1302,7 @@ export default function EvalBarChartD3({
           updateUnofficialScoreLabels(group, showLabels);
         },
         onZoom: (group, { newXScale, yScale: ys }) => {
-          const xScale = newXScale as d3.ScaleLinear<number, number>;
+          const xScale = scoreX(newXScale);
           const yScale = ys as d3.ScaleBand<string>;
           group
             .selectAll<SVGGElement, EvaluationChartData>('.unofficial-eval-point')
@@ -1208,6 +1311,28 @@ export default function EvalBarChartD3({
               (d) =>
                 `translate(${xScale(d.score)},${(yScale(d.configLabel) || 0) + yScale.bandwidth() / 2})`,
             );
+        },
+      },
+      {
+        type: 'custom',
+        key: 'score-axis',
+        render: (group, ctx) => {
+          const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLinear<number, number>;
+          renderTopAxis(ctx.layout, xScale, {
+            tickCount: SCORE_TICK_COUNT,
+            tickFormat: formatPlotTick,
+            tickValues: scoreTicks(xScale),
+          });
+          drawScoreAxisBreak(group, xScale, ctx.height, scoreAxis.gap);
+        },
+        onZoom: (group, ctx) => {
+          const xScale = ctx.newXScale as d3.ScaleLinear<number, number>;
+          renderTopAxis(ctx.layout, xScale, {
+            tickCount: SCORE_TICK_COUNT,
+            tickFormat: formatPlotTick,
+            tickValues: scoreTicks(xScale),
+          });
+          drawScoreAxisBreak(group, xScale, ctx.height, scoreAxis.gap);
         },
       },
     ],
@@ -1224,8 +1349,13 @@ export default function EvalBarChartD3({
       runIndexByUrl,
       locale,
       pointColor,
+      scoreAxis,
+      scoreX,
+      scoreTicks,
+      formatPlotTick,
     ],
   );
+  useStickyTopAxis(chartRef);
 
   const isInitializing = evaluationChartIsInitializing({ isEvaluationDataSettled });
   if (isInitializing && chartData.length === 0 && unofficialChartData.length === 0) {
@@ -1272,71 +1402,87 @@ export default function EvalBarChartD3({
   }
 
   return (
-    <D3Chart<EvaluationChartData>
-      ref={chartRef}
-      chartId="evaluation-chart"
-      data={chartData}
-      dataIdentity={dataIdentity}
-      metricIdentity={metricIdentity}
-      displayIdentity={displayIdentity}
-      height={chartHeight}
-      margin={chartMargin}
-      watermark={getChartWatermark(isUnofficialRun)}
-      grabCursor={false}
-      caption={caption}
-      footer={footer}
-      xScale={xScaleConfig}
-      yScale={yScaleConfig}
-      xAxis={xAxisConfig}
-      yAxis={yAxisConfig}
-      layers={layers}
-      zoom={zoomConfig}
-      tooltip={tooltipConfig}
-      legendElement={
-        <ChartLegend
-          variant="sidebar"
-          legendItems={legendItems}
-          onItemRemove={removeHardware}
-          isLegendExpanded={isLegendExpanded}
-          onExpandedChange={(expanded) => {
-            setIsLegendExpanded(expanded);
-            track('evaluation_legend_expanded', { enabled: expanded });
-          }}
-          switches={[
-            {
-              id: 'eval-show-labels',
-              label: legendT.showLabels,
-              checked: showLabels,
-              onCheckedChange: (checked) => {
-                setShowLabels(checked);
-                track('evaluation_show_labels_toggled', { enabled: checked });
+    <div className="w-full" ref={setContainerRef}>
+      <D3Chart<EvaluationChartData>
+        ref={chartRef}
+        chartId="evaluation-chart"
+        data={chartData}
+        dataIdentity={dataIdentity}
+        metricIdentity={metricIdentity}
+        displayIdentity={displayIdentity}
+        height={chartHeight}
+        margin={chartMargin}
+        watermark={getChartWatermark(isUnofficialRun)}
+        grabCursor={false}
+        caption={caption}
+        footer={footer}
+        xScale={xScaleConfig}
+        yScale={yScaleConfig}
+        xAxis={xAxisConfig}
+        yAxis={yAxisConfig}
+        layers={layers}
+        zoom={zoomConfig}
+        tooltip={tooltipConfig}
+        onRender={stickRenderedTopAxis}
+        onExportRender={unstickExportedTopAxis}
+        scrollablePlot={{
+          minWidth: plotMinWidth,
+          label: legendT.scrollHint,
+          enabled: dimensions.width > 0 && plotMinWidth > dimensions.width,
+        }}
+        legendElement={
+          <ChartLegend
+            variant="sidebar"
+            legendItems={legendItems}
+            onItemRemove={removeHardware}
+            isLegendExpanded={isLegendExpanded}
+            onExpandedChange={(expanded) => {
+              setIsLegendExpanded(expanded);
+              track('evaluation_legend_expanded', { enabled: expanded });
+            }}
+            switches={[
+              {
+                id: 'eval-show-labels',
+                label: legendT.showLabels,
+                checked: showLabels,
+                onCheckedChange: (checked) => {
+                  setShowLabels(checked);
+                  track('evaluation_show_labels_toggled', { enabled: checked });
+                },
               },
-            },
-            {
-              id: 'eval-high-contrast',
-              label: legendT.highContrast,
-              checked: highContrast,
-              onCheckedChange: (checked) => {
-                setHighContrast(checked);
-                track('evaluation_high_contrast_toggled', { enabled: checked });
+              {
+                id: 'eval-high-contrast',
+                label: legendT.highContrast,
+                checked: highContrast,
+                onCheckedChange: (checked) => {
+                  setHighContrast(checked);
+                  track('evaluation_high_contrast_toggled', { enabled: checked });
+                },
               },
-            },
-          ]}
-          reset={{
-            id: 'eval-reset-filter',
-            disabled:
-              effectiveOfficialHardware.size >= hwTypesWithData.size &&
-              activeOverlayHwTypes.size >= allOverlayHwTypes.size,
-            onClick: () => {
-              selectAllHwTypes();
-              setUnifiedOverlaySelection(hwTypesWithData, allOverlayHwTypes);
-              track('evaluation_filter_reset');
-            },
-          }}
-          enableTooltips={true}
-          keyIndicators={parallelismKey}
-        />
-      }
-    />
+            ]}
+            reset={{
+              id: 'eval-reset-filter',
+              disabled:
+                effectiveOfficialHardware.size >= hwTypesWithData.size &&
+                activeOverlayHwTypes.size >= allOverlayHwTypes.size,
+              onClick: () => {
+                selectAllHwTypes();
+                setUnifiedOverlaySelection(hwTypesWithData, allOverlayHwTypes);
+                track('evaluation_filter_reset');
+              },
+            }}
+            enableTooltips={true}
+            keyIndicators={
+              parallelismKey || axisBreakNote ? (
+                <>
+                  {parallelismKey}
+                  {axisBreakNote}
+                </>
+              ) : null
+            }
+          />
+        }
+      />
+    </div>
   );
 }
