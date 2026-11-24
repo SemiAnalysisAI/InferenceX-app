@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 
 /**
- * SHA-256 of the database URL's host name, so a manifest identifies its database without
- * revealing the host when the manifest is uploaded or printed.
+ * SHA-256 of the database URL's host name and path (the database name), so a manifest identifies
+ * its database without revealing the host when the manifest is uploaded or printed.
  */
 export function databaseFingerprint(databaseUrl: string): string {
-  return createHash('sha256').update(new URL(databaseUrl).hostname).digest('hex');
+  const { hostname, pathname } = new URL(databaseUrl);
+  return createHash('sha256').update(`${hostname}${pathname}`).digest('hex');
 }
 
 /** Throws unless a manifest's `database` fingerprint is that of `databaseUrl`. */

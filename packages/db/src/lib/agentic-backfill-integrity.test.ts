@@ -21,6 +21,13 @@ describe('manifest database', () => {
     expect(() => assertManifestDatabase(other, url)).toThrow('different database');
     expect(() => assertManifestDatabase(undefined, url)).toThrow('different database');
   });
+
+  it('tells apart two databases on one host', () => {
+    const sameHost = 'postgres://user:pass@ep-example-123.us-east-2.aws.neon.tech/other_db';
+    expect(() => assertManifestDatabase(databaseFingerprint(sameHost), url)).toThrow(
+      'different database',
+    );
+  });
 });
 
 const before: BackfillState = {
