@@ -1,9 +1,10 @@
 'use client';
 
 import { ticks } from 'd3';
+import { ChevronRight } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 import {
@@ -22,7 +23,14 @@ import {
 } from '@/components/ui/dialog';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  TooltipContent,
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useOperatorXTimelines } from '@/hooks/api/use-operatorx';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { hardwareLabel } from './compare/hardware';
@@ -32,6 +40,9 @@ import { caseOrigin } from './compare/slices';
 type CategoryColors = Record<KernelCategory, string>;
 
 const OTHER = 'var(--muted-foreground)';
+
+/** A full kernel symbol in a tooltip: monospace, wrapped anywhere since symbols have no spaces. */
+const SYMBOL_TOOLTIP = 'break-all font-mono text-xs';
 
 const CATEGORY_COLORS: Record<'light' | 'dark', CategoryColors> = {
   light: {
@@ -242,6 +253,7 @@ function kernelTimes(timeline: OperatorXTimeline | null): (k: TimelineKernel) =>
 }
 
 function GpuTimeline({
+  op,
   hardware,
   color,
   latencyUs,
@@ -249,6 +261,7 @@ function GpuTimeline({
   scaleUs,
   palette,
 }: {
+  op: ComparisonOp;
   hardware: string;
   color: string;
   latencyUs: number | null;
@@ -258,10 +271,18 @@ function GpuTimeline({
 }) {
   const strings = STRINGS[useLocale()];
   const [hovered, setHovered] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
   const colorOf = (name: number) => (timeline ? palette[timeline.categories[name]] : OTHER);
   const event = timeline && hovered !== null ? timeline.events[hovered] : null;
   const timeOf = kernelTimes(timeline);
   const total = timeline?.kernels.reduce((sum, k) => sum + timeOf(k), 0) ?? 0;
+  const toggleKernel = (name: number) => {
+    const next = new Set(expanded);
+    const enabled = !next.delete(name);
+    if (enabled) next.add(name);
+    setExpanded(next);
+    track('operatorx_kernel_name_toggled', { op, gpu: hardware, enabled });
+  };
   return (
     <section className="space-y-2 border-t border-border/60 pt-3" data-testid="operatorx-timeline">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
@@ -311,6 +332,28 @@ function GpuTimeline({
                       />
                     ) : null,
                   )}
+                  {event?.[1] === li && (
+                    <TooltipRoot open onOpenChange={(open) => !open && setHovered(null)}>
+                      <TooltipTrigger asChild>
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-y-0"
+                          style={{
+                            left: `${(event[2] / scaleUs) * 100}%`,
+                            width: `max(2px, ${(event[3] / scaleUs) * 100}%)`,
+                          }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        collisionPadding={10}
+                        updatePositionStrategy="always"
+                        className={SYMBOL_TOOLTIP}
+                      >
+                        {timeline.names[event[0]]}
+                      </TooltipContent>
+                    </TooltipRoot>
+                  )}
                 </div>
               </div>
             ))}
@@ -351,33 +394,73 @@ function GpuTimeline({
             <tbody className="tabular-nums">
               {timeline.kernels.map((k) => {
                 const name = timeline.names[k.name];
+                const open = expanded.has(k.name);
                 return (
-                  <tr key={k.name} className="border-b border-border/30 last:border-0">
-                    <td className="py-1 pr-3">
-                      <span className="flex min-w-0 items-center gap-2" title={name}>
-                        <span
-                          className="inline-block size-2 shrink-0 rounded-sm"
-                          style={{ background: colorOf(k.name) }}
-                        />
-                        <span className="truncate font-mono">{shortName(name)}</span>
-                      </span>
-                    </td>
-                    <td className="py-1 text-right">{formatUs(timeOf(k))}</td>
-                    <td className="py-1 text-right">
-                      {total > 0 ? `${Math.round((timeOf(k) / total) * 100)}%` : '—'}
-                    </td>
-                    <td className="py-1 text-right">{k.countPerCall}</td>
-                    <td className="hidden py-1 text-right md:table-cell">
-                      {k.grid?.join('×') ?? '—'}
-                    </td>
-                    <td className="hidden py-1 text-right md:table-cell">
-                      {k.block?.join('×') ?? '—'}
-                    </td>
-                    <td className="hidden py-1 text-right md:table-cell">{k.regs ?? '—'}</td>
-                    <td className="hidden py-1 text-right md:table-cell">
-                      {k.occupancyPct ? `${Math.round(k.occupancyPct)}%` : '—'}
-                    </td>
-                  </tr>
+                  <Fragment key={k.name}>
+                    {/* A click or tap anywhere on the row toggles its full kernel name. */}
+                    <tr
+                      className={`cursor-pointer hover:bg-muted/30 ${open ? '' : 'border-b border-border/30 last:border-0'}`}
+                      onClick={() => toggleKernel(k.name)}
+                    >
+                      <td className="py-1 pr-3">
+                        <TooltipRoot>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-expanded={open}
+                              className="flex w-full min-w-0 items-center gap-1.5 rounded-xs text-left focus-visible:outline-2 focus-visible:outline-ring"
+                            >
+                              <ChevronRight
+                                aria-hidden="true"
+                                className={`size-3 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
+                              />
+                              <span
+                                className="inline-block size-2 shrink-0 rounded-sm"
+                                style={{ background: colorOf(k.name) }}
+                              />
+                              <span className="truncate font-mono">{shortName(name)}</span>
+                            </button>
+                          </TooltipTrigger>
+                          {!open && (
+                            <TooltipContent
+                              side="top"
+                              align="start"
+                              collisionPadding={10}
+                              className={SYMBOL_TOOLTIP}
+                            >
+                              {name}
+                            </TooltipContent>
+                          )}
+                        </TooltipRoot>
+                      </td>
+                      <td className="py-1 text-right">{formatUs(timeOf(k))}</td>
+                      <td className="py-1 text-right">
+                        {total > 0 ? `${Math.round((timeOf(k) / total) * 100)}%` : '—'}
+                      </td>
+                      <td className="py-1 text-right">{k.countPerCall}</td>
+                      <td className="hidden py-1 text-right md:table-cell">
+                        {k.grid?.join('×') ?? '—'}
+                      </td>
+                      <td className="hidden py-1 text-right md:table-cell">
+                        {k.block?.join('×') ?? '—'}
+                      </td>
+                      <td className="hidden py-1 text-right md:table-cell">{k.regs ?? '—'}</td>
+                      <td className="hidden py-1 text-right md:table-cell">
+                        {k.occupancyPct ? `${Math.round(k.occupancyPct)}%` : '—'}
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="border-b border-border/30 last:border-0">
+                        <td
+                          colSpan={8}
+                          className="break-all pb-1.5 pl-8 font-mono"
+                          data-testid="operatorx-kernel-name"
+                        >
+                          {name}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -434,6 +517,7 @@ function CaseTimelines({
         return (
           <GpuTimeline
             key={hw}
+            op={op}
             hardware={hw}
             color={colors[hw] ?? OTHER}
             latencyUs={view.measurements[hw]?.latencyUs[caseIndex] ?? null}
@@ -482,9 +566,15 @@ export function CaseDetail({
       <DialogContent
         className="flex max-h-[94vh] w-[min(96vw,64rem)] max-w-[min(96vw,64rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6"
         data-testid="operatorx-case-detail"
+        // Focus the dialog itself: a cached timeline renders kernel name toggles first, and
+        // focusing one would open its tooltip as the dialog appears.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement).focus();
+        }}
       >
         {c && caseIndex !== null && (
-          <>
+          <TooltipProvider delayDuration={150} disableHoverableContent>
             <DialogHeader>
               <DialogTitle>{c.shape}</DialogTitle>
               <DialogDescription>{c.precision}</DialogDescription>
@@ -497,7 +587,7 @@ export function CaseDetail({
               colors={colors}
               caseIndex={caseIndex}
             />
-          </>
+          </TooltipProvider>
         )}
       </DialogContent>
     </Dialog>

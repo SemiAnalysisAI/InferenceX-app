@@ -600,8 +600,8 @@ never collide with the compare API's `roofline*` summary selectors.
 | Scatter log scale, baseline       | `scatterLog`, `baseline`                                     | Presentation only; returned rows do not change                                                                          |
 
 Unknown or malformed URL values fall back to the existing defaults in the UI; the APIs
-reject them with 400. Legend expansion, open dialogs and diagram folds are
-presentation-only and are not persisted.
+reject them with 400. Legend expansion, open dialogs, diagram folds and full kernel names
+expanded in case detail are presentation-only and are not persisted.
 
 中文：OperatorX 分享链接保留类别路径（包括 `/zh`）以及 `model`、`parallel`、`metric`、
 `hardware` 和 `baseline`；在对比标签切换模型时会清除 `hardware` 和 `baseline`，旧的 `workload`
@@ -613,5 +613,5 @@ ID 会替换为对应模型。
 汇总图的 `summaryPrecision`、`summaryNormalized`、`summarySharedOnly` 对应对比 API 的
 `rooflinePrecision`、`rooflineNormalized`、`rooflineSharedOnly`，GPU 选择对应
 `rooflineHardware`。`scatterLog` 和 `baseline` 仅影响展示，不改变返回的数据行。
-UI 遇到无效值时沿用默认设置，API 则返回 400。图例展开、详情弹窗和模型结构折叠仅影响展示，
-不写入分享链接。
+UI 遇到无效值时沿用默认设置，API 则返回 400。
+图例展开、详情弹窗、模型结构折叠以及在详情弹窗中展开的完整 kernel 名称仅影响展示，不写入分享链接。
