@@ -975,10 +975,12 @@ const SlotDetail = memo(
     const strings = STRINGS[locale];
     const [inspected, setInspected] = useState<number | null>(null);
     const [pickedFamily, setFamily] = useState<string | null>(null);
-    // A case or shape opened for one op never carries over to the next op shown
-    const [inspectedFor, setInspectedFor] = useState(data);
-    if (inspectedFor !== data) {
-      setInspectedFor(data);
+    // A case or shape opened for one op never carries over to the next op shown. A legend
+    // click rebuilds `data` for the same op, which keeps them.
+    const shown = data && `${data.block.id}:${data.slot.id}`;
+    const [inspectedFor, setInspectedFor] = useState(shown);
+    if (inspectedFor !== shown) {
+      setInspectedFor(shown);
       setInspected(null);
       setFamily(null);
     }
@@ -1098,7 +1100,8 @@ export function ModelView({
   const pickedParam = search.get(HARDWARE_PARAM);
   const picked = useMemo(() => parsePickedHardware(pickedParam), [pickedParam]);
   const pickedPrecision = sharePrecision(search.get('modelPrecision'));
-  const [open, setOpen] = useState<SlotData | null>(null);
+  // The op is looked up again on every render, so its charts follow the legend
+  const [open, setOpen] = useState<{ block: string; slot: string } | null>(null);
   const pickedBin = shareBin(search.get('modelBin'));
   const sweep = shareBoolean(search.get('modelSweep'), false);
 
@@ -1280,7 +1283,7 @@ export function ModelView({
   const openSlot = useCallback(
     (data: SlotData) => {
       track('operatorx_model_op_opened', { model: requested, op: data.slot.op });
-      setOpen(data);
+      setOpen({ block: data.block.id, slot: data.slot.id });
     },
     [requested],
   );
@@ -1296,6 +1299,10 @@ export function ModelView({
     [requested, openFolds],
   );
   const closeSlot = useCallback(() => setOpen(null), []);
+  const opened = useMemo(
+    () => (open && slots.get(open.block)?.find((s) => s.slot.id === open.slot)) ?? null,
+    [open, slots],
+  );
 
   const error = gemm.error ?? moe.error ?? attention.error;
   if (error)
@@ -1403,7 +1410,11 @@ export function ModelView({
             </div>
           </Card>
         )}
-        <SlotDetail data={open} modelName={getModelLabel(requested as Model)} onClose={closeSlot} />
+        <SlotDetail
+          data={opened}
+          modelName={getModelLabel(requested as Model)}
+          onClose={closeSlot}
+        />
       </div>
     </TooltipProvider>
   );
