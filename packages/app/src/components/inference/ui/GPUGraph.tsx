@@ -49,6 +49,7 @@ import {
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
 import { computeTooltipPosition, syncPointLabel } from '@/lib/d3-chart/layers/scatter-points';
+import { zoomRedrawLayer } from '@/lib/d3-chart/layers/zoom-redraw-layer';
 import {
   attachOverlayXMarkerHandlers,
   overlayMarkerPosition,
@@ -1033,27 +1034,8 @@ const GPUGraph = React.memo(
     );
     drawPerfRulerRef.current = drawPerfRuler;
 
-    const perfRulerLayer: CustomLayerConfig = useMemo(
-      () => ({
-        type: 'custom',
-        key: 'perf-ruler',
-        render: (zoomGroup, ctx) =>
-          drawPerfRuler(
-            zoomGroup,
-            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
-            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-        onZoom: (zoomGroup, ctx) =>
-          drawPerfRuler(
-            zoomGroup,
-            ctx.newXScale as ContinuousScale,
-            ctx.newYScale as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-      }),
+    const perfRulerLayer = useMemo(
+      () => zoomRedrawLayer('perf-ruler', drawPerfRuler),
       [drawPerfRuler],
     );
 

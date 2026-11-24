@@ -105,6 +105,7 @@ import {
   type PerfRulerRenderEntry,
   type PerfRulerState,
 } from '@/lib/d3-chart/layers/perf-ruler';
+import { zoomRedrawLayer } from '@/lib/d3-chart/layers/zoom-redraw-layer';
 import {
   attachOverlayXMarkerHandlers,
   overlayMarkerPosition,
@@ -3704,26 +3705,7 @@ const ScatterGraph = React.memo(
         };
       });
 
-      const perfRulerLayer: CustomLayerConfig = {
-        type: 'custom',
-        key: 'perf-ruler',
-        render: (zoomGroup, ctx) =>
-          drawPerfRuler(
-            zoomGroup,
-            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
-            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-        onZoom: (zoomGroup, ctx) =>
-          drawPerfRuler(
-            zoomGroup,
-            ctx.newXScale as ContinuousScale,
-            ctx.newYScale as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-      };
+      const perfRulerLayer = zoomRedrawLayer('perf-ruler', drawPerfRuler);
 
       const axisCeiling = metricAxisCeiling(selectedYAxisMetric);
       const drawCeiling = (
@@ -3862,22 +3844,7 @@ const ScatterGraph = React.memo(
           .attr('stroke-dasharray', '2,3')
           .attr('d', (d) => line(d.band));
       };
-      const headroomLayer: CustomLayerConfig = {
-        type: 'custom',
-        key: 'powerx-headroom',
-        render: (zoomGroup, ctx) =>
-          drawHeadroom(
-            zoomGroup,
-            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
-            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
-          ),
-        onZoom: (zoomGroup, ctx) =>
-          drawHeadroom(
-            zoomGroup,
-            ctx.newXScale as ContinuousScale,
-            ctx.newYScale as ContinuousScale,
-          ),
-      };
+      const headroomLayer = zoomRedrawLayer('powerx-headroom', drawHeadroom);
 
       // PowerX on a coarse pointer: there is no hover tooltip, so a finger dragged across
       // the plot snaps to the nearest visible point (official or overlay, under the current
@@ -4162,27 +4129,7 @@ const ScatterGraph = React.memo(
           .style('font-weight', 600)
           .text((d) => d.text);
       };
-      const labelsLayer: CustomLayerConfig = {
-        type: 'custom',
-        key: 'powerx-direct-labels',
-        render: (zoomGroup, ctx) =>
-          drawDirectLabels(
-            zoomGroup,
-            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
-            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-        onZoom: (zoomGroup, ctx) =>
-          drawDirectLabels(
-            zoomGroup,
-            ctx.newXScale as ContinuousScale,
-            ctx.newYScale as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-      };
-      return [labelsLayer];
+      return [zoomRedrawLayer('powerx-direct-labels', drawDirectLabels)];
     }, [
       powerXDirectLabels,
       powerRole,
