@@ -8,7 +8,7 @@ import { useClientSearch } from '@/hooks/useClientSearch';
 import { DEFAULT_OPERATORX_MODEL } from '@/lib/routing/operatorx-category';
 
 import { ComparisonDashboard } from './ComparisonDashboard';
-import { ModelViewLoading } from './model-view/shell';
+import { ModelViewLoading } from './model-view/ModelViewLoading';
 import { useOperatorXCategory } from './OperatorXHeader';
 
 const ModelView = dynamic(() => import('./model-view/ModelView').then((mod) => mod.ModelView), {

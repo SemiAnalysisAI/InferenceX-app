@@ -14,7 +14,7 @@ import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { VizCaption, VizFooter, hardwareLegend } from '../charts/kit';
+import { VizCaption, VizFooter, hardwareLegend } from '../charts/ChartChrome';
 import { formatRatio, logAxisTicks, ratioScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import { type ComparisonModel, geomeanAdvantage } from '../compare/model';

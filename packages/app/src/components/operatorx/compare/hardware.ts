@@ -3,7 +3,6 @@ import { OPERATORX_HARDWARE_REFERENCES } from '@semianalysisai/inferencex-db/ope
 
 import { GPU_SPECS, type GpuSpec } from '@/lib/catalog/gpu-specs';
 import { getModelSortIndex } from '@/lib/catalog/constants';
-import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 import type {
   ComparisonView,
   ComputePrecision,
@@ -11,10 +10,6 @@ import type {
 
 export function hardwareLabel(key: string): string {
   return OPERATORX_HARDWARE_REFERENCES[key]?.label ?? HW_REGISTRY[key]?.label ?? key.toUpperCase();
-}
-
-export function operatorXColors(keys: string[], theme: 'light' | 'dark'): Record<string, string> {
-  return generateVendorColors(keys, theme);
 }
 
 export function sortHardware(keys: string[]): string[] {

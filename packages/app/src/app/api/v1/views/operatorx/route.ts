@@ -1,5 +1,5 @@
 import { rooflineBound } from '@/components/operatorx/compare/roofline-bound';
-import { sizeBin } from '@/components/operatorx/model-view/OpBars';
+import { sizeBin } from '@/lib/operatorx/size-bins';
 import type { NextRequest } from 'next/server';
 
 import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';

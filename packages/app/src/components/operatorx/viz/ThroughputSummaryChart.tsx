@@ -1,4 +1,4 @@
-import { Roofline, SUMMARY_TITLE } from './roofline';
+import { Roofline, SUMMARY_TITLE } from './RooflineChart';
 import type { ComparisonModel } from '../compare/model';
 import type { VizDefinition } from './types';
 

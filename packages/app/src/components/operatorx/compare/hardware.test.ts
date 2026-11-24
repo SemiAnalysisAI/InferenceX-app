@@ -2,11 +2,9 @@ import { describe, expect, it } from 'bun:test';
 
 import { buildComparison, comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';
-import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import {
   hardwareLabel,
-  operatorXColors,
   peakBandwidthTBs,
   peakTflops,
   removeHardwareSelection,
@@ -125,22 +123,6 @@ describe('Ascend OperatorX reference', () => {
     expect(filtered.hardware).toEqual([]);
     expect(filtered.cases).toEqual([]);
   });
-
-  it.each(['light', 'dark'] as const)(
-    'uses the shared Huawei palette without recoloring AMD in %s mode',
-    (theme) => {
-      const otherKeys = ['mi300x', 'mi325x', 'mi355x', 'h100', 'unknown'];
-      const colors = operatorXColors([...otherKeys, 'ascend950pr'], theme);
-      for (const key of otherKeys)
-        expect(colors[key]).toBe(generateVendorColors(otherKeys, theme)[key]);
-      expect(colors.ascend950pr).toBe(
-        generateVendorColors(['Huawei 950PR'], theme)['Huawei 950PR'],
-      );
-      expect(colors.ascend950pr).not.toBe(colors.mi355x);
-      expect(operatorXColors(['ascend950pr'], theme).ascend950pr).toBe(colors.ascend950pr);
-      expect(operatorXColors([], theme)).toEqual({});
-    },
-  );
 });
 
 describe('toggleHardwareSelection', () => {

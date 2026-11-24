@@ -18,6 +18,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { type Model, getModelLabel } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -33,7 +34,6 @@ import {
 } from './OperatorXHeader';
 import {
   hardwareLabel,
-  operatorXColors,
   measuredHardware,
   removeHardwareSelection,
   toggleHardwareSelection,
@@ -65,6 +65,7 @@ const STRINGS = {
     baseline: 'Baseline',
     none: 'None',
     oneDevice: '1 GPU',
+    metricOption: (label: string, unit: string) => `${label} (${unit})`,
     loadingModel: (label?: string) => `Loading ${label ?? 'results'}…`,
     tooltips: {
       model: 'The model, or shape list, whose operator shapes are compared.',
@@ -87,6 +88,7 @@ const STRINGS = {
     baseline: '基线',
     none: '无',
     oneDevice: '单 GPU',
+    metricOption: (label: string, unit: string) => `${label}（${unit}）`,
     loadingModel: (label?: string) => `正在加载${label ? ` ${label}` : '结果'}…`,
     tooltips: {
       model: '参与对比的算子形状所属的模型或形状列表。',
@@ -253,7 +255,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   // GPUs with measured results at the selected device split
   const available = useMemo(() => (view ? measuredHardware([view]) : []), [view]);
   const colors = useMemo(
-    () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
+    () => generateVendorColors(view?.hardware.map((h) => h.id) ?? [], theme),
     [view, theme],
   );
   const hardware = useMemo(
@@ -398,8 +400,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                   label: '',
                   options: METRICS.map((m) => ({
                     value: m.id,
-                    label:
-                      locale === 'zh' ? `${m.label.zh}（${m.unit}）` : `${m.label.en} (${m.unit})`,
+                    label: strings.metricOption(m.label[locale], m.unit),
                   })),
                 },
               ]}

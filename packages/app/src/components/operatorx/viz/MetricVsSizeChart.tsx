@@ -15,7 +15,13 @@ import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { SCATTER_MARGIN, VizCaption, VizFooter, hardwareLegend, inspectCase } from '../charts/kit';
+import {
+  SCATTER_MARGIN,
+  VizCaption,
+  VizFooter,
+  hardwareLegend,
+  inspectCase,
+} from '../charts/ChartChrome';
 import { formatCompact, logAxisTicks, valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';

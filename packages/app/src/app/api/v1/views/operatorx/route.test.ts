@@ -4,7 +4,7 @@ import { mocked } from '@/test/helpers';
 
 import type { Comparison, ComparisonRow } from '@semianalysisai/inferencex-db/operatorx/compare';
 
-import { sizeBin } from '@/components/operatorx/model-view/OpBars';
+import { sizeBin } from '@/lib/operatorx/size-bins';
 import { getComparison } from '@/lib/operatorx/service';
 
 import { GET } from './route';

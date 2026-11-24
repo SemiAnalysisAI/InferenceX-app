@@ -457,7 +457,7 @@ function CaseOrigin({ origin }: { origin: { label: string; value: string }[] }) 
       {origin.map((o) => (
         <div key={o.label} className="contents">
           <dt className="text-muted-foreground">{o.label}</dt>
-          <dd className="font-mono">{o.value}</dd>
+          <dd>{o.value}</dd>
         </div>
       ))}
     </dl>
@@ -491,7 +491,7 @@ export function CaseDetail({
           <>
             <DialogHeader>
               <DialogTitle>{c.shape}</DialogTitle>
-              <DialogDescription className="font-mono text-xs">{c.precision}</DialogDescription>
+              <DialogDescription>{c.precision}</DialogDescription>
             </DialogHeader>
             <CaseOrigin origin={caseOrigin(view, caseIndex, locale)} />
             <CaseTimelines

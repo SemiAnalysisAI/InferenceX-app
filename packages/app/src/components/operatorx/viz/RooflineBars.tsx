@@ -10,7 +10,7 @@ import { type CustomLayerConfig, D3Chart, type D3ChartHandle } from '@/lib/d3-ch
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { RooflineSummary, RooflineSummaryBar } from '@/lib/operatorx/roofline-summary';
-import { VizFooter, inspectCase } from '../charts/kit';
+import { VizFooter, inspectCase } from '../charts/ChartChrome';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
 

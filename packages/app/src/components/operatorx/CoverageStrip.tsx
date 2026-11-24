@@ -22,17 +22,18 @@ const STATES: {
   { id: 'not-run', label: { en: 'Not run', zh: '未运行' }, className: 'bg-muted' },
 ];
 
+const STRINGS = {
+  en: { coverage: (cases: string) => `Coverage of ${cases} cases` },
+  zh: { coverage: (cases: string) => `${cases} 个用例的覆盖情况` },
+};
+
 export function CoverageStrip({ model }: { model: ComparisonModel }) {
   const locale = useLocale();
   const total = model.view.cases.length;
   return (
     <div data-testid="operatorx-coverage" className="space-y-2 text-xs">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-        <span>
-          {locale === 'zh'
-            ? `${total.toLocaleString()} 个用例的覆盖情况`
-            : `Coverage of ${total.toLocaleString()} cases`}
-        </span>
+        <span>{STRINGS[locale].coverage(total.toLocaleString())}</span>
         {STATES.map((s) => (
           <span key={s.id} className="flex items-center gap-1.5">
             <span className={`inline-block size-2 rounded-sm ${s.className}`} />

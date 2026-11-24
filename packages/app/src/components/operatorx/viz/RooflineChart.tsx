@@ -20,7 +20,13 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 
-import { SCATTER_MARGIN, VizCaption, VizFooter, hardwareLegend, inspectCase } from '../charts/kit';
+import {
+  SCATTER_MARGIN,
+  VizCaption,
+  VizFooter,
+  hardwareLegend,
+  inspectCase,
+} from '../charts/ChartChrome';
 import { formatCompact, logAxisTicks } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
 import { type RooflineBound, rooflineBound, ridgeShare } from '../compare/roofline-bound';
@@ -28,7 +34,7 @@ import type { ComparisonModel } from '../compare/model';
 import { originText } from '../compare/slices';
 import { setSearchParam } from '../compare/url-selection';
 import type { VizDefinition } from './types';
-import { RooflineBars } from './roofline-bars';
+import { RooflineBars } from './RooflineBars';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROOF_DASH = '6 4';

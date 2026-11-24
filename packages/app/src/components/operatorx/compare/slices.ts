@@ -22,14 +22,15 @@ export function sizeBucket(x: number | null): string | null {
   return SIZE_BUCKETS.find((b) => x <= b.max)?.label ?? null;
 }
 
+const TESTLIST: Record<Locale, string> = { en: 'Testlist', zh: '测试列表' };
+
 export function caseOrigin(
   view: ComparisonView,
   i: number,
   locale: Locale,
 ): { label: string; value: string }[] {
   const c = view.cases[i];
-  if (c.sources.length === 0)
-    return [{ label: locale === 'zh' ? '测试列表' : 'Testlist', value: c.testlist }];
+  if (c.sources.length === 0) return [{ label: TESTLIST[locale], value: c.testlist }];
   return c.sources.map((s) => ({ label: view.models[s.model], value: s.roles.join(', ') }));
 }
 

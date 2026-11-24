@@ -59,7 +59,6 @@ import {
 import {
   hardwareLabel,
   measuredHardware,
-  operatorXColors,
   removeHardwareSelection,
   restoresAllHardware,
   toggleHardwareSelection,
@@ -74,8 +73,8 @@ import {
   parsePickedHardware,
   setPickedHardware,
 } from '../compare/url-selection';
-import { metricVsSize } from '../viz/metric-vs-size';
-import { roofline } from '../viz/roofline';
+import { metricVsSize } from '../viz/MetricVsSizeChart';
+import { roofline } from '../viz/RooflineChart';
 import {
   architecture,
   type FlowNode,
@@ -88,25 +87,24 @@ import {
   subView,
 } from './layers';
 import { track } from '@/lib/analytics/analytics';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 import { isDarkTheme } from '@/lib/themes/themes';
 
 import { diagramText } from './diagram-copy';
+import { binTokens, sizeBin, tokenBin } from '@/lib/operatorx/size-bins';
 import {
   barsHeight,
   binPct,
-  binTokens,
   gpuSweep,
   gpuValues,
   inBin,
   OpBars,
   OpSweep,
-  sizeBin,
   SWEEP_PX,
-  tokenBin,
 } from './OpBars';
 import { DEFAULT_OPERATORX_MODEL } from '@/lib/routing/operatorx-category';
 
-import { ModelViewLoading } from './shell';
+import { ModelViewLoading } from './ModelViewLoading';
 
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
@@ -672,7 +670,7 @@ const BlockDiagram = memo(
           <div
             key={n.id}
             title={n.title && diagramText(n.title, locale)}
-            className={`absolute flex items-center justify-center overflow-hidden rounded-sm border bg-card px-1.5 text-center leading-tight ${measured ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
+            className={`absolute flex items-center justify-center overflow-hidden rounded-sm border bg-card px-1.5 text-center leading-tight ${measured ? 'text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
             style={{
               left: pct(box.left),
               width: pct(box.width),
@@ -860,7 +858,7 @@ const ModelControls = memo(
         value={requested}
         models={modelOptions}
         onChange={(v) => {
-          track('operatorx_model_selected', { model: v });
+          track('operatorx_model_selected', { op: 'model', model: v });
           setParam('model', v);
         }}
       />
@@ -1037,15 +1035,10 @@ const SlotDetail = memo(
           {data && sub && familyKey !== null && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-mono">
-                  {diagramText(data.slot.label, locale)}
-                </DialogTitle>
+                <DialogTitle>{diagramText(data.slot.label, locale)}</DialogTitle>
                 <DialogDescription>
                   {diagramText(data.block.label, locale)} · {modelName} ·{' '}
-                  {strings.sizesOf(
-                    familyIndices.length,
-                    <span className="font-mono">{SIZE_DIM[data.slot.op] ?? 'tokens'}</span>,
-                  )}
+                  {strings.sizesOf(familyIndices.length, SIZE_DIM[data.slot.op] ?? 'tokens')}
                 </DialogDescription>
               </DialogHeader>
               {/* One picker for both charts: Metric vs size gets this one shape only */}
@@ -1143,7 +1136,7 @@ export function ModelView({
   const available = useMemo(() => measuredHardware(atSplitViews), [atSplitViews]);
   const colors = useMemo(
     () =>
-      operatorXColors(
+      generateVendorColors(
         [...new Set(views.flatMap((v) => v.hardware.map((h) => h.id)))],
         isDark ? 'dark' : 'light',
       ),
