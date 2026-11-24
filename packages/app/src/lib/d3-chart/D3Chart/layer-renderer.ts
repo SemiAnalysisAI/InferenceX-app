@@ -178,7 +178,12 @@ export function updateLayerPositionOnZoom<T>(
       break;
     }
     case 'horizontalBar': {
-      updateHorizontalBarsOnZoom(group, newXScale as ContinuousScale, layer.config.getX);
+      updateHorizontalBarsOnZoom(
+        group,
+        newXScale as ContinuousScale,
+        layer.config.getX,
+        layer.config.getX0,
+      );
       break;
     }
     case 'point': {

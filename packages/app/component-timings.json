@@ -1860,6 +1860,28 @@
       ]
     },
     {
+      "spec": "cypress/component/powerx-point-details.cy.tsx",
+      "duration": 643,
+      "tests": [
+        {
+          "title": [
+            "PowerX point details",
+            "opens Over time on the point with the GPU role and focus from View power trace"
+          ],
+          "duration": 257,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX point details",
+            "keeps the pinned point and its details in the legend slot under Strict Mode until closed"
+          ],
+          "duration": 361,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/powerx-tutorial-layout.cy.tsx",
       "duration": 5641,
       "tests": [

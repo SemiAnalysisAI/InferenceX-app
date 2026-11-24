@@ -9,13 +9,13 @@ import {
 } from '@/components/inference/InferenceContext';
 import type { InferenceData } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAvailability } from '@/hooks/api/use-availability';
 import { track } from '@/lib/analytics/analytics';
 import { getModelLabel, type Model } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { powerXRoleRows } from './powerx-insight';
-import type { PowerXRole } from './powerx-role';
+import { hasPowerRoleData, type PowerXRole } from './powerx-role';
 import { modelsWithRoleData } from './powerx-role-availability';
 
 const STRINGS = {
@@ -49,7 +49,10 @@ export function PowerXRoleNoData({ role, points }: PowerXRoleNoDataProps) {
   const { availableModels } = useInferenceData();
   const { setSelectedModel } = useInferenceActions();
   const { data: availability } = useAvailability();
-  const hasRoleRows = useMemo(() => powerXRoleRows(points).length > 0, [points]);
+  const hasRoleRows = useMemo(
+    () => points.some((point) => !point.hidden && !point.powerVariant && hasPowerRoleData(point)),
+    [points],
+  );
   const alternatives = useMemo(
     () =>
       modelsWithRoleData(
@@ -65,34 +68,36 @@ export function PowerXRoleNoData({ role, points }: PowerXRoleNoDataProps) {
     setSelectedModel(model as Model);
   };
   return (
-    <div
+    <EmptyState
       role="status"
       data-testid="powerx-role-no-data"
-      className="mb-2 flex min-w-0 flex-col gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm"
+      className="mb-2 items-start border-dashed border-border px-3 py-2 text-left"
+      action={
+        alternatives.length > 0 ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+            <span>{t.existsOn}</span>
+            {alternatives.map((model) => {
+              const label = getModelLabel(model as Model);
+              return (
+                <Button
+                  key={model}
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  aria-label={t.switchTo(label)}
+                  data-testid="powerx-role-no-data-model"
+                  data-model={model}
+                  onClick={() => pick(model)}
+                >
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
+        ) : undefined
+      }
     >
       <p className="text-foreground">{t.message(getModelLabel(selectedModel as Model))}</p>
-      {alternatives.length > 0 && (
-        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>{t.existsOn}</span>
-          {alternatives.map((model) => {
-            const label = getModelLabel(model as Model);
-            return (
-              <Button
-                key={model}
-                type="button"
-                variant="outline"
-                size="xs"
-                aria-label={t.switchTo(label)}
-                data-testid="powerx-role-no-data-model"
-                data-model={model}
-                onClick={() => pick(model)}
-              >
-                {label}
-              </Button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    </EmptyState>
   );
 }

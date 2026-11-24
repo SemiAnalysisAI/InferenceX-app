@@ -88,6 +88,15 @@ describe('formatHoverValue', () => {
     expect(formatHoverValue(0.8512)).toBe('0.85');
   });
 
+  it('keeps two significant figures below 1, so small J/tok never reads 0', () => {
+    expect(formatHoverValue(0.005_12)).toBe('0.0051');
+    expect(formatHoverValue(0.002)).toBe('0.002');
+    expect(formatHoverValue(0.0456)).toBe('0.046');
+    expect(formatHoverValue(-0.004_37)).toBe('-0.0044');
+    expect(formatHoverValue(0)).toBe('0');
+    expect(formatHoverValue(2.004)).toBe('2');
+  });
+
   it('keeps watt metrics as whole watts', () => {
     expect(formatHoverValue(893.079, 'y_measuredAvgPower')).toBe('893');
   });

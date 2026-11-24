@@ -20,6 +20,19 @@ describe('buildScale', () => {
     }
   });
 
+  it('applies optional outer padding and alignment to a band scale', () => {
+    const scale = buildScale(
+      { type: 'band', domain: ['a', 'b'], padding: 0.75, paddingOuter: 0.5, align: 1 },
+      [0, 100],
+    );
+    if (!isBandScale(scale)) throw new Error('expected a band scale');
+    expect(scale.paddingInner()).toBeCloseTo(0.75);
+    expect(scale.paddingOuter()).toBeCloseTo(0.5);
+    // align 1 puts all the outer padding before the first band.
+    expect(scale.align()).toBe(1);
+    expect(scale('b')! + scale.bandwidth()).toBeCloseTo(100);
+  });
+
   it('builds a linear scale with nice by default', () => {
     const scale = buildScale({ type: 'linear', domain: [0, 97] }, [500, 0]);
     expect(isContinuousScale(scale)).toBe(true);

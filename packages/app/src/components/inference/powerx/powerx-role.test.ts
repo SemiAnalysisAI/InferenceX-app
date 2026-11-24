@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
-import { powerRoleTableRows, resolvePowerXRole, rewriteLegacyPowerRoleParams } from './powerx-role';
+import {
+  powerRoleTableRows,
+  powerXRoleTitle,
+  resolvePowerXRole,
+  rewriteLegacyPowerRoleParams,
+} from './powerx-role';
 
 describe('rewriteLegacyPowerRoleParams', () => {
   it.each([
@@ -53,5 +58,25 @@ describe('powerRoleTableRows', () => {
     expect(powerRoleTableRows(rows, 'decode')).toEqual([aggregated, decode]);
     expect(powerRoleTableRows(rows, 'split')).toEqual([aggregated, prefill, decode]);
     expect(powerRoleTableRows(rows, 'all')).toEqual([aggregated, base]);
+  });
+});
+
+describe('powerXRoleTitle', () => {
+  it('puts the pool in the title after Measured, prefixes it otherwise, and leaves All alone', () => {
+    expect(powerXRoleTitle('Measured J per Output Token (J/tok)', 'decode', 'en')).toBe(
+      'Measured Decode J per Output Token (J/tok)',
+    );
+    expect(powerXRoleTitle('每输入 token 实测焦耳能耗', 'prefill', 'zh')).toBe(
+      '每输入 token 实测 Prefill 焦耳能耗',
+    );
+    expect(powerXRoleTitle('Measured Joules per Output Token', 'split', 'en')).toBe(
+      'Measured Prefill vs Decode Joules per Output Token',
+    );
+    expect(powerXRoleTitle('Throughput per GPU', 'decode', 'en')).toBe(
+      'Decode · Throughput per GPU',
+    );
+    expect(powerXRoleTitle('Measured Joules per Output Token', 'all', 'en')).toBe(
+      'Measured Joules per Output Token',
+    );
   });
 });

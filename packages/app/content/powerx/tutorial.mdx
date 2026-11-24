@@ -50,7 +50,7 @@ Fans and PSU loss track the GPU; CPUs, memory, NICs and switches hold their leve
 
 Average, P75 and P90 power are time-weighted over the window across every GPU in the deployment; prefill and decode roles are averaged over the same window. Planners read **P90**, because dynamic power steering reacts to peaks; chip comparisons read **energy per token**.
 
-Energy is charged to every token, input plus output. Aggregated serving runs prefill and decode on the same GPUs, so their joules cannot be split by phase, and joules per output token would bill the prompt to the output. Disaggregated runs keep separate prefill and decode pools, and the **Where the power goes** view splits their energy by role.
+Energy is charged to every token, input plus output. Aggregated serving runs prefill and decode on the same GPUs, so their joules cannot be split by phase, and joules per output token would bill the prompt to the output. Disaggregated runs keep separate prefill and decode pools, and the **Breakdown** view splits their energy by role.
 
 A point is **Validated** only when the offline validator, re-run from the raw samples, passes all five checks. Anything else is **Historical**: throughput stays, energy and modeled power are dropped, and the audit record names the failing check.
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { GpuPowerSeries, GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
-import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface-provider';
 import type { InferenceData } from '@/components/inference/types';
 import { traceKeyForPoint } from '@/components/inference/utils/powerTimeline';
 import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
@@ -283,7 +283,7 @@ describe('PowerTimeline', () => {
       `[data-testid="power-timeline-summary-trace"][data-trace="${traceKeyForPoint(overlayPoint)}"]`,
     )
       .should('contain.text', 'unofficial')
-      .find('th > span')
+      .find('td > span')
       .first()
       .should('have.attr', 'style')
       .and('contain', overlayRunColor(0));
@@ -563,7 +563,7 @@ describe('PowerTimeline', () => {
       status().should('have.attr', 'data-status', 'empty').and('contain.text', 'predate');
       plotSvg().should('have.css', 'visibility', 'hidden');
     });
-    it('gives the plot the card width on a phone and names traces in a key above it', () => {
+    it('gives the plot the card width on a phone and names traces in the legend', () => {
       cy.viewport(PHONE, 800);
       cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
         body: { ...response, series: [series('b200', 16, 700), series('h100', 16, 500)] },
@@ -572,8 +572,17 @@ describe('PowerTimeline', () => {
         width: '100%',
       });
       cy.wait('@series');
-      cy.get('[data-testid="power-timeline-key"] li').should('have.length', 2);
-      cy.get('[data-testid="power-timeline-key"] li[data-hw="b200"]').should('be.visible');
+      cy.get('[data-testid="chart-legend"] [data-testid="legend-section-heading"]').should(
+        'have.text',
+        'Traces',
+      );
+      cy.get('[data-testid="chart-legend"] input[id^="checkbox-power-trace-key:"]').should(
+        'have.length',
+        2,
+      );
+      cy.get('[data-testid="chart-legend"] label[for^="checkbox-power-trace-key:"]')
+        .contains('B200')
+        .should('be.visible');
       cy.get('text.power-trace-label').should('not.exist');
       cy.get('[data-testid="power-timeline-chart-svg"] svg[data-testid="d3-chart-svg"]').then(
         ($svg) => {
@@ -639,7 +648,7 @@ describe('PowerTimeline', () => {
       mountTimeline([measuredPoint('b200', 16, 700)]);
       cy.wait('@series');
       cy.get('text.power-trace-label').should('have.length', 1);
-      cy.get('[data-testid="power-timeline-key"]').should('not.exist');
+      cy.get('[data-testid="legend-section-heading"]').should('not.exist');
     });
 
     it('lays the PowerX stats out as cards on a phone, below the chart, without clipping', () => {
@@ -676,6 +685,21 @@ describe('PowerTimeline', () => {
       cy.get('[data-testid="powerx-load-swings-table"] td').each(($cell) => {
         expect($cell.css('white-space')).to.equal('nowrap');
       });
+    });
+
+    it('scales the y axis and the load swings to kW per NVL72 rack from the legend switch', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 1237)], { powerx: true });
+      cy.wait('@series');
+      cy.get('[data-testid="powerx-load-swings-table"]').should('contain.text', ' W');
+      cy.get('[data-testid="power-timeline-rack"]').click();
+      cy.get('[data-testid="power-timeline-rack"]').should('have.attr', 'aria-checked', 'true');
+      cy.get('[data-testid="power-timeline-chart-svg"]').should(
+        'contain.text',
+        'Power per GPU × 72 (kW)',
+      );
+      cy.get('[data-testid="powerx-load-swings-table"]').should('contain.text', ' kW');
+      cy.get('[data-testid="powerx-load-swings"]').should('contain.text', 'kW per NVL72 rack');
     });
   });
 });

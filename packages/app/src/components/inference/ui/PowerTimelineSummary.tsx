@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import type { GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { PowerXRole } from '../powerx/powerx-role';
@@ -60,6 +61,9 @@ const STRINGS = {
   },
 };
 
+// Headers wrap inside the fixed-width columns.
+const head = (label: string) => <span className="whitespace-normal">{label}</span>;
+
 const watts = d3.format(',.0f');
 const seconds = d3.format(',.0f');
 
@@ -114,103 +118,146 @@ export default function PowerTimelineSummary({
       />
     );
   }
+  // One row per pool; the trace, run and window cells span the trace's pool rows.
+  const poolRows: PoolRow[] = rows.flatMap(({ trace, summary }) =>
+    summary.pools.map((pool) => ({ trace, summary, pool })),
+  );
+  const columns: DataTableColumn<PoolRow>[] = [
+    {
+      header: t.trace,
+      headerContent: head(t.trace),
+      className: 'w-1/5 align-top',
+      spanGroup: true,
+      sortValue: ({ trace }) => hardwareLabel(trace.point),
+      cell: ({ trace }) => (
+        <>
+          <span style={{ color: colorOf(trace) }}>● </span>
+          {hardwareLabel(trace.point)}
+          <span className="block text-muted-foreground">
+            {traceConfigLabel(trace.point)}
+            {isOverlay(trace.point) ? ` · ${t.unofficial}` : ''}
+          </span>
+        </>
+      ),
+    },
+    {
+      header: t.run,
+      headerContent: head(t.run),
+      className: 'w-1/4 align-top',
+      spanGroup: true,
+      cell: ({ trace }) => {
+        const name = telemetryNameForPoint(trace.point);
+        const source = responses.get(trace.runId)?.source;
+        return (
+          <>
+            <TraceRunLink trace={trace} />
+            {/* The file name is provenance, not something to read in a table:
+                one truncated line, full name on hover. */}
+            <span
+              className="block truncate text-muted-foreground"
+              title={name ? `power_validation_${name}.json` : undefined}
+            >
+              {source ? `${t.source[source]} · ` : ''}
+              {name ? `power_validation_${name}.json` : '—'}
+            </span>
+          </>
+        );
+      },
+    },
+    {
+      header: t.window,
+      headerContent: head(t.window),
+      className: 'align-top',
+      spanGroup: true,
+      sortValue: ({ summary }) => summary.windowSeconds ?? Number.NEGATIVE_INFINITY,
+      cell: ({ summary }) =>
+        summary.windowSeconds === null ? t.noWindow : seconds(summary.windowSeconds),
+    },
+    {
+      header: t.pool,
+      headerContent: head(t.pool),
+      className: 'align-top',
+      cell: ({ pool }) => (
+        <>
+          {t.pools[pool.role]} · {pool.gpuCount}
+        </>
+      ),
+    },
+    {
+      header: t.validated,
+      headerContent: head(t.validated),
+      className: 'align-top',
+      cell: ({ trace, pool }) => {
+        const validated = validatedWatts(trace.point, pool.role);
+        return validated === null ? '—' : watts(validated);
+      },
+    },
+    {
+      header: t.peak,
+      headerContent: head(t.peak),
+      className: 'align-top',
+      cell: ({ pool }) => (pool.peakWatts === null ? '—' : watts(pool.peakWatts)),
+    },
+    {
+      header: t.poolTdp,
+      headerContent: head(t.poolTdp),
+      className: 'align-top',
+      cell: ({ trace, pool }) => {
+        const tdp = HW_REGISTRY[trace.point.hwKey.split('_')[0]]?.tdp ?? 0;
+        return tdp > 0 ? watts(tdp * pool.gpuCount) : '—';
+      },
+    },
+  ];
   return (
     <section className="min-w-0 space-y-2 px-1" data-testid="power-timeline-summary">
       <h3 className="text-sm font-medium">{t.title}</h3>
-      <div className="max-h-96 min-w-0 overflow-auto">
-        <table className="w-full min-w-[48rem] table-fixed break-words text-left text-xs">
-          <thead className="sticky top-0 bg-background">
-            <tr>
-              <th className="w-1/5 p-2">{t.trace}</th>
-              <th className="w-1/4 p-2">{t.run}</th>
-              <th className="p-2">{t.window}</th>
-              <th className="p-2">{t.pool}</th>
-              <th className="p-2">{t.validated}</th>
-              <th className="p-2">{t.peak}</th>
-              <th className="p-2">{t.poolTdp}</th>
-            </tr>
-          </thead>
-          {rows.map(({ trace, summary }) => {
-            const { point } = trace;
-            const attempt = runAttemptFromUrl(point.run_url);
-            const name = telemetryNameForPoint(point);
-            const source = responses.get(trace.runId)?.source;
-            const tdp = HW_REGISTRY[point.hwKey.split('_')[0]]?.tdp ?? 0;
-            return (
-              <tbody
-                key={trace.key}
-                className="border-t"
-                data-testid="power-timeline-summary-trace"
-                data-trace={trace.key}
-              >
-                {summary.pools.map((pool, index) => {
-                  const validated = validatedWatts(point, pool.role);
-                  return (
-                    <tr key={pool.role} data-testid={`power-timeline-summary-${pool.role}`}>
-                      {index === 0 && (
-                        <>
-                          <th className="p-2 align-top font-normal" rowSpan={summary.pools.length}>
-                            <span style={{ color: colorOf(trace) }}>● </span>
-                            {hardwareLabel(point)}
-                            <span className="block text-muted-foreground">
-                              {traceConfigLabel(point)}
-                              {isOverlay(point) ? ` · ${t.unofficial}` : ''}
-                            </span>
-                          </th>
-                          <td className="p-2 align-top" rowSpan={summary.pools.length}>
-                            <a
-                              href={point.run_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline decoration-dotted"
-                            >
-                              {`run ${trace.runId}`}
-                            </a>
-                            {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
-                            {/* The file name is provenance, not something to read in a table:
-                                one truncated line, full name on hover. */}
-                            <span
-                              className="block truncate text-muted-foreground"
-                              title={name ? `power_validation_${name}.json` : undefined}
-                            >
-                              {source ? `${t.source[source]} · ` : ''}
-                              {name ? `power_validation_${name}.json` : '—'}
-                            </span>
-                          </td>
-                          <td className="p-2 align-top" rowSpan={summary.pools.length}>
-                            {summary.windowSeconds === null
-                              ? t.noWindow
-                              : seconds(summary.windowSeconds)}
-                          </td>
-                        </>
-                      )}
-                      <td className="p-2 align-top">
-                        {t.pools[pool.role]} · {pool.gpuCount}
-                      </td>
-                      <td className="p-2 align-top">
-                        {validated === null ? '—' : watts(validated)}
-                      </td>
-                      <td className="p-2 align-top">
-                        {pool.peakWatts === null ? '—' : watts(pool.peakWatts)}
-                      </td>
-                      <td className="p-2 align-top">
-                        {tdp > 0 ? watts(tdp * pool.gpuCount) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            );
-          })}
-        </table>
-      </div>
+      <DataTable
+        data={poolRows}
+        columns={columns}
+        testId="power-timeline-summary-table"
+        analyticsPrefix="powerx_timeline_summary"
+        searchable={false}
+        columnPresets={false}
+        paginated={false}
+        rowGroupKey={(row) => row.trace.key}
+        rowGroupAttributes={(row) => ({
+          'data-testid': 'power-timeline-summary-trace',
+          'data-trace': row.trace.key,
+        })}
+        rowAttributes={(row) => ({ 'data-testid': `power-timeline-summary-${row.pool.role}` })}
+        scrollClassName="max-h-96"
+        tableClassName="min-w-[48rem] table-fixed break-words text-xs"
+      />
     </section>
+  );
+}
+
+/** The trace's run link, then the attempt when the run was retried. */
+function TraceRunLink({ trace }: { trace: PowerTimelineTrace }) {
+  const t = STRINGS[useLocale()];
+  const attempt = runAttemptFromUrl(trace.point.run_url);
+  return (
+    <>
+      <a
+        href={trace.point.run_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline decoration-dotted"
+      >
+        {`run ${trace.runId}`}
+      </a>
+      {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
+    </>
   );
 }
 
 interface SummaryRow {
   trace: PowerTimelineTrace;
   summary: ReturnType<typeof summarizeTraceWindow>;
+}
+
+interface PoolRow extends SummaryRow {
+  pool: SummaryRow['summary']['pools'][number];
 }
 
 /**
@@ -238,7 +285,6 @@ function PowerTimelineSummaryCards({
       <ul className="space-y-2" data-testid="power-timeline-summary-cards">
         {rows.map(({ trace, summary }) => {
           const { point } = trace;
-          const attempt = runAttemptFromUrl(point.run_url);
           const name = telemetryNameForPoint(point);
           const source = responses.get(trace.runId)?.source;
           const tdp = HW_REGISTRY[point.hwKey.split('_')[0]]?.tdp ?? 0;
@@ -258,15 +304,7 @@ function PowerTimelineSummaryCards({
                 {isOverlay(point) ? ` · ${t.unofficial}` : ''}
               </p>
               <p className="mt-1">
-                <a
-                  href={point.run_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline decoration-dotted"
-                >
-                  {`run ${trace.runId}`}
-                </a>
-                {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
+                <TraceRunLink trace={trace} />
               </p>
               <p className="whitespace-nowrap">
                 {t.window}:{' '}

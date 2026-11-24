@@ -97,30 +97,44 @@ link still opens that view for locked visitors.
 
 - Header card (`DashboardSectionHeader` + `ChartControls`, as on `/infx/inference`): title and
   description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
-  draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a metric +
+  draw, Breakdown, Over time; `powerx-views.ts` maps each tab onto a metric +
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
-  Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
-  Metric beside `PowerXChartConfig`: Count, Per or Show as, then Scope and Power statistic
-  on the views they apply to (the Energy view opens on Per: All tokens, J per input + output
-  token, because aggregated serving shares GPUs between prefill and decode and cannot split
-  their energy by phase; only All tokens and Output carry the IT, Facility and rated
-  boundaries, `ENERGY_METRICS` in `powerx-views.ts`), and the Rated boundaries toggle where rated lines exist, all as
-  plain labelled controls with no expander) in place of the Y-axis metric pick, the
-  **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
-  Compare history fieldsets fold into "More chart controls" exactly as on `/infx/inference`. Under `md`
-  the view tabs become a 2×2 grid of 48 px buttons, Count and Per (or Show as) render as native
-  selects (`SegmentedToggle` `variant="select"`, each option carrying the segment's hover hint),
-  and the X-Axis Metric, Scope, Power statistic and Rated boundaries sit behind one "More" row
-  (`powerx-more`, "More · N changed" via `powerXSecondaryChangedCount`); dashboard toasts stay
-  off there and the pinned point sheet says Tap. From `md` up nothing changes.
-- The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
-  `/infx/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
-  line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and
-  the footer notes. On phones the plot height is capped at 55 % of the viewport.
-- Where the power goes (`i_pcompare=breakdown`): the caption stays at the top of the card and
+  Scenario, Precision through the shared selectors), the **Chart Config** fieldset
+  (`PowerXChartConfig`, in place of the Y-axis metric pick: the X-Axis Metric on Energy per token
+  and Power draw, the GPU role on every view, with its lock, "Set by …" and "Why?" when a role
+  pins a control, then the view's own controls: Boundary, Energy per and the Provisioned bound
+  toggle where rated lines exist on Energy per token (the view opens on Energy per: All tokens,
+  J per input + output token, because aggregated serving shares GPUs between prefill and decode
+  and cannot split their energy by phase; only All tokens and Output carry the IT, Facility and
+  rated boundaries, `ENERGY_METRICS` in `powerx-views.ts`); Boundary, Show as and Statistic on
+  Power draw; Compare at, Facility and Chart style on Breakdown; nothing more on Over time, whose
+  Concurrency, Highlight and Time axis controls stay in the chart card), each a labelled
+  `SegmentedToggle` with an info icon, then the **Run context** (`WorkflowInfoDisplay`) and
+  **Compare history** fieldsets. On phones the title row holds "PowerX" and an icon-only Share
+  at its right edge, with the "How we measure power" card under the description, and
+  Benchmark Config keeps Model, Scenario and Precision in view; Chart Config, Run context and
+  Compare history fold into "More chart controls" exactly as on `/infx/inference`. Under `md`
+  the view tabs stay one underline row with short names (Energy, Power, Breakdown, Over time)
+  that fits 390 px without scrolling, and each Chart Config cell is a full-width select whose
+  trigger shows only the short option label; the option's hover hint is the muted second line
+  of its dropdown item. On Run context, Changelog sits at the far right as on `/infx/inference`.
+- Over time end labels and Load swings rows name the GPU and concurrency. When two drawn
+  traces would still read the same, they add the framework, then the parallelism, then the
+  GPU count, only where those differ (`traceDistinctions`): H200 vLLM at TP8 and TP4 read
+  "H200 TP8 c16" and "H200 TP4 c16".
+- The chart card is AgentX's: the h2 caption (model logo + title) and the Updated / Source line,
+  with Chart/Table, Export and Reset at its top right, the shared legend (no PowerX controls in
+  the rail) or a clicked point's details beside the plot in one 276 px column, and the footer
+  notes. On phones the plot height is capped at 55 % of the viewport.
+- Over time is the base trace chart: the Concurrency select (`i_ptconc`, the most covered
+  concurrency by default), Highlight and Time axis sit in the card, lines draw a centered 30 s
+  rolling mean (Raw 1-s samples, `i_ptraw`, is off by default; tooltips and the summary table
+  always read recorded values), Prefill vs decode labels its lanes inside the plot, and the
+  legend beside the chart carries the × 72 per NVL72 rack switch.
+- Breakdown (`i_pcompare=breakdown`): the caption stays at the top of the card and
   the chip comparison is the visual. The compared chip's drill-down (the "across load"
-  stacked bars / stacked area, with its Hardware select, Stacked bars | Stacked area toggle
-  (`i_pbview`), TDP and All in Provisioned reference lines and PNG/CSV buttons) is open
+  stacked bars / stacked area, with its Hardware select, drawn in the Chart style Chart Config
+  sets (`i_pbview`), TDP and All in Provisioned reference lines and PNG/CSV buttons) is open
   inline under that chip's bar from the first render and follows the slider to whichever
   chip is nearest; clicking a bar or picking another chip in the Hardware select moves it,
   Collapse hides it for the session (`PowerAnalysisPanels`). The stack
@@ -181,11 +195,11 @@ link still opens that view for locked visitors.
   through `i_metric` like the other bases (no new URL parameter; old links are unchanged).
   `POWER_COUNT_LABELS` names the three measured boundaries GPU only / IT (no PUE) / Facility
   on PowerX (legend rows, line labels, pills, table series column, CSV); the registry label is
-  "All in Measured IT (no PUE)". Count: All on Power draw (and on Energy per token or per output token)
+  "All in Measured IT (no PUE)". Boundary: All on Power draw (and on Energy per token or per output token)
   sets `i_pcompare=boundaries`, which draws all three per chip on the one scatter
   (`COUNT_COMPARE_BASES`: GPU only solid, IT dashed, Facility dash-dot) with the Boundary
   legend section; the X-Axis Metric and Show as controls apply as on any Power draw chart.
-  The **Rated boundaries** toggle in Chart Config (Off | All-in provisioned) sets
+  The **Provisioned bound** toggle in Chart Config (Off | All-in provisioned) sets
   `i_pcompare=provisioned` on the GPU-only metric, which draws exactly two lines per chip
   (`PROVISIONED_COMPARE_BASES`: GPU Level Measured solid, All in Provisioned dashed; no IT,
   Facility or GPU-level TDP line, to keep the chart readable); turning it off returns to the
@@ -202,7 +216,7 @@ link still opens that view for locked visitors.
   (`yMetric`, formatted as the tooltip would) for it (`source: 'scrub'`, which replaces a
   pinned point and survives the compat hover end a tap synthesises); a tap on a point still
   opens the point sheet as before.
-- **Where the power goes** stacks IT only by default; the Include facility switch
+- **Breakdown** stacks IT only by default; the Include facility switch
   (`PowerXFacilitySwitch`, context state, not a URL parameter) appends the PUE part after a
   gap. `breakdownSeriesAtBoundary` derives the IT series from the breakdown so the chip
   comparison, the drill-down and the tooltips agree; `FACILITY_PUE_NOTE` ("Facility =
@@ -223,17 +237,12 @@ link still opens that view for locked visitors.
 - **Load swings** (Over time, PowerX only): `PowerLoadSwings` computes
   `lib/power/load-swing-stats.ts` per visible trace (peak, min, idle floor = P5 before the
   window, window mean, P5/P95, max Δ1s / Δ5s in W and % TDP, ramp up/down W/s, volatility =
-  std ÷ mean; telemetry gaps are counted, never bridged), a × 72 per NVL72 rack switch, and
+  std ÷ mean; telemetry gaps are counted, never bridged) in a table under the chart, scaled by
+  the legend's × 72 per NVL72 rack switch (which also rescales the y-axis), and
   per-point CSV / JSON links to `GET /api/v1/gpu-metrics-point/stats?id=N[&format=csv|json]
   [&scale=gpu|nvl72][&role=all|prefill|decode|split]`, which runs the same function over the same stored buckets
   (`storedPowerSeries`). The fixed caveat line under the chart reads "1 s DCGM samples ·
   single node · inference only · sub-second swings not captured".
-- **Over time insight** (All GPUs): the insight card states the largest 5 s swing (Max Δ5s, W
-  per GPU, % of TDP and × 72 per NVL72 rack) among the visible traces that split into prefill
-  and decode pools, the focused trace when one is focused. `powerXLoadSwingInsight`
-  (`powerx/powerx-insight.ts`) reads the same `loadSwingRows` (`powerx/load-swing-rows.ts`)
-  and formatters as the load-swings table, so the card's number is one of the table's cells.
-  Under a role the card states the pool's average draw, as on Power draw.
 - **Labels**: `PowerBasisPill` (GPU / IT / Facility) on readouts, table headers, the breakdown
   totals and the tooltip's power-model block; each pill's `title` is the tag's one-clause
   meaning (GPU board power, measured by DCGM · GPU + modeled server, no PUE · IT × PUE).
@@ -270,10 +279,10 @@ resolves their run/audit provenance automatically.
 
 `i_pcompare=boundaries|provisioned|all` (default `''`, "Off"; legacy `roles` is rewritten to `i_role=split`, below) overlays sibling series on the selected
 metric without changing it. `boundaries` draws GPU Level Measured, All in Measured IT (no PUE)
-and All in Measured; `provisioned` (the PowerX Rated boundaries toggle) draws GPU Level
+and All in Measured; `provisioned` (the PowerX Provisioned bound toggle) draws GPU Level
 Measured and All in Provisioned only; `all` (share links only) adds both provisioned bounds
 to the measured three. `i_pcompare=breakdown` is the PowerX
-Where the power goes view (per-chip stacks at one interactivity) and overlays nothing. `utils/power-compare.ts` is the single source: `useChartData` and
+Breakdown view (per-chip stacks at one interactivity) and overlays nothing. `utils/power-compare.ts` is the single source: `useChartData` and
 the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both call
 `expandPowerCompareSeries`, which appends one clone per sibling to every base point — same
 `x`, `y` taken from the sibling's field, `powerVariant` set — and leaves the base points
@@ -308,7 +317,7 @@ the `/infx/inference` → `/pwx` redirect (`lib/routing/powerx-redirect.ts`); an
 
 | Old link                                   | Rewritten to                                       |
 | ------------------------------------------ | -------------------------------------------------- |
-| `i_pcompare=roles`                         | `i_role=split` (Where the power goes)              |
+| `i_pcompare=roles`                         | `i_role=split` (Breakdown)                         |
 | `i_metric=y_measuredPrefillAvgPower`       | `i_metric=y_measuredAvgPower&i_role=prefill`       |
 | `i_metric=y_measuredDecodeAvgPower`        | `i_metric=y_measuredAvgPower&i_role=decode`        |
 | `i_metric=y_measuredPrefillJPerInputToken` | `i_metric=y_measuredJPerInputToken&i_role=prefill` |
@@ -363,7 +372,7 @@ config is `display: 'timeline'`.
 
 ## Analysis panels
 
-The role and system power breakdown panels on the PowerX tab's Where the power goes view live in
+The role and system power breakdown panels on the PowerX tab's Breakdown view live in
 `ui/PowerAnalysisPanels.tsx`. Their read-only API fields (`rolePoints`, `powerBreakdowns`), the
 API-only power fit (`powerFits`) and the API-only equal-service comparisons are described in the
 [dashboard views reference](../packages/skills/skills/inferencex-api/references/dashboard-views.md).

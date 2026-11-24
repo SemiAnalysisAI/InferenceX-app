@@ -49,6 +49,7 @@ import {
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
 import { computeTooltipPosition, syncPointLabel } from '@/lib/d3-chart/layers/scatter-points';
+import { zoomRedrawLayer } from '@/lib/d3-chart/layers/zoom-redraw-layer';
 import {
   attachOverlayXMarkerHandlers,
   overlayMarkerPosition,
@@ -79,6 +80,7 @@ import {
   generateHoverTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
+import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { pointLabelText } from '@/components/inference/ui/point-label';
@@ -203,7 +205,7 @@ const GPU_STRINGS = {
     noRoleEnergyDataHint:
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
-      'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
+      'No measured GPU power is reported for this selection. Choose other GPU configs, or a different model, scenario, precision or date.',
     unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
   },
   zh: {
@@ -228,7 +230,7 @@ const GPU_STRINGS = {
     noRoleEnergyDataHint:
       '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
     noMeasuredDataHint:
-      '当前选择没有实测 GPU 功耗数据。请选择其他芯片配置，或更换模型、场景、精度或日期。',
+      '当前选择没有实测 GPU 功耗数据。请选择其他 GPU 配置，或更换模型、场景、精度或日期。',
     unofficialTitle: (branch: string) => `非官方：${branch}`,
   },
 } as const;
@@ -296,8 +298,11 @@ const GPUGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const featureGateUnlocked = useFeatureGate();
+    // View PowerX opens the PowerX telemetry dialog; on PowerX itself the page is already that.
+    const powerXSurface = usePowerXSurface();
     const showPowerTelemetry =
-      featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
+      !powerXSurface &&
+      (featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined);
     const showPowerTelemetryRef = useRef(showPowerTelemetry);
     showPowerTelemetryRef.current = showPowerTelemetry;
     const legendT = GPU_STRINGS[locale];
@@ -1029,27 +1034,8 @@ const GPUGraph = React.memo(
     );
     drawPerfRulerRef.current = drawPerfRuler;
 
-    const perfRulerLayer: CustomLayerConfig = useMemo(
-      () => ({
-        type: 'custom',
-        key: 'perf-ruler',
-        render: (zoomGroup, ctx) =>
-          drawPerfRuler(
-            zoomGroup,
-            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
-            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-        onZoom: (zoomGroup, ctx) =>
-          drawPerfRuler(
-            zoomGroup,
-            ctx.newXScale as ContinuousScale,
-            ctx.newYScale as ContinuousScale,
-            ctx.width,
-            ctx.height,
-          ),
-      }),
+    const perfRulerLayer = useMemo(
+      () => zoomRedrawLayer('perf-ruler', drawPerfRuler),
       [drawPerfRuler],
     );
 

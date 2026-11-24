@@ -72,4 +72,29 @@ describe('DataTable watermark', () => {
     expect(html).not.toContain('data-table-preset');
     expect(html).toContain('Detail');
   });
+
+  it('spans grouped cells over each row group and drops the pager when unpaginated', () => {
+    const data = Array.from({ length: 12 }, (_, i) => ({ trace: `t${i % 2 ? 1 : 0}`, pool: i }));
+    data.sort((a, b) => a.trace.localeCompare(b.trace));
+    const html = renderToString(
+      <DataTable
+        data={data}
+        columns={[
+          { header: 'Trace', cell: (row) => row.trace, spanGroup: true },
+          { header: 'Pool', cell: (row) => `p${row.pool}` },
+        ]}
+        paginated={false}
+        searchable={false}
+        rowGroupKey={(row) => row.trace}
+        rowGroupAttributes={(row) => ({ 'data-trace': row.trace })}
+        rowAttributes={(row) => ({ 'data-testid': `pool-${row.pool}` })}
+      />,
+    );
+
+    expect(html).not.toContain('data-table-pagination-summary');
+    expect(html.match(/<tbody/g)).toHaveLength(2);
+    expect(html.match(/rowSpan="6"/gi)).toHaveLength(2);
+    expect(html).toContain('data-trace="t1"');
+    expect(html).toContain('data-testid="pool-11"');
+  });
 });

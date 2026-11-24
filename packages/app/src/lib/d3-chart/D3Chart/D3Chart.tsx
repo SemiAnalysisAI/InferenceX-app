@@ -98,8 +98,15 @@ function D3ChartInner<T>(
     ],
   );
 
+  // Fire on the pinned -> none transition only: a ref survives Strict Mode's effect replay,
+  // while an unmount cleanup would run there and close the details it just opened.
+  const onDetailsCloseRef = useRef(tooltipConfig?.onDetailsClose);
+  onDetailsCloseRef.current = tooltipConfig?.onDetailsClose;
+  const wasPinnedRef = useRef(false);
   useEffect(() => {
     if (!pinnedPoint) clearPinRing(svgRef.current);
+    if (wasPinnedRef.current && !pinnedPoint) onDetailsCloseRef.current?.();
+    wasPinnedRef.current = pinnedPoint !== null;
   }, [pinnedPoint]);
 
   useD3ChartRenderer(

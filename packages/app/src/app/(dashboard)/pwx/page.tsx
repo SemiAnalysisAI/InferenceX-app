@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { PowerXFeatureGate } from '@/components/powerx/powerx-feature-gate';
-import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface-provider';
 import { tabMetadata } from '@/lib/routing/tab-meta';
 
 export const metadata: Metadata = tabMetadata('powerx');

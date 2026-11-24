@@ -773,6 +773,19 @@ export const showsPowerTraceAction = (
   getMeasuredMetricConfig(selectedYAxisMetric) !== undefined &&
   traceKeyForPoint(point) !== null;
 
+/**
+ * The View power trace link: Over time focused on the point's trace. It keeps the current
+ * chart state (the GPU role among it) and drops a stale trace concurrency.
+ */
+export const powerTraceHref = (point: Pick<InferenceData, 'power_audit' | 'run_url'>): string =>
+  typeof window === 'undefined'
+    ? '#'
+    : chartStateHref({
+        i_metric: POWER_TIMELINE_METRIC_KEY,
+        i_ptfocus: traceKeyForPoint(point) ?? '',
+        i_ptconc: '',
+      });
+
 interface PointLinksInput {
   point: InferenceData;
   runUrl?: string;
@@ -837,14 +850,7 @@ const pointLinks = ({
     links.push({
       action: 'view-power-trace',
       label: t.powerTrace,
-      href:
-        typeof window === 'undefined'
-          ? '#'
-          : chartStateHref({
-              i_metric: POWER_TIMELINE_METRIC_KEY,
-              i_ptfocus: traceKeyForPoint(point) ?? '',
-              i_ptconc: '',
-            }),
+      href: powerTraceHref(point),
     });
   }
   links.push({ action: 'reproduce', label: t.reproduce });
@@ -1185,6 +1191,8 @@ export const formatHoverValue = (value: number, metric?: string): string => {
   if (abs >= 1e4) return `${(value / 1e3).toFixed(1)}K`;
   if (abs >= 100) return value.toFixed(0);
   if (abs >= 10) return value.toFixed(1);
+  // Below 1, two significant figures: two decimals read 0.005 J/tok as 0.
+  if (abs < 1) return String(parseFloat(value.toPrecision(2)));
   return String(parseFloat(value.toFixed(2)));
 };
 

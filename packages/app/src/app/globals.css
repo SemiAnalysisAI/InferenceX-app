@@ -216,6 +216,10 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-primary: var(--primary);
   --color-brand: var(--brand);
   --color-brand-fill: var(--brand-fill);
+  /* PowerX: Compare at (the orange reading line) and the GPU pools. */
+  --color-powerx-at: #e8900c;
+  --color-powerx-prefill: #7c4dcc;
+  --color-powerx-decode: #0b7f8c;
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -827,6 +831,11 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     margin-top: -0.75rem;
     margin-bottom: -0.75rem;
   }
+  /* The last row's touch target reaches 0.75rem below the row; pad the list to match
+   * so a list that fits doesn't scroll by a few pixels and fade its last row. */
+  [data-powerx-surface] .legend-container ul.custom-scrollbar:has([data-testid^='legend-points-']) {
+    padding-bottom: 0.75rem;
+  }
   [data-powerx-surface] [data-testid='legend-close-button'],
   [data-powerx-surface] [data-testid='legend-open-button'] {
     width: 2.75rem;
@@ -938,6 +947,25 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   [data-chart-tooltip][data-sheet='true'] a[data-action] {
     display: inline-flex;
     align-items: center;
+  }
+}
+
+/*
+ * PowerX on desktop: the Energy, Power and Over time legend column is AgentX's width, and
+ * the point details that replace it keep that width (so the plot never reflows on click)
+ * and start at the top of the chart so the body and the pinned actions get its full
+ * height.
+ */
+@media (min-width: 1024px) {
+  [data-powerx-surface]
+    [data-slot='chart-legend-wrapper']:has([data-testid='scatter-quick-filters']),
+  [data-powerx-surface] [data-slot='chart-legend-wrapper']:has([data-testid='power-timeline-raw']),
+  [data-powerx-surface] [data-slot='chart-legend-wrapper']:has([data-slot='chart-details-frame']) {
+    width: 276px;
+    min-width: 276px;
+  }
+  [data-powerx-surface] [data-slot='chart-legend-wrapper']:has([data-slot='chart-details-frame']) {
+    margin-top: 0;
   }
 }
 

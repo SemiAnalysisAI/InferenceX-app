@@ -14,13 +14,12 @@ mock.module('@/hooks/useMediaQuery', () => ({
   useMediaQuery: () => false,
 }));
 
-import { PowerXReadout } from '../powerx/PowerXLayout';
 import {
-  PowerXSurfaceProvider,
   usePowerXActivePoint,
   useSetPowerXActivePoint,
   type PowerXActivePointUpdate,
 } from './powerx-surface';
+import { PowerXSurfaceProvider } from './powerx-surface-provider';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -73,7 +72,6 @@ beforeEach(() => {
     root.render(
       <PowerXSurfaceProvider>
         <Probe />
-        <PowerXReadout points={[hovered, scrubbed, pinned]} />
       </PowerXSurfaceProvider>,
     ),
   );
@@ -86,21 +84,15 @@ afterEach(() => {
 
 const update = (next: PowerXActivePointUpdate) => act(() => setter!(next));
 const active = () => container.querySelector('[data-testid="active"]')?.textContent;
-const source = () => container.querySelector('[data-testid="powerx-readout-source"]')?.textContent;
 
 describe('PowerX active point: hover, scrub and pin', () => {
   it('lets a scrub replace anything and survive a hover end, unlike a hover', () => {
     update({ point: hovered, source: 'hover' });
     expect(active()).toBe('hover:16');
-    expect(source()).toBe('Hovered point');
     update(null);
     expect(active()).toBe('');
     update({ point: scrubbed, source: 'scrub' });
     expect(active()).toBe('scrub:32');
-    expect(source()).toBe('Point under your finger · tap it for details');
-    expect(
-      container.querySelector<HTMLElement>('[data-testid="powerx-readout"]')?.dataset.source,
-    ).toBe('scrub');
     // The compat mouse events a tap synthesises end a hover; the scrub stays.
     update(null);
     expect(active()).toBe('scrub:32');

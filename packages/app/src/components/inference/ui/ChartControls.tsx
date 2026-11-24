@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { cn } from '@/lib/shared/utils';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
   METRIC_CONTROL_GROUPS,
@@ -62,7 +63,7 @@ import { MeasuredMetricControls } from './MeasuredMetricControls';
 import { usePowerXSurface } from './powerx-surface';
 import { usePowerXModelBadges } from '../powerx/PowerXModelBadges';
 import { powerXChangedCount } from '../powerx/powerx-views';
-import type { PowerXChartConfigSlots } from '../powerx/PowerXLayout';
+import type { PowerXChartConfigSlots } from '../powerx/PowerXChartConfig';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -194,8 +195,7 @@ interface ChartControlsProps {
   showXAxisMode?: boolean;
   runContext?: ReactNode;
   trailingPanel?: ReactNode;
-  /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
-  /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
+  /** PowerX's Chart Config cells (GPU role and the tab's options); receives the X-Axis Metric cell. */
   powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
   /** Extra details on each model's row in the model dropdown, e.g. its benchmark history. */
   modelDetails?: ReadonlyMap<string, ReactNode>;
@@ -241,6 +241,7 @@ export default function ChartControls({
     defaultXAxisMode,
     scaleType,
     powerCompare,
+    powerRole,
   } = useInferenceDisplay();
   const {
     setSelectedModel,
@@ -493,13 +494,13 @@ export default function ChartControls({
   };
 
   const secondaryCount =
-    // PowerX picks the metric through its tabs; its Count, Per, Show as, Scope,
-    // Power statistic and Rated boundaries controls count instead.
+    // PowerX picks the metric through its tabs; its GPU role and the tab's Boundary,
+    // Energy per, Show as, Statistic and Provisioned bound controls count instead.
     (powerXSurface
       ? powerXChangedCount({
           metric: selectedYAxisMetric,
           compare: powerCompare,
-        })
+        }) + (powerRole === 'all' ? 0 : 1)
       : selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC
         ? 0
         : 1) +
@@ -514,17 +515,13 @@ export default function ChartControls({
     tcoSource === 'inference' &&
     selectedSequence === Sequence.AgenticTraces &&
     countsInputTokens(selectedYAxisMetric);
-  // Chart Config columns: PowerX keeps an X-Axis Metric column of 11rem, or 18rem on agentic
-  // traces where its options are longer, and splits the rest in two, so its Count toggle (two
-  // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one cell
-  // each) flow left to right in rows of three. Elsewhere the X and Y pickers share the row
-  // evenly. Below sm every cell is a row.
-  const xAxisWide = selectedSequence === Sequence.AgenticTraces;
+  // Chart Config cells: the X and Y pickers share the row evenly. PowerX's cells (X-Axis
+  // Metric, GPU role, then the tab's options) are segmented toggles of different widths, so
+  // they flow left to right at their natural width and wrap. Below sm every cell is a
+  // full-width row, as on Infx.
   const chartConfigGridClass = powerXSurface
-    ? xAxisWide
-      ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
-      : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
-    : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
+    ? 'flex flex-col max-sm:items-stretch sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-3'
+    : 'grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
 
   const scenarioSelector = !scenarioInFooter && (
     <div className="min-w-0">
@@ -584,7 +581,13 @@ export default function ChartControls({
                 modelBadges={powerXModelBadges}
               />
             </div>
-            {!isMobile && <div className="hidden md:contents">{scenarioSelector}</div>}
+            {/* PowerX keeps Scenario in Benchmark Config on phones too, so the fold opens on
+                Chart Config as on Infx. */}
+            {powerXSurface
+              ? scenarioSelector && (
+                  <div className="col-span-2 min-w-0 md:col-span-1">{scenarioSelector}</div>
+                )
+              : !isMobile && <div className="hidden md:contents">{scenarioSelector}</div>}
             <div className="min-w-0 col-span-2 md:col-span-1">
               <PrecisionSelector
                 value={selectedPrecisions}
@@ -605,7 +608,7 @@ export default function ChartControls({
           countLabel={t.changed}
           testId="inference-secondary-controls"
         >
-          {isMobile && scenarioSelector && (
+          {isMobile && !powerXSurface && scenarioSelector && (
             <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:hidden">
               {scenarioSelector}
             </div>
@@ -615,7 +618,7 @@ export default function ChartControls({
             data-testid="inference-chart-configuration"
             className={spans.chart}
           >
-            <div className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass}`}>
+            <div className={`min-w-0 items-start gap-3 ${chartConfigGridClass}`}>
               {powerXSurface && powerXControls
                 ? powerXControls({
                     xAxisSelector: showXAxisMode ? <XAxisModeSelector /> : null,
@@ -792,7 +795,20 @@ export default function ChartControls({
             </div>
           </ControlPanel>
 
-          {runContext && <div className={`min-w-0 ${spans.run}`}>{runContext}</div>}
+          {runContext && (
+            <div
+              className={cn(
+                'min-w-0',
+                spans.run,
+                // PowerX's run context shares its row with Compare history, so the date and run
+                // fields share the width and Changelog keeps the far right, as on Infx.
+                powerXSurface &&
+                  'lg:[&_[data-testid=inference-run-context]>div]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]',
+              )}
+            >
+              {runContext}
+            </div>
+          )}
           {!hideGpuComparison && (
             <ControlPanel legend={t.compareHistory} className={spans.history}>
               <div className="grid min-w-0 gap-3">

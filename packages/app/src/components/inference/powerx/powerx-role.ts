@@ -1,3 +1,5 @@
+import type { Locale } from '@/lib/i18n/i18n';
+
 import {
   energyPerFor,
   POWER_PERCENT_TDP_METRIC,
@@ -39,7 +41,7 @@ export interface PowerXRoleParams {
 
 /**
  * Old share links that encoded a GPU role in `i_metric` or `i_pcompare`, rewritten onto
- * `i_role` with the role-free metric. `i_pcompare=roles` was the Where view's Split by
+ * `i_role` with the role-free metric. `i_pcompare=roles` was the Breakdown view's Split by
  * role, so it keeps that view (`breakdown`) split by role. Params that carry no role pass
  * through unchanged; an explicit `i_role` wins over the role an old metric implied.
  */
@@ -68,7 +70,7 @@ export function rewriteLegacyPowerRoleParams(params: PowerXRoleParams): PowerXRo
  * The metric + compare pair the chart draws under a role. The user's stored choice stays
  * untouched so it comes back with All GPUs:
  * - Energy: GPU only, J per output token (the denominator prefill and decode share), or
- *   J per input token for the prefill GPUs when Per is Input; rated boundaries off.
+ *   J per input token for the prefill GPUs when Energy per is Input; Provisioned bound off.
  * - Power draw: GPU only, average W per GPU (or % of TDP per pool); percentiles need the
  *   whole fleet, so P75 / P90 fall back to the average.
  * - Where and Over time keep their own selection and split their layers or lanes.
@@ -83,7 +85,7 @@ export function resolvePowerXRole(selection: PowerXSelection, role: PowerXRole):
       compare: 'roles',
     };
   }
-  if (view === 'draw') {
+  if (view === 'power') {
     return {
       metric:
         powerXShowAsFor(selection.metric) === 'tdp'
@@ -95,6 +97,31 @@ export function resolvePowerXRole(selection: PowerXSelection, role: PowerXRole):
   return selection;
 }
 
+const ROLE_TITLE_POOL: Record<Exclude<PowerXRole, 'all'>, Record<Locale, string>> = {
+  prefill: { en: 'Prefill', zh: 'Prefill' },
+  decode: { en: 'Decode', zh: 'Decode' },
+  split: { en: 'Prefill vs Decode', zh: 'Prefill 与 Decode' },
+};
+
+/**
+ * A role draws the role-free metric, so its title says which pool it reads, worded like
+ * the old role metrics: "Measured Joules per Input Token" under Prefill GPUs reads
+ * "Measured Prefill Joules per Input Token" (zh: "每输入 token 实测 Prefill 焦耳能耗").
+ * A title without "Measured" gets the pool as a prefix.
+ */
+export function powerXRoleTitle(title: string, role: PowerXRole, locale: Locale): string {
+  if (role === 'all' || !title) return title;
+  const pool = ROLE_TITLE_POOL[role][locale];
+  if (locale === 'zh') {
+    return title.includes('实测')
+      ? title.replace(/实测\s*/u, `实测 ${pool} `)
+      : `${pool} · ${title}`;
+  }
+  return /\bMeasured\s/u.test(title)
+    ? title.replace(/\bMeasured\s+/u, `Measured ${pool} `)
+    : `${pool} · ${title}`;
+}
+
 /** Controls a GPU role pins, so the view can say why each one cannot change. */
 export type PowerXPinnedControl = 'count' | 'per' | 'rated' | 'statistic' | 'headroom';
 
@@ -104,11 +131,11 @@ export function powerXPinnedControls(
 ): readonly PowerXPinnedControl[] {
   if (role === 'all') return [];
   if (view === 'energy') return role === 'prefill' ? ['count', 'rated'] : ['count', 'per', 'rated'];
-  if (view === 'draw') return ['count', 'statistic', 'headroom'];
+  if (view === 'power') return ['count', 'statistic', 'headroom'];
   return [];
 }
 
-/** Per units a role allows on the Energy view: prefill adds its role-local Input. */
+/** Energy per units a role allows on the Energy view: prefill adds its role-local Input. */
 export function powerXRoleEnergyPers(role: PowerXRole): readonly ('output' | 'input')[] {
   return role === 'prefill' ? ['output', 'input'] : ['output'];
 }

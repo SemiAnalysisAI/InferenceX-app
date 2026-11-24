@@ -8,7 +8,7 @@ import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { AggDataEntry, InferenceData } from '../types';
-import PowerBreakdownPanel from './PowerBreakdownPanel';
+import PowerBreakdownPanel, { type PowerBreakdownView } from './PowerBreakdownPanel';
 import PowerChipCompare from './PowerChipCompare';
 import {
   buildPowerBreakdownsWithOverlays,
@@ -46,6 +46,7 @@ export default function PowerAnalysisPanels({
   contextLabel,
   role = 'all',
   placement = 'after',
+  breakdownView,
 }: {
   data: InferenceData[];
   overlayData?: readonly InferenceData[];
@@ -59,6 +60,8 @@ export default function PowerAnalysisPanels({
    * and decode pools; the modeled layers stay whole and aggregated chips stay listed.
    */
   role?: PowerXRole;
+  /** PowerX layout: the drill-down's chart style, chosen in the Breakdown toolbar's More. */
+  breakdownView?: PowerBreakdownView;
   /**
    * `before`: the PowerX Where tab leads with the chip comparison (the answer),
    * and the boundary line chart follows as supporting detail.
@@ -218,6 +221,7 @@ export default function PowerAnalysisPanels({
               onLayerHighlight={setLayerHighlight}
               onCollapse={() => setCollapsed(true)}
               role={role}
+              view={breakdownView}
               heading={
                 series
                   ? {

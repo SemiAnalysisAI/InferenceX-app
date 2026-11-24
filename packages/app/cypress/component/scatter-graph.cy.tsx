@@ -8,7 +8,7 @@ import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unoff
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
-import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface-provider';
 import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
@@ -2231,6 +2231,9 @@ describe('ChartDisplay responsive status notes', () => {
           inference: {
             selectedYAxisMetric: 'y_measuredAvgPower',
             powerCompare: 'breakdown',
+            // The PowerX view reads the stored choice.
+            storedYAxisMetric: 'y_measuredAvgPower',
+            storedPowerCompare: 'breakdown',
             selectedGPUs: history ? ['b200_trt'] : [],
             selectedDates: history ? ['2025-03-01'] : [],
             activeDates: new Set(['2025-03-01_b200_trt']),
