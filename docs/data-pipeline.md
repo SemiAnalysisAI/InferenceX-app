@@ -657,19 +657,26 @@ these with `***REDACTED***`:
 
 - access tokens: `hf_`, GitHub, AWS `AKIA`/`ASIA` key IDs, Slack, `sk-` and `nvapi-` API keys, and
   JWTs;
-- `Authorization: Bearer|Basic|Token` values, and a bare `Bearer` with a long token;
+- `Authorization: Bearer|Basic|Token` values, and a bare `Bearer` with a long token unless it is a
+  slash path without digits (`bearer src/auth/…`);
 - values of upper-case `*_TOKEN`, `*_API_KEY`, `*_SECRET`, `*_ACCESS_KEY` and `*_PASSWORD`
-  assignments, unless the value is a placeholder (`$VAR`, `<…>`, `***`, a number, `none`…);
+  assignments, also with JSON-escaped quotes (`\"MY_SECRET_TOKEN\":\"…\"`), unless the value is a
+  placeholder (`$VAR`, `<…>`, `***`, a number, `none`…);
+- values of lower-case `*_token`, `*api_key`, `*_secret` and `*_password` assignments and of
+  `--*-token`, `--api-key`, `--*-secret` and `--*-password` flags, when the value mixes letters
+  and digits (so `initial-cluster-token: etcd-cluster` and `bytes_per_full_token=13125.54` stay);
 - URL passwords, with any scheme case and JSON-escaped `:\/\/`;
 - email addresses with a public TLD;
 - public IPv4 and IPv6 addresses and `*.oraclevcn.com` host suffixes.
 
-Tokens are found after ANSI colour codes and escaped `\n`, `\r` or `\t` too. Private, loopback,
-link-local and CGNAT addresses, internal node names, short usernames such as `/home/cam`,
+Tokens are found after ANSI CSI sequences (colour `\x1b[0m`, erase `\x1b[2K`, cursor `\x1b[1A`),
+their escaped spellings (`\x1b[`, `\u001b[`, `\033[`) and escaped `\n`, `\r` or `\t` too. Private,
+loopback, link-local and CGNAT addresses, internal node names, short usernames such as `/home/cam`,
 `user@host` without a TLD or with an internal one (`.internal`, `.local`, `.lan`), scp-style
 remotes (`git@github.com:org/repo`), URL userinfo without a password, `q@k.transpose(…)`,
 `pkg@1.2.3`, image digests, and package versions (`==9.19.0.56`, pip's `(9.19.0.56)`, and the
-version column of `pip list`, `conda list` and torch's `[conda]` dump) stay. For runs from a
+version column of `pip list`, `conda list` and torch's `[conda]` dump, when the package name has a
+lower-case letter and no address-like word such as `addr`, `ip` or `node`) stay. For runs from a
 repository that is not public, `owner/repo`, `owner%2Frepo` and the name with `-` or `_` in either
 place are removed wherever no letter or digit continues them. The InferenceX uploader applies the
 same rules, and both sides test against `etl/log-redaction.vectors.json`, so change the two
@@ -687,19 +694,23 @@ this change stay exposed until the backfill runs.
 (point `DATABASE_WRITE_URL` at it). It is a dry run by default. `--write` applies it, `--run-id`
 scopes it to one run, and `--concurrency N` sanitizes N files at once. Each file is its own
 transaction under the file's advisory lock, which `compact-server-logs` also takes, and its
-blocks are rebuilt from the sanitized text, as are blocks whose character count no longer matches
-already-sanitized text. Rerunning is safe because sanitized text is a fixed point.
+blocks are rebuilt from the sanitized text. So are blocks that no longer describe already-sanitized
+text: a different character count gives them away, and for text holding `***REDACTED***` the
+blocks are decoded and compared. Rerunning is safe because sanitized text is a fixed point. The
+backfill exits 1 whenever a file failed, `--downstream` included.
 
 Besides log text, it clears `workflow_runs.html_url` for runs from repositories that are not
 public, once every file succeeded. Each cleared URL is first appended to an operator-only JSONL
-file (`--url-map <path>`, default `~/.inferencex/redacted-run-urls/`, mode 600) whose path is
-printed; `sync-public-db` records the URLs it does not copy the same way. Keep that file out of git
-and CI logs: it is the only record of those runs' repositories. Admin backfills that read
-artifacts (`backfill-server-log-files`, `backfill-gpu-metrics`, `backfill-runtime-metadata`) skip
-a run without a URL and report it, instead of reading `INGEST_REPO`. On a downstream deployment's
-own database, pass `--downstream`: it applies the shared rules but keeps that deployment's
-private repository names and run URLs, and never asks GitHub. Visibility checks use
-`GITHUB_TOKEN` when it is set.
+file (`--url-map <path>`, default `~/.inferencex/redacted-run-urls/`, mode 600 even for an existing
+file) whose path is printed; `sync-public-db` records the URLs it does not copy the same way. Keep
+that file out of git and CI logs: it is the only record of those runs' repositories. Admin
+backfills that read artifacts (`backfill-server-log-files`, `backfill-gpu-metrics`,
+`backfill-runtime-metadata`) read every map in `~/.inferencex/redacted-run-urls/` and use a cleared
+run's recorded repository; any other run without a URL falls back to `INGEST_REPO`, as before.
+GitHub run IDs are unique across repositories, so a cleared run missing from the maps reads as not
+found there rather than as another run. On a downstream deployment's own database, pass
+`--downstream`: it applies the shared rules but keeps that deployment's private repository names
+and run URLs, and never asks GitHub. Visibility checks use `GITHUB_TOKEN` when it is set.
 
 After a write, purge the log cache with `bun run admin:cache:invalidate -- <app-url> --immediate`.
 Log responses carry `s-maxage=31536000`, so the CDN keeps the old text until that purge; browsers
