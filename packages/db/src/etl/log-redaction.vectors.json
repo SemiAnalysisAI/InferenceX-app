@@ -204,6 +204,121 @@
       "name": "decorator kept",
       "input": "@torch.compile(dynamic=True) and @functools.lru_cache",
       "output": "@torch.compile(dynamic=True) and @functools.lru_cache"
+    },
+    {
+      "name": "public ipv4 after ansi colour code",
+      "input": "\u001b[2mpeer\u001b[0m\u001b[2m=\u001b[0m198.51.100.7:8000",
+      "output": "\u001b[2mpeer\u001b[0m\u001b[2m=\u001b[0m***REDACTED***:8000"
+    },
+    {
+      "name": "hf token after ansi colour code",
+      "input": "\u001b[32mINFO\u001b[0mhf_abcdefghijklmnopqrstuvwxyzABCDEF12",
+      "output": "\u001b[32mINFO\u001b[0m***REDACTED***"
+    },
+    {
+      "name": "email after ansi colour code keeps the code",
+      "input": "\u001b[0mjane@example.com",
+      "output": "\u001b[0m***REDACTED***"
+    },
+    {
+      "name": "public ipv4 after escaped newline and before escaped tab",
+      "input": "b'connect\\n198.51.100.7\\tok'",
+      "output": "b'connect\\n***REDACTED***\\tok'"
+    },
+    {
+      "name": "github token after escaped newline",
+      "input": "b'line\\nghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'",
+      "output": "b'line\\n***REDACTED***'"
+    },
+    {
+      "name": "public ipv6 after escaped newline",
+      "input": "b'via\\n2001:db8::9'",
+      "output": "b'via\\n***REDACTED***'"
+    },
+    {
+      "name": "email after escaped newline keeps the escape",
+      "input": "b'owner\\njane@example.com'",
+      "output": "b'owner\\n***REDACTED***'"
+    },
+    {
+      "name": "authorization bearer header",
+      "input": "headers={'Authorization': 'Bearer abcdefghijklmnop1234'}",
+      "output": "headers={'Authorization': 'Bearer ***REDACTED***'}"
+    },
+    {
+      "name": "authorization basic header",
+      "input": "curl -H \"Authorization: Basic dXNlcjpwYXNzd29yZA==\"",
+      "output": "curl -H \"Authorization: Basic ***REDACTED***\""
+    },
+    {
+      "name": "bare bearer token",
+      "input": "token type Bearer abcdefghijklmnopqrstuvwxyz ok",
+      "output": "token type Bearer ***REDACTED*** ok"
+    },
+    {
+      "name": "basic and bearer in prose kept",
+      "input": "Basic information: the bearer of bad news",
+      "output": "Basic information: the bearer of bad news"
+    },
+    {
+      "name": "secret assignments",
+      "input": "WANDB_API_KEY=0123456789abcdef0123456789abcdef01234567 \"DB_PASSWORD\": \"s3cret-pass\" AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY",
+      "output": "WANDB_API_KEY=***REDACTED*** \"DB_PASSWORD\": \"***REDACTED***\" AWS_SECRET_ACCESS_KEY: ***REDACTED***"
+    },
+    {
+      "name": "placeholder and numeric assignments kept",
+      "input": "HF_TOKEN=$HF_TOKEN DB_PASSWORD=<your-password> MAX_NUM_BATCHED_TOKEN=16384 SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token hf_token=lowercase-value",
+      "output": "HF_TOKEN=$HF_TOKEN DB_PASSWORD=<your-password> MAX_NUM_BATCHED_TOKEN=16384 SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token hf_token=lowercase-value"
+    },
+    {
+      "name": "nvidia api key",
+      "input": "key nvapi-abcdefghijklmnopqrstuvwxyz0123456789",
+      "output": "key ***REDACTED***"
+    },
+    {
+      "name": "aws temporary access key",
+      "input": "aws ASIAABCDEFGHIJKLMNOP",
+      "output": "aws ***REDACTED***"
+    },
+    {
+      "name": "url password with uppercase scheme",
+      "input": "Postgres://reader:s3cret@db.example.com/x",
+      "output": "Postgres://reader:***REDACTED***@db.example.com/x"
+    },
+    {
+      "name": "url password with json-escaped slashes",
+      "input": "\"url\": \"https:\\/\\/user:s3cret@10.0.0.9\\/path\"",
+      "output": "\"url\": \"https:\\/\\/user:***REDACTED***@10.0.0.9\\/path\""
+    },
+    {
+      "name": "internal tld after at sign kept",
+      "input": "ssh root@im-b200-c006.nsc-sa.internal; user@worker.svc.cluster.local; ops@nas.lan",
+      "output": "ssh root@im-b200-c006.nsc-sa.internal; user@worker.svc.cluster.local; ops@nas.lan"
+    },
+    {
+      "name": "matrix multiply call kept",
+      "input": "attn = q@k.transpose(-2, -1)",
+      "output": "attn = q@k.transpose(-2, -1)"
+    },
+    {
+      "name": "pip list version column kept",
+      "input": "Package                  Version\nnvidia-cudnn-cu12        9.10.2.21\n",
+      "output": "Package                  Version\nnvidia-cudnn-cu12        9.10.2.21\n"
+    },
+    {
+      "name": "conda environment version column kept",
+      "input": "[conda] nvidia-cudnn-cu12 9.10.2.21 pypi_0 pypi",
+      "output": "[conda] nvidia-cudnn-cu12 9.10.2.21 pypi_0 pypi"
+    },
+    {
+      "name": "public ipv4 in a two-column line",
+      "input": "peer  198.51.100.7\nnode-1 198.51.100.8",
+      "output": "peer  ***REDACTED***\nnode-1 ***REDACTED***"
+    },
+    {
+      "name": "non-ascii text next to an ip and a token",
+      "input": "地址198.51.100.7 密钥hf_abcdefghijklmnopqrstuvwxyzABCDEF12",
+      "output": "地址***REDACTED*** 密钥***REDACTED***"
     }
   ]
 }
