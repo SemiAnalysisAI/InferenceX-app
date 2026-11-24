@@ -13,6 +13,7 @@ import {
   type ChartPointDetailsMetric,
   type ChartPointDetailsRow,
 } from '@/components/ui/chart-point-details';
+import { HINT_MIN_TOP_MARGIN_PX } from '@/components/ui/d3-chart-wrapper';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { readableTextContrast } from '@/lib/d3-chart/contrast-colors';
@@ -26,8 +27,14 @@ import type {
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
-import { setAttrIfChanged, widthTickCount } from '@/lib/d3-chart/chart-update';
-import type { ChartLayout, ContinuousScale } from '@/lib/d3-chart/types';
+import type { ContinuousScale } from '@/lib/d3-chart/types';
+import {
+  TOP_AXIS_BAND_PX,
+  renderTopAxis,
+  stickTopAxis,
+  unstickTopAxis,
+  useStickyTopAxis,
+} from '@/lib/d3-chart/sticky-top-axis';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -59,7 +66,7 @@ const OVERLAY_STRINGS = {
     inputOutputCost: 'Input · output cost',
     inputOutputPower: 'Input · output tok/s/MW',
     cacheHit: 'KV cache hit rate',
-    theoreticalCacheHit: 'Theoretical cache hit rate',
+    theoreticalCacheHit: 'Theoretical Cache Hit Rate',
     inputShare: 'Input token share',
   },
   zh: {
@@ -211,10 +218,10 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
   }
   switch (provider) {
     case 'costh': {
-      return 'Owning at large hyperscaler volume';
+      return 'Owning at Large Hyperscaler Volume';
     }
     case 'costr': {
-      return 'Rent – 3-year commit';
+      return 'Rent – 3-Year Commit';
     }
   }
 }
@@ -237,20 +244,20 @@ export function getChartTitle(
     : '';
   const qualifier =
     mode === 'interactivity_to_throughput'
-      ? `at ${targetValue} tok/s/user ${percentilePrefix}interactivity`
-      : `at ${targetValue} tok/s/chip throughput`;
+      ? `at ${targetValue} tok/s/user ${percentilePrefix}Interactivity`
+      : `at ${targetValue} tok/s/chip Throughput`;
 
   const tokenTypeLabel =
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
     case 'power': {
-      return { title: `${tokenTypeLabel} tokens per provisioned all-in megawatt`, qualifier };
+      return { title: `${tokenTypeLabel} Tokens per Provisioned All-in Megawatt`, qualifier };
     }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh');
       return {
-        title: `Cost per million ${tokenTypeLabel.toLowerCase()} tokens (${providerLabel})`,
+        title: `Cost per Million ${tokenTypeLabel} Tokens (${providerLabel})`,
         qualifier,
       };
     }
@@ -258,7 +265,7 @@ export function getChartTitle(
       return {
         title:
           mode === 'interactivity_to_throughput'
-            ? `${tokenTypeLabel} token throughput per chip`
+            ? `${tokenTypeLabel} Token Throughput per Chip`
             : 'Interactivity',
         qualifier,
       };
@@ -433,61 +440,6 @@ function getColor(): string {
 const BAR_OPACITY = 0.85;
 const MIN_INSIDE_LABEL_CONTRAST = 5.5;
 const MIN_CLAMPED_LABEL_CONTRAST = 4.5;
-const TOP_AXIS_BAND_PX = 28;
-
-function renderTopAxis(
-  layout: ChartLayout,
-  xScale: d3.ScaleLinear<number, number>,
-  tickCount: number,
-) {
-  let axis = layout.g.select<SVGGElement>('.x-axis-top');
-  if (axis.empty()) {
-    axis = layout.g.append('g').attr('class', 'x-axis-top').style('pointer-events', 'none');
-    axis
-      .append('rect')
-      .attr('class', 'x-axis-top-band')
-      .attr('fill', 'var(--card)')
-      .attr('opacity', 0);
-    axis
-      .append('line')
-      .attr('class', 'x-axis-top-edge')
-      .attr('stroke', 'var(--chart-grid)')
-      .attr('opacity', 0);
-    axis.append('g').attr('class', 'x-axis-top-ticks');
-  }
-  const count = widthTickCount(layout.width, tickCount);
-  axis.attr('data-plot-top', layout.margin.top).attr('data-plot-height', layout.height);
-  axis
-    .select('.x-axis-top-band')
-    .attr('x', -layout.margin.left)
-    .attr('y', -TOP_AXIS_BAND_PX)
-    .attr('width', layout.width + layout.margin.left + layout.margin.right)
-    .attr('height', TOP_AXIS_BAND_PX + 4);
-  axis
-    .select('.x-axis-top-edge')
-    .attr('x1', -layout.margin.left)
-    .attr('x2', layout.width + layout.margin.right)
-    .attr('y1', 4.5)
-    .attr('y2', 4.5);
-  axis
-    .select<SVGGElement>('.x-axis-top-ticks')
-    .call(d3.axisTop(xScale).ticks(count).tickFormat(xTickFormat).tickSize(0).tickPadding(8))
-    .call((ticks) => ticks.select('.domain').remove());
-}
-
-function stickTopAxis(svg: SVGSVGElement | null | undefined) {
-  const axis = svg?.querySelector<SVGGElement>('.x-axis-top');
-  if (!svg || !axis) return;
-  const headerBottom =
-    document.querySelector('.vt-site-header')?.getBoundingClientRect().bottom ?? 0;
-  const plotTop = svg.getBoundingClientRect().top + Number(axis.dataset.plotTop);
-  const maxOffset = Math.max(0, Number(axis.dataset.plotHeight) - TOP_AXIS_BAND_PX);
-  const offset = Math.min(maxOffset, Math.max(0, headerBottom + TOP_AXIS_BAND_PX - plotTop));
-  setAttrIfChanged(axis, 'transform', `translate(0,${offset})`);
-  const opacity = offset > 0 ? '1' : '0';
-  for (const el of axis.querySelectorAll('.x-axis-top-band, .x-axis-top-edge'))
-    setAttrIfChanged(el, 'opacity', opacity);
-}
 
 function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -597,11 +549,16 @@ export default function ThroughputBarChart({
 
   const dynamicMargin = useMemo(() => {
     if (sortedResults.length === 0) {
-      return { top: TOP_AXIS_BAND_PX + 4, right: 32, bottom: 60, left: 80 };
+      return {
+        top: TOP_AXIS_BAND_PX + 4 + HINT_MIN_TOP_MARGIN_PX,
+        right: 32,
+        bottom: 60,
+        left: 80,
+      };
     }
     const labels = sortedResults.map((r) => getLabel(r, hardwareConfig));
     return {
-      top: TOP_AXIS_BAND_PX + 4,
+      top: TOP_AXIS_BAND_PX + 4 + HINT_MIN_TOP_MARGIN_PX,
       right: 32,
       bottom: 60,
       left: computeLeftMargin(labels, { split: 'parens', minMargin: 80, padding: 12 }),
@@ -735,7 +692,10 @@ export default function ThroughputBarChart({
         renderTopAxis(
           ctx.layout,
           (ctx.renderedXScale ?? xScale) as d3.ScaleLinear<number, number>,
-          xTickCount,
+          {
+            tickCount: xTickCount,
+            tickFormat: xTickFormat,
+          },
         );
       },
       onDisplayUpdate: (zoomGroup, ctx) => {
@@ -751,12 +711,15 @@ export default function ThroughputBarChart({
           costType,
           resolveBarColor,
         );
-        renderTopAxis(ctx.layout, currentXScale, xTickCount);
+        renderTopAxis(ctx.layout, currentXScale, {
+          tickCount: xTickCount,
+          tickFormat: xTickFormat,
+        });
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
         positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, resolveBarColor);
-        renderTopAxis(ctx.layout, newXScale, xTickCount);
+        renderTopAxis(ctx.layout, newXScale, { tickCount: xTickCount, tickFormat: xTickFormat });
       },
     };
 
@@ -906,29 +869,12 @@ export default function ThroughputBarChart({
   const onExportRender = useCallback(
     (ctx: RenderContext) => {
       renderDecorations(ctx);
-      const topAxis = ctx.layout.g.select('.x-axis-top').attr('transform', null);
-      topAxis.selectAll('.x-axis-top-band, .x-axis-top-edge').attr('opacity', 0);
+      unstickTopAxis(ctx.layout);
     },
     [renderDecorations],
   );
 
-  useEffect(() => {
-    let frame = 0;
-    const schedule = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        stickTopAxis(chartRef.current?.getSvgElement());
-      });
-    };
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-    };
-  }, []);
+  useStickyTopAxis(chartRef);
 
   useEffect(() => {
     const svgEl = chartRef.current?.getSvgElement();

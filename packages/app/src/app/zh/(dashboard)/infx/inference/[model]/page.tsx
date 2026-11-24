@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { InferenceEarlyFetch } from '@/components/inference/inference-early-fetch';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { InferencePageIntro } from '@/components/inference/inference-page-intro';
@@ -44,6 +45,7 @@ export default async function ZhInferenceModelPage({ params }: Props) {
   if (!entry) notFound();
   return (
     <>
+      <InferenceEarlyFetch routeModel={entry.model} />
       <InferencePageIntro locale="zh" />
       <InferenceProvider activeTab="inference">
         <InferenceChartDisplay centerOnEnter />

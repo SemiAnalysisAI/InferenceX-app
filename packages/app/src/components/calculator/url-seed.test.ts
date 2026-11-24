@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { profitModelDefaults } from './profit-estimator';
-import { parseProfitTargetParam, profitTargetUrlValue, resolveCalculatorUrlSeed } from './url-seed';
+import {
+  calculatorUrlSeed,
+  parseProfitTargetParam,
+  profitTargetUrlValue,
+  resolveCalculatorUrlSeed,
+} from './url-seed';
 import { Model, Percentile, Precision, Sequence } from '@/lib/catalog/data-mappings';
 
 const seedOf = (query: ConstructorParameters<typeof URLSearchParams>[0]) =>
@@ -104,6 +109,54 @@ describe('resolveCalculatorUrlSeed', () => {
 
   it('does not read the retired fixed-8k/1k c_profit_target param', () => {
     expect(seedOf({ c_profit_target: '222' })).toEqual({});
+  });
+});
+
+describe('calculatorUrlSeed profit history controls', () => {
+  it('seeds chips, dates, cache-hit mode and power from profit route path filters', () => {
+    const seed = calculatorUrlSeed(
+      '/infx/profit-estimator-per-gigawatt/kimi-k3/cache-hit-mode/actual/power/compare/chips/b300_vllm%2Cgb300_dynamo-vllm/dates/2026-10-20%2C2026-10-27~r42/start/2026-10-08/end/2026-11-06',
+      '',
+      undefined,
+    );
+    expect(seed.profit).toEqual({
+      historyGpus: ['b300_vllm', 'gb300_dynamo-vllm'],
+      historyDateRange: { startDate: '2026-10-08', endDate: '2026-11-06' },
+      historyDates: ['2026-10-20', '2026-10-27~r42'],
+      cacheHitMode: 'actual',
+      powerBasis: 'compare',
+    });
+  });
+
+  it('keeps the path seed when the query adds nothing, so the hydrated tree is not remounted', () => {
+    const path = '/zh/infx/profit-estimator/deepseek-v41-flash/chips/h200_vllm';
+    const pathSeed = calculatorUrlSeed(path, '', undefined);
+    expect(pathSeed.profit?.historyGpus).toEqual(['h200_vllm']);
+    expect(calculatorUrlSeed(path, '?utm_source=newsletter', undefined)).toEqual(pathSeed);
+  });
+
+  it('reads legacy query filters on profit routes, so the boundary remounts on them', () => {
+    const seed = calculatorUrlSeed('/infx/profit-estimator', '?i_gpus=b200_vllm', undefined);
+    expect(seed.profit?.historyGpus).toEqual(['b200_vllm']);
+  });
+
+  it('drops a half-open date range and unknown cache-hit and power values', () => {
+    const seed = calculatorUrlSeed(
+      '/infx/profit-estimator',
+      '?i_dstart=2026-10-08&c_chmode=bogus&c_power=provisioned',
+      undefined,
+    );
+    expect(seed.profit).toEqual({
+      historyGpus: [],
+      historyDateRange: { startDate: '', endDate: '' },
+      historyDates: [],
+    });
+  });
+
+  it('leaves the seed of other calculator routes unchanged', () => {
+    expect(
+      calculatorUrlSeed('/infx/calculator/kimi-k3', '?i_gpus=b200_vllm', undefined).profit,
+    ).toBeUndefined();
   });
 });
 

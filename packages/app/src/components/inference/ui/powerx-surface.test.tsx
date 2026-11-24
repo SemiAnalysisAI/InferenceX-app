@@ -1,14 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 
-const mocks = vi.hoisted(() => ({ coarse: false }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/hooks/useMediaQuery', () => ({
+const mocks = { coarse: false };
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/hooks/useMediaQuery', () => ({
   useIsMobileViewport: () => false,
   useIsCoarsePointer: () => mocks.coarse,
   useMediaQuery: () => false,

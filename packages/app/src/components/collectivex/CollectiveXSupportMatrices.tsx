@@ -23,14 +23,14 @@ const MODES = ['normal', 'low-latency'] as const;
 
 const STRINGS = {
   en: {
-    title: 'Known kernel support',
+    title: 'Known Kernel Support',
     description:
       'The full SKU × library picture, independent of the runs above: ✓ marks combinations that work on the fleet, ✕ marks combinations known not to work (the numbered notes say why), and a dash marks combinations that are unavailable or awaiting qualification (see notes). Under each cell is the backend version the selected runs measured.',
     modes: {
       normal: 'Throughput kernels',
       'low-latency': 'Low-latency kernels',
     },
-    axes: 'SKU / library',
+    axes: 'SKU / Library',
     works: 'Works',
     broken: 'Known not to work',
     na: 'Not applicable',

@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import { PowerXSurfaceProvider, usePowerXIncludeFacility } from '../ui/powerx-surface';
 import { PowerXFacilitySwitch } from './PowerXLayout';

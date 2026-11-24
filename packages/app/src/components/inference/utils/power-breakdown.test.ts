@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
@@ -22,7 +22,8 @@ import {
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
 } from './power-breakdown';
-import { estimateChassisPower, SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-categories';
+import { estimateChassisPower } from '@/lib/power/system-power-model';
 
 const metric = (y: number) => ({ y, roof: false });
 

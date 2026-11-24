@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { BlogPostMeta, TocHeading } from '@/lib/blog/blog';
 
@@ -71,7 +71,7 @@ describe('BlogPostContent', () => {
     expect(html).toContain('Updated August 25, 2026');
     expect(html).toContain('6 min read');
     expect(html).toContain('href="/blog?tag=benchmark"');
-    expect(html).toContain('More articles');
+    expect(html).toContain('More Articles');
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(RELATED.length);
     expect(html).toContain('href="/blog/older"');
     expect(html).toContain('href="/blog/newer"');
@@ -89,8 +89,8 @@ describe('BlogPostContent', () => {
     expect(html).toContain('hrefLang="en"');
     expect(html).toContain('2026年8月19日');
     expect(html).not.toContain('min read');
-    expect(html).not.toContain('More articles');
-    expect(html).not.toContain('Back to articles');
+    expect(html).not.toContain('More Articles');
+    expect(html).not.toContain('Back to Articles');
   });
 });
 

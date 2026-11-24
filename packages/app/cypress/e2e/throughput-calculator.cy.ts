@@ -20,7 +20,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="footer-link-calculator"]')
         .scrollIntoView()
         .should('be.visible')
-        .and('contain.text', 'TCO calculator');
+        .and('contain.text', 'TCO Calculator');
 
       cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/infx/calculator');
@@ -52,8 +52,8 @@ describe('TCO Calculator', () => {
       cy.viewport(1280, 900);
       cy.get('[data-testid="calculator-controls"] fieldset legend').should(($legends) => {
         expect([...$legends].map((legend) => legend.textContent)).to.deep.equal([
-          'Benchmark config',
-          'Pricing config',
+          'Benchmark Config',
+          'Pricing Config',
           'Comparison target',
         ]);
       });
@@ -66,7 +66,7 @@ describe('TCO Calculator', () => {
       });
       cy.get('[data-testid="calc-cost-selector"]').should(
         'contain.text',
-        'Owning at large hyperscaler volume',
+        'Owning at Large Hyperscaler Volume',
       );
       cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
       cy.get('[data-testid="calculator-metric-throughput"]')
@@ -111,15 +111,15 @@ describe('TCO Calculator', () => {
 
     it('displays chart title that updates when metric changes', () => {
       const metrics = [
-        { metric: 'throughput', title: 'Total token throughput per chip', badges: [] },
+        { metric: 'throughput', title: 'Total Token Throughput per Chip', badges: [] },
         {
           metric: 'power',
-          title: 'Total tokens per provisioned all-in megawatt',
-          badges: ['All in power/chip', 'kW'],
+          title: 'Total Tokens per Provisioned All-in Megawatt',
+          badges: ['All in Power/Chip', 'kW'],
         },
         {
           metric: 'cost',
-          title: 'Cost per million',
+          title: 'Cost per Million',
           badges: ['TCO', '$/chip/hr'],
         },
       ] as const;
@@ -225,13 +225,13 @@ describe('TCO Calculator', () => {
         cy.get('#calc-cost').click();
       });
       cy.get('[role="option"]').should('have.length', 7);
-      cy.get('[role="option"]').eq(0).should('contain.text', 'Owning at large hyperscaler volume');
-      cy.get('[role="option"]').eq(1).should('contain.text', 'Rent – 3-year commit');
-      cy.get('[role="option"]').eq(2).should('contain.text', 'Rent – on demand');
-      cy.get('[role="option"]').eq(3).should('contain.text', 'Rent – 1-month commit');
-      cy.get('[role="option"]').eq(4).should('contain.text', 'Rent – 6-month commit');
-      cy.get('[role="option"]').eq(5).should('contain.text', 'Rent – 1-year commit');
-      cy.get('[role="option"]').eq(6).should('contain.text', 'Rent – 2-year commit');
+      cy.get('[role="option"]').eq(0).should('contain.text', 'Owning at Large Hyperscaler Volume');
+      cy.get('[role="option"]').eq(1).should('contain.text', 'Rent – 3-Year Commit');
+      cy.get('[role="option"]').eq(2).should('contain.text', 'Rent – On Demand');
+      cy.get('[role="option"]').eq(3).should('contain.text', 'Rent – 1-Month Commit');
+      cy.get('[role="option"]').eq(4).should('contain.text', 'Rent – 6-Month Commit');
+      cy.get('[role="option"]').eq(5).should('contain.text', 'Rent – 1-Year Commit');
+      cy.get('[role="option"]').eq(6).should('contain.text', 'Rent – 2-Year Commit');
       cy.get('[role="option"] [data-testid="locked-tier-badge"]').should('have.length', 5);
       cy.get('body').type('{esc}');
 
@@ -242,7 +242,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="cost-provider-locked-rent_1_year"]').click();
       cy.get('[data-testid="tco-model-dialog"]')
         .should('be.visible')
-        .and('contain.text', 'Rent – 1-year commit');
+        .and('contain.text', 'Rent – 1-Year Commit');
       cy.get('[data-testid="tco-model-dialog-link"]').should(
         'have.attr',
         'href',
@@ -260,16 +260,16 @@ describe('TCO Calculator', () => {
         cy.get('#calc-cost-type').click();
       });
       cy.get('[role="option"]').should('have.length', 3);
-      cy.get('[role="option"]').eq(0).should('contain.text', 'Total tokens');
-      cy.get('[role="option"]').eq(1).should('contain.text', 'Input tokens');
-      cy.get('[role="option"]').eq(2).should('contain.text', 'Output tokens');
+      cy.get('[role="option"]').eq(0).should('contain.text', 'Total Tokens');
+      cy.get('[role="option"]').eq(1).should('contain.text', 'Input Tokens');
+      cy.get('[role="option"]').eq(2).should('contain.text', 'Output Tokens');
       cy.get('body').type('{esc}');
 
       cy.get('[data-testid="calculator-chart-section"] h2').first().should('contain.text', 'Total');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
-      cy.get('[role="option"]').contains('Input tokens').click();
+      cy.get('[role="option"]').contains('Input Tokens').click();
       cy.get('[data-testid="calculator-chart-section"] h2').first().should('contain.text', 'Input');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
@@ -278,7 +278,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
-      cy.get('[role="option"]').contains('Output tokens').click();
+      cy.get('[role="option"]').contains('Output Tokens').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'Output');
@@ -291,7 +291,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
-      cy.get('[role="option"]').contains('Total tokens').click();
+      cy.get('[role="option"]').contains('Total Tokens').click();
       cy.get('[data-testid="calculator-results-table"] thead').should(
         'contain.text',
         'Total Throughput',
@@ -303,14 +303,14 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Owning at large hyperscaler volume');
+        .should('contain.text', 'Owning at Large Hyperscaler Volume');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
       });
-      cy.get('[role="option"]').contains('Rent – 3-year commit').click();
+      cy.get('[role="option"]').contains('Rent – 3-Year Commit').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Rent – 3-year commit');
+        .should('contain.text', 'Rent – 3-Year Commit');
     });
 
     it('typing a new value in the number input updates the chart title', () => {
@@ -393,7 +393,7 @@ describe('TCO Calculator', () => {
 
       cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
 
-      for (const tokenType of ['Output tokens', 'Input tokens']) {
+      for (const tokenType of ['Output Tokens', 'Input Tokens']) {
         cy.get('[data-testid="calc-cost-type-selector"]').click();
         cy.contains('[role="option"]', tokenType).click();
         cy.get('body').type('{esc}');
@@ -401,7 +401,7 @@ describe('TCO Calculator', () => {
       }
 
       cy.get('[data-testid="calc-cost-type-selector"]').click();
-      cy.contains('[role="option"]', 'Total tokens').click();
+      cy.contains('[role="option"]', 'Total Tokens').click();
       cy.get('body').type('{esc}');
       cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
     });
@@ -477,7 +477,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P90 interactivity');
+        .should('contain.text', 'P90 Interactivity');
 
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-bar-chart"] svg .value-label')
@@ -492,10 +492,10 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P75 interactivity');
+        .should('contain.text', 'P75 Interactivity');
       cy.get('[data-testid="calculator-controls"]').should(
         'contain.text',
-        'Target P75 interactivity',
+        'Target P75 Interactivity',
       );
       cy.get('[data-testid="share-button"]').click();
       cy.get('[data-testid="share-url-input"]').invoke('val').should('include', 'i_pctl=p75');
@@ -513,7 +513,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P75 interactivity');
+        .should('contain.text', 'P75 Interactivity');
     });
 
     it('hides the percentile selector behind the feature gate and defaults to P90', () => {
@@ -532,10 +532,10 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P90 interactivity');
+        .should('contain.text', 'P90 Interactivity');
       cy.get('[data-testid="calculator-controls"]').should(
         'contain.text',
-        'Target P90 interactivity',
+        'Target P90 Interactivity',
       );
     });
   });
@@ -582,7 +582,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-costcap-input"]').type('100');
       cy.get('[data-testid="calculator-costcap-table"]').should('be.visible');
       cy.get('[data-testid="calculator-costcap-table"]').within(() => {
-        cy.contains('th', 'Max interactivity (tok/s/user)').should('exist');
+        cy.contains('th', 'Max Interactivity (tok/s/user)').should('exist');
         cy.get('tbody tr').should('have.length.greaterThan', 0);
         cy.get('tbody tr')
           .first()

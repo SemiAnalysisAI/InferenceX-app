@@ -2,14 +2,14 @@ import { createHash, randomBytes } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { computeRequestTimeline } from '../etl/compute-request-timeline';
 import {
   fullResponseMetricsFromLines,
   fullResponseMetricsFromProfile,
 } from '../etl/full-response-interactivity';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 import {
   PROFILE_CHUNK_BYTES,
   readTraceProfileChunks,
@@ -22,10 +22,11 @@ let db: PGlite;
 let sql: PgliteSql;
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 });
 afterAll(async () => {
-  await db.close();
+  await sql?.end();
+  await db?.close();
 });
 
 async function newTrace(): Promise<number> {
@@ -35,11 +36,17 @@ async function newTrace(): Promise<number> {
 
 describe('lossless trace profile storage', () => {
   it('round-trips multiple bounded parts and verifies their source checksum', async () => {
-    const source = randomBytes(PROFILE_CHUNK_BYTES * 2 + 101);
+    const chunkBytes = 64 * 1024;
+    const source = randomBytes(chunkBytes * 2 + 101);
     const id = await newTrace();
-    await sql.begin((tx) => writeTraceProfileChunks(tx, id, source));
-    const restored = await readTraceProfileGz(sql, id);
-    expect(restored?.equals(source)).toBe(true);
+    await sql.begin((tx) => writeTraceProfileChunks(tx, id, source, chunkBytes));
+    const parts: Buffer[] = [];
+    for await (const part of readTraceProfileChunks(sql, id, chunkBytes)) {
+      expect(part.length).toBeLessThanOrEqual(chunkBytes);
+      parts.push(part);
+    }
+    expect(Buffer.concat(parts).equals(source)).toBe(true);
+    await expect(readTraceProfileGz(sql, id)).rejects.toThrow('Invalid chunk metadata');
     const [row] =
       await sql`select profile_export_jsonl_gz, profile_export_chunk_count, profile_export_compressed_size, profile_export_sha256 from agentic_trace_replay where id = ${id}`;
     expect(row).toMatchObject({

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -14,7 +14,7 @@ import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
 import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { scenarioLabel } from '@/lib/live-seo/rankings';
-import { getRunPageEntry, type RunPageEntry } from '@/lib/live-seo/run-pages';
+import { canonicalRunPageSlug, getRunPageEntry, type RunPageEntry } from '@/lib/live-seo/run-pages';
 import {
   runPageDescriptionZh,
   runPageFaqQuestionsZh,
@@ -22,13 +22,17 @@ import {
   runPageTitleZh,
   runPageKeywordsZh,
 } from '@/lib/live-seo/run-pages-zh';
-import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
+import {
+  getPrerenderedRunParams,
+  getRunPageData,
+  type RunPageData,
+} from '@/lib/live-seo/run-rankings-data.server';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { slug: string }[] {
-  return [];
+export function generateStaticParams(): Promise<{ slug: string }[]> {
+  return getPrerenderedRunParams();
 }
 
 interface Props {
@@ -115,7 +119,11 @@ function buildFaqZh(
 export default async function ZhRunPage({ params }: Props) {
   const { slug } = await params;
   const entry = getRunPageEntry(slug);
-  if (!entry) notFound();
+  if (!entry) {
+    const current = canonicalRunPageSlug(slug);
+    if (current) permanentRedirect(`/zh/run/${current}`);
+    notFound();
+  }
   const data = await getRunPageData(entry.slug);
   if (!data) notFound();
 

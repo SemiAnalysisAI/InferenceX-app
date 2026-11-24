@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 
 import type { EvalRow } from '@/lib/api/api';
 import { Model, Precision } from '@/lib/catalog/data-mappings';
@@ -208,6 +208,7 @@ describe('buildEvaluationChartRows', () => {
   });
 
   it('drops rows with missing metrics and unknown hardware rows, but keeps legitimate zero scores', () => {
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = buildEvaluationChartRows(
       [
         evalRow({ config_id: 1, metrics: {} as never }),
@@ -222,6 +223,13 @@ describe('buildEvaluationChartRows', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ configId: 3, score: 0 });
+    expect(warned.mock.calls).toEqual([
+      ['[evaluation] dropped row with missing metrics: config_id=1 h200 sglang gsm8k'],
+      [
+        '[evaluation] dropped row with unknown hardware mapping: hardware=unknown-gpu framework= spec=none',
+      ],
+    ]);
+    warned.mockRestore();
   });
 });
 

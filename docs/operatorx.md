@@ -324,7 +324,7 @@ all-reduce runs outside the op. Share of roofline is that time over measured
 latency. The roofline chart plots each case at its effective intensity: where
 the GPU's roofline reaches the case's bound, so the gap under the roof is the
 case's share of roofline. For a single-stage op this is plain FLOP/byte. The x axis
-reads "Arithmetic intensity" (FLOP/byte, or over the ridge point when normalized) either
+reads "Arithmetic Intensity" (FLOP/byte, or over the ridge point when normalized) either
 way; the tooltip gives plain FLOP/byte and, for staged cases, the effective value.
 
 中文：MoE 与注意力算子包含多个阶段（投影、注意力核心或线性递归、路由、专家、共享专家），

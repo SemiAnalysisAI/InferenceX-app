@@ -107,29 +107,29 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 These are the main scripts you'll use during development. Admin scripts for database and cache management are listed separately below.
 Some of these may require additional setup or environment variables.
 
-| Script                         | Description                                     |
-| ------------------------------ | ----------------------------------------------- |
-| `bun run dev`                  | Start development server with Turbopack         |
-| `bun run mcp`                  | Start the InferenceX MCP server                 |
-| `bun run build`                | Production build + route bundle budget guard    |
-| `bun run check:bundle-budgets` | Check existing Next.js route bundle diagnostics |
-| `bun run start`                | Start production server                         |
-| `bun run preview`              | Build then start production server locally      |
-| `bun run typecheck`            | TypeScript type checking (all packages)         |
-| `bun run lint`                 | Lint with oxlint                                |
-| `bun run lint:fix`             | Auto-fix lint issues                            |
-| `bun run fmt`                  | Format check with oxfmt                         |
-| `bun run fmt:fix`              | Auto-fix formatting                             |
-| `bun run security`             | Security audit                                  |
-| `bun run test`                 | Run all tests (unit + E2E)                      |
-| `bun run test:unit`            | Vitest unit tests                               |
-| `bun run test:unit:coverage`   | Vitest unit tests with coverage                 |
-| `bun run test:e2e`             | Curated local Cypress smoke suite               |
-| `bun run test:e2e:full`        | Complete Cypress component + integration suite  |
-| `bun run test:e2e:component`   | Complete Cypress component suite only           |
-| `bun run test:e2e:integration` | Complete Cypress integration suite only         |
-| `bun run clean`                | Remove build artifacts                          |
-| `bun run clean:all`            | Remove build artifacts + node_modules           |
+| Script                         | Description                                    |
+| ------------------------------ | ---------------------------------------------- |
+| `bun run dev`                  | Start development server with Turbopack        |
+| `bun run mcp`                  | Start the InferenceX MCP server                |
+| `bun run build`                | Production build                               |
+| `bun run check:route-budgets`  | Check first-load JS per route after a build    |
+| `bun run start`                | Start production server                        |
+| `bun run preview`              | Build then start production server locally     |
+| `bun run typecheck`            | TypeScript type checking (all packages)        |
+| `bun run lint`                 | Lint with oxlint                               |
+| `bun run lint:fix`             | Auto-fix lint issues                           |
+| `bun run fmt`                  | Format check with oxfmt                        |
+| `bun run fmt:fix`              | Auto-fix formatting                            |
+| `bun run security`             | Security audit                                 |
+| `bun run test`                 | Run all tests (unit + E2E)                     |
+| `bun run test:unit`            | Vitest unit tests                              |
+| `bun run test:unit:coverage`   | Vitest unit tests with coverage                |
+| `bun run test:e2e`             | Curated local Cypress smoke suite              |
+| `bun run test:e2e:full`        | Complete Cypress component + integration suite |
+| `bun run test:e2e:component`   | Complete Cypress component suite only          |
+| `bun run test:e2e:integration` | Complete Cypress integration suite only        |
+| `bun run clean`                | Remove build artifacts                         |
+| `bun run clean:all`            | Remove build artifacts + node_modules          |
 
 This repository uses Vitest and Cypress. Use the `bun run test:*` scripts above; `bun test` invokes Bun's separate built-in test runner and is not supported.
 
@@ -140,17 +140,18 @@ However, using `bun run admin:cache:invalidate` pointed at your local developmen
 
 Changes to `packages/db/src/etl/run-overrides.ts` that reach `main` or `master` are applied to the production database automatically by CI, followed by database verification, cache invalidation, and cache warmup. The override command remains available for local previews and manual recovery.
 
-| Script                             | Description                              |
-| ---------------------------------- | ---------------------------------------- |
-| `bun run admin:db:migrate`         | Run database migrations                  |
-| `bun run admin:db:ingest:run`      | Ingest benchmark data from GitHub runs   |
-| `bun run admin:db:ingest:ci`       | Ingest benchmark data (CI mode)          |
-| `bun run admin:db:ingest:gcs`      | Ingest benchmark data from GCS           |
-| `bun run admin:db:apply-overrides` | Preview or apply data overrides manually |
-| `bun run admin:db:reset`           | Reset the database                       |
-| `bun run admin:db:verify`          | Verify database integrity                |
-| `bun run admin:cache:invalidate`   | Invalidate API cache                     |
-| `bun run admin:cache:warmup`       | Warm up API cache                        |
+| Script                              | Description                                   |
+| ----------------------------------- | --------------------------------------------- |
+| `bun run admin:db:migrate`          | Run database migrations                       |
+| `bun run admin:db:check-migrations` | List migrations the database has not recorded |
+| `bun run admin:db:ingest:run`       | Ingest benchmark data from GitHub runs        |
+| `bun run admin:db:ingest:ci`        | Ingest benchmark data (CI mode)               |
+| `bun run admin:db:ingest:gcs`       | Ingest benchmark data from GCS                |
+| `bun run admin:db:apply-overrides`  | Preview or apply data overrides manually      |
+| `bun run admin:db:reset`            | Reset the database                            |
+| `bun run admin:db:verify`           | Verify database integrity                     |
+| `bun run admin:cache:invalidate`    | Invalidate API cache                          |
+| `bun run admin:cache:warmup`        | Warm up API cache                             |
 
 ## Deployment
 

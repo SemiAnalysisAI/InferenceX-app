@@ -1,4 +1,4 @@
-import { expectNoPageOverflow, unlockAgenticGate } from '../support/e2e';
+import { expectNoPageOverflow, fastForwardQueryRetry, unlockAgenticGate } from '../support/e2e';
 
 const timelineRequest = (
   index: number,
@@ -243,7 +243,7 @@ describe('Agentic point request metric time series', () => {
     cy.wait('@serverLogInitialChunk');
 
     cy.get('[data-testid="agentic-server-log-viewer"]')
-      .should('contain.text', 'Log files')
+      .should('contain.text', 'Log Files')
       .and('contain.text', longServerLogPath)
       .then(($viewer) => {
         cy.get('#agentic-log-file').then(($trigger) => {
@@ -356,7 +356,9 @@ describe('Agentic point request metric time series', () => {
       'contain.text',
       'INFO retained after failure',
     );
-    cy.get('[data-testid="load-more-server-log"]').click();
+    fastForwardQueryRetry(':contains("The next chunk could not be loaded")', () => {
+      cy.get('[data-testid="load-more-server-log"]').click();
+    });
     cy.wait('@failedLogChunkSettled');
     cy.contains('The next chunk could not be loaded').should('be.visible');
     cy.get('[data-testid="server-log-content"]').should(
@@ -369,7 +371,7 @@ describe('Agentic point request metric time series', () => {
 
   it('renders rolling P90 interactivity and TTFT by default using profiling requests only', () => {
     cy.get('[data-testid="interactivity-over-time-chart"]').within(() => {
-      cy.contains('h2', 'Interactivity over time').should('be.visible');
+      cy.contains('h2', 'Interactivity over Time').should('be.visible');
       cy.get('[data-testid="interactivity-percentile-toggle"]')
         .find('[role="tab"][aria-selected="true"]')
         .should('have.text', 'P90');
@@ -381,7 +383,7 @@ describe('Agentic point request metric time series', () => {
     });
 
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
-      cy.contains('h2', 'TTFT over time').should('be.visible');
+      cy.contains('h2', 'TTFT over Time').should('be.visible');
       cy.get('[data-testid="ttft-point-count"]').should('have.text', '6 points');
       cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'TTFT (s)');
@@ -399,28 +401,53 @@ describe('Agentic point request metric time series', () => {
   it('switches ISL and OSL cards from distributions to in-flight averages', () => {
     cy.get('[data-testid="isl-metric-chart"]').within(() => {
       cy.get('[data-testid="isl-metric-inflight"]').click();
-      cy.contains('h2', 'Average ISL in flight').should('be.visible');
+      cy.contains('h2', 'Average ISL in Flight').should('be.visible');
       cy.get('svg').should('contain.text', 'Average ISL in flight (30s avg)');
     });
     cy.get('[data-testid="osl-metric-chart"]').within(() => {
       cy.get('[data-testid="osl-metric-inflight"]').click();
-      cy.contains('h2', 'Average OSL in flight').should('be.visible');
+      cy.contains('h2', 'Average OSL in Flight').should('be.visible');
       cy.contains('Retrospective: final observed OSL').should('be.visible');
       cy.get('svg').should('contain.text', 'Average OSL in flight (30s avg)');
+    });
+  });
+
+  it('keeps eight-digit in-flight Y tick labels inside the chart', () => {
+    const requests = [0, 1, 2, 3].map((index) =>
+      timelineRequest(index, 100, 10, { isl: 58_000_000 }),
+    );
+    cy.intercept('GET', '/api/v1/request-chart-data*', {
+      body: requestChartPayload(requests),
+    }).as('largeRequestChartData');
+    cy.reload();
+    cy.wait('@largeRequestChartData');
+    cy.get('[data-testid="isl-metric-chart"]').within(() => {
+      cy.get('[data-testid="isl-metric-inflight"]').click();
+      cy.contains('svg text', '60,000,000').then(($tick) => {
+        const svg = $tick[0]!.closest('svg')!;
+        const svgLeft = svg.getBoundingClientRect().left;
+        const ticks = [...svg.querySelectorAll('text[text-anchor="end"]')].filter((text) =>
+          /^[\d,]+$/u.test(text.textContent ?? ''),
+        );
+        expect(ticks.length).to.be.greaterThan(1);
+        for (const tick of ticks) {
+          expect(tick.getBoundingClientRect().left, tick.textContent ?? '').to.be.at.least(svgLeft);
+        }
+      });
     });
   });
 
   it('switches the TTFT chart to E2E request latency over time', () => {
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.get('[data-testid="latency-metric-e2e"]').click();
-      cy.contains('h2', 'E2E latency over time').should('be.visible');
+      cy.contains('h2', 'E2E Latency over Time').should('be.visible');
       cy.get('[data-testid="e2e-point-count"]').should('have.text', '8 points');
       cy.get('svg circle').should('have.length', 8);
       cy.get('svg').should('contain.text', 'E2E latency (s)');
       cy.get('svg').should('contain.text', 'Cumulative P90 E2E latency');
 
       cy.get('[data-testid="latency-metric-ttft"]').click();
-      cy.contains('h2', 'TTFT over time').should('be.visible');
+      cy.contains('h2', 'TTFT over Time').should('be.visible');
     });
   });
 
@@ -457,13 +484,13 @@ describe('Agentic point request metric time series', () => {
 
   it('switches the request activity card from queue depth to cumulative completions', () => {
     cy.get('[data-testid="request-activity-chart"]').within(() => {
-      cy.contains('h2', 'Request queue depth').should('be.visible');
+      cy.contains('h2', 'Request Queue Depth').should('be.visible');
       cy.get('[data-testid="request-activity-completed"]').click();
-      cy.contains('h2', 'Cumulative completed requests').should('be.visible');
+      cy.contains('h2', 'Cumulative Completed Requests').should('be.visible');
       cy.get('svg').should('contain.text', 'Completed requests');
       cy.get('svg').should('contain.text', 'Requests');
       cy.get('[data-testid="request-activity-queue"]').click();
-      cy.contains('h2', 'Request queue depth').should('be.visible');
+      cy.contains('h2', 'Request Queue Depth').should('be.visible');
     });
   });
 
@@ -541,8 +568,10 @@ describe('Agentic point request metric time series', () => {
             },
       );
     }).as('retryServerLogSearch');
-    cy.visit('/zh/infx/inference/agentic/206885?view=logs&e2e=log-retries', {
-      onBeforeLoad: unlockAgenticGate,
+    fastForwardQueryRetry('[data-testid="server-log-files-query-error"]', () => {
+      cy.visit('/zh/infx/inference/agentic/206885?view=logs&e2e=log-retries', {
+        onBeforeLoad: unlockAgenticGate,
+      });
     });
 
     cy.get('[data-testid="server-log-files-query-error"]')
@@ -552,7 +581,9 @@ describe('Agentic point request metric time series', () => {
       fileAttemptsBeforeRetry = fileAttempts;
       failFile = false;
     });
-    cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
+    fastForwardQueryRetry('[data-testid="server-log-content-query-error"]', () => {
+      cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
+    });
     cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
     cy.wrap(null).should(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
 
@@ -569,7 +600,9 @@ describe('Agentic point request metric time series', () => {
       expect(contentAttempts).to.be.greaterThan(contentAttemptsBeforeRetry),
     );
 
-    cy.get('[data-testid="server-log-search"]').type('recovered');
+    fastForwardQueryRetry('[data-testid="server-log-search-query-error"]', () => {
+      cy.get('[data-testid="server-log-search"]').type('recovered');
+    });
     cy.get('[data-testid="server-log-search-query-error"]').should('contain.text', '重试');
     cy.then(() => {
       searchAttemptsBeforeRetry = searchAttempts;
@@ -700,7 +733,9 @@ describe('Agentic point request metric time series', () => {
       );
     });
 
-    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    fastForwardQueryRetry('[data-testid="agentic-request-charts-query-error"]', () => {
+      cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    });
     cy.get('[data-testid="agentic-request-charts-query-error"]')
       .should('contain.text', '请求图表数据加载失败')
       .and('contain.text', '重试');
@@ -712,7 +747,9 @@ describe('Agentic point request metric time series', () => {
     cy.contains('h2', '输入序列长度分布').should('be.visible');
     cy.then(() => expect(requestChartAttempts).to.be.greaterThan(requestChartAttemptsBeforeRetry));
 
-    cy.get('[data-testid="detail-view-aggregates"]').click();
+    fastForwardQueryRetry('[data-testid="agentic-aggregates-query-error"]', () => {
+      cy.get('[data-testid="detail-view-aggregates"]').click();
+    });
     cy.get('[data-testid="agentic-aggregates-query-error"]')
       .should('contain.text', '跨配置聚合数据加载失败')
       .and('contain.text', '重试');
@@ -724,7 +761,9 @@ describe('Agentic point request metric time series', () => {
     cy.contains('h2', '各配置的 ISL 分布').should('be.visible');
     cy.then(() => expect(aggregateAttempts).to.be.greaterThan(aggregateAttemptsBeforeRetry));
 
-    cy.get('[data-testid="detail-view-timeline"]').click();
+    fastForwardQueryRetry('[data-testid="agentic-timeline-query-error"]', () => {
+      cy.get('[data-testid="detail-view-timeline"]').click();
+    });
     cy.get('[data-testid="agentic-timeline-query-error"]')
       .should('contain.text', '请求时间线加载失败')
       .and('contain.text', '重试');
@@ -754,7 +793,9 @@ describe('Agentic point request metric time series', () => {
         failSibling ? { statusCode: 500, body: {} } : { statusCode: 200, body: benchmarkSiblings },
       );
     });
-    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    fastForwardQueryRetry('[data-testid="agentic-trace-query-error"]', () => {
+      cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    });
 
     cy.get('[data-testid="agentic-trace-query-error"]')
       .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据')
@@ -763,7 +804,9 @@ describe('Agentic point request metric time series', () => {
       traceAttemptsBeforeRetry = traceAttempts;
       failTrace = false;
     });
-    cy.get('[data-testid="agentic-trace-query-error"]').contains('button', '重试').click();
+    fastForwardQueryRetry('[data-testid="agentic-siblings-query-error"]', () => {
+      cy.get('[data-testid="agentic-trace-query-error"]').contains('button', '重试').click();
+    });
     cy.get('[data-testid="agentic-trace-query-error"]').should('not.exist');
     cy.then(() => expect(traceAttempts).to.be.greaterThan(traceAttemptsBeforeRetry));
 
@@ -993,7 +1036,9 @@ describe('Agentic point orchestrator metric sources', () => {
     });
     cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="metric-source-select"]').click();
-    cy.contains('[role="option"]', '解码 · decode-a').click();
+    fastForwardQueryRetry('[data-testid="agentic-metric-source-query-error"]', () => {
+      cy.contains('[role="option"]', '解码 · decode-a').click();
+    });
 
     cy.get('[data-testid="agentic-metric-source-query-error"]')
       .should('contain.text', '无法加载所选服务器指标来源')

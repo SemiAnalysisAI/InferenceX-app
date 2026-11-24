@@ -36,8 +36,8 @@ const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-bt
 
 function assertFleetControlLabels(locale: 'en' | 'zh' = 'en') {
   for (const [id, label] of [
-    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost provider'],
-    ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token type'],
+    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost Provider'],
+    ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token Type'],
   ]) {
     cy.get(`label[for="${id}"]`).should('have.text', label).click();
     cy.get(`button#${id}`).should('have.attr', 'aria-expanded', 'true');
@@ -153,13 +153,13 @@ describe('Fleet — Fleet Lifecycle', () => {
     for (const width of [375, 1440]) {
       cy.viewport(width, 900);
       cy.get('[data-testid="fleet-benchmark-panel"]').within(() => {
-        cy.get('legend').should('have.text', 'Benchmark config');
+        cy.get('legend').should('have.text', 'Benchmark Config');
         cy.get('#fleet-model').should('exist');
         cy.get('#fleet-sequence').should('exist');
         cy.get('#fleet-precision').should('exist');
       });
       cy.get('[data-testid="fleet-chart-panel"]').within(() => {
-        cy.get('legend').should('have.text', 'Chart config');
+        cy.get('legend').should('have.text', 'Chart Config');
         cy.get('#fleet-cost').should('exist');
         cy.get('#fleet-cost-type').should('exist');
         cy.get('#fleet-target').should('exist');
@@ -387,7 +387,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     );
 
     cy.get('[data-testid="calc-lifecycle-metric-cumulative-revenue"]').click();
-    chartText().should('contain', 'Cumulative revenue ($)');
+    chartText().should('contain', 'Cumulative Revenue ($)');
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
       'not.exist',
     );
@@ -424,12 +424,12 @@ describe('Fleet — Fleet Lifecycle', () => {
       .then((perDay) => {
         const sign = Math.sign(money(perDay));
         expect(sign, 'a non-zero daily margin to accumulate').to.not.equal(0);
-        firstRowCell('Cumulative margin')
+        firstRowCell('Cumulative Margin')
           .invoke('text')
           .then((short) => {
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
-            firstRowCell('Cumulative margin')
+            firstRowCell('Cumulative Margin')
               .invoke('text')
               .should((long) => {
                 const delta = (money(long) - money(short)) * sign;
@@ -451,10 +451,10 @@ describe('Fleet — Fleet Lifecycle', () => {
       .invoke('text')
       .should('match', /^\d+(?:\.\d+)?×$/u);
 
-    firstRowCell('First run')
+    firstRowCell('First Run')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
-    firstRowCell('Latest best')
+    firstRowCell('Latest Best')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
   });
@@ -465,12 +465,12 @@ describe('Fleet — Fleet Lifecycle', () => {
       .and('have.attr', 'step', '0.25');
     lineVertices().then((curved) => {
       expect(curved).to.be.greaterThan(20);
-      firstRowCell('Cumulative margin')
+      firstRowCell('Cumulative Margin')
         .invoke('text')
         .then((short) => {
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
-          firstRowCell('Cumulative margin')
+          firstRowCell('Cumulative Margin')
             .invoke('text')
             .should((long) => expect(money(long)).to.be.lessThan(money(short)));
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
@@ -504,7 +504,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       expect(chips.length).to.be.greaterThan(0);
       expect(new Set(chips).size).to.equal(chips.length);
     });
-    firstRowCell('Config now').invoke('text').should('not.be.empty');
+    firstRowCell('Config Now').invoke('text').should('not.be.empty');
   });
 
   it('follows legend visibility', () => {
@@ -535,7 +535,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       });
     cy.get('[data-testid="calculator-lifecycle-section"]').should(
       'contain.text',
-      'Not measured at this interactivity',
+      'Not Measured at This Interactivity',
     );
     cy.get('[data-testid="calculator-lifecycle-unmeasured"]').should('contain.text', 'measured');
   });
@@ -608,7 +608,7 @@ describe('Fleet — self-contained lifecycle regressions', () => {
         );
       }
       expect(header, 'lifecycle CSV header').to.equal(
-        'Chip,Config now,First run,Latest best,Improvements,Gain,Chips,tok/s/MW now,Concurrent users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative margin,Availability',
+        'Chip,Config Now,First Run,Latest Best,Improvements,Gain,Chips,tok/s/MW now,Concurrent Users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative Margin,Availability',
       );
     });
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
@@ -747,8 +747,8 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       .and('contain.text', '来源：');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('not.contain.text', 'Enter a facility power budget')
-      .and('not.contain.text', 'Cumulative margin')
-      .and('not.contain.text', 'First run');
+      .and('not.contain.text', 'Cumulative Margin')
+      .and('not.contain.text', 'First Run');
 
     showTable();
     cy.window().then(captureLifecycleCsvDownloads);
@@ -761,7 +761,9 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       ['calc-lifecycle-horizon-input', '18'],
       ['calc-fleet-mw-input', '4'],
     ]) {
-      cy.get(`[data-testid="${testId}"]`).clear().type(value);
+      // Clearing can re-render the field (an empty budget swaps in the empty state), so re-query it.
+      cy.get(`[data-testid="${testId}"]`).clear();
+      cy.get(`[data-testid="${testId}"]`).type(value);
     }
 
     for (const [option, header] of [

@@ -1,32 +1,37 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
-  fixturesMode: false,
-  cachedQuery: vi.fn(<T, Args extends unknown[]>(fn: (...args: Args) => Promise<T>) => fn),
+const mocks = {
+  cachedQuery: vi.fn(
+    <T, Args extends unknown[]>(fn: (...args: Args) => Promise<T>, _keyPrefix: string) => fn,
+  ),
   getDataset: vi.fn((_db: unknown, slug: string) =>
     Promise.resolve(slug === 'cc-traces' ? { slug: 'cc-traces', label: 'CC traces' } : null),
   ),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  get FIXTURES_MODE() {
-    return mocks.fixturesMode;
-  },
-  getDb: () => ({}),
-}));
-vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
+// bun:test snapshots mocked exports, so a getter would be read once. Re-mocking the module
+// updates the FIXTURES_MODE binding the code under test already imported.
+function mockConnection(fixturesMode: boolean) {
+  mock.module('@semianalysisai/inferencex-db/connection', () => ({
+    FIXTURES_MODE: fixturesMode,
+    getDb: () => ({}),
+  }));
+}
+mockConnection(false);
+mock.module('@semianalysisai/inferencex-db/queries/datasets', () => ({
   getDataset: mocks.getDataset,
 }));
-vi.mock('@/lib/cache/api-cache', () => ({ cachedQuery: mocks.cachedQuery }));
+mock.module('@/lib/cache/api-cache', () => ({ cachedQuery: mocks.cachedQuery }));
 
-import { lookupDatasetPage } from './dataset-pages.server';
+// Imported after the mocks: the dataset cache is created with cachedQuery when the module loads.
+const { lookupDatasetPage } = await import('./dataset-pages.server');
 
-// Vitest clears mock history before every test, so keep the calls made while the module loaded.
+// Keep the calls made while the module loaded, before any test clears mock history.
 const moduleLoadCachedQueryCalls = [...mocks.cachedQuery.mock.calls];
 
 describe('lookupDatasetPage', () => {
   beforeEach(() => {
-    mocks.fixturesMode = false;
+    mockConnection(false);
     mocks.getDataset.mockClear();
   });
 
@@ -48,7 +53,7 @@ describe('lookupDatasetPage', () => {
   });
 
   it('skips the database in fixture builds', async () => {
-    mocks.fixturesMode = true;
+    mockConnection(true);
     await expect(lookupDatasetPage('anything')).resolves.toEqual({ kind: 'unchecked' });
     expect(mocks.getDataset).not.toHaveBeenCalled();
   });

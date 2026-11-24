@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
-import { isCalendarDate, parseBenchmarkRequest } from './benchmark-request-params';
+import { MODEL_DISPLAY_NAMES } from '@/lib/catalog/model-name-resolver';
+
+import {
+  isCalendarDate,
+  parseBenchmarkRequest,
+  UNKNOWN_MODEL_DETAIL,
+} from './benchmark-request-params';
 
 describe('isCalendarDate', () => {
   it.each(['2026-11-03', '2000-02-29', '2028-02-29', '0001-01-01', '9999-12-31'])(
@@ -66,7 +72,23 @@ describe('parseBenchmarkRequest', () => {
     });
   });
 
-  it('reports the model before any other malformed parameter', () => {
-    expect(parse('model=nope&date=bad')).toEqual({ ok: false, error: 'Unknown model' });
+  it('reports the model before any other malformed parameter, with the accepted names', () => {
+    expect(parse('model=nope&date=bad')).toEqual({
+      ok: false,
+      error: 'Unknown model',
+      detail: UNKNOWN_MODEL_DETAIL,
+    });
+    expect(UNKNOWN_MODEL_DETAIL).toEqual({ param: 'model', allowed: MODEL_DISPLAY_NAMES });
+  });
+
+  it('accepts the model forms the views API accepts', () => {
+    expect(parse('model=kimik3.1')).toMatchObject({
+      ok: true,
+      params: { dbModelKeys: ['kimik3.1'] },
+    });
+    expect(parse('model=GLM-5.3')).toMatchObject({
+      ok: true,
+      params: { dbModelKeys: ['glm5.2', 'glm5.3'] },
+    });
   });
 });

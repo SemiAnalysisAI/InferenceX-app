@@ -1,7 +1,15 @@
 'use client';
 
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
-import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  startTransition,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+} from 'react';
 
 import { filterAndSortLegendItems } from '@/lib/charts/legend-utils';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -49,6 +57,24 @@ export interface LegendSwitchConfig {
   onCheckedChange: (checked: boolean) => void;
   infoTooltip?: React.ReactNode;
   advanced?: boolean;
+}
+
+/** Flips at once; the chart redraw the flip starts runs as a transition behind that paint. */
+function LegendSwitch({ config }: { config: LegendSwitchConfig }) {
+  const [checked, setChecked] = useOptimistic(config.checked);
+  return (
+    <Switch
+      id={config.id}
+      data-testid={config.id}
+      checked={checked}
+      onCheckedChange={(next) =>
+        startTransition(() => {
+          setChecked(next);
+          config.onCheckedChange(next);
+        })
+      }
+    />
+  );
 }
 
 export interface LegendActionConfig {
@@ -175,12 +201,19 @@ export default function ChartLegend({
       }
       setStripHeight(el.scrollHeight > room + 0.5 && lastRowBottom > 0 ? lastRowBottom : null);
     };
-    const observer = new ResizeObserver(update);
+    // Measuring in the observer callback resizes the observed strip in the same frame,
+    // which raises "ResizeObserver loop completed with undelivered notifications".
+    let frame: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    });
     observer.observe(el);
     if (panel) observer.observe(panel);
     el.addEventListener('scroll', updateScroll, { passive: true });
     return () => {
       observer.disconnect();
+      if (frame !== undefined) cancelAnimationFrame(frame);
       el.removeEventListener('scroll', updateScroll);
     };
   }, [items, isLegendExpanded, isSidebar]);
@@ -318,12 +351,7 @@ export default function ChartLegend({
       >
         {list.map((sw) => (
           <div key={sw.id} className="mt-2 flex items-center gap-2">
-            <Switch
-              id={sw.id}
-              data-testid={sw.id}
-              checked={sw.checked}
-              onCheckedChange={sw.onCheckedChange}
-            />
+            <LegendSwitch config={sw} />
             <Label
               htmlFor={sw.id}
               className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"

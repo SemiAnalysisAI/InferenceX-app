@@ -1,11 +1,12 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import {
   buildTokenLengthSketch,
   mergeTokenLengthSketches,
 } from '@semianalysisai/inferencex-constants';
 
+import { waitFor } from '../lib/test-helpers';
 import type { DbClient } from '../connection.js';
 import {
   CHART_SERIES_SUMMARY_VERSION,
@@ -14,7 +15,7 @@ import {
 import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gunzipRequestTimeline } from '../etl/request-timeline-codec';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 
 import {
   _resetWriteBackWarned,
@@ -26,6 +27,7 @@ import {
   writeBackTraceReplayJsonb,
 } from './agentic-shared';
 import { getResidentSequenceLengthSketches } from './resident-sequence-lengths';
+import { getTraceServerMetricSource } from './trace-server-metrics';
 
 function mockSql(reject?: Error): {
   sql: DbClient;
@@ -41,7 +43,7 @@ function mockSql(reject?: Error): {
 
 afterEach(() => {
   _resetWriteBackWarned();
-  vi.restoreAllMocks();
+  mock.restore();
 });
 
 describe('writeBackTraceReplayJsonb', () => {
@@ -63,7 +65,7 @@ describe('writeBackTraceReplayJsonb', () => {
   });
 
   it('swallows a rejected UPDATE (read-only replica) and warns exactly once', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
 
     expect(() => writeBackTraceReplayJsonb(sql, 'aggregate_stats', 1, { v: 1 })).not.toThrow();
@@ -114,13 +116,55 @@ describe('writeBackChartSeries', () => {
   });
 
   it('swallows a rejected UPDATE and warns naming chart_series', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
 
     writeBackChartSeries(sql, 1, series);
 
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
     expect(warn.mock.calls[0]![0]).toContain('could not persist chart_series');
+  });
+
+  describe('through postgres.js', () => {
+    let db: PGlite;
+    let pg: PgliteSql;
+
+    beforeAll(async () => {
+      db = await migratedPglite();
+      pg = await pgliteDriverSql(db);
+      await db.exec(`
+        INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
+        VALUES (1, 1, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
+        INSERT INTO configs (id, model, hardware, framework, precision, spec_method, disagg,
+          is_multinode, prefill_tp, decode_tp, num_prefill_gpu, num_decode_gpu)
+        VALUES (1, 'dsv4', 'b200', 'vllm', 'fp4', 'none', false, false, 8, 8, 8, 8);
+        -- Not gzip, so a recompute from this blob would find no series.
+        INSERT INTO agentic_trace_replay (id, server_metrics_json_gz) VALUES (872, 'not gzip'::bytea);
+        INSERT INTO benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc, metrics, trace_replay_id)
+        VALUES (88, 1, 1, 'agentic_traces', '2026-10-01', 1, '{}', 872);
+      `);
+    }, 30_000);
+
+    afterAll(async () => {
+      await pg?.end();
+      await db?.close();
+    });
+
+    it('stores the series as a jsonb object whose version the source read serves', async () => {
+      const source = { source: { id: 'engine-0' }, kvCacheUsage: [{ t: 0, value: 0.5 }] };
+      writeBackChartSeries(pg, 872, { ...series, metricSources: [source] as never });
+
+      const stored = await waitFor(async () => {
+        const [row] = await pg`
+          select jsonb_typeof(chart_series) as type, (chart_series->>'version')::int as version
+          from agentic_trace_replay where id = 872
+        `;
+        expect(row?.type).toBe('object');
+        return row;
+      });
+      expect(stored?.version).toBe(CHART_SERIES_VERSION);
+      expect(await getTraceServerMetricSource(pg, 88, 'engine-0')).toEqual(source);
+    });
   });
 });
 
@@ -142,7 +186,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
 
   beforeAll(async () => {
     db = await migratedPglite();
-    pg = pgliteSql(db);
+    pg = await pgliteDriverSql(db);
     const stale = sequenceLengthSketchColumns({
       version: STATS_VERSION,
       sequenceLengths: { isl: buildTokenLengthSketch([5]) },
@@ -161,6 +205,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
   }, 30_000);
 
   afterAll(async () => {
+    await pg?.end();
     await db?.close();
   });
 
@@ -169,7 +214,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
       version: STATS_VERSION,
       sequenceLengths,
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       expect(await storedVersion()).toBe(SEQUENCE_LENGTH_SKETCHES_VERSION);
     });
     await expect(getResidentSequenceLengthSketches(pg, [88])).resolves.toEqual({
@@ -183,7 +228,7 @@ describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () =
       version: STATS_VERSION - 1,
       sequenceLengths,
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       expect(await storedVersion()).toBeNull();
     });
     await expect(getResidentSequenceLengthSketches(pg, [88])).resolves.toMatchObject({
@@ -232,10 +277,11 @@ describe('writeBackRequestTimeline', () => {
 
   beforeAll(async () => {
     db = await migratedPglite();
-    pg = pgliteSql(db);
+    pg = await pgliteDriverSql(db);
   }, 30_000);
 
   afterAll(async () => {
+    await pg?.end();
     await db?.close();
   });
 
@@ -252,7 +298,7 @@ describe('writeBackRequestTimeline', () => {
     const legacy = { version: REQUEST_TIMELINE_VERSION - 1, requests: [] };
     await pg`
       insert into agentic_trace_replay (id, request_timeline, request_timeline_version)
-      values (870, ${JSON.stringify(legacy)}::jsonb, ${REQUEST_TIMELINE_VERSION - 1})
+      values (870, ${legacy}::jsonb, ${REQUEST_TIMELINE_VERSION - 1})
     `;
 
     await writeBackRequestTimeline(pg, 870, timeline);
@@ -280,7 +326,7 @@ describe('writeBackRequestTimeline', () => {
   });
 
   it('resolves after a rejected UPDATE and warns once with the gzip column name', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
 
     await expect(writeBackRequestTimeline(sql, 870, timeline)).resolves.toBeUndefined();

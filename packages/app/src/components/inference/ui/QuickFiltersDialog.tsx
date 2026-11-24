@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
 import type { PowerTier } from '@/lib/power/power-tier';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
-import { topologyLabel } from '@/components/inference/utils/topology-filter';
+import { topologyLabels } from '@/components/inference/utils/topology-filter';
 
 import {
   useInferenceActions,
@@ -31,7 +31,7 @@ import { Label } from '@/components/ui/label';
 
 const STRINGS = {
   en: {
-    title: 'Quick filters',
+    title: 'Quick Filters',
     description:
       'Narrow the chart by chip vendor, serving framework, deployment mode, speculative decoding, and power-measurement status. Selecting none in a group shows all.',
     agenticDescription:
@@ -53,19 +53,19 @@ const STRINGS = {
     singleNode: 'Single-node',
     multiNode: 'Multi-node',
     disaggregated: 'Disaggregated',
-    specDecoding: 'Spec decoding',
+    specDecoding: 'Spec Decoding',
     specHelp:
       'MTP groups runs with speculative decoding enabled, including methods such as EAGLE. STP groups standard decoding without speculative decoding. Available only for fixed-sequence benchmarks.',
-    power: 'Measured power',
+    power: 'Measured Power',
     topology: 'Topology',
     topologyHelp:
       'Keep one GPU allocation and parallelism configuration across its observed concurrency sweep. This does not match software versions or fill missing measurements.',
     certified: 'Validated',
     legacyTier: 'Historical',
-    validatedTitle: 'Validated measurement',
+    validatedTitle: 'Validated Measurement',
     validatedDescription:
       'GPU power was recorded from runner telemetry using the current PowerX method and passed checks for benchmark-window coverage, expected GPU count, sample quality, and the energy definition.',
-    historicalTitle: 'Historical measurement',
+    historicalTitle: 'Historical Measurement',
     historicalDescription:
       "Real GPU telemetry from an older run, but the record lacks information needed to confirm it meets today's method. This does not mean the measurement is wrong.",
     powerDefault:
@@ -192,6 +192,7 @@ export function QuickFiltersDialog({
   const topologyKeys = [
     ...new Set([...(availableQuickFilters.topologies ?? []), ...(quickFilters.topologies ?? [])]),
   ];
+  const topologyKeyLabels = topologyLabels(topologyKeys, locale);
 
   const groups: {
     key: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power' | 'topology';
@@ -259,9 +260,9 @@ export function QuickFiltersDialog({
     {
       key: 'topology',
       label: t.topology,
-      options: topologyKeys.map((value) => ({
+      options: topologyKeys.map((value, index) => ({
         value,
-        label: topologyLabel(value, locale, topologyKeys),
+        label: topologyKeyLabels[index],
         available: (availableQuickFilters.topologies ?? []).includes(value),
       })),
       selected: quickFilters.topologies ?? [],

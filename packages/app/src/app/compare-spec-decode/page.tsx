@@ -88,7 +88,7 @@ export default async function CompareSpecDecodeIndexPage() {
       <section>
         <Card>
           <Heading as="h1" level="page">
-            Chip speculative decoding comparisons
+            Chip Speculative Decoding Comparisons
           </Heading>
           <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             {totalUrls.toLocaleString()} speculative decoding comparisons across{' '}
@@ -97,7 +97,7 @@ export default async function CompareSpecDecodeIndexPage() {
             chip, covering throughput, cost and interactivity at matched operating points.
           </p>
           <CompareCatalogLinks testId="compare-spec-decode-index-links">
-            <CompareCatalogLink href="/compare">Chip comparisons</CompareCatalogLink>
+            <CompareCatalogLink href="/compare">Chip Comparisons</CompareCatalogLink>
             <CompareCatalogLink href="/compare-per-dollar">
               Performance per dollar
             </CompareCatalogLink>

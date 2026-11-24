@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, mock } from 'bun:test';
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
-vi.mock('../cache/api-cache', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: true }));
+mock.module('../cache/api-cache', () => ({
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fetch: () => Promise<unknown>) => fetch,
 }));

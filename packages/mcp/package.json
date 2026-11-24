@@ -9,19 +9,19 @@
   },
   "scripts": {
     "mcp": "bun --env-file=../../.env src/mcp.ts",
-    "test:unit": "vitest run",
+    "test:unit": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@semianalysisai/inferencex-constants": "workspace:*",
     "@semianalysisai/inferencex-db": "workspace:*",
-    "postgres": "^3.4.9",
+    "postgres": "^4.1.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "typescript": "^6.0.3",
-    "vitest": "^5.1.0"
+    "bun-types": "^1.4.4",
+    "typescript": "^6.0.3"
   }
 }

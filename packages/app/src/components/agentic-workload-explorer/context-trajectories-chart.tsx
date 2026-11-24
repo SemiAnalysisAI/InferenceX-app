@@ -21,12 +21,12 @@ import { elapsedTicks } from '@/components/agentic-workload-explorer/tokens-over
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Trace of context growth over time',
+    sectionTitle: 'Trace of Context Growth Over Time',
     noData: 'No request data available',
     totalRequests: (total: number, subagent: number, invocations: number, main: number) =>
       `${total} total requests split up into ${subagent} sub-agent${invocations > 0 ? ` (${invocations} invocation${invocations === 1 ? '' : 's'})` : ''} and ${main} main-agent requests`,
-    mainAgent: 'Main agent',
-    resetZoom: 'Reset zoom',
+    mainAgent: 'Main Agent',
+    resetZoom: 'Reset Zoom',
     inputTokens: 'input tokens',
     subagentFallback: 'sub-agent',
   },

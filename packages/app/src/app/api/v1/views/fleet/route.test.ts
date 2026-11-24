@@ -1,25 +1,25 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetAllBenchmarksForHistory, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
+const { mockGetAllBenchmarksForHistory, mockCachedJson, mockCachedText } = {
   mockGetAllBenchmarksForHistory: vi.fn(),
   mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),
   ),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: false,
   getDb: vi.fn(() => ({}) as unknown),
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getAllBenchmarksForHistory: mockGetAllBenchmarksForHistory,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
@@ -267,10 +267,16 @@ describe('GET /api/v1/views/fleet', () => {
   });
 
   it('returns 500 when the query fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllBenchmarksForHistory.mockRejectedValueOnce(new Error('database unavailable'));
     const response = await GET(
       request('/api/v1/views/fleet?model=DeepSeek-V4-Pro&sequence=1k/1k&mw=100'),
     );
     expect(response.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error building fleet view:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

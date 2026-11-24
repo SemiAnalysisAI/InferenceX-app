@@ -105,10 +105,13 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('not.have.been.called');
   });
 
-  it('still navigates to Dashboard from a sibling dashboard tab', () => {
+  it('navigates Dashboard straight to the default model, skipping the bare-path redirect', () => {
     mountHeader('/infx/evaluation');
-    cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.wrap(mockRouter.push).should('have.been.calledWith', '/infx/inference');
+    cy.get('[data-testid="nav-link-dashboard"]')
+      .should('have.attr', 'href', '/infx/inference/kimi-k31-pro')
+      .click();
+    cy.wrap(mockRouter.push).should('have.been.calledWith', '/infx/inference/kimi-k31-pro');
+    cy.wrap(mockRouter.push).should('not.have.been.calledWith', '/infx/inference');
   });
 
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
@@ -168,7 +171,7 @@ describe('Header', () => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard')
         .should('be.visible')
-        .and('have.attr', 'href', '/infx/inference');
+        .and('have.attr', 'href', '/infx/inference/kimi-k31-pro');
       cy.contains('a', 'uBenchX').should('be.visible').and('have.attr', 'href', '/ubx/mem-bw');
       cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/infx/agentx');
       cy.contains('a', 'Comparisons').should('not.exist');

@@ -20,17 +20,17 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    title: 'uBenchX microbenchmarks',
+    title: 'uBenchX Microbenchmarks',
     beta: 'Beta',
     subtitle:
       'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics',
-    controls: 'Benchmark config',
+    controls: 'Benchmark Config',
     chartControls: 'Chart config',
     test: 'Microbenchmark',
     testTooltip: 'The uBenchX microbenchmark to display.',
-    memBwTitle: 'HBM bandwidth',
-    tpcSkylineTitle: 'TPC Skyline & SKU configurations',
-    coreProfilesTitle: 'Core memory-access profiles',
+    memBwTitle: 'HBM Bandwidth',
+    tpcSkylineTitle: 'TPC Skyline & SKU Configurations',
+    coreProfilesTitle: 'Core Memory-Access Profiles',
   },
   zh: {
     title: 'uBenchX 微基准测试',

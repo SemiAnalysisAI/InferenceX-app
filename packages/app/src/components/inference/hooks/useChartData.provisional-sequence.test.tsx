@@ -1,20 +1,25 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
-const { mockFetchBenchmarks } = vi.hoisted(() => ({ mockFetchBenchmarks: vi.fn() }));
-vi.mock(import('@/lib/api/api'), async (importOriginal) => ({
-  ...(await importOriginal()),
+const mockFetchBenchmarks = vi.fn();
+const actual = { ...(await import('@/lib/api/api')) };
+mock.module('@/lib/api/api', () => ({
+  ...actual,
   fetchBenchmarks: mockFetchBenchmarks,
 }));
 
 import { useChartData } from './useChartData';
+import { loadSystemPowerModeler } from '@/lib/power/system-power-modeler';
+
+// The chart waits for the lazily loaded power model, so load it before rendering the hook.
+await loadSystemPowerModeler();
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;

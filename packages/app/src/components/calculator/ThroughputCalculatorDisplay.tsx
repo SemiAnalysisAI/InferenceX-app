@@ -79,6 +79,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
+import { useDraftNumberInput } from '@/hooks/useDraftNumberInput';
 
 import { exportToCsv } from '@/lib/export/csv-export';
 import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
@@ -108,16 +109,16 @@ const COST_PROVIDER_OPTIONS: {
 }[] = [
   {
     value: 'costh',
-    label: 'Owning at large hyperscaler volume',
+    label: 'Owning at Large Hyperscaler Volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent – 3-year commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
-  { value: 'total', label: 'Total tokens' },
-  { value: 'input', label: 'Input tokens' },
-  { value: 'output', label: 'Output tokens' },
+  { value: 'total', label: 'Total Tokens' },
+  { value: 'input', label: 'Input Tokens' },
+  { value: 'output', label: 'Output Tokens' },
 ];
 
 const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
@@ -163,6 +164,11 @@ export function resolveCalculatorTargetInputValue(
   return isEditing ? editingValue : String(effectiveTarget);
 }
 
+function parseCalculatorTarget(raw: string): number | null {
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export function resolveCalculatorBarSelection(
   intent: { resultsKey: string; selected: Set<string> } | null,
   resultsKey: string,
@@ -190,32 +196,32 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 
 const STRINGS = {
   en: {
-    title: 'TCO calculator',
-    benchmarkGroup: 'Benchmark config',
-    pricingGroup: 'Pricing config',
+    title: 'TCO Calculator',
+    benchmarkGroup: 'Benchmark Config',
+    pricingGroup: 'Pricing Config',
     comparisonGroup: 'Comparison target',
     secondaryControls: 'More chart controls',
     changed: 'changed',
     description:
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
-    costProviderLabel: 'Cost provider',
+    costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
-    tokenTypeLabel: 'Token type',
+    tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
       'Whether to show costs for total tokens, input tokens only, or output tokens only.',
     tokenTypePlaceholder: 'Token type',
-    tcoBasisLabel: 'TCO basis',
+    tcoBasisLabel: 'TCO Basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal only changes hardware with a separate owner cost, currently TPUv7.',
     metricLabel: 'Metric',
     metricTooltip:
       'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), or cost per million tokens.',
-    targetLabel: 'Target interactivity (tok/s/user)',
+    targetLabel: 'Target Interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
@@ -226,11 +232,11 @@ const STRINGS = {
     errorLoading: 'Error loading data. Please try a different selection.',
     clickToCompare: 'selected. Click another bar to compare.',
     clearSelection: 'Clear selection',
-    highContrast: 'High contrast',
-    totalTokens: 'Total tokens',
-    inputTokens: 'Input tokens',
-    outputTokens: 'Output tokens',
-    allInPower: 'All in power/chip',
+    highContrast: 'High Contrast',
+    totalTokens: 'Total Tokens',
+    inputTokens: 'Input Tokens',
+    outputTokens: 'Output Tokens',
+    allInPower: 'All in Power/Chip',
     source: 'Source: ',
     note: 'Note:',
     disaggCost:
@@ -243,7 +249,7 @@ const STRINGS = {
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall — divided by fewer chips, so on the Input and Output token types a disaggregated config reads faster per chip than it is, by a median 2× and up to 18× on input and 7× on output. Total throughput is unaffected: both kinds report it per chip overall. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
     fleetMoved:
       'Fleet Lifecycle has its own page: a fixed fleet sized against a power budget, projected across its life with every measured config improvement.',
-    fleetMovedLink: 'Open fleet lifecycle',
+    fleetMovedLink: 'Open Fleet Lifecycle',
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
@@ -412,15 +418,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     [chipBasisControl],
   );
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels } =
+  const { availablePrecisions, availableSequences, availableModels, availabilitySettled } =
     useGlobalFilterAvailability();
   const { availableRuns } = useGlobalFilterWorkflow();
   const mode = 'interactivity_to_throughput' as const;
   const [costProvider, setCostProvider] = useState<CostProvider>('costh');
   const [costType, setCostType] = useState<CostType>('total');
   const [requestedTargetValue, setRequestedTargetValue] = useState<number>(35);
-  const [inputValue, setInputValue] = useState<string>('35');
-  const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
@@ -467,7 +471,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     ranges,
     getResults,
     getOverlayResults,
-    loading,
+    loading: throughputLoading,
     error: throughputError,
     hasData,
     hasOverlayData,
@@ -488,6 +492,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     chipBasis,
   );
   const error = throughputError;
+  // Until availability settles the precision/sequence may still change, so rows that match the
+  // provisional selection would flash an empty chart and collapse the cost panel for a frame.
+  const loading = throughputLoading || !availabilitySettled;
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
@@ -612,37 +619,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const currentRange = ranges.interactivity;
 
-  const handleSliderChange = useCallback((value: number) => {
-    setRequestedTargetValue(value);
-    setInputValue(String(value));
-  }, []);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-    const parsed = parseFloat(e.target.value);
-    if (!isNaN(parsed) && parsed >= 0) {
-      setRequestedTargetValue(parsed);
-    }
-  }, []);
-
-  const handleInputFocus = useCallback(() => {
-    setInputValue(String(targetValue));
-    setIsTargetInputFocused(true);
-  }, [targetValue]);
-
-  const handleInputBlur = useCallback(() => {
-    const parsed = parseFloat(inputValue);
-    if (isNaN(parsed) || parsed < 0) {
-      setInputValue(String(targetValue));
-    } else {
-      const { min, max } = ranges.interactivity;
-      const clamped = Math.max(min, Math.min(max, parsed));
-      setRequestedTargetValue(clamped);
-      setInputValue(String(clamped));
-    }
-    setIsTargetInputFocused(false);
-    track('calculator_target_set', { mode, value: targetValue });
-  }, [inputValue, targetValue, mode, ranges.interactivity]);
+  const targetInput = useDraftNumberInput(targetValue, parseCalculatorTarget, (next, source) => {
+    const clamped = Math.max(currentRange.min, Math.min(currentRange.max, next));
+    setRequestedTargetValue(clamped);
+    if (source === 'blur') track('calculator_target_set', { mode, value: clamped });
+  });
 
   const handleCostProviderChange = useCallback((value: string) => {
     setCostProvider(value as CostProvider);
@@ -941,6 +922,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     console.error(error);
     return (
       <Card>
+        <DashboardSectionHeader headingAs="h1" title={t.title} />
         <div className="flex items-center justify-center h-64 text-muted-foreground">
           {t.errorLoading}
         </div>
@@ -1007,7 +989,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
             onChange={(values) => {
               const next = values[0];
               if (!next) return;
-              if (interceptLockedTier(next)) return;
+              if (interceptLockedTier(next)) return false;
               handleCostProviderChange(next);
             }}
             open={openDropdown === 'costProvider'}
@@ -1068,6 +1050,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title}
               description={t.description}
               actions={<ChartShareActions />}
@@ -1176,21 +1159,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           }
                           min={currentRange.min}
                           max={currentRange.max}
-                          value={targetValue}
-                          onSliderChange={handleSliderChange}
+                          value={targetInput.sliderValue}
+                          onSliderChange={(next) => {
+                            targetInput.discardDraft();
+                            setRequestedTargetValue(next);
+                          }}
                           onSliderCommit={() =>
                             track('calculator_target_slider_set', { mode, value: targetValue })
                           }
                           input={{
                             id: 'calc-target',
-                            value: resolveCalculatorTargetInputValue(
-                              inputValue,
-                              targetValue,
-                              isTargetInputFocused,
-                            ),
-                            onFocus: handleInputFocus,
-                            onChange: handleInputChange,
-                            onBlur: handleInputBlur,
+                            ...targetInput.input,
                           }}
                         />
                       </div>
@@ -1205,7 +1184,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
       {loading && (
         <section aria-hidden="true">
-          <Card className="h-56 lg:h-55">
+          <Card className="h-51.5 md:h-48.5 lg:h-43.5">
             <Skeleton className="size-full" />
           </Card>
         </section>

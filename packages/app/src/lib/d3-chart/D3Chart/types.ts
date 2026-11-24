@@ -4,6 +4,7 @@ import type { ChartHeight } from '@/hooks/useResponsiveChartDimensions';
 import type { ChartLayout, ChartMargin, ContinuousScale } from '../types';
 import type { AnyScale } from '../chart-update';
 import type { BuiltScale } from './scale-builders';
+import type { LayerSurface } from './layer-renderer';
 import type { BarConfig } from '../layers/bars';
 import type { HorizontalBarConfig } from '../layers/horizontal-bars';
 import type { PointConfig } from '../layers/points';
@@ -176,6 +177,8 @@ export interface RenderContext {
   width: number;
   height: number;
   transitionDuration?: number;
+  /** `export` when drawing the PNG clone; absent on screen. */
+  surface?: LayerSurface;
 }
 
 export interface ZoomContext extends RenderContext {

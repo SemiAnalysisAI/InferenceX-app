@@ -46,7 +46,7 @@ const STRINGS = {
     interactivityAxis: 'Interactivity (tok/s/user)',
     interactivity: 'Interactivity',
     instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
-    summary: 'AI summary',
+    summary: 'AI Summary',
     noData: 'No data matched this chart specification',
     chartAria: {
       bar: 'AI-generated bar chart',

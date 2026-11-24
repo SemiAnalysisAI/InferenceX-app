@@ -1,5 +1,6 @@
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { createChartDataPoint, getHardwareKey } from '@/lib/charts/chart-utils';
 
 import type {
@@ -151,7 +152,7 @@ export function buildReplayTimeline(
   for (const row of dedupeAgenticHistoryRuns(rows)) {
     if (!selectedPrecisions.includes(row.precision)) continue;
 
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelSystemPower });
     entry.hwKey = getHardwareKey(entry);
     const point = createChartDataPoint(
       row.date,

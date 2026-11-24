@@ -34,8 +34,8 @@ const STRINGS = {
     locked: 'Locked',
     title: (tier: string) => `${tier} pricing is in the ${TCO_MODEL_TITLE}`,
     lead: (tier: string) =>
-      `InferenceX publishes two TCO tiers: Owning at large hyperscaler volume and Rent – 3-year commit. ${tier} and the other rental terms come from the same source, the SemiAnalysis ${TCO_MODEL_TITLE}.`,
-    includesHeading: 'What the model covers',
+      `InferenceX publishes two TCO tiers: Owning at Large Hyperscaler Volume and Rent – 3-Year Commit. ${tier} and the other rental terms come from the same source, the SemiAnalysis ${TCO_MODEL_TITLE}.`,
+    includesHeading: 'What the Model Covers',
     includes: [
       'Current market GPU rental prices and their variation across on-demand, 1 month, 6 month, 1 year, 2 year and 3 year terms.',
       'All-in $/GPU/hr cost of ownership built from server capex, networking, colocation, power and cost of capital, per accelerator across NVIDIA, AMD, TPU and Trainium.',

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { PAGE_TIER, pageTier } from './page-tiers';
 import { SiteSearchIndex } from './search-index';
@@ -68,6 +68,31 @@ describe('tier ordering in search', () => {
       },
     ]);
     expect(index.search('ironwood successor')[0].url).toBe('/blog/tpu-v8');
+  });
+
+  it('puts a page whose title holds every query term above higher-tier body matches', () => {
+    const index = new SiteSearchIndex(pageTier);
+    index.replacePages([
+      {
+        url: '/ubx/hbm-bandwidth',
+        pageTitle: 'uBenchX: HBM Bandwidth',
+        text: 'MI355X vs B200 HBM bandwidth. MI355X reaches 8 TB/s, B200 reaches 8 TB/s.',
+        source: 'page',
+      },
+      {
+        url: '/',
+        pageTitle: 'InferenceX',
+        text: 'Compare MI355X vs B200 vs H200 throughput across vendors.',
+        source: 'page',
+      },
+      {
+        url: '/chips/mi355x-vs-b200',
+        pageTitle: 'MI355X vs B200: Specs, Price & Power',
+        text: 'Head-to-head comparison of memory, compute, price and power.',
+        source: 'page',
+      },
+    ]);
+    expect(index.search('MI355X vs B200')[0].url).toBe('/chips/mi355x-vs-b200');
   });
 
   it('falls back to score order without a tier function', () => {

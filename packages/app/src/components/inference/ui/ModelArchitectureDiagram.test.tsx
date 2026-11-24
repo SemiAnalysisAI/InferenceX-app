@@ -1,39 +1,46 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { Model } from '@/lib/catalog/data-mappings';
 import { getModelArchitecture } from '@/lib/catalog/model-architectures';
 
-const mocks = vi.hoisted(() => ({
+import * as architectureRenderer from './model-architecture-diagram-renderer';
+
+// Captured before mock.module replaces the renderer's exports for the component under test.
+const renderActual = architectureRenderer.renderDiagram;
+
+const mocks = {
   renderDiagram: vi.fn(),
   diagramHeight: vi.fn((_arch: unknown, _expanded: ReadonlySet<string>): number | null => 480),
   theme: { resolved: 'light' },
   pathname: { value: '/infx/inference' },
-}));
+};
 
-vi.mock('./model-architecture-diagram-renderer', () => ({
+mock.module('./model-architecture-diagram-renderer', () => ({
   renderDiagram: mocks.renderDiagram,
   diagramHeight: mocks.diagramHeight,
 }));
-vi.mock('next-themes', () => ({
+mock.module('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: mocks.theme.resolved }),
 }));
-vi.mock('next/link', () => ({
-  default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+mock.module('next/link', () => ({
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
+  default: ({
+    children,
+    prefetch: _prefetch,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean | null }) => (
     <a {...props}>{children}</a>
   ),
 }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
 
 import ModelArchitectureDiagram from './ModelArchitectureDiagram';
-
-interface ArchitectureRendererModule {
-  renderDiagram: (...args: unknown[]) => void;
-}
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -76,7 +83,8 @@ class ResizeObserverStub {
 let container: HTMLDivElement;
 let root: Root;
 let observedWidth: number;
-let clientWidthSpy: { mockRestore: () => void };
+// bun:test's spyOn cannot spy on accessors, so the clientWidth getter is replaced and restored here.
+const ownClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
 const resizeFrames = new Map<number, FrameRequestCallback>();
 let nextFrame = 0;
 
@@ -104,17 +112,18 @@ beforeEach(() => {
   mocks.renderDiagram.mockReset();
   mocks.pathname.value = '/infx/inference';
   ResizeObserverStub.instances = [];
-  vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  stubGlobal('ResizeObserver', ResizeObserverStub);
   resizeFrames.clear();
   nextFrame = 0;
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+  stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     resizeFrames.set(++nextFrame, callback);
     return nextFrame;
   });
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => resizeFrames.delete(id));
-  clientWidthSpy = vi
-    .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
-    .mockImplementation(() => observedWidth);
+  stubGlobal('cancelAnimationFrame', (id: number) => resizeFrames.delete(id));
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => observedWidth,
+  });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -123,8 +132,9 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  clientWidthSpy.mockRestore();
-  vi.unstubAllGlobals();
+  if (ownClientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', ownClientWidth);
+  else Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth');
+  unstubAllGlobals();
 });
 
 describe('ModelArchitectureDiagram rendering', () => {
@@ -149,7 +159,7 @@ describe('ModelArchitectureDiagram rendering', () => {
     act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
 
     expect(container.textContent).toContain('模型架构');
-    expect(container.textContent).not.toContain('Model architecture');
+    expect(container.textContent).not.toContain('Model Architecture');
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
   });
 
@@ -244,11 +254,7 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
   });
 
-  it('renders objective English and Chinese SVG labels', async () => {
-    const renderer = await vi.importActual<ArchitectureRendererModule>(
-      './model-architecture-diagram-renderer',
-    );
-    const renderActual = renderer.renderDiagram;
+  it('renders objective English and Chinese SVG labels', () => {
     const arch = getModelArchitecture(Model.DeepSeek_R1);
     expect(arch).toBeDefined();
 

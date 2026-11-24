@@ -8,7 +8,7 @@ import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import {
   SYSTEM_POWER_MODEL_REVISION,
   SYSTEM_POWER_MODEL_SOURCE_URL,
-} from '@/lib/power/system-power-model';
+} from '@/lib/power/system-power-categories';
 
 import {
   createMockChartDefinition,

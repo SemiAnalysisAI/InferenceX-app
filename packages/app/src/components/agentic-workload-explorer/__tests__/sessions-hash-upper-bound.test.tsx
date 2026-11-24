@@ -1,23 +1,25 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, useCallback, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as InfiniteScrollModule from '@/hooks/agentic-workload-explorer/use-infinite-scroll';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import type { Session } from '@/lib/agentic-workload-explorer/api-types';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   resetSessions: vi.fn(),
   routerReplace: vi.fn(),
-}));
+};
 
-vi.mock('next/link', () => ({
+mock.module('next/link', () => ({
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
   default: ({
     href,
     children,
+    prefetch: _prefetch,
     ...props
-  }: { href: string; children: ReactNode } & Omit<
+  }: { href: string; children: ReactNode; prefetch?: boolean | null } & Omit<
     AnchorHTMLAttributes<HTMLAnchorElement>,
     'href'
   >) => (
@@ -27,37 +29,35 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('next/navigation', () => ({
+mock.module('next/navigation', () => ({
   usePathname: () => '/infx/agentic-workload-explorer/sessions',
   useRouter: () => ({ replace: mocks.routerReplace }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock('@/hooks/agentic-workload-explorer/use-infinite-scroll', async (importOriginal) => {
-  const actual = await importOriginal<typeof InfiniteScrollModule>();
-  return {
-    ...actual,
-    useInfiniteList: () => {
-      const [hasMore, setHasMore] = useState(false);
-      const reset = useCallback((items: Session[], more: boolean) => {
-        mocks.resetSessions(items, more);
-        setHasMore(true);
-      }, []);
-      const sentinelRef = actual.useInfiniteScroll({
-        hasMore,
-        loading: false,
-        onLoadMore: () => {},
-      });
-      return {
-        items: [session],
-        reset,
-        loadingMore: false,
-        hasMore,
-        sentinelRef,
-      };
-    },
-  };
-});
+const actual = { ...(await import('@/hooks/agentic-workload-explorer/use-infinite-scroll')) };
+mock.module('@/hooks/agentic-workload-explorer/use-infinite-scroll', () => ({
+  ...actual,
+  useInfiniteList: () => {
+    const [hasMore, setHasMore] = useState(false);
+    const reset = useCallback((items: Session[], more: boolean) => {
+      mocks.resetSessions(items, more);
+      setHasMore(true);
+    }, []);
+    const sentinelRef = actual.useInfiniteScroll({
+      hasMore,
+      loading: false,
+      onLoadMore: () => {},
+    });
+    return {
+      items: [session],
+      reset,
+      loadingMore: false,
+      hasMore,
+      sentinelRef,
+    };
+  },
+}));
 
 import SessionsPage from '@/components/agentic-workload-explorer/views/sessions-view';
 
@@ -140,9 +140,9 @@ beforeEach(() => {
   requests = [];
   mocks.resetSessions.mockClear();
   mocks.routerReplace.mockClear();
-  vi.stubGlobal('IntersectionObserver', ControlledIntersectionObserver);
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal(
+  stubGlobal('IntersectionObserver', ControlledIntersectionObserver);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal(
     'fetch',
     vi.fn((input: string | URL | Request) => {
       const url = String(input);
@@ -176,7 +176,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 async function settle(action: () => void) {

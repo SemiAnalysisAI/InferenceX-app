@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 import {
   hasAppendOnlyFlag,
   ingestChangelogEntries,
@@ -35,13 +35,10 @@ describe('append-only changelog metadata', () => {
 describe('ingestChangelogEntries', () => {
   it('updates existing metadata for the same workflow and git refs', async () => {
     const queries: string[] = [];
-    const sqlMock = Object.assign(
-      vi.fn((strings: TemplateStringsArray) => {
-        queries.push(strings.join('?'));
-        return Promise.resolve([{ id: 123 }]);
-      }),
-      { array: vi.fn((values: string[]) => values) },
-    );
+    const sqlMock = mock((strings: TemplateStringsArray) => {
+      queries.push(strings.join('?'));
+      return Promise.resolve([{ id: 123 }]);
+    });
 
     const written = await ingestChangelogEntries(
       sqlMock as unknown as Parameters<typeof ingestChangelogEntries>[0],

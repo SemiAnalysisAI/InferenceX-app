@@ -1,25 +1,29 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubEnv, unstubAllEnvs } from '@/test/helpers';
 
-const splitAfterRun = vi.hoisted(() => vi.fn());
-vi.mock('cypress-split', () => ({
+const splitAfterRun = (() => vi.fn())();
+mock.module('cypress-split', () => ({
   default: (on: Cypress.PluginEvents) => {
     on('after:run', splitAfterRun);
     on('before:run', () => {});
   },
 }));
-vi.mock('./cypress-source-fingerprint', () => ({
+mock.module('./cypress-source-fingerprint', () => ({
   cypressSourceFingerprint: () => 'current-source',
 }));
 
-import { setupTimingSplit } from '../../../cypress/plugins/timings';
+// Imported after mock.module so the real cypress-split never loads. Its find-cypress-specs
+// dependency installs tsx's require hook, which bun keeps for later files in the same worker; a
+// later file that requires an ESM .js file then blocks forever in esbuild's transformSync.
+const { setupTimingSplit } = await import('../../../cypress/plugins/timings');
 
 const temporary: string[] = [];
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
   vi.clearAllMocks();
   for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
@@ -28,19 +32,22 @@ function harness() {
   const directory = mkdtempSync(join(tmpdir(), 'cypress-observation-'));
   temporary.push(directory);
   const output = join(directory, 'nested', 'observation.json');
-  vi.stubEnv('CYPRESS_TIMING_OUTPUT', output);
-  vi.stubEnv('SPLIT', '8');
-  vi.stubEnv('SPLIT_INDEX1', '3');
-  vi.stubEnv('GITHUB_SHA', 'revision');
-  vi.stubEnv('GITHUB_RUN_ID', 'run');
-  vi.stubEnv('GITHUB_RUN_ATTEMPT', '2');
-  const events = new Map<string, (...args: unknown[]) => unknown>();
+  stubEnv('CYPRESS_TIMING_OUTPUT', output);
+  stubEnv('SPLIT', '8');
+  stubEnv('SPLIT_INDEX1', '3');
+  stubEnv('GITHUB_SHA', 'revision');
+  stubEnv('GITHUB_RUN_ID', 'run');
+  stubEnv('GITHUB_RUN_ATTEMPT', '2');
+  // Cypress 16.3+ keeps every handler for an event and runs them in registration order.
+  const events = new Map<string, ((...args: unknown[]) => unknown)[]>();
   const on = ((event: string, callback: (...args: unknown[]) => unknown) => {
-    if (events.has(event)) throw new Error(`Overwritten Cypress handler: ${event}`);
-    events.set(event, callback);
+    events.set(event, [...(events.get(event) ?? []), callback]);
   }) as Cypress.PluginEvents;
+  const emit = async (event: string, ...args: unknown[]) => {
+    for (const handler of events.get(event) ?? []) await handler(...args);
+  };
   setupTimingSplit(on, { testingType: 'e2e' } as Cypress.PluginConfigOptions);
-  return { output, events };
+  return { output, events, emit };
 }
 
 const runResult = () => ({
@@ -67,10 +74,13 @@ const runResult = () => ({
 });
 
 describe('Cypress timing event integration', () => {
-  it('composes plugin handlers and records Cypress 15 spec and test durations', async () => {
-    const { output, events } = harness();
+  it('runs the plugin handlers first and records spec and test durations', async () => {
+    const { output, events, emit } = harness();
     const results = runResult();
-    await events.get('after:run')!(results);
+    splitAfterRun.mockImplementationOnce(() => {
+      expect(existsSync(output)).toBe(false);
+    });
+    await emit('after:run', results);
     expect(events.has('before:run')).toBe(true);
     expect(splitAfterRun).toHaveBeenCalledWith(results);
     expect(JSON.parse(readFileSync(output, 'utf8'))).toEqual({
@@ -97,15 +107,15 @@ describe('Cypress timing event integration', () => {
   it.each(['totalFailed', 'totalPending', 'totalSkipped'])(
     'does not qualify a run with %s',
     async (counter) => {
-      const { output, events } = harness();
-      await events.get('after:run')!({ ...runResult(), [counter]: 1 });
+      const { output, emit } = harness();
+      await emit('after:run', { ...runResult(), [counter]: 1 });
       expect(JSON.parse(readFileSync(output, 'utf8')).passed).toBe(false);
     },
   );
 
   it('rejects a runner failure instead of inventing timings', async () => {
-    const { events } = harness();
-    await expect(events.get('after:run')!({ status: 'failed', failures: 1 })).rejects.toThrow(
+    const { emit } = harness();
+    await expect(emit('after:run', { status: 'failed', failures: 1 })).rejects.toThrow(
       'did not return test results',
     );
   });

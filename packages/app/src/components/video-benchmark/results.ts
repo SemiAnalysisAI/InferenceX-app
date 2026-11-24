@@ -14,7 +14,15 @@ import {
   type ResultsYMetric,
 } from './results-chart';
 
-export const RESULTS_HARDWARE = ['gb200', 'b300', 'b200', 'mi355x', 'h200', 'h100'] as const;
+export const RESULTS_HARDWARE = [
+  'gb200',
+  'b300',
+  'b200',
+  'mi355x',
+  'h200',
+  'h100',
+  'a100',
+] as const;
 
 /** Listed before its first matched run so readers see it is coming; other hardware appears with data. */
 const PLANNED_HARDWARE: readonly string[] = ['mi355x'];
@@ -24,7 +32,6 @@ export function resultsHardwareRoster(points: readonly Pick<VideoPoint, 'hardwar
     (key) => PLANNED_HARDWARE.includes(key) || points.some((point) => point.hardwareKey === key),
   );
 }
-export type VideoMode = 't2v' | 'i2v' | 'r2v';
 
 export const MAX_CHIP_CONFIGS = 4;
 export interface ResultsState {
@@ -50,9 +57,6 @@ export interface ResultsState {
   hidden: string[];
   deadlineSeconds: number;
   costTier: CostTier;
-  apiPrice: number | null;
-  apiPrices: Record<VideoMode, number | null>;
-  utilization: number;
   unofficialRun: string | null;
   xMetric: ResultsXMetric;
   yMetric: ResultsYMetric;
@@ -79,9 +83,6 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   hidden: [],
   deadlineSeconds: 120,
   costTier: 'h',
-  apiPrice: null,
-  apiPrices: { t2v: null, i2v: null, r2v: null },
-  utilization: 1,
   unofficialRun: null,
   xMetric: 'p50',
   yMetric: 'videoSecondsPerDollar',
@@ -111,6 +112,7 @@ export const RESULTS_QUERY_PARAMS = [
   'r_hidden',
   'r_deadline',
   'r_tier',
+  // Retired profit estimator: accepted so old links and API calls still work, then ignored.
   'r_api',
   'r_price_t2v',
   'r_price_i2v',
@@ -137,10 +139,10 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     null;
   const x = s.get('r_x'),
     y = s.get('r_y');
-  const numeric = (key: string, fallback: number | null, allowZero = false) => {
+  const numeric = (key: string, fallback: number | null) => {
     if (!s.has(key) || s.get(key)?.trim() === '') return fallback;
     const n = Number(s.get(key));
-    return Number.isFinite(n) && (allowZero ? n >= 0 : n > 0) ? n : fallback;
+    return Number.isFinite(n) && n > 0 ? n : fallback;
   };
   return {
     model: s.get('r_model') || null,
@@ -164,13 +166,6 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     hidden: [...new Set((s.get('r_hidden') ?? '').split(',').filter(Boolean))],
     deadlineSeconds: numeric('r_deadline', 120)!,
     costTier: s.get('r_tier') === 'r' ? 'r' : 'h',
-    apiPrice: numeric('r_api', null, true),
-    apiPrices: {
-      t2v: numeric('r_price_t2v', null, true),
-      i2v: numeric('r_price_i2v', null, true),
-      r2v: numeric('r_price_r2v', null, true),
-    },
-    utilization: Math.min(numeric('r_utilization', 1, true)!, 1),
     unofficialRun: /^[1-9]\d*$/u.test(overlay ?? '') ? overlay : null,
     xMetric: isResultsXMetric(x) ? x : DEFAULT_RESULTS_STATE.xMetric,
     yMetric: isResultsYMetric(y) ? y : DEFAULT_RESULTS_STATE.yMetric,
@@ -202,11 +197,6 @@ export function resultsSearch(state: ResultsState): string {
     r_hidden: state.hidden.join(',') || null,
     r_deadline: changed('deadlineSeconds'),
     r_tier: changed('costTier'),
-    r_api: state.apiPrice,
-    r_price_t2v: state.apiPrices.t2v,
-    r_price_i2v: state.apiPrices.i2v,
-    r_price_r2v: state.apiPrices.r2v,
-    r_utilization: changed('utilization'),
     r_x: changed('xMetric'),
     r_y: changed('yMetric'),
     r_optimal: state.optimal ? null : 0,
@@ -225,13 +215,27 @@ const modelSlug = (model: string) =>
     .replaceAll(/[^a-z0-9.]+/gu, '-')
     .replaceAll(/^-+|-+$/gu, '');
 
-export function resultMetadata(point: VideoPoint) {
+/** Workload keys already parsed: every point of a workload shares its key, and a render reads them all. */
+const parsedWorkloads = new Map<string, Json>();
+
+function workloadIdentity(key: string | null | undefined): Json {
+  if (!key) return null;
+  const kept = parsedWorkloads.get(key);
+  if (kept !== undefined) return kept;
   let identity: Json = null;
   try {
-    identity = JSON.parse(point.workloadKey ?? 'null') as Json;
+    identity = JSON.parse(key) as Json;
   } catch {
     /* Old sources have no canonical metadata. */
   }
+  // History can page through many workloads; the handful on screen is parsed again after a reset.
+  if (parsedWorkloads.size >= 256) parsedWorkloads.clear();
+  parsedWorkloads.set(key, identity);
+  return identity;
+}
+
+export function resultMetadata(point: VideoPoint) {
+  const identity = workloadIdentity(point.workloadKey);
   const plan = at(identity, 'plan');
   const generation = at(plan, 'generation');
   const width = number(at(generation, 'width')),
@@ -281,12 +285,6 @@ export interface ResultCost {
   perVideoSecond: number | null;
   perHour: number;
 }
-export interface ResultProfit {
-  revenuePerHour: number;
-  profitPerHour: number;
-  revenuePerGpuHour: number;
-  profitPerGpuHour: number;
-}
 export interface ResultCell {
   overlay: boolean;
   point: VideoPoint;
@@ -300,7 +298,6 @@ export interface ResultCell {
   deadlineAttainment: number | null;
   deadlineGoodput: number | null;
   cost: Record<'participating' | 'allocated', ResultCost | null>;
-  profit: Record<'participating' | 'allocated', ResultProfit | null>;
   evidence: ResultsEvidence | null;
 }
 function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
@@ -312,10 +309,6 @@ function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
     : null;
   const energy = metricValue(point, 'kjPerVideo', { tier: state.costTier });
   const joulesPerClip = energy === null ? null : energy * 1000;
-  const price =
-    metadata.mode && metadata.mode in state.apiPrices
-      ? state.apiPrices[metadata.mode as VideoMode]
-      : state.apiPrice;
   const cost = (gpuCount: number | null): ResultCost | null => {
     const hourly = point.hardwareKey ? costPerGpuHour(point.hardwareKey, state.costTier) : null;
     if (
@@ -338,27 +331,6 @@ function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
   };
   const participating = cost(point.participating),
     allocated = cost(point.allocated);
-  const profit = (costs: ResultCost | null, gpuCount: number | null): ResultProfit | null => {
-    if (
-      costs === null ||
-      !positive(gpuCount) ||
-      !finite(price) ||
-      price < 0 ||
-      videoSecondsPerSecond === null ||
-      !finite(state.utilization) ||
-      state.utilization < 0 ||
-      state.utilization > 1
-    )
-      return null;
-    const revenuePerHour = videoSecondsPerSecond * 3600 * price * state.utilization;
-    const profitPerHour = revenuePerHour - costs.perHour;
-    return {
-      revenuePerHour,
-      profitPerHour,
-      revenuePerGpuHour: revenuePerHour / gpuCount,
-      profitPerGpuHour: profitPerHour / gpuCount,
-    };
-  };
   const times = point.results?.latencies;
   const delivered =
     times && times.length === point.valid
@@ -389,10 +361,6 @@ function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
     deadlineGoodput:
       delivered !== null && positive(point.wallSeconds) ? delivered / point.wallSeconds : null,
     cost: { participating, allocated },
-    profit: {
-      participating: profit(participating, point.participating),
-      allocated: profit(allocated, point.allocated),
-    },
     evidence: point.results ?? null,
   };
 }
@@ -570,12 +538,7 @@ export function resultProjection(
         point.runId !== state.unofficialRun
       );
     }),
-  ).map((point) => {
-    const cell = resultCell(point, state);
-    return point.workloadKey === workloadKey
-      ? cell
-      : { ...cell, profit: { participating: null, allocated: null } };
-  });
+  ).map((point) => resultCell(point, state));
   return {
     state: {
       ...state,

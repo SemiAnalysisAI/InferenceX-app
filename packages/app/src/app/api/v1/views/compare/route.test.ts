@@ -1,29 +1,29 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import type { ComparePageDerivedData } from '@/lib/compare/compare-page-data.server';
 import { computeCompareTableData, summarize } from '@/lib/compare/compare-ssr';
 import { buildCompareTable } from '@/lib/views-api/compare-view';
 
-const { mockGetComparePageDerivedData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
+const { mockGetComparePageDerivedData, mockCachedJson, mockCachedText } = {
   mockGetComparePageDerivedData: vi.fn(),
   mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),
   ),
-}));
+};
 
-vi.mock('@/lib/compare/compare-page-data.server', () => ({
+mock.module('@/lib/compare/compare-page-data.server', () => ({
   getComparePageDerivedData: mockGetComparePageDerivedData,
 }));
 
-vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({
+mock.module('@/lib/benchmarks/benchmark-data.server', () => ({
   getCachedBenchmarks: vi.fn(),
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
 }));
@@ -282,9 +282,15 @@ describe('GET /api/v1/views/compare', () => {
   });
 
   it('returns 500 when compare assembly fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetComparePageDerivedData.mockRejectedValueOnce(new Error('database unavailable'));
     const response = await GET(request('/api/v1/views/compare?slug=deepseek-r1-b200-vs-h200'));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'Internal server error' });
+    expect(logged).toHaveBeenCalledWith(
+      'Error building compare view:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

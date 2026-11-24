@@ -387,7 +387,7 @@ export function comparesEngines(series: readonly ResultsChartSeries[]): boolean 
 }
 
 /**
- * Cells that may stand for their hardware in cards, profit bars and clips: those of
+ * Cells that may stand for their hardware in cards and clips: those of
  * a runtime the chart draws for that hardware and run channel, other than a lossy
  * line's twin, so they name the chart's engine. A channel the chart draws nothing for
  * keeps every cell. The page, its server seed and the overview API all pick clips

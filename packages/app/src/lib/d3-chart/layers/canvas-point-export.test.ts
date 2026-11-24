@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import * as d3 from 'd3';
-import { expect, it } from 'vitest';
+import { expect, it } from 'bun:test';
 
 import { SHAPE_ORDER, type ShapeKey } from '@/lib/charts/chart-rendering';
 
@@ -202,8 +202,8 @@ it('leaves a repeated key as the fresh export point the SVG join re-created', ()
   applyTransitions(exported);
   layer.restoreExportOrder(exported.node()!, key);
   expect(dotMarkup(exported)).toEqual([
-    'transition: opacity 150ms ease; filter: opacity(0.2);|,point-label,visible-shape',
-    'filter: opacity(0.2); transition: opacity 150ms ease;|,visible-shape,point-label',
+    'transition: opacity 150ms; filter: opacity(0.2);|,point-label,visible-shape',
+    'filter: opacity(0.2); transition: opacity 150ms;|,visible-shape,point-label',
   ]);
   svg.remove();
 });

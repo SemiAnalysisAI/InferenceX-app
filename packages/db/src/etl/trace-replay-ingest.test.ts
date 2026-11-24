@@ -5,9 +5,9 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 
 import type { PGlite } from '@electric-sql/pglite';
 import type postgres from 'postgres';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { PROFILE_INLINE_BYTES, readTraceProfileGz } from '../lib/trace-profile-storage';
 import {
   SEQUENCE_LENGTH_SKETCHES_VERSION,
@@ -77,6 +77,7 @@ function preparedFixture(): PreparedTraceReplay {
       median_itl: 0.005,
       median_intvty: 200,
     },
+    warnings: [],
   };
 }
 
@@ -102,11 +103,9 @@ function mockSqlWithTransaction(
     return Promise.resolve([]);
   };
   const tx = Object.assign(execute, {
-    array: (values: unknown[]) => values,
     json: (value: unknown) => value,
   });
   const sql = Object.assign(execute, {
-    array: (values: unknown[]) => values,
     begin: (operation: (transaction: typeof tx) => Promise<void>) => operation(tx),
   }) as unknown as Parameters<typeof persistPreparedTraceReplay>[0];
   return { sql, calls };
@@ -434,7 +433,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
 
   beforeAll(async () => {
     db = await migratedPglite();
-    pg = pgliteSql(db);
+    pg = await pgliteDriverSql(db);
     await db.exec(`
       INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
       VALUES (1, 29181694248, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
@@ -449,6 +448,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
   }, 30_000);
 
   afterAll(async () => {
+    await pg?.end();
     await db?.close();
   });
 
@@ -556,4 +556,54 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     const after = await storedTrace(43);
     expect(after.trace_replay_id).toBe(row.trace_replay_id);
   }, 30_000);
+});
+
+const trtllmMetric = (prefill: number, decode: number) => ({
+  series: [
+    {
+      endpoint_url: 'prefill',
+      labels: { disaggregation_mode: 'prefill' },
+      timeslices: [slice(0, 1, prefill)],
+    },
+    {
+      endpoint_url: 'decode',
+      labels: { disaggregation_mode: 'decode' },
+      timeslices: [slice(0, 1, decode)],
+    },
+  ],
+});
+
+describe('TRT-LLM prefill cache-hit ingestion', () => {
+  it.each(['trtllm_prompt_tokens', 'trtllm_prompt_tokens_total'])(
+    'prepares corrected row rates and chart data from %s',
+    async (promptName) => {
+      const cachedName = promptName.replace('prompt_tokens', 'prompt_cached_tokens');
+
+      const metrics = Buffer.from(
+        JSON.stringify({
+          metrics: {
+            trtllm_request_type_total: trtllmMetric(1, 1),
+            [promptName]: {
+              series: trtllmMetric(1000, 1000).series.map(({ labels: _labels, ...s }) => s),
+            },
+            [cachedName]: {
+              series: trtllmMetric(970, 0).series.map(({ labels: _labels, ...s }) => s),
+            },
+          },
+        }),
+      );
+      const prepared = await prepareTraceReplay(null, null, metrics, {
+        framework: 'dynamo-trt',
+        disagg: true,
+      });
+      expect(prepared.cacheHitRates).toEqual({ gpu: 0.97, cpu: null });
+      const chart = JSON.parse(prepared.chartSeriesJson!.toString());
+      expect(chart.prefixCacheHitRate).toEqual([{ t: 0, value: 0.97 }]);
+      expect(chart.prefillTps).toEqual([{ t: 0, value: 1000 }]);
+      expect(
+        chart.metricSources.find((s: { source: { role: string } }) => s.source.role === 'decode')
+          .promptTps,
+      ).toEqual([{ t: 0, value: 1000 }]);
+    },
+  );
 });

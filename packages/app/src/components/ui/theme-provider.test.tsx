@@ -1,13 +1,11 @@
-// @vitest-environment jsdom
-import React, { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+// @test-environment jsdom
 import { useTheme } from 'next-themes';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { APP_THEMES } from '@/lib/themes/themes';
+import { hydrate, settle } from '@/test/dom';
 import { ThemeProvider } from './theme-provider';
 
-let container: HTMLDivElement;
-let root: Root;
+let container: HTMLElement;
 
 function Probe() {
   return <span>{useTheme().theme}</span>;
@@ -16,14 +14,9 @@ function Probe() {
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.className = '';
-  container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
 });
 
 afterEach(() => {
-  act(() => root.unmount());
-  container.remove();
   document.documentElement.className = '';
   localStorage.clear();
 });
@@ -31,13 +24,13 @@ afterEach(() => {
 async function renderSavedTheme(theme: string) {
   localStorage.setItem('theme', theme);
   document.documentElement.className = `test-font ${theme}`;
-  await act(() => {
-    root.render(
-      <ThemeProvider attribute="class" themes={APP_THEMES} defaultTheme="dark">
-        <Probe />
-      </ThemeProvider>,
-    );
-  });
+  // Hydrated like a page load, so next-themes' boot script is adopted rather than created.
+  ({ container } = hydrate(
+    <ThemeProvider attribute="class" themes={APP_THEMES} defaultTheme="dark">
+      <Probe />
+    </ThemeProvider>,
+  ));
+  await settle();
 }
 
 describe('saved standard theme preferences', () => {

@@ -33,7 +33,7 @@ const STRINGS = {
 const METRIC_LABELS_ZH: Record<string, string> = {
   'Throughput (tok/s/chip)': '吞吐量（tok/s/chip）',
   'Cost ($/M tok)': '成本（$/M tok）',
-  'Dollars per million tokens': '每百万 token 成本（美元）',
+  'Dollars per Million Tokens': '每百万 token 成本（美元）',
   Concurrency: '并发数',
 };
 
@@ -234,8 +234,10 @@ export function CompareInterpolatedTable({
       e.preventDefault();
       const didCommit = commitColumnTarget(colIndex);
       if (didCommit) {
+        // React clears currentTarget once the handler returns.
+        const input = e.currentTarget;
         queueMicrotask(() => {
-          e.currentTarget.blur();
+          input.blur();
         });
       }
     },

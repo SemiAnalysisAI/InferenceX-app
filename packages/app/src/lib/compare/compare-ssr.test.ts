@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import type { InterpolatedResult } from '@/components/calculator/types';
+import { CompareInterpolatedTable } from '@/components/compare/compare-interpolated-table';
 
 import { META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
 
@@ -205,6 +208,106 @@ describe('computeCompareImageRows', () => {
         [20],
       ),
     ).toEqual([]);
+  });
+});
+
+describe('a chip with no total throughput', () => {
+  // Output-only sources, like the July Vera Rubin rows, publish output throughput and no total.
+  const rows = [
+    ...pairRows().filter((row) => row.hardware === 'b200'),
+    ...[10, 20, 30, 40].map((intvty, i) =>
+      stubRow({
+        hardware: 'vr200',
+        framework: 'rubin-july',
+        conc: 50 * (i + 1),
+        metrics: { output_tput_per_gpu: 4000 - intvty * 50, median_intvty: intvty },
+      }),
+    ),
+  ];
+  const table = computeCompareTableData(rows, 'b200', 'vr200', '1k/1k', 'fp8');
+  const zeroCost = /\$0\.0+(?!\d*[1-9])/;
+  const missing =
+    /hasn't been benchmarked|no Vera Rubin NVL72 (?:benchmark )?data|Vera Rubin NVL72 is unmeasured/i;
+  const missingZh = /暂无基准测试数据|暂无数据|尚未测试|尚未在该运行点进行基准测试/;
+
+  it('leaves that chip empty instead of interpolating zeros', () => {
+    expect(table.defaultTargets).toHaveLength(3);
+    expect(table.ssrRows.every((row) => row.a !== null && row.b === null)).toBe(true);
+  });
+
+  it('renders that chip as dashes in the table', () => {
+    const html = renderToStaticMarkup(
+      createElement(CompareInterpolatedTable, {
+        aLabel: 'B200',
+        bLabel: 'Vera Rubin NVL72',
+        ssrRows: table.ssrRows,
+        defaultTargets: table.defaultTargets,
+        interactivityRange: table.interactivityRange,
+        gpuDataPointsA: [],
+        gpuDataPointsB: [],
+      }),
+    );
+    const cells = [...html.matchAll(/Vera Rubin NVL72<\/span><span[^>]*>(?<cell>[^<]*)</g)].map(
+      (match) => match.groups?.cell,
+    );
+    expect(cells).toHaveLength(4 * 3);
+    expect(cells.every((cell) => cell === '—')).toBe(true);
+  });
+
+  it('says the chip has no data in the summary', () => {
+    for (const variant of ['full', 'per-dollar'] as const) {
+      const en = compareTableNarrative(
+        variant,
+        'DeepSeek R1',
+        'B200',
+        'Vera Rubin NVL72',
+        table.ssrRows,
+        table.interactivityRange,
+      );
+      expect(en).toHaveLength(3);
+      for (const paragraph of en) {
+        expect(paragraph).toMatch(missing);
+        expect(paragraph).not.toMatch(zeroCost);
+      }
+      const zh = compareTableNarrativeZh(
+        variant,
+        'DeepSeek R1',
+        'B200',
+        'Vera Rubin NVL72',
+        table.ssrRows,
+        table.interactivityRange,
+      );
+      expect(zh).toHaveLength(3);
+      for (const paragraph of zh) {
+        expect(paragraph).toMatch(missingZh);
+        expect(paragraph).not.toMatch(zeroCost);
+      }
+    }
+  });
+
+  it('draws no line for that chip in the share image', () => {
+    const imageRows = computeCompareImageRows(
+      rows,
+      'b200',
+      'vr200',
+      '1k/1k',
+      'fp8',
+      table.interactivityRange,
+    );
+    expect(imageRows.length).toBeGreaterThan(0);
+    expect(imageRows.every((row) => row.b === null)).toBe(true);
+  });
+
+  it('skips rows that are missing interactivity', () => {
+    const noInteractivity = stubRow({ hardware: 'vr200', metrics: { tput_per_gpu: 900 } });
+    const result = computeCompareTableData(
+      [...pairRows(), noInteractivity].filter((row) => row.hardware !== 'h200'),
+      'b200',
+      'vr200',
+      '1k/1k',
+      'fp8',
+    );
+    expect(result.ssrRows.every((row) => row.b === null)).toBe(true);
   });
 });
 

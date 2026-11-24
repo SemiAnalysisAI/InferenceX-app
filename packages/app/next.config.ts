@@ -1,10 +1,12 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
-import { getDashboardRoute } from './src/lib/routing/dashboard-routes';
-import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
 import {
   DEFAULT_INFERENCE_MODEL_SLUG,
+  getDashboardRoute,
+} from './src/lib/routing/dashboard-routes';
+import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
+import {
   DEFAULT_INFERENCE_REDIRECT_MISSING,
   INFERENCE_MODEL_ALIAS_REDIRECTS,
 } from './src/lib/routing/inference-model-redirects';
@@ -29,6 +31,18 @@ const INFERENCE_PATH = getDashboardRoute('inference').path;
 const SEO_REDIRECTS = [
   { source: '/datasets', destination: '/infx/agentx' },
   { source: '/zh/datasets', destination: '/zh/infx/agentx' },
+  // Hero PNGs used to pick the language from `?lang=zh`; the /zh routes replace that.
+  ...(
+    [
+      ['compare-per-dollar', 'performance-per-dollar.png'],
+      ['compare-precision', 'precision-comparison.png'],
+      ['compare-spec-decode', 'spec-decode-comparison.png'],
+    ] as const
+  ).map(([family, file]) => ({
+    source: `/${family}/:slug/${file}`,
+    has: [{ type: 'query' as const, key: 'lang', value: 'zh' }],
+    destination: `/zh/${family}/:slug/${file}`,
+  })),
   ...LOCALE_PREFIXES.flatMap((prefix) => [
     { source: `${prefix}/xvideo`, destination: `${prefix}/vgx` },
     { source: `${prefix}/xxvideo`, destination: `${prefix}/vgx` },
@@ -66,7 +80,7 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
-  // Tests (Unit) typechecks the workspace; the E2E fixture build skips the duplicate pass.
+  // Lint & Format typechecks the workspace; the E2E fixture build skips the duplicate pass.
   typescript: { ignoreBuildErrors: process.env.E2E_FIXTURES === '1' },
   serverExternalPackages: ['shiki'],
   // PostHog endpoints end in a slash (`/ingest/e/`); the redirects below keep stripping it elsewhere.

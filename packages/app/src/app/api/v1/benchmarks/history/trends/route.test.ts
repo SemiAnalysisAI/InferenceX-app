@@ -1,19 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetAllBenchmarksForHistory } = vi.hoisted(() => ({
+const { mockGetAllBenchmarksForHistory } = {
   mockGetAllBenchmarksForHistory: vi.fn(),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: () => 'mock-sql',
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getAllBenchmarksForHistory: mockGetAllBenchmarksForHistory,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
@@ -76,11 +76,21 @@ describe('GET /api/v1/benchmarks/history/trends', () => {
     expect(mockGetAllBenchmarksForHistory).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for an unknown model', async () => {
+  it('returns 400 for an unknown model with the accepted display names', async () => {
     const res = await GET(req('/api/v1/benchmarks/history/trends?model=Bad&isl=1024&osl=1024'));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('Unknown model');
+    expect(body.allowed).toContain('DeepSeek-R1-0528');
+  });
+
+  it('accepts a dashboard slug for the model', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValueOnce([]);
+    const res = await GET(
+      req('/api/v1/benchmarks/history/trends?model=deepseek-r1&isl=1024&osl=8192'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 8192);
   });
 
   it('serves the published fixed-sequence rows for the same query', async () => {
@@ -114,10 +124,16 @@ describe('GET /api/v1/benchmarks/history/trends', () => {
   });
 
   it('returns 500 when the query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllBenchmarksForHistory.mockRejectedValueOnce(new Error('db down'));
     const res = await GET(
       req('/api/v1/benchmarks/history/trends?model=DeepSeek-R1-0528&isl=1024&osl=1024'),
     );
     expect(res.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching trend history:',
+      expect.objectContaining({ message: 'db down' }),
+    );
+    logged.mockRestore();
   });
 });

@@ -1,5 +1,5 @@
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'bun:test';
 
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -15,6 +15,7 @@ import {
   transformBenchmarkRows,
   type LatencyPercentile,
 } from './benchmark-transform';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 
 function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
@@ -875,7 +876,7 @@ describe('rowLatencyMetric', () => {
         benchmark_type: random() < 0.6 ? 'agentic_traces' : 'single_turn',
         metrics,
       });
-      const entry = new Map(Object.entries(rowToAggDataEntry(row, { modelPower: false })));
+      const entry = new Map(Object.entries(rowToAggDataEntry(row)));
       for (const percentile of percentiles) {
         for (const metric of ['intvty', 'e2el', 'ttft'] as const) {
           expect(rowLatencyMetric(row, percentile, metric)).toBe(
@@ -2020,5 +2021,29 @@ describe('mergeRunScopedRows — AgentX snapshots own all offload variants', () 
     ];
     const merged = mergeRunScopedRows(runRows, baseRows);
     expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 11]);
+  });
+});
+
+const powered = () =>
+  makeRow({ metrics: { ...makeRow().metrics, power_valid: 1, avg_power_w: 700 } });
+
+describe('modeled system power', () => {
+  it('is left out without a power modeler, as server views that ignore it do', () => {
+    expect(rowToAggDataEntry(powered()).modeledSystemPower).toBeUndefined();
+    expect(transformBenchmarkRows([powered()]).chartData[0][0].modeledSystemPower).toBeUndefined();
+  });
+
+  it('is estimated by the modeler the chart passes in', () => {
+    const expected = modelSystemPower(powered());
+    expect(rowToAggDataEntry(powered(), { modelSystemPower }).modeledSystemPower).toEqual(expected);
+    const { chartData } = transformBenchmarkRows(
+      [powered()],
+      'median',
+      undefined,
+      undefined,
+      undefined,
+      modelSystemPower,
+    );
+    for (const points of chartData) expect(points[0].modeledSystemPower).toEqual(expected);
   });
 });

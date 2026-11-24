@@ -117,7 +117,7 @@ const LIFECYCLE_VIEW_OPTIONS: SegmentedToggleOption<LifecycleView>[] = [
 
 const STRINGS = {
   en: {
-    title: 'Fleet lifecycle',
+    title: 'Fleet Lifecycle',
     fleetSizingGroup: 'Fleet sizing',
     assumptionsGroup: 'Fleet economics & assumptions',
     viewChart: 'Chart',
@@ -130,12 +130,12 @@ const STRINGS = {
       'A fixed fleet, from the day the model shipped. The chips never change. The software serving them does, so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers. The gap to the cost line is the return on that work.',
     tooSmall:
       'This power budget is too small to power a single chip of the shown hardware. Try a larger value.',
-    mwLabel: 'Facility power (MW)',
+    mwLabel: 'Facility Power (MW)',
     mwTooltip:
       'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
     mwPlaceholder: 'e.g. 10',
     colChips: 'Chips',
-    colUsers: 'Concurrent users now',
+    colUsers: 'Concurrent Users now',
     needMw: 'Enter a facility power budget to project lifecycle economics',
     noReleaseDate:
       'No release date is on file for this model, so the timeline is anchored to its first benchmark run instead.',
@@ -166,9 +166,9 @@ const STRINGS = {
     singleRung:
       'Every chip here has been measured on a single run date, so each line is one config held flat. The staircase this section exists to show needs several dates per config, and agentic trace history does not go back far enough yet. The levels are measured; the absence of steps is a gap in the history, not a finding about the hardware.',
     colChip: 'Chip',
-    colConfigNow: 'Config now',
-    colFirst: 'First run',
-    colLatest: 'Latest best',
+    colConfigNow: 'Config Now',
+    colFirst: 'First Run',
+    colLatest: 'Latest Best',
     colSteps: 'Improvements',
     colGain: 'Gain',
     inputTokenPrefix: 'input ',
@@ -189,11 +189,11 @@ const STRINGS = {
     colCost: 'Cost $/day',
     colMargin: 'Margin $/day',
     colPayback: 'Payback',
-    colLifetime: 'Cumulative margin',
+    colLifetime: 'Cumulative Margin',
     colAvailability: 'Availability',
     never: 'Never',
     monthsSuffix: 'mo',
-    unmeasuredTitle: 'Not measured at this interactivity',
+    unmeasuredTitle: 'Not Measured at This Interactivity',
     unmeasuredIntro:
       'These chips have run history for this scenario but no single run date was measured across the target interactivity, so no honest number exists for them. The nearest interactivity each one actually reached:',
     unmeasuredRange: (below: number | null, above: number | null, dates: number) => {
@@ -214,19 +214,19 @@ const STRINGS = {
       " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model, and cost is flat throughout because no config moves either term. It is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
       ' Unofficial runs loaded via a run link are not shown here because the run-history API serves ingested official results only.',
-    metricLabel: 'Y axis',
+    metricLabel: 'Y Axis',
     metricTooltip:
       'What to plot. Margin is the per-day revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Margin/MW and Revenue/MW divide their daily rates by provisioned power. Revenue drops the cost term, which makes rollouts easier to compare across chips of very different cost, but a chip being higher no longer means it is more profitable. Cumulative Revenue is the running total taken in since launch, not a rate; it compounds that caveat, because the largest area under a revenue curve may still never have covered its cost.',
     metricMargin: 'Margin',
     metricMarginPerMw: 'Margin/MW',
     metricRevenue: 'Revenue',
     metricRevenuePerMw: 'Revenue/MW',
-    metricCumulativeRevenue: 'Cum. revenue',
+    metricCumulativeRevenue: 'Cum. Revenue',
     chartY: 'Margin ($/day)',
     chartYMarginPerMw: 'Margin ($/MW/day)',
     chartYRevenue: 'Revenue ($/day)',
     chartYRevenuePerMw: 'Revenue ($/MW/day)',
-    chartYCumulativeRevenue: 'Cumulative revenue ($)',
+    chartYCumulativeRevenue: 'Cumulative Revenue ($)',
     chartBreakEven: 'break-even',
     tipDate: 'Measured',
     tipConfig: 'Config',

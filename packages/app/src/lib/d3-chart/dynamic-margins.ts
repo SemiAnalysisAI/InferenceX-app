@@ -1,25 +1,54 @@
-import {
-  clearCache,
-  prepareWithSegments,
-  walkLineRanges,
-  type PrepareOptions,
-} from '@chenglou/pretext';
 import { useSyncExternalStore } from 'react';
 
-import { splitLabel, type LabelSplitMode } from './axis-labels';
+import { splitLabel, type LabelSplitMode } from './label-split';
 import type { ChartMargin } from './types';
 
-const widthCache = new Map<string, number>();
+export interface TextMeasureOptions {
+  /** `normal` collapses white space like SVG text. `pre-wrap` keeps it, as a pill's tspans do. */
+  whiteSpace?: 'normal' | 'pre-wrap';
+}
 
-export function measureTextWidth(text: string, font: string, options?: PrepareOptions): number {
+const widthCache = new Map<string, number>();
+let measureContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
+
+function textContext(): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D {
+  if (measureContext) return measureContext;
+  const context =
+    typeof OffscreenCanvas === 'undefined'
+      ? document.createElement('canvas').getContext('2d')
+      : new OffscreenCanvas(1, 1).getContext('2d');
+  if (!context) throw new Error('Text measurement needs a 2D canvas context.');
+  measureContext = context;
+  return context;
+}
+
+/**
+ * The text of the last line the browser would lay out without a width limit. `normal` white
+ * space collapses each run of spaces, tabs and line breaks into one space and drops the space at
+ * either edge of the line. `pre-wrap` keeps every space and breaks only at line feeds.
+ */
+function lastLine(text: string, whiteSpace: TextMeasureOptions['whiteSpace']): string {
+  if (whiteSpace !== 'pre-wrap') {
+    return text
+      .replaceAll(/[\t\n\f\r ]+/gu, ' ')
+      .replace(/^ /u, '')
+      .replace(/ $/u, '');
+  }
+  return text
+    .replaceAll(/\r\n?|\f/gu, '\n')
+    .replace(/\n$/u, '')
+    .split('\n')
+    .at(-1)!;
+}
+
+/** Width in px of `text` set in the CSS `font`, measured on a canvas and cached per font. */
+export function measureTextWidth(text: string, font: string, options?: TextMeasureOptions): number {
   const key = `${options?.whiteSpace ?? ''}\n${font}\n${text}`;
   const cached = widthCache.get(key);
   if (cached !== undefined) return cached;
-  const prepared = prepareWithSegments(text, font, options);
-  let width = 0;
-  walkLineRanges(prepared, Infinity, (line) => {
-    width = line.width;
-  });
+  const context = textContext();
+  context.font = font;
+  const width = context.measureText(lastLine(text, options?.whiteSpace)).width;
   if (widthCache.size >= 4096) widthCache.clear();
   widthCache.set(key, width);
   return width;
@@ -51,7 +80,6 @@ if (typeof document !== 'undefined' && document.fonts) {
     const loaded = countLoadedFaces();
     if (loaded === loadedFaces) return;
     loadedFaces = loaded;
-    clearCache();
     widthCache.clear();
     fontsVersion++;
     for (const listener of fontListeners) listener();

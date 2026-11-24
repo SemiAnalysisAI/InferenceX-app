@@ -13,6 +13,7 @@ import { enAlternates } from '@/lib/i18n/i18n';
 import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import {
+  getAllRankingPageEntries,
   getRankingPageEntry,
   rankingPageDescription,
   rankingPageHeading,
@@ -27,8 +28,10 @@ import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
 export const revalidate = 86400;
 
+// Built with the deployment so the first visitor after a deploy gets a cached page instead of
+// waiting for the benchmark read. Revalidation still refreshes them daily.
 export function generateStaticParams(): { slug: string }[] {
-  return [];
+  return getAllRankingPageEntries().map((entry) => ({ slug: entry.slug }));
 }
 
 interface Props {
@@ -166,7 +169,7 @@ export default async function RankingPage({ params }: Props) {
   };
 
   const t: RankingsStrings = {
-    backLabel: 'GPU rankings',
+    backLabel: 'GPU Rankings',
     heading,
     scenarioNote: `Measured on ${scenarioLabel(data.scenario, 'en')} at a matched interactivity target of ${data.tier} tokens/s per user. Hardware without a measurement at this operating point is not ranked.`,
     tableCaption: `${heading}: live benchmark ranking`,
@@ -198,9 +201,9 @@ export default async function RankingPage({ params }: Props) {
       `Platforms are then read at the same operating point (${data.tier} tokens/s per user) so the comparison is iso-interactivity: a GPU cannot win by quoting throughput at an unusably slow per-user speed. Rankings default to ${RANKING_STANDARD_TIER} tokens/s per user, the speed current runs cover on the most hardware, and use another speed only when it ranks more GPUs for this model. Cost converts measured throughput to $ per million total tokens using $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model.`,
       `The derivation is shared with the InferenceX overview leaderboard, and results re-run continuously, so this ranking updates as new engine releases and configs land.`,
     ],
-    faqHeading: 'Frequently asked questions',
+    faqHeading: 'Frequently Asked Questions',
     faq,
-    exploreHeading: 'Explore the data',
+    exploreHeading: 'Explore the Data',
     exploreLinks: [
       {
         href: `/model/${entry.model.slug}`,

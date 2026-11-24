@@ -10,8 +10,7 @@ import {
   modelRoutesForTab,
   resolveModelRouteSlug,
 } from '@/lib/routing/model-routes';
-import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
-import { TabIntro } from '@/components/dashboard/tab-intro';
+import { modelTabMetadata } from '@/lib/routing/tab-meta';
 
 type Props = ProfitRouteProps;
 
@@ -32,14 +31,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProfitEstimatorModelPage({ params }: Props) {
   const resolved = await profitRouteInput('profit-estimator-per-gigawatt', false, params);
-  return (
-    <>
-      <ProfitEstimatorDisplay basis="gw-year" routeModel={resolved.route.model} />
-      <TabIntro
-        tab="profit-estimator-per-gigawatt"
-        title={MODEL_TAB_META['profit-estimator-per-gigawatt'].heading(resolved.route.seoName)}
-        intro={MODEL_TAB_META['profit-estimator-per-gigawatt'].intro(resolved.route.seoName)}
-      />
-    </>
-  );
+  return <ProfitEstimatorDisplay basis="gw-year" routeModel={resolved.route.model} />;
 }

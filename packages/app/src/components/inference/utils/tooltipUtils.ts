@@ -17,10 +17,8 @@ import type {
   SystemPowerUnit,
   SystemPowerUnsupportedReason,
 } from '@/lib/power/modeled-system-power';
-import {
-  SYSTEM_POWER_MODEL_SOURCE_URL,
-  type SystemPowerWorkload,
-} from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_SOURCE_URL } from '@/lib/power/system-power-categories';
+import type { SystemPowerWorkload } from '@/lib/power/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
@@ -136,13 +134,13 @@ const TOOLTIP_STRINGS = {
     image: 'Image',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
-    powerData: 'Power measurement',
+    powerData: 'Power Measurement',
     powerCertified: 'Validated (current PowerX method)',
     powerLegacy: 'Historical (not validated under the current method)',
     powerWithheld: 'Measured power withheld',
     series: 'Series',
     roleEnergyShare: 'Share of request energy',
-    run: 'GitHub Actions run',
+    run: 'GitHub Actions Run',
   },
   zh: {
     unofficialRun: '非官方运行',
@@ -412,7 +410,7 @@ const modeledSystemPowerHTML = (
 
 const WORKER_POWER_STRINGS = {
   en: {
-    heading: 'Measured worker power',
+    heading: 'Measured Worker Power',
     chips: 'chips',
   },
   zh: {
@@ -524,15 +522,15 @@ const measuredPowerHTML = (d: InferenceData, locale: Locale): string => {
 
 const CACHE_STRINGS = {
   en: {
-    offloadType: 'Offload type',
-    offloadBackend: 'KV offload engine',
-    transferEngine: 'KV transfer engine',
+    offloadType: 'Offload Type',
+    offloadBackend: 'KV Offload Engine',
+    transferEngine: 'KV Transfer Engine',
     router: 'Router',
-    gpuHitRate: 'Chip cache hit rate',
-    cpuHitRate: 'CPU cache hit rate',
-    combinedHitRate: 'Combined chip + CPU cache hit rate',
-    theoreticalHitRate: 'Theoretical cache hit rate',
-    externalHitRate: 'External cache hit rate',
+    gpuHitRate: 'Chip Cache Hit Rate',
+    cpuHitRate: 'CPU Cache Hit Rate',
+    combinedHitRate: 'Combined Chip + CPU Cache Hit Rate',
+    theoreticalHitRate: 'Theoretical Cache Hit Rate',
+    externalHitRate: 'External Cache Hit Rate',
     legacyEnabled: 'Enabled (legacy data)',
     legacyDisabled: 'Disabled (legacy data)',
     hit: 'KV cache hit',
@@ -656,11 +654,11 @@ const pointCacheHit = (d: InferenceData, locale: Locale): PointCacheHit | undefi
 
 const AGENTIC_STRINGS = {
   en: {
-    speculativeDecoding: 'Speculative decoding',
+    speculativeDecoding: 'Speculative Decoding',
     off: 'Off',
     requests: 'Requests',
-    promptTokens: 'Prompt tokens',
-    generatedTokens: 'Generated tokens',
+    promptTokens: 'Prompt Tokens',
+    generatedTokens: 'Generated Tokens',
     tokens: 'Tokens',
   },
   zh: {
@@ -789,10 +787,11 @@ interface PointLinksInput {
 export function pointLogHref(
   pointId: number,
   benchmarkType: string | undefined,
+  model: string | undefined,
   locale: Locale,
 ): string {
   if (benchmarkType === 'agentic_traces') {
-    const agenticHref = agenticDetailHref(pointId, locale);
+    const agenticHref = agenticDetailHref(pointId, model, locale);
     return `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`;
   }
   return `${locale === 'zh' ? '/zh' : ''}${getDashboardRoute('inference').path}/logs/${pointId}`;
@@ -820,14 +819,14 @@ const pointLinks = ({
       links.push({
         action: 'view-charts',
         label: t.charts,
-        href: agenticDetailHref(pointId, locale),
+        href: agenticDetailHref(pointId, point.model, locale),
       });
     }
     if (hasLogData) {
       links.push({
         action: 'view-logs',
         label: t.logs,
-        href: pointLogHref(pointId, point.benchmark_type, locale),
+        href: pointLogHref(pointId, point.benchmark_type, point.model, locale),
       });
     }
   }
@@ -858,11 +857,11 @@ const PARALLELISM_STRINGS = {
     prefill: 'Prefill',
     decode: 'Decode',
     gpusUnit: 'Chips',
-    tensorParallelism: 'Tensor parallelism',
-    dataParallelism: 'Data parallelism',
-    expertParallelism: 'Expert parallelism',
-    pipelineParallelism: 'Pipeline parallelism',
-    dpAttention: 'DP attention',
+    tensorParallelism: 'Tensor Parallelism',
+    dataParallelism: 'Data Parallelism',
+    expertParallelism: 'Expert Parallelism',
+    pipelineParallelism: 'Pipeline Parallelism',
+    dpAttention: 'DP Attention',
     yes: 'True',
     no: 'False',
     on: 'on',

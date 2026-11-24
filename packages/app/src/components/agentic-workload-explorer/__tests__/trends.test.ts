@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import {
   Kysely,
   PostgresAdapter,
@@ -245,7 +245,7 @@ describe('daily trends UTC day buckets', () => {
       expectedOccurrences: 1,
     },
     {
-      name: 'CLI version',
+      name: 'CLI Version',
       run: (db) => dailyCliVersionMix(db, null, null),
       bucket: "date_trunc('day', sessions.started_at at time zone 'utc')::date",
       expectedOccurrences: 2,

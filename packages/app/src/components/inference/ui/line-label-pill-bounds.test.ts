@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import * as d3 from 'd3';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
   fitPillSegments,
@@ -576,6 +576,53 @@ describe('pills keep clear of other series', () => {
     const node = zoomGroup.select<SVGGElement>('.line-label').node()!;
     expect(node.style.opacity).toBe('0');
     expect(node.dataset.visible).toBe('0');
+  });
+});
+
+describe('exported charts with few series name every curve', () => {
+  const fewCurves = Array.from({ length: 8 }, (_, index) =>
+    placement(`hw${index}`, 40 + index * 40, 150, `HW${index}`),
+  );
+
+  it('places a pill over another series rather than hide it', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, fewCurves, {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(0, 300),
+      labelEverySeries: true,
+    });
+
+    const nodes = zoomGroup.selectAll<SVGGElement, unknown>('.line-label').nodes();
+    expect(nodes).toHaveLength(8);
+    for (const node of nodes) {
+      expect(node.style.opacity).not.toBe('0');
+      expect(Object.hasOwn(node.dataset, 'placementHidden')).toBe(false);
+    }
+    const boxes = fewCurves.map(({ key }) => pillBox(zoomGroup, key));
+    for (const [index, box] of boxes.entries()) {
+      expectInsidePlot(box);
+      for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
+    }
+  });
+
+  it('keeps hiding blocked pills on screen and with many series', () => {
+    const many = [...fewCurves, placement('hw8', 360, 150, 'HW8')];
+    for (const [labels, labelEverySeries] of [
+      [fewCurves, false],
+      [many, true],
+    ] as const) {
+      const { zoomGroup } = renderChart();
+      renderLineLabels(zoomGroup, labels, {
+        seriesAttribute: 'data-hw-key',
+        occluders: stripes(0, 300),
+        labelEverySeries,
+      });
+      const hidden = zoomGroup
+        .selectAll<SVGGElement, unknown>('.line-label')
+        .nodes()
+        .filter((node) => node.style.opacity === '0');
+      expect(hidden).toHaveLength(labels.length);
+    }
   });
 });
 

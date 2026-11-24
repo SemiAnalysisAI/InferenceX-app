@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { createMockGroup } from './test-helpers';
 import { renderErrorBars, updateErrorBarsOnZoom, type ErrorBarConfig } from './error-bars';

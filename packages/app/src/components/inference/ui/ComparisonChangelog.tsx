@@ -23,15 +23,15 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 const COMPARISON_CHANGELOG_STRINGS = {
   en: {
-    gitCommit: 'Git commit',
-    workflowRun: 'Workflow run',
+    gitCommit: 'Git Commit',
+    workflowRun: 'Workflow Run',
     label: (count: number) =>
-      `Config changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
-    loading: 'Config changelog (loading…)',
-    deferred: 'Config changelog',
+      `Config Changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
+    loading: 'Config Changelog (loading…)',
+    deferred: 'Config Changelog',
     loadingBody: 'Loading changelog…',
     emptyLabel: (count: number) =>
-      `Config changelog (${count} date${count === 1 ? '' : 's'} queried, no matching changelog data)`,
+      `Config Changelog (${count} date${count === 1 ? '' : 's'} queried, no matching changelog data)`,
     addAll: 'Add all to chart',
     empty:
       'No config changelog data matching the selected chips and precisions for this date range. Changelog tracking began Dec 30, 2025.',
@@ -45,7 +45,7 @@ const COMPARISON_CHANGELOG_STRINGS = {
     initial: 'Initial configuration, no changelog entry recorded',
   },
   zh: {
-    gitCommit: 'Git commit',
+    gitCommit: 'Git Commit',
     workflowRun: '工作流运行记录',
     label: (count: number) => `配置变更日志（${count} 个日期有变更）`,
     loading: '配置变更日志（加载中……）',
@@ -333,7 +333,11 @@ export default function ComparisonChangelog({
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="flex flex-col gap-3 pt-2 pl-6">
+          {/* Bounded and reserved while loading so the list never shoves the chart below it down. */}
+          <div
+            className={`flex max-h-72 flex-col gap-3 overflow-y-auto pt-2 pl-6 ${loading ? 'h-72' : ''}`}
+            data-testid="comparison-changelog-list"
+          >
             {filteredChangelogs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {loading || deferred ? t.loadingBody : t.empty}

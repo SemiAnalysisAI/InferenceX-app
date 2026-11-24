@@ -1,31 +1,27 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const { mockGetLatestBenchmarks, mockUnofficial, mockCachedJson, mockCachedText } = vi.hoisted(
-  () => ({
-    mockGetLatestBenchmarks: vi.fn(),
-    mockUnofficial: vi.fn(),
-    mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
-    mockCachedText: vi.fn(
-      (data: string, contentType: string) =>
-        new Response(data, { headers: { 'Content-Type': contentType } }),
-    ),
-  }),
+const mockGetLatestBenchmarks = vi.fn();
+const mockUnofficial = vi.fn();
+const mockCachedJson = vi.fn((_request: Request, data: unknown) => Response.json(data));
+const mockCachedText = vi.fn(
+  (data: string, contentType: string) =>
+    new Response(data, { headers: { 'Content-Type': contentType } }),
 );
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: false,
   getDb: vi.fn(() => ({}) as unknown),
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getLatestBenchmarks: mockGetLatestBenchmarks,
   getBenchmarksForRun: mockGetLatestBenchmarks,
 }));
 
-vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
+mock.module('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
@@ -378,10 +374,16 @@ describe('GET /api/v1/views/calculator', () => {
   });
 
   it('returns 500 when the query fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetLatestBenchmarks.mockRejectedValueOnce(new Error('database unavailable'));
     const response = await GET(
       request('/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k'),
     );
     expect(response.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith(
+      'Error building calculator view:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

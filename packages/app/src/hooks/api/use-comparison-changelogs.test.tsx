@@ -1,13 +1,14 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { waitFor } from '@/test/helpers';
 
 import type { ChangelogRow, WorkflowChangelogDate } from '@/lib/api/api';
 
-const { mockFetch } = vi.hoisted(() => ({ mockFetch: vi.fn() }));
-vi.mock('@/lib/api/api', () => ({ fetchWorkflowChangelogs: mockFetch }));
+const { mockFetch } = { mockFetch: vi.fn() };
+mock.module('@/lib/api/api', () => ({ fetchWorkflowChangelogs: mockFetch }));
 
 import {
   type ComparisonChangelog,
@@ -215,7 +216,7 @@ describe('useComparisonChangelogs', () => {
     mockFetch.mockResolvedValue({ dates: SERVER });
     const availableDates = ['2025-12-31', '2026-01-04', '2026-01-01', '2026-01-03', '2026-01-06'];
     await render(['h100'], availableDates);
-    await act(() => vi.waitFor(() => expect(observed?.loading).toBe(false)));
+    await act(() => waitFor(() => expect(observed?.loading).toBe(false)));
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch.mock.calls[0]!.slice(0, 2)).toEqual(['2026-01-01', '2026-01-04']);

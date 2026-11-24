@@ -33,7 +33,7 @@ import type {
   TokenRevenuePricing,
 } from '@/components/inference/types';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
-import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
+import { fetchOpenRouterPricing } from '@/lib/calculator/openrouter-pricing.server';
 import type { TcoBasis } from '@/lib/catalog/constants';
 import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
@@ -45,7 +45,7 @@ import {
   Sequence,
 } from '@/lib/catalog/data-mappings';
 import { buildHeadroomRows, HEADROOM_INTERACTIVITIES } from '@/lib/power/headroom';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseNumberMap,
@@ -398,7 +398,7 @@ export function GET(request: NextRequest) {
       throw new ViewsApiParamError('priceSource', 'No OpenRouter model configured');
     const pricing =
       priceSource === 'openrouter'
-        ? await fetchOpenRouterPricing(pricingId!, AbortSignal.timeout(15000))
+        ? await fetchOpenRouterPricing(pricingId!)
         : NORMALIZED_TOKEN_REVENUE_PRICING;
 
     const params: InferenceViewParams = {

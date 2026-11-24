@@ -1,22 +1,22 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { OverviewPageData } from '@/lib/overview/overview-data';
 
-const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
+const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = {
   mockGetOverviewPageData: vi.fn(),
   mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),
   ),
-}));
+};
 
-vi.mock('@/lib/overview/overview-data.server', () => ({
+mock.module('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
 }));
@@ -237,10 +237,16 @@ describe('GET /api/v1/views/overview', () => {
   });
 
   it('returns 500 when overview assembly fails', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetOverviewPageData.mockRejectedValueOnce(new Error('database unavailable'));
 
     const response = await GET(request('/api/v1/views/overview'));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: 'Internal server error' });
+    expect(logged).toHaveBeenCalledWith(
+      'Error building overview view:',
+      expect.objectContaining({ message: 'database unavailable' }),
+    );
+    logged.mockRestore();
   });
 });

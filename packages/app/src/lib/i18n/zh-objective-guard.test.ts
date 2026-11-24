@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   compareBlogPair,
@@ -36,6 +36,8 @@ function runChineseOnlyGuard(directory: string, base: string, head: string): str
     cwd: directory,
     encoding: 'utf8',
     env: { ...process.env, ZH_GUARD_BASE_SHA: base, ZH_GUARD_HEAD_SHA: head },
+    // Capture stderr instead of echoing it. A failing guard's report stays in the thrown error.
+    stdio: 'pipe',
   });
 }
 

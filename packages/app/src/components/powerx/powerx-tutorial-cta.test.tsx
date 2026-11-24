@@ -1,14 +1,19 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({ track: vi.fn() }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
-vi.mock('next/link', () => ({
-  default: ({ href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+const mocks = { track: vi.fn() };
+mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
+mock.module('next/link', () => ({
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
+  default: ({
+    href,
+    prefetch: _prefetch,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean | null }) => (
     <a href={href} {...props} />
   ),
 }));
@@ -53,7 +58,7 @@ describe('PowerXTutorialCta', () => {
       act(() => root.unmount());
     }
     const { host } = mount('en');
-    expect(host.textContent).toContain('How we measure power');
+    expect(host.textContent).toContain('How We Measure Power');
   });
 
   it('tracks the header entry point on click', () => {

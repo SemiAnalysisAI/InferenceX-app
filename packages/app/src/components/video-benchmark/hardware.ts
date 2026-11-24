@@ -6,7 +6,7 @@ export type CostTier = 'h' | 'r';
 
 /** Registry keys that can appear as a whole token in an artifact GPU name, longest first. */
 const TOKENS = Object.keys(HW_REGISTRY)
-  .filter((key) => /^(?:h|b|gb|mi)\d/u.test(key))
+  .filter((key) => /^(?:a|h|b|gb|mi)\d/u.test(key))
   .toSorted((a, b) => b.length - a.length);
 
 /** Map a raw device name (`NVIDIA H100 80GB HBM3`, `MI355X`) to a HW_REGISTRY key. */

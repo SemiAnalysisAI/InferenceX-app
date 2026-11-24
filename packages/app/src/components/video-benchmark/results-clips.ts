@@ -137,9 +137,9 @@ export function publishedResultsSide(saved: StoredArtifact, point: VideoPoint): 
 export interface ResultsClip {
   side: ResultsClipSide;
   record: CaseRecord;
-  /** Sealed original: Difference, PSNR pairing and the media link; empty for an unpublished run. */
+  /** Sealed original: PSNR pairing and the media link; empty for an unpublished run. */
   url: string;
-  /** Lighter web rendition of `url` for Clip view playback. */
+  /** Lighter web rendition of `url`, which the stage plays in every view. */
   previewUrl?: string;
   /** JPEG of the first decoded frame of `url`; presentation only. */
   posterUrl?: string;
@@ -155,7 +155,19 @@ export interface ResultsClipGroup {
   clips: Map<string, ResultsClip>;
 }
 
+/** One side's own groups, built once: a render asks for them per chart point and per pairing. */
+const ownGroups = new WeakMap<ResultsClipSide, ResultsClipGroup[]>();
+
 export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] {
+  if (sides.length !== 1) return buildClipGroups(sides);
+  const kept = ownGroups.get(sides[0]);
+  if (kept) return kept;
+  const built = buildClipGroups(sides);
+  ownGroups.set(sides[0], built);
+  return built;
+}
+
+function buildClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] {
   const groups = new Map<string, ResultsClipGroup>();
   for (const side of sides) {
     if (!side.generationKey) continue;

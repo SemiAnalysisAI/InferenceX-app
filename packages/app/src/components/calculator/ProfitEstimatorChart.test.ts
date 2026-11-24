@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
@@ -260,7 +260,7 @@ describe('profitPointDetails', () => {
       'en',
     );
     expect(details.metrics[0]).toEqual({ value: '−$190', label: 'Loss' });
-    expect(JSON.stringify(details.rows)).toContain('Model license fee');
+    expect(JSON.stringify(details.rows)).toContain('Model License Fee');
     expect(JSON.stringify(details.rows)).toContain('$90');
   });
 
@@ -304,17 +304,17 @@ describe('profitPointDetails', () => {
 });
 
 const SEGMENT_WORDS = {
-  tco: 'Compute expense',
-  labCut: 'Model license fee',
+  tco: 'Compute Expense',
+  labCut: 'Model License Fee',
   profit: 'Profit',
   loss: 'Loss',
 };
 
 describe('segmentLabelLines', () => {
   it('names the segment and its amount when the rectangle is tall enough', () => {
-    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual(['Compute expense', '$400']);
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual(['Compute Expense', '$400']);
     expect(segmentLabelLines('labCut', row(), 40, SEGMENT_WORDS)).toEqual([
-      'Model license fee',
+      'Model License Fee',
       '$180',
     ]);
     expect(segmentLabelLines('profit', row(), 40, SEGMENT_WORDS)).toEqual(['Profit', '$420']);
@@ -335,7 +335,7 @@ describe('segmentLabelLines', () => {
 
   it('drops the name, then the amount, when the bar is too narrow (phones)', () => {
     expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 200)).toEqual([
-      'Compute expense',
+      'Compute Expense',
       '$400',
     ]);
     expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 60)).toEqual(['$400']);

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { encodeRequestChartColumns } from '../etl/request-chart-columns';
@@ -13,7 +13,7 @@ import {
 } from './request-chart-data';
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  mock.restore();
 });
 
 function mockSql(queue: unknown[][]): { sql: DbClient; calls: string[] } {
@@ -187,7 +187,7 @@ describe('request chart data', () => {
   });
 
   it('logs and returns null when a same-length corrupted gzip slice fails decode', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
     const stored = await gzipRequestTimeline(timeline);
     const corrupted = Buffer.from(stored);
     const middle = Math.floor(corrupted.length / 2);
@@ -209,7 +209,7 @@ describe('request chart data', () => {
   });
 
   it('logs and returns null when a legacy timeline above the projection cap disappears', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
     const { sql } = mockSql([[legacyMeta(LEGACY_PROJECTION_MAX_REQUESTS + 1)], []]);
 
     await expect(getRequestChartData(sql, 42)).resolves.toBeNull();
@@ -262,7 +262,7 @@ describe('request chart data', () => {
   });
 
   it('logs unreadable columns and falls back to the gzip timeline', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = spyOn(console, 'error').mockImplementation(() => {});
     const stored = await gzipRequestTimeline(timeline);
     const { sql } = mockSql([
       [

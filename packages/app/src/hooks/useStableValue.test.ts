@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { useStableValue } from './useStableValue';
 

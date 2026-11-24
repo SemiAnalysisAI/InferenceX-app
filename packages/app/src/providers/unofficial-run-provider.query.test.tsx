@@ -1,19 +1,24 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
+import { describeDataQueryFailure } from '@/lib/analytics/query-error-analytics';
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 
 import './unofficial-chart-data';
 import {
   UnofficialRunProvider,
+  UnofficialRunUnavailableError,
   useUnofficialRun,
   type UnofficialRunContextType,
 } from './unofficial-run-provider';
 
-vi.mock('@/components/ui/unofficial-banner', () => ({ UnofficialBanner: () => null }));
+mock.module('@/components/ui/unofficial-banner', () => ({
+  UnofficialBanner: () => null,
+  UnofficialRunUnavailableNotice: () => null,
+}));
 
 interface PendingRequest {
   url: string;
@@ -185,6 +190,91 @@ describe('UnofficialRunProvider query lifecycle', () => {
     await flush();
     expect(window.location.search).toBe('');
     expect(latestRunIds).toEqual([]);
+    act(() => root.unmount());
+  });
+
+  it('reports a requested overlay from the first render, before its data loads', async () => {
+    installPendingFetch();
+    window.history.replaceState({}, '', '/infx/inference?unofficialrun=1');
+    const root = mountProvider();
+    expect(latestContextValue?.isUnofficialRun).toBe(false);
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(true);
+
+    await flush();
+    requests[0].resolve({
+      ok: true,
+      json: () => Promise.resolve({ runInfos: [runInfo(1)], benchmarks: [], evaluations: [] }),
+    } as Response);
+    await waitForRunIds([1]);
+    expect(latestContextValue?.isUnofficialRun).toBe(true);
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(true);
+
+    act(() => dismissLatest?.('1'));
+    await flush();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(false);
+    act(() => root.unmount());
+  });
+
+  it('stops reporting a requested overlay when the run is unavailable', async () => {
+    installPendingFetch();
+    window.history.replaceState({}, '', '/infx/inference?unofficialrun=5');
+    const root = mountProvider();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(true);
+    await flush();
+    requests[0].resolve({
+      ok: false,
+      status: 410,
+      json: () => Promise.resolve({ error: 'expired', code: 'ARTIFACTS_EXPIRED', runId: '5' }),
+    } as Response);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (latestContextValue?.unavailable) break;
+      await flush();
+    }
+    expect(latestContextValue?.unavailable).not.toBeNull();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(false);
+    act(() => root.unmount());
+  });
+
+  it('does not report a requested overlay without a run id', () => {
+    const root = mountProvider();
+    expect(latestContextValue?.isUnofficialRunRequested).toBe(false);
+    act(() => root.unmount());
+  });
+
+  it('reports an expired run as unavailable instead of a failed query', async () => {
+    installPendingFetch();
+    window.history.replaceState({}, '', '/infx/evaluation?unofficialRun=27968834654');
+    const root = mountProvider();
+    await flush();
+    requests[0].resolve({
+      ok: false,
+      status: 410,
+      json: () =>
+        Promise.resolve({
+          error: 'The result artifacts of run 27968834654 have expired',
+          code: 'ARTIFACTS_EXPIRED',
+          runId: '27968834654',
+        }),
+    } as Response);
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (latestContextValue?.unavailable) break;
+      await flush();
+    }
+
+    expect(latestContextValue?.unavailable).toEqual({
+      code: 'ARTIFACTS_EXPIRED',
+      runId: '27968834654',
+    });
+    expect(
+      describeDataQueryFailure(
+        new UnofficialRunUnavailableError('ARTIFACTS_EXPIRED', '27968834654', ''),
+        { key: ['unofficial-runs'], hash: 'h', throwsToErrorBoundary: false },
+        'query',
+        '/infx/evaluation',
+      ),
+    ).toBeNull();
+    act(() => dismissLatest?.('27968834654'));
+    expect(window.location.search).toBe('');
     act(() => root.unmount());
   });
 });

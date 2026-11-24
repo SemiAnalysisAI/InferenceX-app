@@ -13,6 +13,7 @@ export default function EmbeddedModelDashboard({
   sequence,
   yAxisMetric = DEFAULT_Y_AXIS_METRIC,
   lockedFrameworks,
+  initialActiveHwTypes,
   minimalChrome,
   chipBasis,
 }: {
@@ -20,6 +21,7 @@ export default function EmbeddedModelDashboard({
   sequence: string;
   yAxisMetric?: string;
   lockedFrameworks?: readonly string[];
+  initialActiveHwTypes?: string[];
   minimalChrome?: boolean;
   chipBasis?: ChipBasis;
 }) {
@@ -35,6 +37,7 @@ export default function EmbeddedModelDashboard({
           initialYAxisMetric={yAxisMetric}
           autoSelectAllGpus
           lockedFrameworks={lockedFrameworks}
+          initialActiveHwTypes={initialActiveHwTypes}
           minimalChrome={minimalChrome}
         >
           <InferenceChartDisplay embedded />

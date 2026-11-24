@@ -1,6 +1,7 @@
-import { act, createElement, useReducer } from 'react';
+import { act, createElement, useLayoutEffect, useReducer } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi, mock } from 'bun:test';
+import { mocked, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
@@ -11,16 +12,21 @@ import {
   POINT_HIT_AREA_CLASS,
 } from '@/lib/d3-chart/layers/canvas-point-registry';
 import type { CanvasPointLayerElement } from '@/lib/d3-chart/layers/canvas-points';
-import type * as NextNavigation from 'next/navigation';
 
-vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
-vi.hoisted(() => {
+// Keeps chart-setup's real behaviour and records setupChartStructure calls.
+const chartSetup = { ...(await import('@/lib/d3-chart/chart-setup')) };
+mock.module('@/lib/d3-chart/chart-setup', () => ({
+  ...chartSetup,
+  setupChartStructure: vi.fn(chartSetup.setupChartStructure),
+}));
+mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+mock.module('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
+(() => {
   globalThis.__scatterPathnameState = { value: '/infx/inference' };
-});
-vi.mock('next/navigation', async (importOriginal) => ({
-  ...(await importOriginal<typeof NextNavigation>()),
+})();
+const actual = { ...(await import('next/navigation')) };
+mock.module('next/navigation', () => ({
+  ...actual,
   usePathname: () => globalThis.__scatterPathnameState.value,
 }));
 
@@ -34,26 +40,29 @@ declare global {
   };
   var __scatterPathnameState: { value: string };
 }
-vi.hoisted(() => {
+(() => {
   globalThis.__scatterLegendState = { current: null };
   globalThis.__scatterInferenceState = { current: {} };
   globalThis.__scatterOverlayState = { current: {} };
   globalThis.__scatterPresenceState = { current: undefined, enabled: undefined };
-});
+})();
 
-vi.mock('@/components/ui/chart-legend', () => ({
+// Captures the committed props, like the handlers a real click reaches.
+mock.module('@/components/ui/chart-legend', () => ({
   default: (props: Record<string, any>) => {
-    globalThis.__scatterLegendState.current = props;
+    useLayoutEffect(() => {
+      globalThis.__scatterLegendState.current = props;
+    });
     return props.keyIndicators ?? null;
   },
 }));
-vi.mock('@/components/inference/InferenceContext', () => ({
+mock.module('@/components/inference/InferenceContext', () => ({
   useInferenceActions: () => globalThis.__scatterInferenceState.current,
   useInferenceData: () => globalThis.__scatterInferenceState.current,
   useInferenceDisplay: () => globalThis.__scatterInferenceState.current,
   useInferenceFilters: () => globalThis.__scatterInferenceState.current,
 }));
-vi.mock('@/providers/unofficial-run-provider', () => ({
+mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => globalThis.__scatterOverlayState.current,
 }));
 
@@ -61,7 +70,7 @@ export const legendState = globalThis.__scatterLegendState;
 export const inferenceState = globalThis.__scatterInferenceState;
 export const overlayState = globalThis.__scatterOverlayState;
 export const presenceState = globalThis.__scatterPresenceState;
-vi.mock('@/hooks/api/use-benchmark-presence', () => ({
+mock.module('@/hooks/api/use-benchmark-presence', () => ({
   useBenchmarkPresence: (enabled: boolean) => {
     globalThis.__scatterPresenceState.enabled = enabled;
     return { data: globalThis.__scatterPresenceState.current, isPending: false };
@@ -231,11 +240,11 @@ export function dispatchAtPoint(
   });
 }
 
-export const rebuildCount = () => vi.mocked(setupChartStructure).mock.calls.length;
+export const rebuildCount = () => mocked(setupChartStructure).mock.calls.length;
 
 beforeEach(() => {
   globalThis.__scatterPathnameState.value = '/infx/inference';
-  vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  stubGlobal('ResizeObserver', MockResizeObserver);
   Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
     configurable: true,
     value(this: SVGElement) {
@@ -273,11 +282,11 @@ beforeEach(() => {
   legendState.current = null;
   presenceState.current = undefined;
   presenceState.enabled = undefined;
-  vi.mocked(setupChartStructure).mockClear();
+  mocked(setupChartStructure).mockClear();
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
   if (originalGetComputedTextLength) {
     Object.defineProperty(

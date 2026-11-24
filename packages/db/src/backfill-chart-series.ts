@@ -1,20 +1,14 @@
 import { hasNoSslFlag } from './cli-utils.js';
 import {
-  CHART_SERIES_SUMMARY_VERSION,
-  encodeChartSeriesSummary,
-} from './etl/chart-series-summary.js';
-import {
   CHART_SERIES_VERSION,
   computeChartData,
   type ChartSeries,
 } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
+import { selectServerMetricsAdapter } from './etl/server-metrics-adapters.js';
+import { cacheHitRatesFromPromptTokenTotals } from './etl/trace-replay-ingest.js';
+import { writeChartSeriesBackfill } from './lib/backfill-chart-series-row.js';
 import {
-  cacheHitRatesFromPromptTokenTotals,
-  writeCacheHitMetrics,
-} from './etl/trace-replay-ingest.js';
-import {
-  jsonbParam,
   parseLimitForceFlags,
   parseRunIdFlag,
   requireBackfillPayload,
@@ -125,29 +119,14 @@ async function main(): Promise<void> {
         'hostKvCacheUsage',
       ]);
 
-      const json = JSON.stringify(series);
-      await sql`
-        update agentic_trace_replay
-        set chart_series = ${jsonbParam(sql, series)},
-            chart_series_summary_gz = ${encodeChartSeriesSummary(json)},
-            chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION}
-        where id = ${id}
-          and coalesce((chart_series->>'version')::int, -1) <= ${CHART_SERIES_VERSION}
-      `;
-      // ATOM P/D row cache rates come from this chart series at ingest, so
-      // refresh them with it. Other frameworks keep their ingested values.
       const atomPd = row.framework === 'mooncake-atom' || row.framework === 'atom-disagg';
-      const rates = atomPd ? cacheHitRatesFromPromptTokenTotals(promptTokenTotals) : null;
-      if (rates) {
-        const linked = await sql<{ id: number }[]>`
-          select id from benchmark_results where trace_replay_id = ${id}
-        `;
-        await writeCacheHitMetrics(
-          sql,
-          linked.map((r) => r.id),
-          rates,
-        );
-      }
+      const trtllmDisagg =
+        (row.disagg ?? false) &&
+        selectServerMetricsAdapter({ framework: row.framework }).id === 'trtllm';
+      const rates =
+        atomPd || trtllmDisagg ? cacheHitRatesFromPromptTokenTotals(promptTokenTotals) : null;
+      const updated = await writeChartSeriesBackfill(sql, id, series, rates);
+      if (!updated) return 'skipped';
       return 'ok';
     },
   );

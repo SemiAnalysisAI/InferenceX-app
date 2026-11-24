@@ -1,12 +1,12 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { hydrateRoot, type Root } from 'react-dom/client';
+import { renderToStaticMarkup, renderToString } from 'react-dom/server';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-const themeState = vi.hoisted(() => ({ resolvedTheme: undefined as string | undefined }));
+const themeState = { resolvedTheme: undefined as string | undefined };
 
-vi.mock('next-themes', () => ({
+mock.module('next-themes', () => ({
   useTheme: () => themeState,
 }));
 
@@ -14,11 +14,30 @@ import { createMdxComponents } from '@/components/blog/mdx-components';
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
 import figureDimensions from '@/lib/blog/figure-dimensions.json';
 
-let container: HTMLDivElement;
-let root: Root;
+// A blog page builds its MDX components per render, once on the server and once when it
+// hydrates, so the first-figure counter starts fresh each time as it does in production.
+function PlainFigurePage() {
+  const { Figure } = createMdxComponents();
+  return <Figure src="/plain.png" alt="Plain diagram" />;
+}
 
+let container: HTMLDivElement;
+let root: Root | undefined;
+
+/**
+ * The first render hydrates server markup, as the blog page does, so React adopts the prepaint
+ * <script> instead of creating one on the client. Later renders update the hydrated tree.
+ */
 function renderUi(ui: React.ReactNode) {
-  act(() => root.render(ui));
+  if (root) {
+    const current = root;
+    act(() => current.render(ui));
+    return;
+  }
+  container.innerHTML = renderToString(ui);
+  act(() => {
+    root = hydrateRoot(container, ui);
+  });
 }
 
 function runPrepaintScript(target = container) {
@@ -41,11 +60,11 @@ beforeEach(() => {
   document.documentElement.className = '';
   container = document.createElement('div');
   document.body.append(container);
-  root = createRoot(container);
+  root = undefined;
 });
 
 afterEach(() => {
-  act(() => root.unmount());
+  if (root) act(() => root?.unmount());
   container.remove();
   document.documentElement.className = '';
 });
@@ -152,8 +171,7 @@ describe('ThemedFigureImage', () => {
   });
 
   it('falls back to a plain image for an MDX figure with no recorded size', () => {
-    const Figure = createMdxComponents().Figure;
-    renderUi(<Figure src="/plain.png" alt="Plain diagram" />);
+    renderUi(<PlainFigurePage />);
 
     const image = container.querySelector('img');
     expect(container.querySelector('script')).toBeNull();
@@ -165,13 +183,16 @@ describe('ThemedFigureImage', () => {
 
   it('serves sized MDX figures through the image optimizer, eager only for the first', () => {
     const [src, [width, height]] = Object.entries(figureDimensions)[0];
-    const Figure = createMdxComponents().Figure;
-    renderUi(
-      <>
-        <Figure src={src} alt="First" />
-        <Figure src={src} alt="Second" />
-      </>,
-    );
+    function Page() {
+      const { Figure } = createMdxComponents();
+      return (
+        <>
+          <Figure src={src} alt="First" />
+          <Figure src={src} alt="Second" />
+        </>
+      );
+    }
+    renderUi(<Page />);
 
     const [first, second] = container.querySelectorAll('img');
     for (const image of [first, second]) {

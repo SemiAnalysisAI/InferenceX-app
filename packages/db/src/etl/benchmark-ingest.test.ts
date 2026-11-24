@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import type { Sql } from './db-utils';
 import {
@@ -13,18 +13,17 @@ import {
   type BenchmarkPersistenceInput,
 } from './benchmark-ingest';
 import * as blockWriter from './server-log-block-writer';
+import { stubEnv, unstubAllEnvs } from '../lib/test-helpers';
 
-const blocksWritten = vi.hoisted((): string[] => []);
-vi.mock('./server-log-block-writer', async (importOriginal) => ({
-  ...(await importOriginal<typeof blockWriter>()),
-  writeTextAsBlocks: vi.fn(async (_tx: unknown, _id: unknown, fileName: string) => {
-    const { promise, resolve } = Promise.withResolvers<void>();
-    setImmediate(resolve);
-    await promise;
-    blocksWritten.push(fileName);
-    return true;
-  }),
-}));
+const blocksWritten: string[] = [];
+const writeTextAsBlocks = mock(async (_tx: unknown, _id: unknown, fileName: string) => {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setImmediate(resolve);
+  await promise;
+  blocksWritten.push(fileName);
+  return true;
+});
+mock.module('./server-log-block-writer', () => ({ ...blockWriter, writeTextAsBlocks }));
 
 const point = (recipeFingerprint: string | null) => ({
   configId: 7,
@@ -60,7 +59,7 @@ function fakeTransactionSql(
   conflictingFileNames?: string[],
 ) {
   const calls: { text: string; values: unknown[] }[] = [];
-  const tag = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+  const tag = mock((strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join('');
     calls.push({ text, values });
     if (text.includes('select id, server_log_id')) {
@@ -75,18 +74,16 @@ function fakeTransactionSql(
     }
     return Promise.resolve([]);
   }) as any;
-  tag.array = (value: unknown) => value;
   tag.begin = (fn: (tx: typeof tag) => Promise<void>) => fn(tag);
   return { sql: tag as Sql, calls };
 }
 
 function captureInsertSql() {
   const calls: { text: string; values: unknown[] }[] = [];
-  const tag = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+  const tag = mock((strings: TemplateStringsArray, ...values: unknown[]) => {
     calls.push({ text: strings.join('?').replaceAll(/\s+/gu, ' ').trim(), values });
     return Promise.resolve([]);
   }) as any;
-  tag.array = (value: unknown) => value;
   return { sql: tag as Sql, calls };
 }
 
@@ -131,7 +128,7 @@ describe('bulkIngestBenchmarkRows — power audit provenance lanes', () => {
 
     const { text } = calls[0];
     expect(text).toContain('metrics, workers, power_invalid_reasons, power_audit )');
-    expect(text.match(/::jsonb\[\]/gu)).toHaveLength(4);
+    expect(text.match(/::text\[\]\)::jsonb/gu)).toHaveLength(4);
     expect(text).toContain('power_invalid_reasons = excluded.power_invalid_reasons');
     expect(text).toContain('coalesce(excluded.power_audit, benchmark_results.power_audit)');
   });
@@ -237,7 +234,7 @@ describe('insertServerLogFiles', () => {
   it('caps oversized files before sending them to PostgreSQL', async () => {
     const previous = process.env.SERVER_LOG_MAX_FILE_BYTES;
     process.env.SERVER_LOG_MAX_FILE_BYTES = String(128 * 1024);
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const big = 'decode worker line\n'.repeat(50_000);
       const { sql, calls } = fakeTransactionSql(null);
@@ -272,27 +269,25 @@ describe('insertServerLogFiles block copies', () => {
 
   afterEach(() => {
     blocksWritten.length = 0;
-    vi.mocked(blockWriter.writeTextAsBlocks).mockClear();
-    vi.unstubAllEnvs();
+    writeTextAsBlocks.mockClear();
+    unstubAllEnvs();
   });
 
   it('writes blocks for the new primary and each child row it inserted, before resolving', async () => {
-    vi.stubEnv('SERVER_LOG_BLOCKS', '1');
+    stubEnv('SERVER_LOG_BLOCKS', '1');
     const { sql } = fakeTransactionSql(null, [], ['results/router.log']);
 
     await insertServerLogFiles(sql, [42], files);
 
     expect(blocksWritten).toEqual(['results/server.log', 'results/benchmark.log']);
-    expect(
-      vi.mocked(blockWriter.writeTextAsBlocks).mock.calls.map((call) => call.slice(1)),
-    ).toEqual([
+    expect(writeTextAsBlocks.mock.calls.map((call) => call.slice(1))).toEqual([
       [99, 'results/server.log', 'server'],
       [99, 'results/benchmark.log', 'benchmark'],
     ]);
   });
 
   it('writes child blocks into an existing bundle without rewriting its primary', async () => {
-    vi.stubEnv('SERVER_LOG_BLOCKS', '1');
+    stubEnv('SERVER_LOG_BLOCKS', '1');
     const { sql } = fakeTransactionSql(7, [], []);
 
     await insertServerLogFiles(sql, [42], files);

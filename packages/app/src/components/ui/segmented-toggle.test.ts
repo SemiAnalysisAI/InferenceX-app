@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 
@@ -100,5 +100,56 @@ describe('SegmentedToggle', () => {
     )!;
     act(() => enabledButton.click());
     expect(handleValueChange).toHaveBeenCalledExactlyOnceWith('chart');
+  });
+
+  it('presses the picked segment while the re-render it starts is still pending', async () => {
+    const never = new Promise<never>(() => {});
+    function Slow({ view }: { view: string }) {
+      if (view === 'correlation') React.use(never);
+      return null;
+    }
+    function Parent() {
+      const [view, setView] = React.useState<'chart' | 'correlation'>('chart');
+      return React.createElement(
+        React.Suspense,
+        { fallback: 'loading' },
+        React.createElement(SegmentedToggle<'chart' | 'correlation'>, {
+          value: view,
+          options: OPTIONS,
+          onValueChange: setView,
+          ariaLabel: 'View mode',
+        }),
+        React.createElement(Slow, { view }),
+      );
+    }
+    act(() => root.render(React.createElement(Parent)));
+    await act(() => {
+      container.querySelector<HTMLButtonElement>('[data-testid="correlation-option"]')!.click();
+      return Promise.resolve();
+    });
+    // The pick is a transition, so the suspended render keeps the old view instead of a fallback.
+    expect(container.textContent).not.toContain('loading');
+    expect(
+      container.querySelector('[data-testid="correlation-option"]')?.getAttribute('aria-selected'),
+    ).toBe('true');
+  });
+
+  it('falls back to the controlled value when the parent ignores the pick', () => {
+    act(() => {
+      root.render(
+        React.createElement(SegmentedToggle, {
+          value: 'chart',
+          options: OPTIONS,
+          onValueChange: () => {},
+          ariaLabel: 'View mode',
+        }),
+      );
+    });
+    act(() =>
+      container.querySelector<HTMLButtonElement>('[data-testid="correlation-option"]')!.click(),
+    );
+    expect(
+      container.querySelector('[data-testid="chart-option"]')?.getAttribute('aria-selected'),
+    ).toBe('true');
   });
 });

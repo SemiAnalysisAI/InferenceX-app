@@ -1,5 +1,3 @@
-import 'cypress-axe';
-
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 
@@ -51,6 +49,27 @@ Cypress.on('window:before:load', (win) => {
     }
   } catch {}
 });
+
+/**
+ * The app's queries retry a failure once, after a 1s `setTimeout`, before rendering their error.
+ * Fakes the page's timeouts while `trigger` runs and advances them until `errorSelector` shows,
+ * then fires the timeouts due within another second and returns the page to real timers.
+ */
+export function fastForwardQueryRetry(errorSelector: string, trigger: () => void): void {
+  cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
+    trigger();
+    cy.get('body').should(($body) => {
+      clock.tick(200);
+      expect($body.find(errorSelector).filter(':visible'), errorSelector).to.have.length.at.least(
+        1,
+      );
+    });
+    cy.then(() => {
+      clock.tick(1000);
+      clock.restore();
+    });
+  });
+}
 
 export function unlockAgenticGate(win: Window): void {
   try {

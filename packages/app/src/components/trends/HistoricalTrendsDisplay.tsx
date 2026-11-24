@@ -17,6 +17,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
+import { shouldRequestTrendHistory } from '@/components/trends/trend-history-gate';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
@@ -122,22 +123,22 @@ const STRINGS = {
     frontierLoadError: 'Frontier history could not be loaded',
     frontierEmpty: 'No frontier history for the selected configurations',
     memes: 'Memes',
-    heading: 'Historical trends',
+    heading: 'Historical Trends',
     description:
       'Interpolated performance metrics over time at a fixed interactivity operating point',
-    targetLabel: 'Target interactivity (tok/s/user)',
-    agenticTargetLabel: 'Target P90 interactivity (tok/s/user)',
+    targetLabel: 'Target Interactivity (tok/s/user)',
+    agenticTargetLabel: 'Target P90 Interactivity (tok/s/user)',
     agenticTargetTooltip:
       'AgentX uses 1 / P90 full-response ITL in seconds, not P90 of token rates. Legacy ITL is used only when full-response mean/percentile ITL fields are absent. Missing or invalid P90 latency is omitted.',
     targetTooltip:
       "The interactivity operating point used for interpolation. Move the slider to see how each chip's performance changes at different interactivity levels.",
     captionTitle: (yTitle: string) => `${yTitle} over time`,
     captionQualifier: (target: number, isAgentic: boolean) =>
-      `at ${target} tok/s/user ${isAgentic ? 'P90 ' : ''}interactivity`,
+      `at ${target} tok/s/user ${isAgentic ? 'P90 ' : ''}Interactivity`,
     source: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
-    logScale: 'Log scale',
-    highContrast: 'High contrast',
+    logScale: 'Log Scale',
+    highContrast: 'High Contrast',
     noData: 'No interactivity chart data available for the selected model and sequence',
     loadError: 'Historical benchmark data could not be loaded',
     retry: 'Reload page',
@@ -196,7 +197,7 @@ export default function HistoricalTrendsDisplay() {
   // A vendor narrows every chip view to that company's chips; null shows all vendors.
   const [frontierVendorFilter, setFrontierVendorFilter] = useState<string | null>(null);
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
-  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis, sequenceResolved } = useGlobalFilterSelection();
   const modelDetails = useModelHistoryDetails();
   const { setChipBasis } = useGlobalFilterActions();
   const chipBasisControl = useMemo(
@@ -290,7 +291,11 @@ export default function HistoricalTrendsDisplay() {
     targetInteractivity,
     availableDates,
     tokenRevenuePricing,
-    enabled: hasInteractivityChart,
+    enabled: shouldRequestTrendHistory({
+      sequenceResolved,
+      chartDataLoading: loading,
+      hasInteractivityChart,
+    }),
     tcoBasis,
     chipBasis,
   });
@@ -671,6 +676,7 @@ export default function HistoricalTrendsDisplay() {
       <section data-testid="historical-trends-display">
         <Card>
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.loadError}
             descriptionClassName="text-destructive"
@@ -697,7 +703,7 @@ export default function HistoricalTrendsDisplay() {
       <section data-testid="historical-trends-display">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.heading} description={t.description} />
+            <DashboardSectionHeader headingAs="h1" title={t.heading} description={t.description} />
             <ChartControls
               tcoSource="historical"
               hideGpuComparison
@@ -725,6 +731,7 @@ export default function HistoricalTrendsDisplay() {
       <section data-testid="historical-trends-display">
         <Card data-testid="historical-trend-error">
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.trendLoadError}
             descriptionClassName="text-destructive"
@@ -751,6 +758,7 @@ export default function HistoricalTrendsDisplay() {
       <Card className="relative z-30">
         <div className="flex flex-col gap-4">
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.description}
             actions={<ChartShareActions />}

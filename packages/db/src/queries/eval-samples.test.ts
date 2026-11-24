@@ -1,45 +1,12 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import type { DbClient } from '../connection.js';
-import { migratedPglite } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 
 import { getEvalSamples } from './eval-samples';
 
-interface Query {
-  strings: readonly string[];
-  values: unknown[];
-}
-
-function isQuery(value: unknown): value is Query {
-  return typeof value === 'object' && value !== null && 'strings' in value && 'values' in value;
-}
-
-function fragmentSql(db: PGlite): DbClient {
-  const render = (query: Query, params: unknown[]): string =>
-    query.strings.reduce((text, part, i) => {
-      if (i === 0) return part;
-      const value = query.values[i - 1];
-      if (isQuery(value)) return text + render(value, params) + part;
-      params.push(value);
-      return `${text}$${params.length}${part}`;
-    }, '');
-  const tag = (strings: TemplateStringsArray, ...values: unknown[]) => {
-    const query: Query = { strings, values };
-    return Object.assign(query, {
-      // oxlint-disable-next-line unicorn/no-thenable
-      then<T>(resolve: (rows: unknown[]) => T, reject: (error: unknown) => T) {
-        const params: unknown[] = [];
-        const text = render(query, params);
-        return db.query(text, params).then((result) => resolve(result.rows), reject);
-      },
-    });
-  };
-  return tag as unknown as DbClient;
-}
-
 let db: PGlite;
-let sql: DbClient;
+let sql: PgliteSql;
 
 const sample = (
   docId: number,
@@ -65,7 +32,7 @@ const sample = (
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = fragmentSql(db);
+  sql = await pgliteDriverSql(db);
   await db.exec('set session_replication_role = replica');
   await sample(3, true, {
     resps: [['raw 3']],
@@ -81,7 +48,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.close();
+  await sql?.end();
+  await db?.close();
 });
 
 const docIds = (result: { samples: { doc_id: number }[] }) => result.samples.map((s) => s.doc_id);

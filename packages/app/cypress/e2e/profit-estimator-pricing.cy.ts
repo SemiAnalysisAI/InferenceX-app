@@ -4,7 +4,7 @@ import {
   chartSvg,
   chipTrigger,
   openFormulaNotes,
-  OPENROUTER_MODELS,
+  interceptOpenRouterPricing,
   pickChip,
   revenueLabels,
   stubOpenRouter,
@@ -126,7 +126,7 @@ describe('Profit Estimator per GW', () => {
     cy.contains('[role="option"]', 'OpenRouter').click();
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.6')
-      .and('contain.text', 'Cached input: $0.1')
+      .and('contain.text', 'Cached Input: $0.1')
       .and('contain.text', 'Output: $2.5')
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
@@ -181,7 +181,7 @@ describe('Profit Estimator per GW', () => {
     );
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
-      'Owning at large hyperscaler volume',
+      'Owning at Large Hyperscaler Volume',
     );
   });
 
@@ -189,7 +189,7 @@ describe('Profit Estimator per GW', () => {
     cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
-      'Owning at large hyperscaler volume',
+      'Owning at Large Hyperscaler Volume',
     );
     expectTcoCost('mi355x', 'MI355X', '1.50');
     cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();
@@ -204,7 +204,7 @@ describe('Profit Estimator per GW', () => {
 
   it('explains a missing OpenRouter listing instead of drawing an unpriced chart', () => {
     interceptProfitData();
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] }).as('openrouter-empty');
+    interceptOpenRouterPricing({ data: [] }).as('openrouter-empty');
     cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
@@ -225,6 +225,7 @@ const waitForChart = () => {
   chart().should('exist');
   bars().should('have.length.greaterThan', 0);
 };
+const PINNED_RUN_URL = `/infx/profit-estimator-per-gigawatt?i_gpus=gb300_sglang&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_DATE}&i_dates=${PROFIT_RUN_DATE}~r${PROFIT_RUNS[1].runId}`;
 
 describe('Profit Estimator per GW — compare history', () => {
   beforeEach(stubOpenRouter);
@@ -232,12 +233,12 @@ describe('Profit Estimator per GW — compare history', () => {
   it('offers the agentic chip configs and shows the range picker once one is chosen', () => {
     cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    historyPanel().should('contain.text', 'Compare history').and('contain.text', 'Chip config');
+    historyPanel().should('contain.text', 'Compare history').and('contain.text', 'Chip Config');
     cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
     bars()
       .its('length')
       .then((allBars) => {
-        chipTrigger().should('contain.text', 'Select chip config');
+        chipTrigger().should('contain.text', 'Select Chip Config');
         chipTrigger().click({ force: true });
         cy.get('[role="option"]').should('have.length', 5).and('contain.text', 'GB300');
         cy.get('[role="option"]').should('contain.text', 'H200');
@@ -250,7 +251,7 @@ describe('Profit Estimator per GW — compare history', () => {
         cy.get('[role="option"]').contains('GB300').click();
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
-        chipTrigger().should('contain.text', 'Select chip config');
+        chipTrigger().should('contain.text', 'Select Chip Config');
       });
   });
 
@@ -260,7 +261,7 @@ describe('Profit Estimator per GW — compare history', () => {
     pickChip('GB300');
     pickChip('B200');
     cy.contains('button', 'Select date range').click();
-    cy.contains('button', 'Max range').click();
+    cy.contains('button', 'Max Range').click();
     cy.contains('button', 'Apply').click();
 
     cy.contains('button', 'Jul 15, 2026').should('be.visible');
@@ -295,7 +296,7 @@ describe('Profit Estimator per GW — compare history', () => {
     cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
     cy.get('[data-testid="profit-history-note"]').should('not.exist');
     chart().find('rect.bar-tco').should('have.length', 4);
-    chipTrigger().should('contain.text', 'Select chip config');
+    chipTrigger().should('contain.text', 'Select Chip Config');
     changelog().should('not.exist');
   });
 
@@ -305,13 +306,13 @@ describe('Profit Estimator per GW — compare history', () => {
     changelog().should('not.exist');
     pickChip('GB300');
     changelog()
-      .contains('button', 'Config changelog (3 dates with changes)')
+      .contains('button', 'Config Changelog (3 dates with changes)')
       .should('have.attr', 'aria-expanded', 'true');
     changelog()
       .should('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_HISTORY_DATE])
       .and('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_DATE])
-      .and('contain.text', 'Git commit')
-      .and('contain.text', 'Workflow run')
+      .and('contain.text', 'Git Commit')
+      .and('contain.text', 'Workflow Run')
       .and('contain.text', 'Add all to chart');
     changelog().find('span:contains("On chart")').should('have.length', 0);
     changelog()
@@ -368,10 +369,7 @@ describe('Profit Estimator per GW — compare history', () => {
   });
 
   it('hydrates pinned runs from the URL and locks the range endpoints as "On chart"', () => {
-    cy.visit(
-      `/infx/profit-estimator-per-gigawatt?i_gpus=gb300_sglang&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_DATE}&i_dates=${PROFIT_RUN_DATE}~r${PROFIT_RUNS[1].runId}`,
-      { onBeforeLoad: suppressNudges },
-    );
+    cy.visit(PINNED_RUN_URL, { onBeforeLoad: suppressNudges });
     chart().should('exist');
     chart().find('rect.bar-tco').should('have.length', 3);
     axisLabels()
@@ -385,6 +383,18 @@ describe('Profit Estimator per GW — compare history', () => {
       .parent()
       .contains('button', 'Add to chart')
       .should('exist');
+  });
+
+  it('numbers a pinned run on the axis when the changelog arrives after the bars', () => {
+    const releaseChangelogs = interceptProfitData({ holdChangelogs: true });
+    cy.visit(PINNED_RUN_URL, { onBeforeLoad: suppressNudges });
+    chart().find('rect.bar-tco').should('have.length', 3);
+    axisLabels()
+      .should('contain.text', PROFIT_RUN_DATE)
+      .and('not.contain.text', `${PROFIT_RUN_DATE} #`);
+    cy.then(releaseChangelogs);
+    changelog().should('contain.text', `${PROFIT_RUN_DATE} #2`);
+    axisLabels().should('contain.text', `${PROFIT_RUN_DATE} #2`);
   });
 });
 
@@ -407,7 +417,7 @@ describe('VR publication economics', () => {
   for (const basis of ['chip-hour', 'gw-year']) {
     it(`prices cached-input TRTLLM data per ${basis} under /en`, () => {
       interceptVrPublicationData();
-      cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
+      interceptOpenRouterPricing();
       const page = basis === 'chip-hour' ? 'profit-estimator' : 'profit-estimator-per-gigawatt';
       cy.visit(`/infx/${page}/deepseek-v4`, {
         onBeforeLoad: suppressNudges,
@@ -445,7 +455,7 @@ describe('VR publication economics', () => {
         });
       cy.get('[data-testid="profit-cache-hit-selector"]').should(
         'contain.text',
-        'Theoretical roofline',
+        'Theoretical Roofline',
       );
       assertCachePricing(0.97);
       cy.get('[data-testid="profit-cache-hit-selector"]').click();
@@ -457,7 +467,7 @@ describe('VR publication economics', () => {
 
 it('keeps the latest VR snapshot in the profit estimator, matching the private preference scope', () => {
   interceptVrPublicationData(true);
-  cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
+  interceptOpenRouterPricing();
   cy.visit('/infx/profit-estimator/deepseek-v4/cache-hit-mode/actual', {
     onBeforeLoad: suppressNudges,
   });

@@ -393,6 +393,11 @@ export interface InferenceDataContextType {
 export interface InferenceFiltersContextType {
   activeHwTypes: Set<string>;
   bestPerSku: boolean;
+  /**
+   * The hardware the page asked for (`i_active` or `initialActiveHwTypes`), while it is still the
+   * active selection. Unofficial-run overlays seed their official selection from it.
+   */
+  requestedHwTypes: ReadonlySet<string> | null;
   /** Inactive hardware keys whose legend toggle the engine exclusion blocks. */
   blockedHwToggles: ReadonlyMap<string, BlockedComparisonToggle>;
   selectedModel: Model;
@@ -491,7 +496,8 @@ export interface InferenceActionsContextType {
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
   setShowParetoFrontier: (show: boolean) => void;
-  setSelectedGPUs: (gpus: string[]) => void;
+  /** False when the picks are not applied as given: consent is pending, blocked or rewritten. */
+  setSelectedGPUs: (gpus: string[]) => boolean;
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDateRange: (dateRange: { startDate: string; endDate: string }) => void;

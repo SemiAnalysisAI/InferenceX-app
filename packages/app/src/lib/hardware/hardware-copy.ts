@@ -4,11 +4,11 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 export const HARDWARE_COPY = {
   en: {
-    indexEyebrow: 'InferenceX research',
+    indexEyebrow: 'InferenceX Research',
     /** SEO title, social title and JSON-LD name. Kept in Title Case. */
     indexTitle: 'Hardware Results',
     /** On-page heading and breadcrumb link, in sentence case. */
-    indexHeading: 'Hardware results',
+    indexHeading: 'Hardware Results',
     indexIntro:
       'Head-to-head AgentX results for new accelerator systems: tokens per dollar of TCO, per megawatt and per chip at matched interactivity.',
     indexDescription: `Head-to-head ${SITE_NAME} AgentX results for new accelerator systems, comparing tokens per dollar of TCO, per megawatt and per chip at matched interactivity.`,

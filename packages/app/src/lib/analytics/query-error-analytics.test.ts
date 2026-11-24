@@ -1,13 +1,18 @@
-import { CancelledError } from '@tanstack/react-query';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CancelledError, onlineManager, QueryObserver } from '@tanstack/react-query';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubGlobal, unstubAllGlobals, waitFor } from '@/test/helpers';
 
 import { ApiRequestError, requestEndpoint } from '../api/api-request-error';
 import { createAppQueryClient } from '@/providers/query-provider';
 
 import { trackOncePerPageview } from './analytics';
-import { describeDataQueryFailure, reportDataQueryFailure } from './query-error-analytics';
+import {
+  describeDataQueryFailure,
+  ExpectedQueryFailureError,
+  reportDataQueryFailure,
+} from './query-error-analytics';
 
-vi.mock('./analytics', () => ({ trackOncePerPageview: vi.fn(() => true) }));
+mock.module('./analytics', () => ({ trackOncePerPageview: vi.fn(() => true) }));
 
 const request = {
   key: ['benchmarks', 'dsr1'],
@@ -37,7 +42,7 @@ describe('describeDataQueryFailure', () => {
     });
   });
 
-  it('reports network and parse errors without endpoint or status', () => {
+  it('reports the error name and a truncated message for non-HTTP failures', () => {
     expect(
       describeDataQueryFailure(
         new TypeError('Failed to fetch'),
@@ -45,7 +50,17 @@ describe('describeDataQueryFailure', () => {
         'query',
         '/',
       ),
-    ).toEqual({ kind: 'query', query_key: 'unknown', route_template: '/' });
+    ).toEqual({
+      kind: 'query',
+      query_key: 'unknown',
+      error_name: 'TypeError',
+      error_message: 'Failed to fetch',
+      route_template: '/',
+    });
+    expect(
+      describeDataQueryFailure(new SyntaxError('x'.repeat(500)), request, 'query', '/')
+        ?.error_message,
+    ).toHaveLength(200);
   });
 
   it('skips cancellations, aborts, and errors that reach an error boundary', () => {
@@ -60,19 +75,60 @@ describe('describeDataQueryFailure', () => {
         '/',
       ),
     ).toBeNull();
+    expect(
+      describeDataQueryFailure(new ExpectedQueryFailureError('expired'), request, 'query', '/'),
+    ).toBeNull();
+    expect(
+      describeDataQueryFailure(
+        new TypeError('Failed to fetch'),
+        { ...request, keepsData: true },
+        'query',
+        '/',
+      ),
+    ).toBeNull();
   });
 });
 
+// The reconnect refetch of a stale query: the browser reports `online` before requests work.
+async function reconnectWhileRequestsFail(initial: 'loaded' | 'failed'): Promise<void> {
+  const client = createAppQueryClient();
+  client.setDefaultOptions({ queries: { retry: false } });
+  // QueryClientProvider mounts the client, which subscribes it to the online manager.
+  client.mount();
+  let calls = 0;
+  const observer = new QueryObserver(client, {
+    queryKey: ['benchmark-presence'],
+    queryFn: () => {
+      calls += 1;
+      return initial === 'loaded' && calls === 1
+        ? Promise.resolve({ trace: [], log: [] })
+        : Promise.reject(new TypeError('Failed to fetch'));
+    },
+    staleTime: 0,
+  });
+  const unsubscribe = observer.subscribe(() => {});
+  await waitFor(() => expect(calls).toBe(1));
+  await waitFor(() => expect(observer.getCurrentResult().isFetching).toBe(false));
+  mocked(trackOncePerPageview).mockClear();
+
+  onlineManager.setOnline(false);
+  onlineManager.setOnline(true);
+  await waitFor(() => expect(calls).toBe(2));
+  await waitFor(() => expect(observer.getCurrentResult().isFetching).toBe(false));
+  unsubscribe();
+  client.unmount();
+}
+
 describe('reportDataQueryFailure', () => {
   beforeEach(() => {
-    vi.stubGlobal('window', {
+    stubGlobal('window', {
       location: new URL('https://inferencex.semianalysis.com/infx/evaluation'),
     });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.mocked(trackOncePerPageview).mockClear();
+    unstubAllGlobals();
+    mocked(trackOncePerPageview).mockClear();
   });
 
   it('dedupes per query hash and kind within a page view', () => {
@@ -104,5 +160,27 @@ describe('reportDataQueryFailure', () => {
       },
       'query:["evaluations"]',
     );
+  });
+
+  describe('after the network comes back (wake from sleep)', () => {
+    afterEach(() => onlineManager.setOnline(true));
+
+    it('does not report a failed refetch that keeps the earlier data on screen', async () => {
+      await reconnectWhileRequestsFail('loaded');
+      expect(trackOncePerPageview).not.toHaveBeenCalled();
+    });
+
+    it('still reports a query that has no data to show', async () => {
+      await reconnectWhileRequestsFail('failed');
+      expect(trackOncePerPageview).toHaveBeenCalledWith(
+        'data_query_failed',
+        expect.objectContaining({
+          query_key: 'benchmark-presence',
+          error_name: 'TypeError',
+          error_message: 'Failed to fetch',
+        }),
+        'query:["benchmark-presence"]',
+      );
+    });
   });
 });

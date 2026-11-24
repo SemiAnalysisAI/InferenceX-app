@@ -21,7 +21,7 @@ import {
   OPERATORX_URL,
   TPUV7_QWEN_3_5_AGENTX_URL,
 } from '@/lib/nudges/landing-banner';
-import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
+import { GRADIENT_NUDGE_EVENT, NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { GoogleIcon } from '@/components/ui/google-icon';
@@ -36,8 +36,6 @@ import {
 } from '@/lib/routing/dashboard-routes';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
-
-export const GRADIENT_NUDGE_EVENT = 'inferencex:parallelism-label-enabled';
 
 function isOnInferenceTab(): boolean {
   if (typeof window === 'undefined') return false;
@@ -84,12 +82,12 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: ShieldCheck,
-      title: 'Every result is reproducible',
+      title: 'Every Result Is Reproducible',
       titleZh: '每项结果均可复现',
       description:
-        'Each data point is produced by a public GitHub Actions run. Click any point on a chart to jump to the exact run, logs, and artifacts.',
+        'Each data point is produced by a public GitHub Actions run. Click any point on a chart to open its details, then follow the link to the exact run, logs, and artifacts.',
       descriptionZh:
-        '每个数据点都由公开的 GitHub Actions 运行产生。点击图表上的任意数据点即可跳转到对应的运行记录、日志和产物。',
+        '每个数据点都由公开的 GitHub Actions 运行产生。点击图表上的任意数据点可打开详情，再通过其中的链接查看对应的运行记录、日志和产物。',
       action: {
         label: 'See how',
         labelZh: '了解详情',
@@ -121,7 +119,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Star,
-      title: 'Finding us useful?',
+      title: 'Finding Us Useful?',
       titleZh: '觉得有用吗？',
       description: 'Help the project grow so we can add more benchmarks. Star us on GitHub.',
       descriptionZh: '帮助项目成长，让我们可以添加更多基准测试。在 GitHub 上为我们加星。',
@@ -157,7 +155,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Download,
-      title: 'Need the data?',
+      title: 'Need the Data?',
       titleZh: '需要数据？',
       description:
         'Use the download button on any chart to export PNG or CSV instead of copying from tooltips.',
@@ -172,20 +170,20 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'gradient-label',
     type: 'inline',
-    trigger: { type: 'event', event: 'inferencex:parallelism-label-enabled' },
+    trigger: { type: 'event', event: GRADIENT_NUDGE_EVENT },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-gradient-nudge-shown',
     priority: 25,
     scope: 'dashboard',
     content: {
       icon: Palette,
-      title: 'Try gradient labels',
+      title: 'Try Gradient Labels',
       titleZh: '试试渐变标签',
       description:
         'Gradient labels color-code data points by parallelism level, making it easier to spot performance patterns at a glance.',
       descriptionZh: '渐变标签按并行度对数据点进行颜色编码，让您一目了然地发现性能模式。',
       action: {
-        label: 'Enable gradient labels',
+        label: 'Enable Gradient Labels',
         labelZh: '启用渐变标签',
         onClick: (eventDetail?: unknown) => {
           const detail = eventDetail as { enableGradient?: () => void } | undefined;
@@ -216,7 +214,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: SlidersHorizontal,
-      title: 'Too much on the chart?',
+      title: 'Too Much on the Chart?',
       titleZh: '图表太拥挤？',
       description:
         'Filter the legend below by vendor (NVIDIA or AMD), disaggregated or aggregated serving (disagg/agg), precision (FP8/FP4) and more to compare only what you care about.',
@@ -246,10 +244,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'evaluation',
     content: {
       icon: MessageSquareText,
-      title: "See the model's actual answers",
+      title: "See the Model's Actual Answers",
       titleZh: '查看模型的实际回答',
       description:
-        'Click the prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
+        'Click the Prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
       descriptionZh: '点击任意行末尾的提示词图标，对比每条提示、预期答案和模型的实际回复。',
       testId: 'eval-samples-nudge',
       slot: NUDGE_SLOTS.evaluationTable,
@@ -270,9 +268,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'landing',
     content: {
       icon: GoogleIcon,
-      title: 'TPUv7 preliminary results across multiple models',
+      title: 'TPUv7 Preliminary Results Across Multiple Models',
       titleZh: 'TPUv7 多模型初步结果',
-      description: 'AgentX preview submissions',
+      description: 'AgentX Preview Submissions',
       descriptionZh: 'AgentX 预览版提交结果',
       testId: 'launch-modal',
       centered: true,
@@ -338,9 +336,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     variant: 'ubenchx',
     content: {
       icon: Cpu,
-      title: 'Huawei Ascend 950PR microbenchmarks',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
       titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: 'Cycle-level core memory-access microbenchmarks (beta)',
+      description: 'Cycle-Level Core memory-access microbenchmarks (Beta)',
       descriptionZh: '周期级核心访存微基准测试（Beta）',
       testId: 'launch-banner',
       badge: 'New',
@@ -374,9 +372,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     variant: 'operatorx',
     content: {
       icon: Cpu,
-      title: 'Huawei Ascend 950PR microbenchmarks',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
       titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: '950PR GEMM FLOPs and max FLOPS utilization',
+      description: '950PR GEMM FLOPs and Max FLOPS utilization',
       descriptionZh: '950PR GEMM FLOPs 与最大 FLOPS 利用率',
       testId: 'launch-banner',
       badge: 'New',
@@ -402,14 +400,16 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'agentx-telemetry-tutorial',
     type: 'modal',
-    trigger: { type: 'timer', delayMs: 2500 },
+    // After the first scroll, when the browser has stopped picking LCP candidates, so the
+    // card's paragraph never becomes this page's largest (and latest) contentful paint.
+    trigger: { type: 'dom-event', event: 'scroll', delayMs: 2500 },
     dismissal: { type: 'permanent' },
     storageKey: TELEMETRY_TUTORIAL_STORAGE_KEY,
     priority: 40,
     scope: 'agentic-detail',
     content: {
       icon: BookOpen,
-      title: 'New to these charts?',
+      title: 'New to These Charts?',
       titleZh: '第一次看这些图表？',
       description:
         'The telemetry tutorial explains every chart on this page: the sequence-length distributions, the cache and queue series, the request timeline and the per-conversation flamegraph.',

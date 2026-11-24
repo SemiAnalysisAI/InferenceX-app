@@ -1,22 +1,24 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as NextNavigation from 'next/navigation';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   reload: vi.fn(),
   useDashboardData: vi.fn(),
-}));
+};
 
-vi.mock('next/link', () => ({
+mock.module('next/link', () => ({
+  // `prefetch` is a Link prop, not an anchor attribute, so it stays off the DOM.
   default: ({
     href,
     children,
+    prefetch: _prefetch,
     ...props
-  }: { href: string; children: ReactNode } & Omit<
+  }: { href: string; children: ReactNode; prefetch?: boolean | null } & Omit<
     AnchorHTMLAttributes<HTMLAnchorElement>,
     'href'
   >) => (
@@ -26,22 +28,24 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('next/navigation', async (importOriginal) => ({
-  ...(await importOriginal<typeof NextNavigation>()),
+const actual = { ...(await import('next/navigation')) };
+mock.module('next/navigation', () => ({
+  ...actual,
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock('@/hooks/agentic-workload-explorer/use-trace-version', () => ({
+mock.module('@/hooks/agentic-workload-explorer/use-trace-version', () => ({
   useTraceVersion: () => ({ apiParam: null }),
   appendTraceVersion: (url: string) => url,
 }));
 
-vi.mock('@/hooks/agentic-workload-explorer/use-dashboard-data', () => ({
+mock.module('@/hooks/agentic-workload-explorer/use-dashboard-data', () => ({
   useDashboardData: mocks.useDashboardData,
 }));
 
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+const actual2 = { ...(await import('@/lib/d3-chart/dynamic-margins')) };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actual2,
   measureTextWidth: (text: string, font: string) =>
     text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
@@ -92,7 +96,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.reload.mockClear();
   mocks.useDashboardData.mockReset();
   mocks.useDashboardData.mockReturnValue({
@@ -109,7 +113,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function normalizedText(element: Element | null) {
@@ -126,7 +130,7 @@ describe('errors page refresh failure', () => {
     expect(normalizedText(alert)).toContain('refresh gateway timeout');
 
     const totalErrorsLabel = [...container.querySelectorAll('dt')].find(
-      (element) => normalizedText(element) === 'Total errors',
+      (element) => normalizedText(element) === 'Total Errors',
     );
     expect(normalizedText(totalErrorsLabel?.parentElement ?? null)).toContain('42');
     expect(normalizedText(container)).toContain('stale-model-visible');

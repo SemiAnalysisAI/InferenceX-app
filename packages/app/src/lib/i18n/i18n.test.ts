@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import nodePath from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '../routing/dashboard-routes';

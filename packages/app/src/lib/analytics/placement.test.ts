@@ -1,11 +1,12 @@
-// @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+// @test-environment jsdom
+import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import { track } from './analytics';
 import { installOutboundLinkTracking } from './outbound-links';
 import { analyticsPlacement, placementFor } from './placement';
 
-vi.mock('./analytics', () => ({ track: vi.fn() }));
+mock.module('./analytics', () => ({ track: vi.fn() }));
 
 const stopNavigation = (event: Event) => event.preventDefault();
 const click = (selector: string) =>
@@ -15,7 +16,7 @@ const click = (selector: string) =>
 
 afterEach(() => {
   document.body.innerHTML = '';
-  vi.mocked(track).mockClear();
+  mocked(track).mockClear();
 });
 
 describe('placementFor', () => {
@@ -64,7 +65,7 @@ describe('installOutboundLinkTracking', () => {
       document.removeEventListener('click', stopNavigation);
     }
 
-    expect(vi.mocked(track).mock.calls).toEqual([
+    expect(mocked(track).mock.calls).toEqual([
       [
         'outbound_link_clicked',
         {

@@ -1,22 +1,24 @@
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import { mocked, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
-const afterTasks = vi.hoisted(() => ({ pending: [] as Promise<unknown>[] }));
+const afterTasks = { pending: [] as Promise<unknown>[] };
 
-vi.mock('next/server', () => ({
+mock.module('next/server', () => ({
   after: (task: Promise<unknown> | (() => Promise<unknown>)) => {
     afterTasks.pending.push(typeof task === 'function' ? task() : task);
   },
 }));
-vi.mock('next/cache', () => ({ revalidateTag: vi.fn(), unstable_cache: vi.fn() }));
-vi.mock('next/dist/server/app-render/work-async-storage.external', () => ({
+mock.module('next/cache', () => ({ revalidateTag: vi.fn(), unstable_cache: vi.fn() }));
+mock.module('next/dist/server/app-render/work-async-storage.external', () => ({
   workAsyncStorage: { getStore: () => undefined },
 }));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-vi.mock('@vercel/blob', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
+const actual = { ...(await import('@vercel/blob')) };
+mock.module('@vercel/blob', () => ({
+  ...actual,
   put: vi.fn(),
 }));
 
@@ -30,7 +32,7 @@ import {
   copyingToContentBlob,
 } from './content-blob';
 
-const mockPut = vi.mocked(put);
+const mockPut = mocked(put);
 const fetchMock = vi.fn<typeof fetch>();
 const originalEnv = { ...process.env };
 const KEY = contentBlobKey('ns-v1', 'abc');
@@ -52,14 +54,14 @@ async function drain(chunks: AsyncIterable<Uint8Array>): Promise<string> {
 
 function uploadedBody(): Promise<string> {
   const body = mockPut.mock.calls[0]?.[1];
-  if (!(body instanceof ReadableStream)) throw new Error('no streamed upload');
+  if (!(body instanceof ReadableStream)) throw new TypeError('no streamed upload');
   return new Response(body).text();
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   afterTasks.pending = [];
-  vi.stubGlobal('fetch', fetchMock);
+  stubGlobal('fetch', fetchMock);
   process.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_store1_secret';
   process.env.BLOB_CACHE_PREFIX = 'test-cache';
   mockPut.mockResolvedValue({
@@ -73,7 +75,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   process.env.BLOB_READ_WRITE_TOKEN = originalEnv.BLOB_READ_WRITE_TOKEN;
   process.env.BLOB_CACHE_PREFIX = originalEnv.BLOB_CACHE_PREFIX;
 });

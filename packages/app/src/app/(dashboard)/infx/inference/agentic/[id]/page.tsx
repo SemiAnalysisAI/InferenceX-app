@@ -13,7 +13,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: 'Agentic trace detail | InferenceX',
+    title: 'Agentic Trace Detail | InferenceX',
     description: `Inspect request timelines, server metrics, aggregates, and logs for Agentic benchmark point #${id}.`,
     alternates: enAlternates(`${getDashboardRoute('inference').path}/agentic/${id}`),
     robots: { index: false },

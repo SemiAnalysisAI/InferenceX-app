@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { speculativeDecodingLabel } from './speculative-decoding';
 
@@ -13,7 +13,7 @@ describe('speculativeDecodingLabel', () => {
     expect(speculativeDecodingLabel({ method: 'mtp' }, undefined, 'en')).toBe('MTP');
     expect(
       speculativeDecodingLabel({ method: 'draft_model', algorithm: null }, undefined, 'en'),
-    ).toBe('Draft model');
+    ).toBe('Draft Model');
     expect(speculativeDecodingLabel({ method: 'mtp' }, 'Kimi-K3', 'en')).toBe('DSpark');
   });
 

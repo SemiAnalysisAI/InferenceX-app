@@ -40,12 +40,12 @@ export const EVALUATION_DISPLAY_STRINGS = {
     chartView: 'Chart',
     tableView: 'Table',
     viewModeAria: 'View mode',
-    heading: 'Accuracy evals',
+    heading: 'Accuracy Evals',
     description:
       'Benchmark results showing model quality versus throughput trade-offs across different chips, quantization levels, and inference configurations',
-    captionTitle: 'evaluation score',
+    captionTitle: 'evaluation Score',
     captionQualifier: (precision: string) =>
-      precision ? `By hardware configuration · ${precision}` : 'By hardware configuration',
+      precision ? `By hardware configuration · ${precision}` : 'By Hardware Configuration',
     queryError: 'Failed to load evaluation data',
     availabilityError: 'Failed to load filter availability data',
     combinedError: 'Failed to load evaluation and filter availability data',
@@ -185,6 +185,7 @@ export default function EvaluationChartDisplay() {
         <Card>
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.heading}
               description={t.description}
               actions={<ChartShareActions />}

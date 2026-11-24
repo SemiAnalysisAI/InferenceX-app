@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
-const localeState = vi.hoisted(() => ({ pathname: '/infx/inference/agentic/206885' }));
-vi.mock('next/navigation', () => ({
+const localeState = { pathname: '/infx/inference/agentic/206885' };
+mock.module('next/navigation', () => ({
   usePathname: () => localeState.pathname,
 }));
 
@@ -123,11 +123,11 @@ describe('PointSummary', () => {
       ),
     );
 
-    expect(html).toContain('Offload type');
+    expect(html).toContain('Offload Type');
     expect(html).toContain('DRAM');
-    expect(html).toContain('KV offload engine');
+    expect(html).toContain('KV Offload Engine');
     expect(html).toContain('LMCache 0.5.1');
-    expect(html).toContain('KV transfer engine');
+    expect(html).toContain('KV Transfer Engine');
     expect(html).toContain('Mooncake');
     expect(html).toContain('Router');
     expect(html).toContain('vLLM Router 0.1.14');

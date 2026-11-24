@@ -4,17 +4,6 @@ on:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/tests-e2e.yml'
-      - 'package.json'
-      - 'packages/app/**'
-      - 'packages/constants/**'
-      - 'packages/db/**'
-      - 'bunfig.toml'
-      - 'bun.lock'
-      - 'patches/**'
-      - 'tsconfig.json'
-      - 'tsconfig.base.json'
   # Firefox runs only here: in the merge queue, nightly, and on demand.
   merge_group:
   schedule:
@@ -31,7 +20,7 @@ jobs:
   component-tests:
     name: Component tests (shard ${{ matrix.shard }})
     if: ${{ !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
-    timeout-minutes: 15
+    timeout-minutes: 10
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
       contents: read
@@ -40,41 +29,12 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: $/.github/actions/setup-workspace
         with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Restore Bun package cache
-        id: bun-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
-            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Restore Cypress binary cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/Cypress
-          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{
-            hashFiles('bun.lock') }}
-          restore-keys: |
-            cypress-binary-${{ runner.os }}-${{ runner.arch }}-
-      - name: Install Cypress binary if missing
-        working-directory: packages/app
-        run: bunx cypress verify || bunx cypress install
+          cypress-binary: 'true'
       - name: Run component tests
         working-directory: packages/app
         run: bunx cypress run --component --browser chrome
@@ -100,7 +60,7 @@ jobs:
   cypress:
     name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
     if: ${{ !github.event.pull_request.draft && (github.event_name != 'schedule' || github.repository == 'SemiAnalysisAI/InferenceX-app') }}
-    timeout-minutes: 15
+    timeout-minutes: 10
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
       contents: read
@@ -109,96 +69,30 @@ jobs:
       matrix:
         browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    env:
-      # Chrome shard 1 is the only writer of the shared caches.
-      CACHE_WRITER: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Restore Bun package cache
-        id: bun-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
-            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
-      # Persist .next/cache between builds (the Turbopack compiler cache, enabled
-      # via turbopackFileSystemCacheForBuild in next.config.ts for CI, plus the
-      # incremental fetch cache), per
-      # https://nextjs.org/docs/pages/guides/ci-build-caching#github-actions.
-      # Runs before `bun install` so hashFiles never scans node_modules.
-      - name: Restore Next.js build cache
-        id: nextjs-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: packages/app/.next/cache
-          # New cache whenever packages or source files change; fall back to
-          # the newest cache for the same lockfile so changed sources still
-          # start from a warm compiler cache.
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-${{
-            hashFiles('packages/**/*.js', 'packages/**/*.jsx',
-            'packages/**/*.ts', 'packages/**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
-            ${{ runner.os }}-nextjs-
       - uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
         if: matrix.browser == 'firefox'
         with:
           firefox-version: latest
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Save Bun package cache
-        if: ${{ env.CACHE_WRITER == 'true' && steps.bun-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: $/.github/actions/setup-workspace
         with:
-          path: ~/.bun/install/cache
-          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
-      # Each shard builds the app itself: on 16 vCPU with the restored compiler
-      # cache this is faster than waiting for one build job and its artifact.
+          nextjs-cache: 'true'
+          cypress-binary: 'true'
+      # Each shard builds the app itself: with the mounted compiler cache this is
+      # faster than waiting for one build job and its artifact.
       - name: Build app
         run: bun run build
         env:
           E2E_FIXTURES: '1'
       - name: Check client bundle
-        if: ${{ env.CACHE_WRITER == 'true' }}
+        if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
         run: bun run check:bundle
-      - name: Save Next.js build cache
-        if: ${{ env.CACHE_WRITER == 'true' && steps.nextjs-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: packages/app/.next/cache
-          key: ${{ steps.nextjs-cache.outputs.cache-primary-key }}
-      - name: Restore Cypress binary cache
-        id: cypress-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/Cypress
-          key: cypress-binary-${{ runner.os }}-${{ runner.arch }}-${{
-            hashFiles('bun.lock') }}
-          restore-keys: |
-            cypress-binary-${{ runner.os }}-${{ runner.arch }}-
-      - name: Install Cypress binary if missing
-        working-directory: packages/app
-        run: bunx cypress verify || bunx cypress install
-      - name: Save Cypress binary cache
-        if: ${{ env.CACHE_WRITER == 'true' && steps.cypress-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/Cypress
-          key: ${{ steps.cypress-cache.outputs.cache-primary-key }}
+      - name: Check route bundle budgets
+        if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
+        run: bun run check:route-budgets
       - name: Run integration tests
         uses: cypress-io/github-action@c541a95ea92d9239347a2355f2e895cd4b3f8060 # v7.4.6
         with:
@@ -223,6 +117,23 @@ jobs:
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
           SPLIT_SUMMARY: 'false'
           CYPRESS_TIMING_OUTPUT: /tmp/cypress-timings/observation.json
+      # The action leaves its `start` server running, and the runner reaps it only after the post
+      # steps. next-server maps @next/swc from node_modules, so the node_modules sticky disk could
+      # not unmount and its post step retried ten times on every shard. Stop it before then.
+      - name: Stop app server
+        if: ${{ always() }}
+        # Match the next-server title and the `next start` command line, whichever the runtime exposes.
+        run: |
+          pattern='^next-server|[ /]next start'
+          if ! pkill -TERM -f "$pattern"; then
+            echo '::warning::No next-server process found; the node_modules sticky disk may retry its unmount'
+            exit 0
+          fi
+          for _ in $(seq 100); do
+            pgrep -f "$pattern" > /dev/null || exit 0
+            sleep 0.1
+          done
+          pkill -KILL -f "$pattern" || true
       - name: Upload integration timing observations
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -231,6 +142,18 @@ jobs:
           path: /tmp/cypress-timings/observation.json
           if-no-files-found: error
           retention-days: 14
+
+  result:
+    name: E2E tests
+    needs: [component-tests, cypress]
+    if: ${{ always() }}
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Fail when an E2E job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
 
   timings:
     name: Validate timings and shard balance
@@ -251,7 +174,7 @@ jobs:
           bun-version-file: package.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Restore Bun package cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

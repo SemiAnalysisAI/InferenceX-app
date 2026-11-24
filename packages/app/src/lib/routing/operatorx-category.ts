@@ -5,7 +5,7 @@ export const OPERATORX_CATEGORIES = [
   { slug: 'gemm', label: { en: 'GEMM', zh: 'GEMM' } },
   { slug: 'moe', label: { en: 'MoE', zh: 'MoE' } },
   { slug: 'attention', label: { en: 'Attention', zh: 'Attention' } },
-  { slug: 'model', label: { en: 'Model view', zh: '模型视图' } },
+  { slug: 'model', label: { en: 'Model View', zh: '模型视图' } },
 ] as const;
 
 export type OperatorXCategory = (typeof OPERATORX_CATEGORIES)[number]['slug'];

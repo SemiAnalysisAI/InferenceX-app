@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import {
   buildTokenLengthSketch,
@@ -10,7 +10,7 @@ import {
 
 import type { DbClient } from '../connection';
 import { encodeSequenceLengthSketches } from '../etl/sequence-length-sketch-codec';
-import { migratedPglite, pgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getAgenticAggregates } from './agentic-aggregates';
 import {
   SEQUENCE_LENGTH_SKETCHES_VERSION,
@@ -31,6 +31,7 @@ const ISL_B = buildTokenLengthSketch([7, 9_000]);
 const BENCHMARK_IDS = [1, 2, 3, 4, 5, 6];
 
 let db: PGlite;
+let base: PgliteSql;
 let sql: DbClient;
 let writes: unknown[][];
 
@@ -48,7 +49,7 @@ function profileRecord(isl: number, osl: number, latencyMs: number): string {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  const base = pgliteSql(db);
+  base = await pgliteDriverSql(db);
   writes = [];
   sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     if (strings.join('').includes('update agentic_trace_replay')) {
@@ -91,7 +92,7 @@ beforeAll(async () => {
       insert into agentic_trace_replay (id, aggregate_stats, profile_export_jsonl_gz, server_metrics_json_gz)
       values (
         ${id},
-        ${id in stats ? JSON.stringify(stats[id]) : null}::jsonb,
+        ${id in stats ? stats[id] : null}::jsonb,
         ${id === 3 ? profile : null},
         ${id === 3 ? Buffer.from('not gzip') : null}
       )
@@ -122,6 +123,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await base?.end();
   await db?.close();
 });
 

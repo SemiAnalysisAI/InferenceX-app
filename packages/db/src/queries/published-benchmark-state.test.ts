@@ -1,16 +1,11 @@
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync, readdirSync } from 'node:fs';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { PGlite } from '@electric-sql/pglite';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import type { DbClient } from '../connection';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getAvailabilityData } from './workflow-info';
 
 let db: PGlite;
-const sql: DbClient = async (strings, ...values) => {
-  const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-  const result = await db.query<Record<string, unknown>>(query, values);
-  return result.rows;
-};
+let sql: PgliteSql;
 
 const LIVE_AVAILABILITY = `
   WITH live AS (
@@ -77,12 +72,8 @@ async function addPoint(
 }
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  const dir = new URL('../../migrations/', import.meta.url);
-  for (const name of readdirSync(dir)
-    .filter((filename) => filename.endsWith('.sql'))
-    .toSorted())
-    await db.exec(readFileSync(new URL(name, dir), 'utf8'));
+  db = await migratedPglite();
+  sql = await pgliteDriverSql(db);
   await db.exec(`INSERT INTO configs (id, model, hardware, framework, precision, spec_method, disagg,
       prefill_tp, decode_tp, num_prefill_gpu, num_decode_gpu)
     VALUES (1, 'm1', 'h100', 'sglang', 'fp8', 'none', false, 8, 8, 8, 8),
@@ -108,6 +99,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

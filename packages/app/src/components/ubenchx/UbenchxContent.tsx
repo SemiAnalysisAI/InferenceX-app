@@ -34,6 +34,7 @@ import {
   sizeAxisTicks,
   type UbenchxDerivedRow,
 } from './ubenchx-transform';
+import { MethodologyFold } from './MethodologyFold';
 
 const subscribeNoop = () => () => {};
 
@@ -62,13 +63,13 @@ const STRINGS = {
   en: {
     protocolNote:
       'Huawei uses amortized rotating-buffer graph timing; NVIDIA/AMD use Triton copy timing. Small-message latency is not directly comparable.',
-    latencyTitle: 'Latency vs message size',
+    latencyTitle: 'Latency vs Message Size',
     latencyY: 'Latency (ms)',
-    mbuTitle: 'Memory bandwidth utilization (MBU) vs message size',
+    mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
     mbuY: 'MBU (%)',
-    bwTitle: 'Bandwidth vs message size',
+    bwTitle: 'Bandwidth vs Message Size',
     bwY: 'Bandwidth (TB/s)',
-    xAxis: 'Message size',
+    xAxis: 'Message Size',
     yMetric: 'Y-axis',
     yMetricTooltip:
       'The measurement plotted on the Y-axis, either memory bandwidth utilization, copy bandwidth or latency.',
@@ -516,10 +517,11 @@ export function UbenchxContent() {
             <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
             <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
               <p>{t.protocolNote}</p>
-              <h3 className="pt-1.5 font-medium text-foreground">{t.methodology}</h3>
-              <p>{t.methodologyText}</p>
-              <p>{t.huaweiMethodology}</p>
-              <p>{t.huaweiReference}</p>
+              <MethodologyFold title={t.methodology} testId="ubenchx">
+                <p>{t.methodologyText}</p>
+                <p>{t.huaweiMethodology}</p>
+                <p>{t.huaweiReference}</p>
+              </MethodologyFold>
             </div>
             <div className="mt-3 overflow-x-auto" data-testid="ubenchx-device-specs">
               <table className="w-full text-left text-xs text-muted-foreground tabular-nums">

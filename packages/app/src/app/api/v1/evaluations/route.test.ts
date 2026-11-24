@@ -1,25 +1,26 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, mock } from 'bun:test';
 
-const { mockGetAllEvalResults, mockGetDb } = vi.hoisted(() => ({
+const { mockGetAllEvalResults, mockGetDb } = {
   mockGetAllEvalResults: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/evaluations', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/evaluations', () => ({
   getAllEvalResults: mockGetAllEvalResults,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
-import { GET } from './route';
+// Imported after mock.module so the route builds its reader from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -36,11 +37,17 @@ describe('GET /api/v1/evaluations', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetAllEvalResults.mockRejectedValueOnce(new Error('Query timeout'));
 
     const res = await GET(new Request('https://example.test/api/v1/evaluations'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching evaluations:',
+      expect.objectContaining({ message: 'Query timeout' }),
+    );
+    logged.mockRestore();
   });
 });

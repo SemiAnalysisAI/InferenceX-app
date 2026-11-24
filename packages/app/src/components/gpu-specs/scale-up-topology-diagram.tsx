@@ -27,9 +27,9 @@ const STRINGS = {
   en: {
     expand: 'Expand',
     expandHint: 'Click to expand',
-    previous: 'Previous chip',
-    next: 'Next chip',
-    title: 'Scale-up topology',
+    previous: 'Previous Chip',
+    next: 'Next Chip',
+    title: 'Scale-Up Topology',
     diagram: 'scale-up topology diagram',
     nodes: 'nodes',
     chips: 'Chips',

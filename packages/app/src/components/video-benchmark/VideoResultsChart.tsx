@@ -26,21 +26,29 @@ import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { axisLabelUnit, chartHoverCard, chartHoverCardImage } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { logDomain, zeroAnchoredDomain } from './chart-domain';
 import {
+  BADGE_HEIGHT,
   PILL_HEIGHT,
+  badgeBox,
   boxesOverlap,
-  clearOfLabels,
   labelShift,
-  pillBox,
+  placePill,
   spreadPills,
+  tapTarget,
+  type Box,
 } from './chart-marks';
-import { mayHaveClips } from './clip-stage';
+import { mayHaveClips, parseStage, writeStage } from './clip-stage';
+import { useStageValue } from './use-stage-value';
+import type { VideoPoint } from './metrics';
+import VideoPointSheet from './VideoPointSheet';
 import { serverSplit } from './deployment';
 import { engineLabel, engineShape, engineSort } from './engines';
+import { figures, kilojoules, reading, usd } from './format';
 import { isLossy, lossyLabel, runtimeLabel } from './optimizations';
 import { hardwareLabel, hardwareSort } from './hardware';
 import type { ResultCell, ResultsState } from './results';
@@ -66,7 +74,7 @@ const STRINGS = {
     gpus: (count: number | null) => (count === null ? 'GPU count not recorded' : `${count} GPU`),
     noMatchedRun: 'no matched run',
     noMatchedRunHelp: 'No qualifying run for this workload on this hardware.',
-    optimal: 'Optimal only',
+    optimal: 'Optimal Only',
     optimalHelp:
       "On: each hardware's Pareto-optimal deployments only. Off: dominated deployments are shown faded.",
     labels: 'Deployment labels',
@@ -86,7 +94,7 @@ const STRINGS = {
     latency: 'Latency per clip',
     latencyClip: (seconds: number, fps: number) => `Latency per ${seconds} s clip at ${fps} fps`,
     median: 'Median',
-    throughputCost: 'Throughput and cost',
+    throughputCost: 'Throughput and Cost',
     powerSection: 'Power',
     deployment: 'Deployment',
     replicas: (count: number) => `${count} ${count === 1 ? 'replica' : 'replicas'}`,
@@ -104,7 +112,7 @@ const STRINGS = {
     videoSecondsPerHour: 'Video-seconds per hour',
     powerLimit: 'Enforced power limit',
     runtime: 'Runtime',
-    runLink: 'GitHub Actions run',
+    runLink: 'GitHub Actions Run',
     viewTelemetry: 'View telemetry',
     engines: 'Engines',
     engineNotRecorded: 'Engine not recorded',
@@ -119,6 +127,7 @@ const STRINGS = {
     tipClick: 'Click to compare below',
     tipHollow: 'Only filled points have clips',
     compareBelow: 'Compare below ↓',
+    perClip: '$ per clip',
   },
   zh: {
     gpus: (count: number | null) => (count === null ? '未记录 GPU 数量' : `${count} 张 GPU`),
@@ -175,6 +184,7 @@ const STRINGS = {
     tipClick: '点击即可在下方对比',
     tipHollow: '只有实心点有视频',
     compareBelow: '在下方对比 ↓',
+    perClip: '每条视频成本',
   },
 };
 
@@ -195,11 +205,15 @@ interface PlotPoint extends ResultsChartPoint {
 interface SeriesPill {
   key: string;
   text: string;
+  /** The hardware alone, for a plot too narrow to name each line's engine; `text` when that would not tell lines apart. */
+  short: string;
   color: string;
   lossy: boolean;
   overlay: boolean;
   /** The point it sits beside: the last frontier point, or the best point without a frontier. */
   end: string;
+  /** The points its line joins, in order, which no pill should cover. */
+  line: readonly string[];
 }
 
 /** What the marks layer reads on every redraw; kept in a ref so it never rebuilds the plot. */
@@ -208,6 +222,8 @@ interface MarkInputs {
   /** The hovered point's series. */
   hover: string | null;
   pills: readonly SeriesPill[];
+  /** The point whose sheet a touch screen has open. */
+  sheet: string | null;
 }
 
 interface PlotSize {
@@ -223,6 +239,9 @@ export interface ClipLink {
   baseline: string | null;
   /** First frames of the stage's prompt by point key, for the hover card; null once read without one. */
   posters: Readonly<Record<string, string | null>>;
+  /** What plays for the stage's prompt by point key, and that prompt, for the point sheet. */
+  media?: Readonly<Record<string, string | null>>;
+  prompt?: { id: string; seed: number } | null;
   /** Playable points pulse until the reader first picks a clip. */
   pulse: boolean;
   onSelect: (pointKey: string) => void;
@@ -234,6 +253,7 @@ export interface ClipLink {
 
 const LOSSY_DASH = '6 4';
 const BADGES = 'clip-badges';
+const SHEET_RING = 'point-sheet-ring';
 const PULSE = 'video-clip-pulse';
 /** How long the pointer rests on a point before its clips are read for the hover card, in ms. */
 const PEEK_DELAY = 250;
@@ -267,9 +287,20 @@ function pointPosition(node: Element): { x: number; y: number } | null {
   return match?.groups ? { x: Number(match.groups.x), y: Number(match.groups.y) } : null;
 }
 
+/** Measuring a text forces a layout and the marks redraw every frame, so each width is measured once per font load. */
+const measuredWidths = new Map<string, number>();
+if (typeof document !== 'undefined')
+  document.fonts?.addEventListener('loadingdone', () => measuredWidths.clear());
+
 /** Rendered text width, with a character estimate where layout is unavailable. */
-function textWidth(node: SVGTextElement, size: number): number {
-  return node.getComputedTextLength() || [...(node.textContent ?? '')].length * size * 0.6;
+function textWidth(node: SVGTextElement, size: number, estimate = 0.6): number {
+  const text = node.textContent ?? '';
+  const key = `${size}\n${node.getAttribute('font-weight') ?? ''}\n${text}`;
+  const kept = measuredWidths.get(key);
+  if (kept !== undefined) return kept;
+  const width = node.getComputedTextLength();
+  if (width > 0) measuredWidths.set(key, width);
+  return width || [...text].length * size * estimate;
 }
 
 /**
@@ -282,9 +313,24 @@ function textWidth(node: SVGTextElement, size: number): number {
 function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings) {
   root.querySelector(`.${BADGES}`)?.remove();
   root.querySelector(`.${PILLS}`)?.remove();
+  root.querySelector(`.${SHEET_RING}`)?.remove();
   const points = [...root.querySelectorAll<SVGGElement>('.dot-group')];
   const host = points[0]?.parentNode;
   if (!host) return;
+  // The point a sheet describes keeps a ring in the ink color.
+  const chosen = points.find(
+    (node) => select<SVGGElement, PlotPoint>(node).datum().key === inputs.sheet,
+  );
+  if (chosen)
+    select(host as SVGGElement)
+      .append('circle')
+      .attr('class', SHEET_RING)
+      .attr('transform', chosen.getAttribute('transform'))
+      .attr('r', 11)
+      .attr('fill', 'none')
+      .attr('stroke', 'var(--foreground)')
+      .attr('stroke-width', 2)
+      .attr('pointer-events', 'none');
   const { link, hover } = inputs;
   const nodes = new Map<string, SVGGElement>();
   const focus = new Set<string>(hover === null ? [] : [hover]);
@@ -295,8 +341,78 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       focus.add(point.series);
   }
 
-  // Point labels: focus series only, kept inside the plot and off each other.
-  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  // Badges on the two points the stage plays go first, so labels and pills keep clear of them;
+  // their layer is raised over the pills at the end.
+  const badgeLayer = link
+    ? select(host as SVGGElement)
+        .append('g')
+        .attr('class', BADGES)
+        .attr('pointer-events', 'none')
+    : null;
+  const badges: Box[] = [];
+  const places = new Map(points.map((node) => [node, pointPosition(node)]));
+  const spots = [...places.values()].flatMap((at) => at ?? []);
+  const lines = inputs.pills.map((pill) =>
+    pill.line.flatMap((key) => places.get(nodes.get(key)!) ?? []),
+  );
+  for (const node of points) {
+    const point = select<SVGGElement, PlotPoint>(node).datum();
+    const role =
+      point.key === link?.playing ? 'playing' : point.key === link?.baseline ? 'baseline' : null;
+    node.toggleAttribute('data-clip-role', role !== null);
+    if (role) node.dataset.clipRole = role;
+    const at = places.get(node);
+    if (!role || !badgeLayer || !at) continue;
+    const playing = role === 'playing';
+    const badge = badgeLayer
+      .append('g')
+      .attr('data-clip-badge', role)
+      .attr('data-point', point.key)
+      .attr('transform', node.getAttribute('transform'));
+    badge
+      .append('circle')
+      .attr('r', 8)
+      .attr('fill', 'none')
+      .attr('stroke', point.color)
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', playing ? null : '3 2');
+    const tag = badge.append('g');
+    const text = tag
+      .append('text')
+      .attr('y', BADGE_HEIGHT / 2)
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', px(CHART_TYPE.annotationSub))
+      .attr('font-weight', 600)
+      .attr('fill', playing ? readableTextColor(point.color) : 'var(--foreground)')
+      .text(playing ? s.playing : s.baseline);
+    const labelWidth = textWidth(text.node()!, CHART_TYPE.annotationSub, 1);
+    const icon = playing ? 8 : 0;
+    const width = labelWidth + icon + 12;
+    text.attr('x', 6 + icon);
+    tag
+      .insert('rect', 'text')
+      .attr('width', width)
+      .attr('height', BADGE_HEIGHT)
+      .attr('rx', BADGE_HEIGHT / 2)
+      .attr('fill', playing ? point.color : 'var(--card)')
+      .attr('stroke', playing ? 'none' : point.color)
+      .attr('stroke-width', 1);
+    if (playing)
+      tag
+        .append('path')
+        .attr('d', `M6 ${BADGE_HEIGHT / 2 - 3} l5 3 l-5 3 z`)
+        .attr('fill', readableTextColor(point.color));
+    // A point zoomed out of the plot keeps its badge over it, where the plot clips both.
+    const inPlot = at.x >= 0 && at.x <= size.width && at.y >= 0 && at.y <= size.height;
+    const box = inPlot
+      ? badgeBox(at, width, size, { boxes: badges, points: spots, lines })
+      : { x0: at.x - width / 2, x1: at.x + width / 2, y0: at.y - 28, y1: at.y - 12 };
+    if (inPlot) badges.push(box);
+    tag.attr('transform', `translate(${box.x0 - at.x},${box.y0 - at.y})`);
+  }
+
+  // Point labels: focus series only, kept inside the plot and off the badges and each other.
+  const placed: Box[] = [...badges];
   for (const node of points) {
     const label = node.querySelector<SVGTextElement>('.point-label');
     if (!label) continue;
@@ -333,11 +449,12 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
     .attr('pointer-events', 'none');
   // Each shown label covers its point too, so a pill keeps clear of both.
   const covered = placed.map((label) => ({ ...label, y1: label.y1 + 11 }));
+  const narrow = size.width < NARROW_PLOT;
+  const taken: Box[] = [];
   const boxes = inputs.pills.flatMap((pill) => {
     // A narrow plot has no room to name every overlay line; it names the focus ones.
-    if (pill.overlay && size.width < NARROW_PLOT && !focus.has(pill.key)) return [];
-    const node = nodes.get(pill.end);
-    const at = node && pointPosition(node);
+    if (pill.overlay && narrow && !focus.has(pill.key)) return [];
+    const at = places.get(nodes.get(pill.end)!);
     if (!at || at.x < 0 || at.x > size.width || at.y < 0 || at.y > size.height) return [];
     const group = pillLayer
       .append('g')
@@ -359,11 +476,19 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
       .attr('font-size', px(CHART_TYPE.annotation))
       .attr('font-weight', 600)
       .attr('fill', pill.lossy ? 'var(--foreground)' : readableTextColor(pill.color))
-      .text(pill.text);
+      // A narrow plot names the hardware alone; the legend under it names the engine.
+      .text(narrow ? pill.short : pill.text);
     const width = textWidth(text.node()!, CHART_TYPE.annotation) + 12;
     rect.attr('width', width);
-    const box = pillBox(pill.key, at, width, size.width);
-    clearOfLabels(box, at, covered, size.width);
+    const box = placePill(
+      pill.key,
+      at,
+      width,
+      size,
+      { boxes: [...badges, ...taken], points: spots, lines },
+      covered,
+    );
+    taken.push({ x0: box.x, x1: box.x + width, y0: box.y, y1: box.y + PILL_HEIGHT });
     return [{ box, group }];
   });
   const spread = spreadPills(
@@ -397,61 +522,7 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
     ring.setAttribute('stroke', point.color);
   }
 
-  if (!link) return;
-  const layer = select(host as SVGGElement)
-    .append('g')
-    .attr('class', BADGES)
-    .attr('pointer-events', 'none');
-  for (const node of points) {
-    const point = select<SVGGElement, PlotPoint>(node).datum();
-    const role =
-      point.key === link.playing ? 'playing' : point.key === link.baseline ? 'baseline' : null;
-    node.toggleAttribute('data-clip-role', role !== null);
-    if (role) node.dataset.clipRole = role;
-    if (!role) continue;
-    const playing = role === 'playing';
-    const badge = layer
-      .append('g')
-      .attr('data-clip-badge', role)
-      .attr('data-point', point.key)
-      .attr('transform', node.getAttribute('transform'));
-    badge
-      .append('circle')
-      .attr('r', 8)
-      .attr('fill', 'none')
-      .attr('stroke', point.color)
-      .attr('stroke-width', 1.5)
-      .attr('stroke-dasharray', playing ? null : '3 2');
-    const text = badge
-      .append('text')
-      .attr('y', -20)
-      .attr('dominant-baseline', 'central')
-      .attr('font-size', px(CHART_TYPE.annotationSub))
-      .attr('font-weight', 600)
-      .attr('fill', playing ? readableTextColor(point.color) : 'var(--foreground)')
-      .text(playing ? s.playing : s.baseline);
-    const label = text.node()!;
-    const labelWidth =
-      label.getComputedTextLength() || [...label.textContent!].length * CHART_TYPE.annotationSub;
-    const icon = playing ? 8 : 0;
-    const width = labelWidth + icon + 12;
-    text.attr('x', -width / 2 + 6 + icon);
-    badge
-      .insert('rect', 'text')
-      .attr('x', -width / 2)
-      .attr('y', -28)
-      .attr('width', width)
-      .attr('height', 16)
-      .attr('rx', 8)
-      .attr('fill', playing ? point.color : 'var(--card)')
-      .attr('stroke', playing ? 'none' : point.color)
-      .attr('stroke-width', 1);
-    if (playing)
-      badge
-        .append('path')
-        .attr('d', `M${-width / 2 + 6} -23 l5 3 l-5 3 z`)
-        .attr('fill', readableTextColor(point.color));
-  }
+  badgeLayer?.raise();
 }
 
 /** "B200 (SGLang)" for a lossless line, "B200 · FirstBlockCache" for a lossy one, as the legend names them. */
@@ -599,6 +670,7 @@ export default function VideoResultsChart({
   footer,
   lossyNote,
   loading = false,
+  phone = false,
 }: {
   /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
@@ -622,6 +694,8 @@ export default function VideoResultsChart({
   lossyNote?: ReactNode;
   /** The cohort is still loading: an empty plot shows a skeleton, not the no-data note. */
   loading?: boolean;
+  /** The phone layout drops the line of zoom gestures. */
+  phone?: boolean;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -684,23 +758,109 @@ export default function VideoResultsChart({
             (best, point) => (!best || better * (point.y - best.y) > 0 ? point : best),
             undefined,
           );
+        const text = pillText(item, s, history !== null);
         return end
           ? [
               {
                 key: item.key,
-                text: pillText(item, s, history !== null),
+                text,
+                // One lossless line per GPU: the hardware names it, and the legend names its engine.
+                short:
+                  byEngine || item.lossy || item.overlay || history
+                    ? text
+                    : hardwareLabel(item.hardwareKey),
                 color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
                 lossy: item.lossy,
                 overlay: item.overlay,
                 end: end.key,
+                line: item.frontier.map((point) => point.key),
               },
             ]
           : [];
       }),
-    [series, s, history, colorFor, better],
+    [series, s, history, colorFor, better, byEngine],
   );
-  const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills });
-  marks.current = { link: clipLink, hover: hover.current, pills };
+  // A touch screen opens a point in a sheet (`r_sheet`); a mouse keeps the pinned panel.
+  const touch = useIsCoarsePointer();
+  const sheetKey = useStageValue('sheet');
+  const sheetPoint =
+    touch && sheetKey ? plotted.find((point) => point.key === sheetKey) : undefined;
+  // A ring costs a style pass and a layout every frame, so the rings rest while the chart is off screen.
+  useEffect(() => {
+    const root = chart.current
+      ?.getSvgElement()
+      ?.closest<HTMLElement>(`[data-testid="${VIDEO_RESULTS_CHART_ID}"]`);
+    if (!root || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(([entry]) =>
+      root.toggleAttribute('data-off-screen', !entry.isIntersecting),
+    );
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+  /** The last point a tap opened, which a tap on the same spot steps past. */
+  const lastTapped = useRef<string | null>(null);
+  const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills, sheet: null });
+  marks.current = { link: clipLink, hover: hover.current, pills, sheet: sheetPoint?.key ?? null };
+  // On a touch screen a tap opens the sheet of the point `tapTarget` picks; the plot's own
+  // handlers, which pin the panel a mouse uses, never see it.
+  const openAt = useCallback((clientX: number, clientY: number) => {
+    const svg = chart.current?.getSvgElement();
+    if (!svg) return false;
+    const xAxis = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
+    const yAxis = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
+    const found = new Map<string, PlotPoint>();
+    const points = [...svg.querySelectorAll<SVGGElement>('.dot-group')].flatMap((node) => {
+      const shape = node.querySelector('.visible-shape')?.getBoundingClientRect();
+      if (!shape) return [];
+      const left = shape.left + shape.width / 2;
+      const top = shape.top + shape.height / 2;
+      // A zoomed plot clips the points outside it; a tap near its edge must not pick one.
+      if (
+        xAxis &&
+        yAxis &&
+        (left < yAxis.left || left > xAxis.right || top < yAxis.top || top > xAxis.top)
+      )
+        return [];
+      const point = select<SVGGElement, PlotPoint>(node).datum();
+      found.set(point.key, point);
+      return [{ key: point.key, x: left, y: top }];
+    });
+    const key = tapTarget({ x: clientX, y: clientY }, points, lastTapped.current);
+    const point = key === null ? undefined : found.get(key);
+    if (!point) return false;
+    lastTapped.current = point.key;
+    track('video_results_point_sheet_opened', {
+      gpu: point.hardwareKey,
+      overlay: point.overlay,
+      optimal: point.optimal,
+      playable: point.clips,
+    });
+    if (point.clips) link.current?.onPeek(point.key);
+    writeStage({ ...parseStage(location.search), sheet: point.key });
+    return true;
+  }, []);
+  useEffect(() => {
+    const svg = chart.current?.getSvgElement();
+    if (!touch || !svg) return undefined;
+    const onClick = (event: MouseEvent) => {
+      if (openAt(event.clientX, event.clientY)) event.stopPropagation();
+    };
+    svg.addEventListener('click', onClick, true);
+    return () => svg.removeEventListener('click', onClick, true);
+  }, [touch, openAt]);
+  const sheetAnchor = useCallback(
+    () => chart.current?.getSvgElement()?.querySelector(`.${SHEET_RING}`) ?? null,
+    [],
+  );
+  const closeSheet = useCallback(
+    () => writeStage({ ...parseStage(location.search), sheet: null }),
+    [],
+  );
+  // A link that opens on a sheet reads its point's clips too.
+  const sheetClips = sheetPoint?.clips ? sheetPoint.key : null;
+  useEffect(() => {
+    if (sheetClips) link.current?.onPeek(sheetClips);
+  }, [sheetClips]);
   const lines = useMemo(
     () =>
       Object.fromEntries(
@@ -783,7 +943,7 @@ export default function VideoResultsChart({
     const svg = chart.current?.getSvgElement();
     if (svg) drawMarks(svg, size.current, marks.current, s);
   }, [s]);
-  useLayoutEffect(redraw, [playing, baseline, pulse, pills, redraw]);
+  useLayoutEffect(redraw, [playing, baseline, pulse, pills, sheetPoint?.key, redraw]);
   // A first frame read after its card opened fills the box the card reserved for it.
   useEffect(() => {
     const key = hovered.current;
@@ -800,6 +960,14 @@ export default function VideoResultsChart({
   const onRender = useCallback(
     ({ layout, width, height }: RenderContext) => {
       size.current = { width, height };
+      // The x title centres on the plot, and moves over where the chart is too narrow for that.
+      const title = layout.svg.select<SVGTextElement>('.x-axis-label').node();
+      if (title) {
+        const centre = layout.margin.left + width / 2;
+        const chartWidth = layout.margin.left + width + layout.margin.right;
+        const shift = labelShift(centre, textWidth(title, CHART_TYPE.axisLabel), chartWidth);
+        title.setAttribute('x', String(centre + shift));
+      }
       const root = layout.zoomGroup.node();
       if (!root) return;
       drawMarks(root, size.current, marks.current, s);
@@ -824,7 +992,7 @@ export default function VideoResultsChart({
     },
     [s],
   );
-  const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
+  const { tooltip, panel } = useMemo(() => {
     const hoverLatency = RESULTS_X_METRICS[x.rankOn ?? xKey];
     const selection = { basis: state.costBasis, tier: state.costTier };
     const describe = ({ cell, overlay, x: xValue, y: yValue }: PlotPoint) => {
@@ -836,11 +1004,96 @@ export default function VideoResultsChart({
         strategy: serverSplit(point),
         replicas: point.replicas === null ? null : s.replicas(point.replicas),
         warning: overlay ? `✕ #${point.runId}` : undefined,
-        yValue: n(yValue, y.digits),
-        xValue: n(xValue, x.digits),
+        yValue: figures(yValue),
+        xValue: figures(xValue),
       };
     };
-    return {
+    /** The run, artifact and reproduce links of a point. */
+    const links = (point: VideoPoint) => [
+      {
+        action: 'run',
+        label: s.runLink,
+        href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
+        external: true,
+      },
+      ...detailLinks(point)
+        .filter((entry) => entry.action !== 'run')
+        .map((entry) => ({
+          action: entry.action,
+          label: entry.action === 'artifact' ? s.artifactLink : s.reproduceLink,
+          href: entry.href,
+          external: true,
+        })),
+    ];
+    /** What the pinned panel lists under its headline: setup, latency, power, throughput and cost. */
+    const sections = (plot: PlotPoint) => {
+      const { cell } = plot;
+      const { point } = cell;
+      const d = describe(plot);
+      const cost = cell.cost[state.costBasis];
+      return (
+        <>
+          <PanelSetup
+            facts={[
+              {
+                label: s.concurrency,
+                value: point.concurrency === null ? '—' : String(point.concurrency),
+              },
+              { label: s.gpusShort, value: s.gpuOf(point.participating, point.allocated) },
+              {
+                label: s.valid,
+                value: s.validOf(point.valid, point.scheduled, point.failed),
+              },
+            ]}
+            deployment={{ label: s.deployment, value: deploymentText(point, d.replicas, s) }}
+          />
+          <PanelSection
+            title={clip ? s.latencyClip(clip.seconds, clip.fps) : s.latency}
+            rows={[
+              { label: s.median, value: unit(reading(point.p50) ?? '—', 's') },
+              {
+                label: s.meets(n(state.deadlineSeconds)),
+                value:
+                  cell.deadlineAttainment === null
+                    ? '—'
+                    : `${n(cell.deadlineAttainment * 100, 0)}%`,
+              },
+            ]}
+          />
+          <PanelSection
+            title={s.powerSection}
+            rows={[
+              ...(state.yMetric === 'kjPerClip'
+                ? []
+                : [{ label: s.energy, value: kilojoules(cell.joulesPerClip) ?? '—' }]),
+              {
+                label: s.power,
+                value: unit(point.avgPowerW === null ? '—' : n(point.avgPowerW, 0), 'W'),
+              },
+              {
+                label: s.powerLimit,
+                value: unit(point.enforcedLimitW === null ? '—' : n(point.enforcedLimitW, 0), 'W'),
+              },
+            ]}
+          />
+          <PanelSection
+            title={s.throughputCost}
+            rows={[
+              ...RESULTS_Y_METRIC_KEYS.filter(
+                (key) => key !== state.yMetric && key !== 'kjPerClip',
+              ).map((key) => ({
+                label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
+                value: reading(RESULTS_Y_METRICS[key].value(cell, selection)) ?? '—',
+              })),
+              { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
+              { label: s.perVideo, value: cost ? usd(cost.perVideo) : '—' },
+            ]}
+          />
+          {point.runtime && <PanelRuntime label={s.runtime} value={point.runtime} />}
+        </>
+      );
+    };
+    const config: TooltipConfig<PlotPoint> = {
       rulerType: 'none',
       attachToLayer: 1,
       content: (plot) => {
@@ -866,7 +1119,7 @@ export default function VideoResultsChart({
           metrics: [
             { value: d.yValue, label: axisLabelUnit(yLabel) },
             {
-              value: n(hoverLatency.value(plot.cell, selection), hoverLatency.digits),
+              value: reading(hoverLatency.value(plot.cell, selection)) ?? '—',
               label:
                 hoverLatency.hoverLabel?.[locale] ??
                 axisLabelUnit(resultsMetricLabel(hoverLatency, locale, clip)),
@@ -886,10 +1139,8 @@ export default function VideoResultsChart({
         });
       },
       details: (plot, _isOverlay, close) => {
-        const { cell } = plot;
-        const { point } = cell;
+        const { point } = plot.cell;
         const d = describe(plot);
-        const cost = cell.cost[state.costBasis];
         return (
           <ChartPointDetails
             title={d.title}
@@ -904,23 +1155,7 @@ export default function VideoResultsChart({
               { value: unit(d.xValue, x.unit), label: x.label[locale] },
             ]}
             // View telemetry sits in the panel's fixed action row, so it never scrolls away.
-            links={[
-              {
-                action: 'run',
-                label: s.runLink,
-                href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
-                external: true,
-              },
-              ...detailLinks(point)
-                .filter((entry) => entry.action !== 'run')
-                .map((entry) => ({
-                  action: entry.action,
-                  label: entry.action === 'artifact' ? s.artifactLink : s.reproduceLink,
-                  href: entry.href,
-                  external: true,
-                })),
-              { action: 'view-telemetry', label: `${s.viewTelemetry} →` },
-            ]}
+            links={[...links(point), { action: 'view-telemetry', label: `${s.viewTelemetry} →` }]}
             onClose={close}
             onAction={(action, event) => {
               event.stopPropagation();
@@ -929,77 +1164,7 @@ export default function VideoResultsChart({
               onOpen(plot.key, 'popover');
             }}
           >
-            <PanelSetup
-              facts={[
-                {
-                  label: s.concurrency,
-                  value: point.concurrency === null ? '—' : String(point.concurrency),
-                },
-                { label: s.gpusShort, value: s.gpuOf(point.participating, point.allocated) },
-                {
-                  label: s.valid,
-                  value: s.validOf(point.valid, point.scheduled, point.failed),
-                },
-              ]}
-              deployment={{ label: s.deployment, value: deploymentText(point, d.replicas, s) }}
-            />
-            <PanelSection
-              title={clip ? s.latencyClip(clip.seconds, clip.fps) : s.latency}
-              rows={[
-                { label: s.median, value: unit(n(point.p50, 1), 's') },
-                {
-                  label: s.meets(n(state.deadlineSeconds)),
-                  value:
-                    cell.deadlineAttainment === null
-                      ? '—'
-                      : `${n(cell.deadlineAttainment * 100, 0)}%`,
-                },
-              ]}
-            />
-            <PanelSection
-              title={s.powerSection}
-              rows={[
-                ...(state.yMetric === 'kjPerClip'
-                  ? []
-                  : [
-                      {
-                        label: s.energy,
-                        value: unit(
-                          cell.joulesPerClip === null ? '—' : n(cell.joulesPerClip / 1000, 1),
-                          'kJ',
-                        ),
-                      },
-                    ]),
-                {
-                  label: s.power,
-                  value: unit(point.avgPowerW === null ? '—' : n(point.avgPowerW, 0), 'W'),
-                },
-                {
-                  label: s.powerLimit,
-                  value: unit(
-                    point.enforcedLimitW === null ? '—' : n(point.enforcedLimitW, 0),
-                    'W',
-                  ),
-                },
-              ]}
-            />
-            <PanelSection
-              title={s.throughputCost}
-              rows={[
-                ...RESULTS_Y_METRIC_KEYS.filter(
-                  (key) => key !== state.yMetric && key !== 'kjPerClip',
-                ).map((key) => ({
-                  label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
-                  value: n(
-                    RESULTS_Y_METRICS[key].value(cell, selection),
-                    RESULTS_Y_METRICS[key].digits,
-                  ),
-                })),
-                { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
-                { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
-              ]}
-            />
-            {point.runtime && <PanelRuntime label={s.runtime} value={point.runtime} />}
+            {sections(plot)}
             {link.current && plot.clips && (
               <Button
                 type="button"
@@ -1058,6 +1223,7 @@ export default function VideoResultsChart({
         pair.onSelect(point.key);
       },
     };
+    return { tooltip: config, panel: { describe, links, sections } };
   }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen, redraw]);
 
   const hidden = new Set(state.hidden);
@@ -1147,7 +1313,90 @@ export default function VideoResultsChart({
       )
     : [];
 
-  return (
+  let sheet: ReactNode = null;
+  if (sheetPoint) {
+    const { cell, key } = sheetPoint;
+    const d = panel.describe(sheetPoint);
+    const cost = cell.cost[state.costBasis];
+    const selection = { basis: state.costBasis, tier: state.costTier };
+    const perDollar = RESULTS_Y_METRICS.videoSecondsPerDollar;
+    const playable = sheetPoint.clips && clipLink;
+    const poster = clipLink?.posters[key];
+    const src = clipLink?.media?.[key] ?? null;
+    sheet = (
+      <VideoPointSheet
+        pointKey={key}
+        title={d.title}
+        color={sheetPoint.color}
+        facts={[d.subtitle, s.gpus(cell.point.participating), d.date, d.warning].filter(
+          (fact) => fact !== undefined,
+        )}
+        // Unread clips show a placeholder; a point read without a first frame or media has none.
+        clip={
+          !playable || (poster === null && src === null)
+            ? null
+            : poster === undefined
+              ? undefined
+              : { poster, src }
+        }
+        noClips={sheetPoint.clips ? undefined : s.tipHollow}
+        prompt={clipLink?.prompt ?? null}
+        metrics={[
+          [
+            RESULTS_X_METRICS.p50.label[locale],
+            unit(reading(RESULTS_X_METRICS.p50.value(cell, selection)) ?? '—', 's'),
+          ],
+          [s.perClip, cost ? usd(cost.perVideo) : '—'],
+          [perDollar.label[locale], reading(perDollar.value(cell, selection)) ?? '—'],
+          [s.energy, kilojoules(cell.joulesPerClip) ?? '—'],
+        ]}
+        onCompare={
+          playable
+            ? () => {
+                track('video_results_clip_selected', {
+                  source: 'sheet',
+                  gpu: sheetPoint.hardwareKey,
+                  overlay: sheetPoint.overlay,
+                  lossy: isLossy(cell.point),
+                  engine: sheetPoint.engine,
+                });
+                clipLink.onSelect(key);
+                closeSheet();
+                clipLink.onReveal();
+              }
+            : undefined
+        }
+        telemetry={`${s.viewTelemetry} →`}
+        onTelemetry={() => {
+          closeSheet();
+          onOpen(key, 'popover');
+        }}
+        context={{ gpu: sheetPoint.hardwareKey, overlay: sheetPoint.overlay }}
+        anchor={sheetAnchor}
+        onOutside={openAt}
+        onClose={closeSheet}
+      >
+        {panel.sections(sheetPoint)}
+        <div className="mt-2 flex flex-wrap gap-x-5">
+          {panel.links(cell.point).map((entry) => (
+            <a
+              key={entry.action}
+              data-action={entry.action}
+              href={entry.href}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 min-w-11 items-center text-brand-fill hover:underline"
+              onClick={() => track('video_results_sheet_link_opened', { action: entry.action })}
+            >
+              {entry.label}
+            </a>
+          ))}
+        </div>
+      </VideoPointSheet>
+    );
+  }
+
+  const figure = (
     <D3Chart<PlotPoint>
       ref={chart}
       chartId={VIDEO_RESULTS_CHART_ID}
@@ -1186,7 +1435,8 @@ export default function VideoResultsChart({
         scaleExtent: [1, 20],
         resetEventName: `video_results_zoom_reset_${VIDEO_RESULTS_CHART_ID}`,
       }}
-      instructions={s.controls}
+      // A phone's chart has the reset button above it and no room for a line of gestures.
+      instructions={phone ? '' : s.controls}
       noDataOverlay={
         plotted.length === 0 ? (
           loading ? (
@@ -1337,5 +1587,11 @@ export default function VideoResultsChart({
         </div>
       }
     />
+  );
+  return (
+    <>
+      {sheet}
+      {figure}
+    </>
   );
 }

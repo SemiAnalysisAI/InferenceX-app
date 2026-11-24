@@ -188,7 +188,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         ],
       },
       hicache: {
-        heading: 'HiCache offload',
+        heading: 'HiCache Offload',
         paragraphs: [
           'HiCache 是 SGLang 原生内置的 offload 机制。它面对的 hybrid 问题与 vLLM connector 相同，但解法是一种不对称设计：offload full-attention cache，而在回载时重建较短的 sliding-window 尾部。只有昂贵的那一半值得跨总线搬运，便宜的一半重建比取回更快。在 AMD 上，分阶段写回让这种搬运不会阻塞引擎。',
           '剩下的缺口是 recurrent 状态——它无法像 window 尾部那样由相邻 token 重建。FlashInfer 的 GDN checkpoint 让它得以参与 prefix 复用，在 92.4% cache 命中率下把吞吐量从 47,771 提升到 53,004 tok/s/GPU。',
@@ -214,7 +214,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         ],
       },
       speculative: {
-        heading: 'Speculative decoding',
+        heading: 'Speculative Decoding',
         paragraphs: [
           'Speculative decoding 需要特别关注，因为 MTP 会引入第二份、体量更小的每请求状态，而它必须与主 cache 一样在各种情况下存活。SGLang 修复了 disaggregated 部署中的 draft window 传输，使该状态完整跨越 prefill 到 decode 的边界；为高并发在线 decode 增加了 overlap 调度；移除了一处无实际作用的 EAGLE 重归一化；并避免了 EAGLE prefill 期间的 host 同步。',
           '仍为 open 的 resource-lease 调度工作与数据并行 graph metadata 修复延续同一方向：当请求可能被撤回并恢复、而不是一路跑完时，让 overlap 依然安全。',

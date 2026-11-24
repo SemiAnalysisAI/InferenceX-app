@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 import {
   invalidateGraphDatasetCache,
   useGraphDataset,
@@ -72,8 +73,8 @@ let container: HTMLDivElement;
 
 beforeEach(() => {
   ControlledIntersectionObserver.instances = [];
-  vi.stubGlobal('IntersectionObserver', ControlledIntersectionObserver);
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  stubGlobal('IntersectionObserver', ControlledIntersectionObserver);
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   invalidateGraphDatasetCache();
   container = document.createElement('div');
   document.body.append(container);
@@ -84,7 +85,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   invalidateGraphDatasetCache();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function LazyVisibleHarness({ resetKey, onVisible }: { resetKey: string; onVisible: () => void }) {
@@ -122,7 +123,7 @@ function installControlledFetch() {
       });
     });
   });
-  vi.stubGlobal('fetch', fetchMock);
+  stubGlobal('fetch', fetchMock);
   return pending;
 }
 

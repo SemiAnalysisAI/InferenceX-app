@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import fixture from '../../../cypress/fixtures/api/video-history.json';
 import type { VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
@@ -64,16 +64,19 @@ describe('VideoGenX results contract', () => {
       { workloadKey: 'unverified-label' },
     ])
       expect(resultProjection([{ ...eligible, ...change }], state()).cells).toEqual([]);
+    expect(
+      resultProjection([{ ...eligible, hardwareKey: 'a100' }], state()).cells.map(
+        (c) => c.point.hardwareKey,
+      ),
+    ).toEqual(['a100']);
     expect(resultProjection([], state()).cells).toEqual([]);
   });
 
   it('preserves unknown allocation and planned measures rather than synthesizing values', () => {
     const point: VideoPoint = { ...eligible, allocated: null, energyKj: null };
-    const row = resultProjection([point], { ...state(), apiPrice: 0.08 }).cells[0];
+    const row = resultProjection([point], state()).cells[0];
     expect(row.cost.participating).not.toBeNull();
     expect(row.cost.allocated).toBeNull();
-    expect(row.profit.allocated).toBeNull();
-    expect(row.profit.participating).toBeNull();
     expect(row.joulesPerClip).toBeNull();
     expect(row.p95).toBeNull();
     expect(row.deadlineAttainment).toBeNull();
@@ -82,12 +85,7 @@ describe('VideoGenX results contract', () => {
     expect(row.cost.participating!.perVideoSecond).toBeNull();
   });
 
-  it('computes both cost bases from measured throughput and charges reserved capacity at zero utilization', () => {
-    const selection = {
-      ...state(),
-      utilization: 0,
-      apiPrices: { t2v: 0.08, i2v: null, r2v: null },
-    };
+  it('computes both cost bases from measured throughput', () => {
     const point = {
       ...eligible,
       participating: 2,
@@ -97,22 +95,13 @@ describe('VideoGenX results contract', () => {
       videoSecondsPerHour: 1860,
       results: evidence(),
     };
-    const row = resultProjection([point], selection).cells[0];
+    const row = resultProjection([point], state()).cells[0];
     expect(row.cost.allocated!.perVideo).toBeCloseTo(row.cost.participating!.perVideo * 4);
     expect(row.cost.participating!.perVideoSecond).toBeCloseTo(
       row.cost.participating!.perHour / 1860,
     );
     expect(row.videoSecondsPerSecond).toBeCloseTo(31 / 60);
     expect(row.metadata.duration).toBe(eligible.durationSeconds);
-    expect(row.profit.allocated!.revenuePerHour).toBe(0);
-    expect(row.profit.allocated!.profitPerHour).toBe(-row.cost.allocated!.perHour);
-    expect(row.profit.allocated!.profitPerGpuHour).toBe(-row.cost.allocated!.perHour / 8);
-    expect(
-      resultProjection([point], { ...selection, utilization: 0.5 }).cells[0].profit.allocated!
-        .revenuePerHour,
-    ).toBeCloseTo(74.4);
-    const changedMode = { ...point, results: evidence({ mode: 'i2v' }) };
-    expect(resultProjection([changedMode], selection).cells[0].profit.participating).toBeNull();
   });
 
   it('uses complete per-request populations for P95 and deadline metrics without treating late clips as failures', () => {
@@ -365,9 +354,6 @@ describe('VideoGenX results contract', () => {
       hidden: ['mi355x'],
       deadlineSeconds: 60,
       costTier: 'r',
-      apiPrice: 0.02,
-      apiPrices: { t2v: 0, i2v: 0.1, r2v: null },
-      utilization: 0.5,
       unofficialRun: '123',
       xMetric: 'gpus',
       yMetric: 'kjPerClip',
@@ -386,9 +372,6 @@ describe('VideoGenX results contract', () => {
     const shared = new URLSearchParams(resultsSearch(selection));
     expect(shared.get('unofficialruns')).toBe('123');
     expect(shared.has('unofficialrun')).toBe(false);
-    expect(shared.get('r_price_t2v')).toBe('0');
-    expect(shared.get('r_price_i2v')).toBe('0.1');
-    expect(shared.has('r_price_r2v')).toBe(false);
     for (const key of ['r_gpus', 'r_basis']) expect(shared.has(key)).toBe(false);
     // PR visualizer links spell the overlay `unofficialRun`, as the other dashboards accept.
     expect(parseResultsState('unofficialRun=43653414377').unofficialRun).toBe('43653414377');
@@ -400,9 +383,7 @@ describe('VideoGenX results contract', () => {
         'r_api=NaN&r_deadline=-2&r_utilization=Infinity&r_x=p95&r_y=toString&r_basis=both&r_optimal=no&r_point=',
       ),
     ).toMatchObject({
-      apiPrice: null,
       deadlineSeconds: 120,
-      utilization: 1,
       xMetric: 'p50',
       yMetric: 'videoSecondsPerDollar',
       costBasis: 'participating',
@@ -421,20 +402,10 @@ describe('VideoGenX results contract', () => {
     const plan = JSON.parse(eligible.workloadKey!);
     plan.plan.generation.height = 512;
     const c = { ...a, id: 'third:c1', workloadKey: JSON.stringify(plan) };
-    const result = resultProjection([a, b, c], {
-      ...state(),
-      apiPrices: { t2v: 0.08, i2v: null, r2v: null },
-    });
+    const result = resultProjection([a, b, c], state());
     expect(result.cells).toHaveLength(2);
     expect(result.workloadMix).toHaveLength(3);
     expect(new Set(result.workloadMix.map((row) => row.point.workloadKey)).size).toBe(2);
-    expect(
-      result.workloadMix.find((row) => row.point.id === 'first:c1')!.profit.participating,
-    ).not.toBeNull();
-    expect(result.workloadMix.find((row) => row.point.id === 'third:c1')!.profit).toEqual({
-      participating: null,
-      allocated: null,
-    });
     // An engine only another workload measured is no choice for this cohort.
     const sol = { ...c, id: 'fourth:c1', results: evidence({ engine: 'sol-engine' }) };
     expect(resultProjection([a, b, c, sol], state()).options.engines).toEqual([

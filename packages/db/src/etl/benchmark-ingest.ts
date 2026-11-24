@@ -92,19 +92,19 @@ export async function bulkIngestBenchmarkRows(
     )
     select
       ${workflowRunId},
-      unnest(${sql.array(configIds)}::int[]),
-      unnest(${sql.array(benchmarkTypes)}::text[]),
-      unnest(${sql.array(offloadModes)}::text[]),
+      unnest(${configIds}::int[]),
+      unnest(${benchmarkTypes}::text[]),
+      unnest(${offloadModes}::text[]),
       ${date}::date,
-      unnest(${sql.array(isls)}::int[]),
-      unnest(${sql.array(osls)}::int[]),
-      unnest(${sql.array(concs)}::int[]),
-      unnest(${sql.array(images)}::text[]),
-      unnest(${sql.array(recipeFingerprints)}::text[]),
-      unnest(${sql.array(metricsJsons)}::jsonb[]),
-      unnest(${sql.array(workersJsons)}::jsonb[]),
-      unnest(${sql.array(powerInvalidReasonsJsons)}::jsonb[]),
-      unnest(${sql.array(powerAuditJsons)}::jsonb[])
+      unnest(${isls}::int[]),
+      unnest(${osls}::int[]),
+      unnest(${concs}::int[]),
+      unnest(${images}::text[]),
+      unnest(${recipeFingerprints}::text[]),
+      unnest(${metricsJsons}::text[])::jsonb,
+      unnest(${workersJsons}::text[])::jsonb,
+      unnest(${powerInvalidReasonsJsons}::text[])::jsonb,
+      unnest(${powerAuditJsons}::text[])::jsonb
     on conflict (
       workflow_run_id, config_id, benchmark_type, isl, osl, conc, offload_mode,
       recipe_fingerprint
@@ -191,7 +191,7 @@ async function insertDeferredServerLogFiles(
   await sql.begin(async (tx) => {
     const rows = await tx<{ id: number; server_log_id: number | null }[]>`
       select id, server_log_id from benchmark_results
-      where id = any(${tx.array(benchmarkResultIds)}::bigint[])
+      where id = any(${benchmarkResultIds}::bigint[])
       for update
     `;
     const unlinked = rows.filter((row) => row.server_log_id === null);
@@ -209,7 +209,7 @@ async function insertDeferredServerLogFiles(
       await tx`
         update benchmark_results
         set server_log_id = ${logId}
-        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+        where id = any(${unlinked.map((row) => row.id)}::bigint[])
       `;
       if (serverLogBlocksEnabled())
         await writeTextAsBlocks(tx, logId, primary.fileName, primaryText);
@@ -251,7 +251,7 @@ async function insertDeferredServerLogFiles(
           '{kv_cache_pool_tokens}',
           to_jsonb(${kvCachePoolTokens}::bigint)
         )
-        where id = any(${tx.array(rows.map((row) => row.id))}::bigint[])
+        where id = any(${rows.map((row) => row.id)}::bigint[])
       `;
     }
   });
@@ -314,9 +314,9 @@ export async function bulkIngestRunStats(
     select
       ${workflowRunId},
       ${date}::date,
-      unnest(${sql.array(deduped.map((r) => r.hardware))}::text[]),
-      unnest(${sql.array(deduped.map((r) => r.nSuccess))}::int[]),
-      unnest(${sql.array(deduped.map((r) => r.total))}::int[])
+      unnest(${deduped.map((r) => r.hardware)}::text[]),
+      unnest(${deduped.map((r) => r.nSuccess)}::int[]),
+      unnest(${deduped.map((r) => r.total)}::int[])
     on conflict (workflow_run_id, hardware)
     do update set n_success = excluded.n_success, total = excluded.total
     returning (xmax = 0) as inserted
@@ -356,15 +356,15 @@ export async function bulkUpsertAvailability(
   await sql`
     insert into availability (model, isl, osl, precision, hardware, framework, spec_method, disagg, benchmark_type, date)
     select
-      unnest(${sql.array(unique.map((r) => r.model))}::text[]),
-      unnest(${sql.array(unique.map((r) => r.isl))}::int[]),
-      unnest(${sql.array(unique.map((r) => r.osl))}::int[]),
-      unnest(${sql.array(unique.map((r) => r.precision))}::text[]),
-      unnest(${sql.array(unique.map((r) => r.hardware))}::text[]),
-      unnest(${sql.array(unique.map((r) => r.framework))}::text[]),
-      unnest(${sql.array(unique.map((r) => r.specMethod))}::text[]),
-      unnest(${sql.array(unique.map((r) => r.disagg))}::bool[]),
-      unnest(${sql.array(unique.map((r) => r.benchmarkType))}::text[]),
+      unnest(${unique.map((r) => r.model)}::text[]),
+      unnest(${unique.map((r) => r.isl)}::int[]),
+      unnest(${unique.map((r) => r.osl)}::int[]),
+      unnest(${unique.map((r) => r.precision)}::text[]),
+      unnest(${unique.map((r) => r.hardware)}::text[]),
+      unnest(${unique.map((r) => r.framework)}::text[]),
+      unnest(${unique.map((r) => r.specMethod)}::text[]),
+      unnest(${unique.map((r) => r.disagg)}::bool[]),
+      unnest(${unique.map((r) => r.benchmarkType)}::text[]),
       ${date}::date
     on conflict do nothing
   `;

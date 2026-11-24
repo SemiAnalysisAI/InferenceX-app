@@ -68,9 +68,9 @@ import { useThroughputData, useWarmThroughputChange, type GroupMeta } from './us
 
 const STRINGS = {
   en: {
-    title: 'Prefix cache reuse',
-    benchmarkGroup: 'Benchmark config',
-    chartGroup: 'Chart config',
+    title: 'Prefix Cache Reuse',
+    benchmarkGroup: 'Benchmark Config',
+    chartGroup: 'Chart Config',
     configLabel: 'Configuration',
     configTooltip:
       'The chip and serving framework whose sweep is plotted. Configurations that reported no cache tier for this selection are listed but draw no bars.',
@@ -552,7 +552,14 @@ function CacheReuseInner() {
 
   if (!loading && error) {
     console.error(error);
-    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
+    return (
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.title} />
+        </Card>
+        <EmptyState className="h-64">{t.errorLoading}</EmptyState>
+      </div>
+    );
   }
 
   return (
@@ -560,7 +567,11 @@ function CacheReuseInner() {
       <section data-testid="cache-reuse-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
+            <DashboardSectionHeader
+              headingAs="h1"
+              title={t.title}
+              actions={<ChartShareActions />}
+            />
 
             <TooltipProvider delayDuration={0}>
               <ControlPanel

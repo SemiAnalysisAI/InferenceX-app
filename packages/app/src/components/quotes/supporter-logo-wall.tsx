@@ -12,7 +12,7 @@ import { SupporterLogoImage } from './supporter-logo-image';
 
 const STRINGS = {
   en: {
-    heading: 'Labs, clouds and open-source projects',
+    heading: 'Labs, Clouds and Open-Source Projects',
     jumpTo: (org: string) => `Jump to ${org}’s quote`,
   },
   zh: {

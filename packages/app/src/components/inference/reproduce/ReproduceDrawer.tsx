@@ -28,7 +28,7 @@ type ReproduceTab = 'command' | 'config' | 'environment';
 
 const STRINGS = {
   en: {
-    title: 'Reproduce this result',
+    title: 'Reproduce This Result',
     description:
       'How this benchmark point was produced, from its stored configuration, run metadata, and logs.',
     unofficial: 'Unofficial run',
@@ -37,7 +37,7 @@ const STRINGS = {
     copied: 'Copied',
     copyFailed: 'Could not copy. Select the text to copy it manually.',
     serverLog: 'Server log',
-    run: 'Workflow run',
+    run: 'Workflow Run',
     loading: 'Loading launch record…',
     error: 'The launch record could not be loaded.',
     recorded: (file: string) =>
@@ -79,7 +79,7 @@ const STRINGS = {
       srtctl_version: 'srtctl version',
       recipe: 'srtctl recipe',
       inferencex_commit: 'InferenceX commit',
-      workflow_run: 'Workflow run',
+      workflow_run: 'Workflow Run',
     } satisfies Record<EnvironmentKey, string>,
   },
   zh: {
@@ -252,7 +252,7 @@ export function ReproduceDrawer({ point, source, onClose }: Props) {
   const runUrl = payload?.run.run_url ?? point.run_url;
   const logHref =
     persistedId !== null && payload?.logs
-      ? pointLogHref(persistedId, point.benchmark_type, locale)
+      ? pointLogHref(persistedId, point.benchmark_type, point.model, locale)
       : null;
   const workload =
     point.benchmark_type === 'agentic_traces'

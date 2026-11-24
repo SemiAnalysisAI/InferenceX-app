@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import type { Sql } from '../etl/db-utils';
@@ -9,7 +9,7 @@ import {
   dropVerifiedLegacyRequestTimeline,
   writeRequestTimelineGz,
 } from './request-timeline-backfill';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 function timelineWith(requestCount: number): RequestTimeline {
   return {
@@ -59,10 +59,11 @@ async function storedRow(id: number): Promise<StoredRow> {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 30_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 
@@ -75,7 +76,7 @@ describe('convertLegacyRequestTimeline (PostgreSQL)', () => {
     const legacy = timelineWith(5);
     await sql`
       insert into agentic_trace_replay (id, request_timeline)
-      values (3811, ${JSON.stringify(legacy)}::jsonb)
+      values (3811, ${legacy}::jsonb)
     `;
 
     const stored = await convertLegacyRequestTimeline(sql, 3811, 2);
@@ -95,7 +96,7 @@ describe('convertLegacyRequestTimeline (PostgreSQL)', () => {
     const stale = { ...timelineWith(2), version: REQUEST_TIMELINE_VERSION - 1 };
     await sql`
       insert into agentic_trace_replay (id, request_timeline)
-      values (12, ${JSON.stringify(stale)}::jsonb)
+      values (12, ${stale}::jsonb)
     `;
 
     await expect(convertLegacyRequestTimeline(sql, 12)).rejects.toThrow(
@@ -168,7 +169,7 @@ describe('writeRequestTimelineGz', () => {
 async function convertedRow(id: number, legacy: RequestTimeline): Promise<void> {
   await sql`
     insert into agentic_trace_replay (id, request_timeline)
-    values (${id}, ${JSON.stringify(legacy)}::jsonb)
+    values (${id}, ${legacy}::jsonb)
   `;
   await writeRequestTimelineGz(sql, id, await convertLegacyRequestTimeline(sql, id));
 }
@@ -189,7 +190,7 @@ describe('dropVerifiedLegacyRequestTimeline', () => {
     const legacy = timelineWith(3);
     await sql`
       insert into agentic_trace_replay (id, request_timeline)
-      values (32, ${JSON.stringify(legacy)}::jsonb)
+      values (32, ${legacy}::jsonb)
     `;
 
     await expect(dropVerifiedLegacyRequestTimeline(sql, 32)).rejects.toThrow(
@@ -215,7 +216,7 @@ describe('dropVerifiedLegacyRequestTimeline', () => {
     const legacy = timelineWith(5);
     await sql`
       insert into agentic_trace_replay (id, request_timeline)
-      values (34, ${JSON.stringify(legacy)}::jsonb)
+      values (34, ${legacy}::jsonb)
     `;
     const edited = timelineWith(5);
     edited.requests[3]!.isl = 1;
@@ -236,7 +237,7 @@ describe('dropVerifiedLegacyRequestTimeline', () => {
     const stale = { ...timelineWith(5), version: REQUEST_TIMELINE_VERSION - 1 };
     await sql`
       insert into agentic_trace_replay (id, request_timeline)
-      values (35, ${JSON.stringify(stale)}::jsonb)
+      values (35, ${stale}::jsonb)
     `;
     await writeRequestTimelineGz(sql, 35, {
       gz: await gzipRequestTimeline(timelineWith(5)),

@@ -17,6 +17,8 @@ import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
+import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
+import { perDollarPngVersion } from '@/lib/compare/per-dollar-png';
 import {
   AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
@@ -32,8 +34,8 @@ import ComparePerDollarPageClient from '../../../compare-per-dollar/[slug]/page-
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { slug: string }[] {
-  return [];
+export function generateStaticParams(): Promise<{ slug: string }[]> {
+  return getPrerenderedCompareParams();
 }
 
 export interface ScenarioOptions {
@@ -128,9 +130,11 @@ export async function renderPerDollarPageZh(slug: string, { scenarioSegment }: S
     null,
     comparisonScenarioForModel(parsed.model).sequence,
   );
+  // Reuses the cached pair read above (the scenario pages read the default scenario once more).
+  const heroImageVersion = await perDollarPngVersion(parsed);
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
-  const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png?lang=zh`;
+  const imageUrl = `${SITE_URL}/zh/compare-per-dollar/${canonical}/performance-per-dollar.png`;
   const jsonLd = buildJsonLdZh(
     'per-dollar',
     parsed.model,
@@ -191,7 +195,8 @@ export async function renderPerDollarPageZh(slug: string, { scenarioSegment }: S
         chipPageLink={compareChipPageLink(parsed.a, parsed.b, 'zh')}
         aCostPerGpuHr={aCostPerGpuHr}
         bCostPerGpuHr={bCostPerGpuHr}
-        heroImageSrc={`/compare-per-dollar/${canonical}/performance-per-dollar.png?lang=zh`}
+        heroImageSrc={`/zh/compare-per-dollar/${canonical}/performance-per-dollar.png`}
+        heroImageVersion={heroImageVersion}
         locale="zh"
       />
     </>

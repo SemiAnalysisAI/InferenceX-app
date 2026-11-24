@@ -144,6 +144,16 @@ a `Chip basis:` note naming it. Embedded charts
 (`/embed/model/<slug>`) accept `chips=total` (or `g_chips=total`) and show the
 basis note, without the toggle, below metrics that depend on it.
 
+Embedded charts also accept `hw=<hardware keys>` (or the dashboard's `i_active`), for
+example `hw=gb200_vllm`, to show only those official lines. A bare GPU such as
+`hw=gb200` keeps every engine on it, and unknown SKUs are ignored. A request turns off
+the best-per-SKU default, so a requested engine is not swapped for its SKU's best one.
+With `unofficialrun=`, the overlay keeps all of its own hardware next to the requested
+official lines, and `i_active` limits the official lines on the dashboard the same way.
+This is a visibility selection. The read-only `inference` view's `gpus` parameter
+accepts the same keys but filters overlay series too. To reproduce such an embed, read
+the official series with `gpus=gb200_vllm&best=false` and the overlay without `gpus`.
+
 Legacy fixed-sequence Dynamo rows (2025-09-29 to 2025-12-05) are marked
 disaggregated but record no workers and the whole deployment in both
 `num_prefill_gpu` and `num_decode_gpu`. Most October 2025 rows store input and
@@ -537,7 +547,7 @@ which API selectors belong together.
 
 With no `run`/`artifact`, `/api/v1/views/video` returns the current dashboard's
 approved-history projection, not CI discovery. Legacy stored sources remain in
-Performance history but cannot enter default charts without a matching immutable
+stored History but cannot enter default charts without a matching immutable
 publication receipt. Authorization to publish is separate from benchmark qualification.
 All public video GET paths, including a `format=media` cache miss, are read-only;
 the miss returns 204. Copy its URL selectors directly:
@@ -556,9 +566,11 @@ use the same defaults as the UI. Unknown/repeated query names still return 400.
 - Metrics use participating GPUs. API list price is USD/video-second multiplied
   by clip duration, not TCO, revenue or measured power. `metricDefinitions`
   declares units and optimization direction; missing values remain null.
-- The server reads the same first **five published history pages at most** as the
-  UI. `coverage.pagesRead`, `coverage.nextPage` and `coverage.truncated` describe
-  the inspected window; this is not all-history or date-range coverage. It applies
+- The server reads the same first **five published history pages** as the UI,
+  plus the latest source of every deployment older than them, so each deployment's
+  newest cell is present. `coverage.pagesRead`, `coverage.nextPage` and
+  `coverage.truncated` describe the paged window; this is not all-history or
+  date-range coverage. It applies
   the UI's canonical workload selection, sample floor and newest-cell rules.
 - Evidence rows share one known workload and deployment layout. Hardware without
   C1 keeps raw concurrency measurements only within that cohort, with null ratios.
@@ -619,6 +631,11 @@ execution/publication times and coverage alongside exported values.
 `artifact` from `artifacts[]`: a plain artifact name, or `<artifact>/<file>` when
 one artifact contains several files. `downsample` only sets the renderer hint
 `maxInteractivePoints` to 2000 (default) or `null`; rows and statistics stay unsampled.
+Live reads explain a missing answer with `error` and `code`: 404 `RUN_NOT_FOUND` (GitHub
+has no such run), 404 `NO_TELEMETRY` (no telemetry artifacts, or every archive is expired,
+unreadable or without series), 422 `ARTIFACT_TOO_LARGE` (every archive exceeds the live
+download limit) and 503 `GITHUB_UNAVAILABLE` (a network error or non-410 HTTP status while
+reading the run, its artifact list or an artifact; retry). Do not retry the 404 or 422 answers.
 
 Stored telemetry includes run-wide `coverage`, even when one host is selected:
 `complete` means the recorded artifact/file inventory is present, `partial` means
@@ -739,6 +756,10 @@ Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` / `unofficialruns` and `runs` take up to eight unique IDs.
 Overlay run indices follow the input order after trimming whitespace and removing
 duplicates. Preserve those indices when attributing results to a run.
+An `unofficialrun` / `unofficialruns` run that cannot be overlaid fails the view with
+`error` and `code`: 404 `RUN_NOT_FOUND` (no such run), 410 `ARTIFACTS_EXPIRED`
+(GitHub deleted its artifacts), 404 `NO_RESULTS` (finished without results) or
+404 `RUN_IN_PROGRESS` (no results uploaded yet).
 `runId` selects an exact logical snapshot, not necessarily
 newly measured producer rows. Comparison entries accept `YYYY-MM-DD` or
 `YYYY-MM-DD~rRUN_ID`; `start` and `end` add the endpoints, not every intervening
@@ -1024,8 +1045,9 @@ API 在 `params` 中返回实际采用的参数，并在 `historicalWindow` 中�
 ### VideoGenX results overview
 
 `GET /api/v1/views/video?view=overview` returns the same nine-group projection as
-`/vgx` and `/zh/vgx`. It reads at most five stored history pages;
-`coverage.truncated` remains authoritative. It never triggers media publication.
+`/vgx` and `/zh/vgx`. It reads five stored history pages plus each older
+deployment's latest source; `coverage.truncated` describes the paged window. It
+never triggers media publication.
 The earlier dashboard/compare and run/artifact results views remain available.
 
 HTTP responses remain `private, no-store`. The underlying published History and
@@ -1046,8 +1068,8 @@ they add no API selectors and change no metrics or official/unofficial membershi
 qualified approved evidence or the exact named diagnostic run is available; the
 same canonical workload and sample floor apply. `r_hidden=h100` hides its results
 and clips. Dismissing an unapproved H100 run removes its slot unless approved H100
-evidence remains. An older H100 workload does not qualify a newer workload. B300 has
-no default slot; it appears only with qualified evidence or the named run.
+evidence remains. An older H100 workload does not qualify a newer workload. B300 and
+A100 have no default slot; each appears only with qualified evidence or the named run.
 
 | UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                                                                                                                                                                    |
 | --------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1056,19 +1078,17 @@ no default slot; it appears only with qualified evidence or the named run.
 | Engine, execution date            | `r_engine`, `r_date`                                 | Recorded engine and as-of execution date. All GPU counts are included.                                                                                                                                                                                                                                                                                      |
 | X metric                          | `r_x`                                                | `p50` per-clip latency (default) or `gpus` (participating GPUs per deployment, log axis). Presentation only; the GPU axis keeps the median-latency frontier and Best engine, and Chip config history plots median latency for `gpus`. The retired `p90` falls back to `p50`.                                                                                |
 | Fixed overview settings           | `r_gpus`, `r_basis` (deprecated)                     | Accepted but ignored: `params.gpuCount=null`, `params.costBasis=participating`. New share/export URLs omit these keys.                                                                                                                                                                                                                                      |
-| Advanced disclosure               | None                                                 | Profit estimator is collapsed by default. Opening/closing preserves inputs and does not change data or calculations.                                                                                                                                                                                                                                        |
 | Representative deployments table  | None                                                 | Removed from the UI; representative cells, deadline metrics and both GPU cost bases remain in the read-only evidence.                                                                                                                                                                                                                                       |
 | Hardware legend                   | `r_hidden`                                           | Applies to all groups and media selection.                                                                                                                                                                                                                                                                                                                  |
 | Deadline                          | `r_deadline`                                         | Seconds, default 120. Attainment = on-time valid / valid; goodput = on-time valid / wall seconds. Missing per-request timing stays null.                                                                                                                                                                                                                    |
 | TCO tier                          | `r_tier`                                             | `h` or `r`; return participating and allocated GPU bases together. Missing allocation stays null.                                                                                                                                                                                                                                                           |
-| Scenario prices                   | `r_price_t2v`, `r_price_i2v`, `r_price_r2v`, `r_api` | Nonnegative USD/video-second inputs, default null. `r_api` is used only when mode is unknown; prices are not borrowed across modes.                                                                                                                                                                                                                         |
-| Utilization                       | `r_utilization`                                      | Fraction 0-1, default 1. Modelled revenue scales; reserved GPU hourly cost does not.                                                                                                                                                                                                                                                                        |
+| Profit estimator (removed)        | `r_api`, `r_price_*`, `r_utilization` (retired keys) | Accepted but ignored. `params` omits them and cells carry no revenue or profit.                                                                                                                                                                                                                                                                             |
 | Named run overlay                 | `unofficialrun` / `unofficialruns`                   | Exact run only, in separate `overlayCells` and `overlayDeploymentCells`, excluded from official cells, deployments and workload mix. A stored run keeps its actual approval. A run absent from History is read live from the JSON documents of its public `h3-results` artifacts: unapproved, `publishedAt` null, no media. Nothing is stored or published. |
 
-中文：概览固定包含全部 GPU 数量，图表使用参与计算的 GPU 口径。`r_x` 可选单条视频 `p50` 延迟（默认）或 `gpus`（每个部署参与计算的 GPU 数，对数坐标），已停用的 `p90` 按 `p50` 处理；GPU 坐标轴沿用中位延迟的前沿和最优引擎，芯片配置历史对 `gpus` 改为绘制中位延迟。旧 `r_gpus`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表已移除，利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的输入会保留。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
+中文：概览固定包含全部 GPU 数量，图表使用参与计算的 GPU 口径。`r_x` 可选单条视频 `p50` 延迟（默认）或 `gpus`（每个部署参与计算的 GPU 数，对数坐标），已停用的 `p90` 按 `p50` 处理；GPU 坐标轴沿用中位延迟的前沿和最优引擎，芯片配置历史对 `gpus` 改为绘制中位延迟。旧 `r_gpus`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表和利润估算器已移除；旧的 `r_api`、`r_price_*`、`r_utilization` 参数仍接受但会被忽略。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
 
 `cells` carries the source point, per-clip/frame energy, P95 only with 20 complete
-request samples, deadline metrics, both cost bases and modelled profit per GPU-hour.
+request samples, deadline metrics and both cost bases.
 `evidence` includes recorded validity, hashes, completion counts and valid power
 samples. Missing quality, stage timing, memory and startup data remains null.
 Per-clip PSNR requires separately sealed pairs against the pinned official Diffusers
@@ -1086,14 +1106,13 @@ audio selection is not a URL/API parameter and changes no returned data.
 technically valid measured requests, divided by measurement wall seconds and
 multiplied by 3600; warmup is excluded. Video-second throughput divides this rate
 by 3600. Cost per video-second divides hourly GPU cost by this rate, independently
-for participating and allocated GPUs. Modelled revenue uses the same output rate
-times utilization and the entered price. Every valid measured request must have
+for participating and allocated GPUs. Every valid measured request must have
 a positive recorded media duration. Otherwise, or when older stored History
-omits this optional field, video-second throughput, per-video-second cost,
-revenue and profit remain null. Requested `durationSeconds` stays in workload
+omits this optional field, video-second throughput and per-video-second cost
+remain null. Requested `durationSeconds` stays in workload
 identity and filters and never fills missing output duration.
 
-中文：`point.videoSecondsPerHour` 按有效测量请求的实际解码视频总时长除以测量窗口时长，再乘以 3600，且排除 warmup。视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用这一输出速率。任何有效测量请求缺少正的视频时长，或旧 History 未提供此可选字段时，这些指标及利润均为 null。`durationSeconds` 保留计划请求时长，仅用于工作负载身份与筛选，不补齐缺失的输出时长。
+中文：`point.videoSecondsPerHour` 按有效测量请求的实际解码视频总时长除以测量窗口时长，再乘以 3600，且排除 warmup。视频秒吞吐量和两种 GPU 口径的每视频秒成本共用这一输出速率。任何有效测量请求缺少正的视频时长，或旧 History 未提供此可选字段时，这些指标均为 null。`durationSeconds` 保留计划请求时长，仅用于工作负载身份与筛选，不补齐缺失的输出时长。
 
 `view=overview` returns `clipQuality: { status, groups }`. The status describes
 artifact-read coverage (`ready`, `partial`, `unavailable`), not quality. Every group
@@ -1149,9 +1168,9 @@ Play/pause, scrub time, clip/difference rendering, theme, and expand controls ar
 presentation-only exclusions. Media is read through the existing published-only
 route; source identities, pairing and unavailable states must remain visible.
 
-Example: `/api/v1/views/video?view=overview&r_tier=r&r_deadline=120&r_price_t2v=0.08&r_utilization=0.75`.
+Example: `/api/v1/views/video?view=overview&r_tier=r&r_deadline=120`.
 
-`workloadMix` keeps separate eligible resolution/duration/mode cohorts under the model, engine, execution-date, GPU and hardware filters. It never pools their measurements. Profit is null outside the selected canonical workload because scenario prices do not transfer across resolutions or durations. Engine deployments remain distinct. Client-ready P50 uses its recorded field; legacy P50 is reused only when the canonical identity explicitly names the submit-to-downloaded-media boundary.
+`workloadMix` keeps separate eligible resolution/duration/mode cohorts under the model, engine, execution-date, GPU and hardware filters. It never pools their measurements. Engine deployments remain distinct. Client-ready P50 uses its recorded field; legacy P50 is reused only when the canonical identity explicitly names the submit-to-downloaded-media boundary.
 
 The plural shared-link alias accepts exactly one positive run ID in this overview. Multiple IDs or both aliases together return HTTP 400; no extra source is ingested.
 
@@ -1364,3 +1383,14 @@ OperatorX share links also keep `modelPrecision=fp4|fp8|bf16`, `modelBin`
 Summary bars are the page-owned compare API's `rooflinePrecision`,
 `rooflineNormalized`, `rooflineSharedOnly` and `rooflineHardware` (the GPU picks).
 `scatterLog` and `baseline` are presentation only.
+
+### Disaggregated TRT-LLM cache metrics
+
+For disaggregated TRT-LLM, aggregate prompt throughput, cached-prompt throughput,
+prompt-token sources and prefix-cache hit rate exclude identified decode endpoints.
+Decode workers receive prompt KV from prefill and re-report prompt tokens; including
+those counters would count prompts twice. Per-source drilldowns retain decode workers'
+own measurements. The row's `server_gpu_cache_hit_rate` uses the same prefill token
+totals as chart derivation. Historical rows require the chart-series backfill before
+stored row rates reflect this calculation. Missing prefill measurements remain missing
+when only decode measurements are available.

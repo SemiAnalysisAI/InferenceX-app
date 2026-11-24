@@ -6,17 +6,10 @@ import type { TimingObservation } from '../../src/lib/testing/cypress-timing-dat
 import { cypressSourceFingerprint } from '../../src/lib/testing/cypress-source-fingerprint';
 
 export function setupTimingSplit(on: Cypress.PluginEvents, config: Cypress.PluginConfigOptions) {
-  const afterRun: ((
-    results: CypressCommandLine.CypressRunResult | CypressCommandLine.CypressFailedRunResult,
-  ) => unknown)[] = [];
-  const splitOn = ((...args: unknown[]) => {
-    const [event, handler] = args;
-    if (event === 'after:run') afterRun.push(handler as (typeof afterRun)[number]);
-    else Reflect.apply(on, undefined, args);
-  }) as Cypress.PluginEvents;
-  cypressSplit(splitOn, config);
-  on('after:run', async (results) => {
-    for (const handler of afterRun) await handler(results);
+  // Cypress runs every handler for an event in registration order, so cypress-split writes its
+  // output before the observation below is recorded.
+  cypressSplit(on, config);
+  on('after:run', (results) => {
     const output = process.env.CYPRESS_TIMING_OUTPUT;
     if (!output) return;
     if (!('runs' in results)) throw new Error('Cypress did not return test results');

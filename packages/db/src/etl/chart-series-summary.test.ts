@@ -1,9 +1,9 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import type { DbClient } from '../connection.js';
 import { backfillChartSeriesSummary } from '../lib/chart-series-summary-backfill';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getTraceServerMetrics } from '../queries/trace-server-metrics';
 import { CHART_SERIES_SUMMARY_VERSION, encodeChartSeriesSummary } from './chart-series-summary';
 import {
@@ -82,7 +82,7 @@ let pg: PgliteSql;
 
 beforeAll(async () => {
   db = await migratedPglite();
-  pg = pgliteSql(db);
+  pg = await pgliteDriverSql(db);
   await db.exec(`
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date, html_url)
     VALUES (1, 34557177019, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01',
@@ -94,13 +94,14 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  await pg?.end();
   await db?.close();
 });
 
 async function insertPoint(id: number, series: ChartSeries): Promise<void> {
   await pg`
     insert into agentic_trace_replay (id, server_metrics_json_gz, chart_series)
-    values (${id}, ${Buffer.from('metrics')}, ${JSON.stringify(series)}::jsonb)
+    values (${id}, ${Buffer.from('metrics')}, ${series}::jsonb)
   `;
   await pg`
     insert into benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc, metrics, trace_replay_id)
@@ -172,7 +173,7 @@ describe('chart_series_summary_gz', () => {
 
     await pg`
       update agentic_trace_replay
-      set chart_series = ${JSON.stringify(trickySeries([]))}::jsonb,
+      set chart_series = ${trickySeries([])}::jsonb,
           chart_series_summary_gz = ${encodeChartSeriesSummary(JSON.stringify(stale))},
           chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION - 1}
       where id = ${id}

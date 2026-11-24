@@ -1,25 +1,26 @@
 import { NextRequest } from 'next/server';
 import { unstable_doesMiddlewareMatch } from 'next/dist/experimental/testing/server/middleware-testing-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubEnv, stubGlobal, unstubAllEnvs, unstubAllGlobals } from '@/test/helpers';
 
 import { COMPARE_MODEL_ALIASES } from '@/lib/compare/compare-slug';
 import { LEGACY_DASHBOARD_PATHS } from '@/lib/routing/legacy-dashboard-redirect';
 import { config, proxy } from './proxy';
 
 beforeEach(() => {
-  vi.stubEnv('VERCEL_ENV', 'production');
-  vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'test-key');
-  vi.stubEnv('INFERENCEX_REQUEST_ANALYTICS', '1');
+  stubEnv('VERCEL_ENV', 'production');
+  stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'test-key');
+  stubEnv('INFERENCEX_REQUEST_ANALYTICS', '1');
 });
 afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
+  unstubAllGlobals();
+  unstubAllEnvs();
 });
 
 it('attaches one pending capture to the request lifetime and immediately continues', async () => {
   const pending = Promise.withResolvers<Response>();
   const send = vi.fn().mockReturnValue(pending.promise);
-  vi.stubGlobal('fetch', send);
+  stubGlobal('fetch', send);
   const waitUntil = vi.fn();
   const event = { waitUntil };
   const response = proxy(
@@ -40,7 +41,7 @@ it('attaches one pending capture to the request lifetime and immediately continu
 
 it('preserves embed headers and CSP and sends no event for pages', () => {
   const send = vi.fn();
-  vi.stubGlobal('fetch', send);
+  stubGlobal('fetch', send);
   const event = { waitUntil: vi.fn() };
   for (const path of ['/embed/model/test', '/zh/embed/model/test']) {
     const response = proxy(
@@ -56,7 +57,7 @@ it('preserves embed headers and CSP and sends no event for pages', () => {
 });
 
 it('sends an old Inference Performance power link to PowerX with its filters', () => {
-  vi.stubGlobal('fetch', vi.fn());
+  stubGlobal('fetch', vi.fn());
   const response = proxy(
     new NextRequest(
       'https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
@@ -70,7 +71,7 @@ it('sends an old Inference Performance power link to PowerX with its filters', (
 });
 
 it('canonicalizes a compare slug with any query intact, including i_metric and utm tags', () => {
-  vi.stubGlobal('fetch', vi.fn());
+  stubGlobal('fetch', vi.fn());
   const response = proxy(
     new NextRequest(
       'https://inferencex.semianalysis.com/zh/compare/deepseek-r1-h100-vs-gb200?i_metric=y_tpPerGpu&utm_source=newsletter&utm_campaign=launch',
@@ -84,7 +85,7 @@ it('canonicalizes a compare slug with any query intact, including i_metric and u
 });
 
 it('passes a compare URL without a query through to the page', () => {
-  vi.stubGlobal('fetch', vi.fn());
+  stubGlobal('fetch', vi.fn());
   const response = proxy(
     new NextRequest('https://inferencex.semianalysis.com/compare/deepseek-r1-h100-vs-gb200'),
     { waitUntil: vi.fn() },
@@ -242,7 +243,7 @@ describe('legacy dashboard paths', () => {
   });
 
   it('never redirects API routes', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')));
+    stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')));
     for (const path of [
       '/api/v1/views/inference',
       '/api/v1/operatorx/compare',
@@ -332,7 +333,7 @@ describe('proxy matcher', () => {
     '/profit-estimator/kimi-k3/target/30',
     '/zh/profit-estimator-per-gigawatt',
     '/evaluation',
-    '/historical/kimi-k3',
+    '/historical/Kimi-k3',
     '/calculator',
     '/fleet',
     '/first-token',
@@ -377,6 +378,8 @@ describe('proxy matcher', () => {
     '/infx/inference?g_model=GLM-5x3-Flash',
     '/infx/inference?g_model=not-a-model',
     '/compare-per-dollar/deepseek-r1-b200-vs-mi355x/performance-per-dollar.png?lang=zh',
+    '/compare-precision/deepseek-r1-b200-fp4-vs-fp8/precision-comparison.png?lang=zh',
+    '/zh/compare-spec-decode/deepseek-r1-b200-fp8-mtp-vs-none/spec-decode-comparison.png',
     '/compare/deepseek-r1-b200-vs-mi355x/opengraph-image',
     '/zh/compare-spec-decode/deepseek-r1-b200-fp8-mtp/opengraph-image?v=2',
     '/infx/calculator',

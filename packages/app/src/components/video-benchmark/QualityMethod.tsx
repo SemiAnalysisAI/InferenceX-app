@@ -16,31 +16,31 @@ import { PIXELS_DIFFER } from './VideoClipReadout';
 
 const STRINGS = {
   en: {
-    title: 'How we score quality',
+    title: 'How We Score Quality',
     today:
       'Today each clip is scored by PSNR against the official Diffusers reference, over every decoded frame of the same prompt and seed.',
     range: (clips: number, hardware: string, min: string, max: string) =>
       `${clips === 1 ? 'The 1 lossless clip loaded here' : `The ${clips} lossless clips loaded here`} (${hardware}) ${clips === 1 ? 'scores' : 'score'} ${min === max ? min : `${min}–${max}`} dB.`,
-    whyTitle: 'Why not score against the official reference?',
+    whyTitle: 'Why Not Score Against the Official Reference?',
     why: `${PIXELS_DIFFER.en}, so a reference score mixes those differences with any change a lossy optimization makes.`,
     paired: 'Paired lossless scores',
     planned: 'Planned',
     pairedBody:
       'No scorer computes these yet. The plan is to score each lossy config against its own lossless run.',
-    fixedTitle: 'Held fixed',
+    fixedTitle: 'Held Fixed',
     fixed: ['GPU', 'Engine', 'Server layout', 'Prompt', 'Seed'],
-    runsTitle: 'Two runs',
+    runsTitle: 'Two Runs',
     lossless: 'Lossless run',
     losslessSub: 'lossy options off',
     lossy: 'Lossy run',
     lossySub: 'lossy options on',
-    scoreTitle: 'Score every decoded frame',
+    scoreTitle: 'Score Every Decoded Frame',
     metrics: [
       ['PSNR', 'dB · higher is closer'],
       ['SSIM', '≤ 1 · higher is closer'],
       ['LPIPS', '0 = identical · lower is closer'],
     ],
-    reportTitle: 'Report per config',
+    reportTitle: 'Report per Config',
     report: 'The median and the worst clip over the scored prompts (up to 20).',
     floor:
       'The plan also runs the lossless config twice. The gap between those two runs would be the noise floor for the pair.',
@@ -248,7 +248,7 @@ function Lane({ name, sub, lossy = false }: { name: string; sub: string; lossy?:
     <div
       className={
         lossy
-          ? 'rounded-md border border-amber-500/50 bg-amber-500/5 px-2 py-1'
+          ? 'rounded-md border border-warning/50 bg-warning/5 px-2 py-1'
           : 'rounded-md border border-border/30 bg-card px-2 py-1'
       }
     >

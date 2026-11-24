@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import {
   type CompareTableData,
   type CompareTableViewInput,
   compareTableDataFromPoints,
+  fmtCost,
   pinTablePrecisions,
   resolveCompareTableView,
 } from '@/lib/compare/compare-table-view';
@@ -30,6 +31,14 @@ function makePoint(interactivity: number, throughput: number): GPUDataPoint {
     outputTpPerMw: 1100,
   };
 }
+
+describe('fmtCost', () => {
+  it('keeps a positive cost below a tenth of a cent from printing as $0.000', () => {
+    expect(fmtCost(0.00038)).toBe('$0.00038');
+    expect(fmtCost(0.0012)).toBe('$0.001');
+    expect(fmtCost(0.25)).toBe('$0.25');
+  });
+});
 
 describe('pinTablePrecisions', () => {
   it('keeps only the pinned precision when the controls include it', () => {

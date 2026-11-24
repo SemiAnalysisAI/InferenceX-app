@@ -242,7 +242,13 @@ export const profitWorkflowInfo = (date: string) => {
   };
 };
 
-export const interceptProfitData = (): void => {
+/**
+ * Stubs the profit estimator's API. With `holdChangelogs`, `/api/v1/workflow-changelogs` waits
+ * until the returned function is called, so a test can let the bars render before the changelog.
+ */
+export const interceptProfitData = ({ holdChangelogs = false } = {}): (() => void) => {
+  const changelogsHeld = Promise.withResolvers<void>();
+  if (!holdChangelogs) changelogsHeld.resolve();
   cy.intercept('GET', '/api/v1/availability/compact', {
     body: availabilityBody(profitAvailabilityRows()),
   }).as('profit-availability');
@@ -272,6 +278,7 @@ export const interceptProfitData = (): void => {
         return { date, runs, changelogs, runConfigs };
       })
       .filter((d) => d.changelogs.length > 0);
-    req.reply({ body: { dates } });
+    return changelogsHeld.promise.then(() => req.reply({ body: { dates } }));
   }).as('profit-workflow-changelogs');
+  return changelogsHeld.resolve;
 };

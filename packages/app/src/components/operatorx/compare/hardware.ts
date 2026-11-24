@@ -23,7 +23,6 @@ export function sortHardware(keys: string[]): string[] {
   );
 }
 
-/** Adds or removes `key`; the last selected GPU stays selected, returning `selected` unchanged. */
 /** GPUs with at least one measured case in these views, the ones charts can draw. */
 export function measuredHardware(views: Pick<ComparisonView, 'measurements'>[]): string[] {
   const out = new Set<string>();
@@ -33,9 +32,33 @@ export function measuredHardware(views: Pick<ComparisonView, 'measurements'>[]):
   return sortHardware([...out]);
 }
 
-export function toggleHardwareSelection(selected: string[], key: string): string[] {
+/**
+ * Legend click, matching the inference charts: clicking a shown GPU isolates it, clicking the only
+ * shown GPU restores every GPU in `all`, and clicking a hidden GPU adds it. Returns `selected`
+ * unchanged when nothing would change so callers can skip the update.
+ */
+export function toggleHardwareSelection(
+  selected: string[],
+  key: string,
+  all: readonly string[],
+): string[] {
   if (!selected.includes(key)) return [...selected, key];
-  return selected.length > 1 ? selected.filter((h) => h !== key) : selected;
+  if (selected.length > 1) return [key];
+  return all.length > 1 ? [...all] : selected;
+}
+
+/**
+ * Whether a legend click on `key` restores every GPU: it is the only GPU that legend shows. Charts
+ * that show a subset of the selected GPUs check their own subset, not the page selection.
+ */
+export function restoresAllHardware(shown: readonly string[], key: string): boolean {
+  return shown.length === 1 && shown[0] === key;
+}
+
+/** Legend hide (x) button: removes `key`, keeping the last selected GPU selected. */
+export function removeHardwareSelection(selected: string[], key: string): string[] {
+  if (!selected.includes(key) || selected.length <= 1) return selected;
+  return selected.filter((h) => h !== key);
 }
 
 function spec(key: string): GpuSpec | undefined {

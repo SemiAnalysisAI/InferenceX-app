@@ -1,3 +1,4 @@
+import { interceptOpenRouterPricing } from '../support/profit-estimator';
 import { interceptProfitData } from '../support/profit-fixtures';
 
 function suppressNudges(win: Cypress.AUTWindow): void {
@@ -8,14 +9,14 @@ function suppressNudges(win: Cypress.AUTWindow): void {
 describe('Profit estimator route parameters', { testIsolation: true }, () => {
   beforeEach(() => {
     interceptProfitData();
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] });
+    interceptOpenRouterPricing({ data: [] });
   });
 
   for (const [prefix, tab] of [
     ['', 'profit-estimator'],
     ['/zh', 'profit-estimator-per-gigawatt'],
   ] as const) {
-    const roofline = prefix ? '理论上限' : 'Theoretical roofline';
+    const roofline = prefix ? '理论上限' : 'Theoretical Roofline';
     const actual = prefix ? '实测' : 'Actual';
     it(`defaults to roofline and preserves explicit Actual in ${prefix}/${tab}`, () => {
       const base = `${prefix}/infx/${tab}/deepseek-v4`;
@@ -98,7 +99,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
       cy.visit(`${gpuHour}?utm_source=test`, { onBeforeLoad: suppressNudges });
       cy.get('[data-testid="profit-estimator-chart"]').should('exist');
       cy.get('[data-testid="profit-basis-chip-hour"]').should('have.attr', 'aria-pressed', 'true');
-      cy.get('[data-testid="profit-controls"] h2').should('not.contain.text', perGwTitle);
+      cy.get('[data-testid="profit-controls"] h1').should('not.contain.text', perGwTitle);
       cy.get('[data-testid="profit-controls"]').should(
         'contain.text',
         prefix ? '按每 GPU 小时或每吉瓦年估算' : 'per GPU-hour or per gigawatt-year',
@@ -107,7 +108,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
       cy.location('pathname').should('eq', perGw);
       cy.location('search').should('eq', '?utm_source=test');
       cy.get('[data-testid="profit-basis-gw-year"]').should('have.attr', 'aria-pressed', 'true');
-      cy.get('[data-testid="profit-controls"] h2').should('contain.text', perGwTitle);
+      cy.get('[data-testid="profit-controls"] h1').should('contain.text', perGwTitle);
       cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
       cy.get('[data-testid="profit-cache-hit-selector"]').should(
         'contain.text',
@@ -121,7 +122,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
       cy.go('back');
       cy.location('pathname').should('eq', gpuHour);
       cy.get('[data-testid="profit-basis-chip-hour"]').should('have.attr', 'aria-pressed', 'true');
-      cy.get('[data-testid="profit-controls"] h2').should('not.contain.text', perGwTitle);
+      cy.get('[data-testid="profit-controls"] h1').should('not.contain.text', perGwTitle);
       cy.go('forward');
       cy.location('pathname').should('eq', perGw);
       cy.get('[data-testid="profit-basis-gw-year"]').should('have.attr', 'aria-pressed', 'true');

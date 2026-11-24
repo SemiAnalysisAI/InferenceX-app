@@ -1,7 +1,7 @@
 import { compactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
 import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
 
-import { availabilityBody } from '../support/e2e';
+import { availabilityBody, fastForwardQueryRetry } from '../support/e2e';
 
 /** Clicks the trend chart where its first point is drawn; the hover overlay above the dots takes the click. */
 const clickFirstTrendPoint = () =>
@@ -210,7 +210,7 @@ describe('Historical Trends — Content & Interactions', () => {
       );
       cy.wait('@benchmarks');
       cy.wait('@history');
-      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured energy');
+      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Energy');
       cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Input token');
       cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'Prefill GPUs');
       cy.get('[data-testid="historical-target-slider"]').should('be.visible');
@@ -262,14 +262,14 @@ describe('Historical Trends — Content & Interactions', () => {
       });
   });
 
-  it('offers the published tiers in the caption Cost Tier selector but no Custom user values', () => {
+  it('offers the published tiers in the caption Cost Tier selector but no Custom User Values', () => {
     cy.document().then((doc) => {
       delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]')
       .should('be.visible')
-      .and('contain.text', 'Owning at large hyperscaler volume')
+      .and('contain.text', 'Owning at Large Hyperscaler Volume')
       .click('right');
     cy.get('[data-testid="cost-tier-hyperscaler"]').should('exist');
     cy.get('[data-testid="cost-tier-rental"]').should('exist');
@@ -277,7 +277,7 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('[data-testid="cost-tier-rental"]').click();
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]').should(
       'contain.text',
-      'Rent – 3-year commit',
+      'Rent – 3-Year Commit',
     );
   });
 });
@@ -349,7 +349,9 @@ describe('Historical Trends — Chinese route', () => {
             : { body: benchmarkRows },
         );
       }).as('failedBenchmarks');
-      cy.reload();
+      fastForwardQueryRetry(':contains("历史基准测试数据加载失败")', () => {
+        cy.reload();
+      });
       cy.wait('@failedBenchmarks');
       cy.wait('@failedBenchmarks');
       cy.contains('历史基准测试数据加载失败').should('be.visible');
@@ -379,7 +381,9 @@ describe('Historical Trends — Chinese route', () => {
         );
       }).as('secondaryHistory');
 
-      cy.reload();
+      fastForwardQueryRetry('[data-testid="historical-trend-error"]', () => {
+        cy.reload();
+      });
       cy.wait('@secondaryHistory');
       cy.wait('@secondaryHistory');
       cy.get('[data-testid="historical-trend-error"]')

@@ -20,6 +20,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { relockFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
@@ -71,12 +72,13 @@ function decryptRow(cipher: Cipher, row: FeedbackListRow): DecryptedRow {
 
 const STRINGS = {
   en: {
+    title: 'User Feedback',
     explanation: 'All user-supplied columns are encrypted server-side. Paste the',
     explanationSuffix: 'to decrypt in your browser. The key never leaves this page.',
     keySecurity: 'Browser-only key handling · never persisted or sent to the server',
     encryptedState: 'Encrypted rows',
     processedState: 'Processed rows',
-    relock: 'Re-lock feature gate',
+    relock: 'Re-Lock Feature Gate',
     keyLabel: 'Decryption key (base64, 32 bytes)',
     keyPlaceholder: 'base64-encoded key',
     decrypt: 'Decrypt',
@@ -99,6 +101,7 @@ const STRINGS = {
     invalidKey: 'The decryption key must be valid base64 for exactly 32 bytes.',
   },
   zh: {
+    title: '用户反馈',
     explanation: '所有用户提交的字段均在服务端加密。粘贴',
     explanationSuffix: '即可在浏览器中解密。密钥不会离开此页面。',
     keySecurity: '仅在浏览器中处理密钥 · 不会持久化或发送到服务端',
@@ -181,6 +184,7 @@ export default function FeedbackViewer() {
     <div data-testid="feedback-viewer" className="flex flex-col gap-4">
       <Card>
         <form onSubmit={handleUnlock} className="flex flex-col gap-3">
+          <DashboardSectionHeader headingAs="h1" title={t.title} />
           <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <p className="text-sm leading-6 text-muted-foreground">
               {t.explanation}

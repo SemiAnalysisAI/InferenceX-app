@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+import { noteAgenticSiblingStep } from '@/lib/routing/agentic-detail-origin';
 
 import type { BenchmarkSibling, BenchmarkSku } from '@/hooks/api/use-benchmark-siblings';
 import {
@@ -229,8 +231,14 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
   const prev = currentIdx > 0 ? sorted[currentIdx - 1] : null;
   const next = currentIdx !== -1 && currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
 
-  const hrefFor = (id: number) =>
-    sortMode === 'default' ? `${agenticBase}/${id}` : `${agenticBase}/${id}?sort=${sortMode}`;
+  // Every sibling shares this SKU's model; naming it keeps Back pointed at the right chart even
+  // before the next point's data loads.
+  const chartModel = DB_MODEL_TO_DISPLAY[sku.model] ?? sku.model;
+  const hrefFor = (id: number, mode: SortMode = sortMode) => {
+    const params = new URLSearchParams({ g_model: chartModel });
+    if (mode !== 'default') params.set('sort', mode);
+    return `${agenticBase}/${id}?${params}`;
+  };
 
   const currentId = siblings.find((s) => s.is_current)?.id;
 
@@ -259,11 +267,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               setSortMode(mode);
               track('agentic_siblings_sorted', { mode });
               if (currentId !== undefined) {
-                const href =
-                  mode === 'default'
-                    ? `${agenticBase}/${currentId}`
-                    : `${agenticBase}/${currentId}?sort=${mode}`;
-                router.replace(href, { scroll: false });
+                router.replace(hrefFor(currentId, mode), { scroll: false });
               }
             }}
           >
@@ -293,7 +297,10 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             onClick={() => {
               if (prev) {
                 track('agentic_siblings_navigated', { direction: 'prev', target_id: prev.id });
-                router.push(hrefFor(prev.id));
+                // Stepping through siblings swaps the point in place so browser Back still
+                // returns to the page that opened the detail.
+                noteAgenticSiblingStep(prev.id);
+                router.replace(hrefFor(prev.id));
               }
             }}
             aria-label={t.previousAria}
@@ -309,7 +316,8 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
             onClick={() => {
               if (next) {
                 track('agentic_siblings_navigated', { direction: 'next', target_id: next.id });
-                router.push(hrefFor(next.id));
+                noteAgenticSiblingStep(next.id);
+                router.replace(hrefFor(next.id));
               }
             }}
             aria-label={t.nextAria}
@@ -332,7 +340,8 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               onClick={() => {
                 if (!active) {
                   track('agentic_siblings_navigated', { direction: 'chip', target_id: s.id });
-                  router.push(hrefFor(s.id));
+                  noteAgenticSiblingStep(s.id);
+                  router.replace(hrefFor(s.id));
                 }
               }}
               className={cn(

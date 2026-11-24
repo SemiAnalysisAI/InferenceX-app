@@ -32,17 +32,17 @@ import {
 
 const STRINGS = {
   en: {
-    gainTitle: 'Software gain on the same chip',
+    gainTitle: 'Software Gain on the Same Chip',
     gain: (name: string, ratio: string, date: string) =>
       `${name}: ${ratio} the ground of its first run (${date})`,
-    barsTitle: 'Gain at each interactivity vs first run',
+    barsTitle: 'Gain at Each Interactivity vs First Run',
     vsFirst: 'vs first run',
     na: 'NA',
     noData: (name: string) => `${name} does not reach this interactivity on both dates`,
     pick: 'Pick at least one chip.',
-    tableTitle: 'Gain by interactivity',
+    tableTitle: 'Gain by Interactivity',
     chip: 'Chip',
-    since: 'First run',
+    since: 'First Run',
     average: 'Average',
   },
   zh: {

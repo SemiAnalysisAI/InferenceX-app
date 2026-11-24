@@ -2,7 +2,7 @@
 
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useTheme } from 'next-themes';
@@ -16,7 +16,7 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import { profitTargetUrlValue } from '@/components/calculator/url-seed';
+import { profitTargetUrlValue, type ProfitUrlSeed } from '@/components/calculator/url-seed';
 import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
@@ -75,6 +75,7 @@ import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useDraftNumberInput } from '@/hooks/useDraftNumberInput';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
@@ -197,13 +198,13 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & profit estimator per gigawatt',
-      'chip-hour': 'Revenue & profit estimator',
+      'gw-year': 'Revenue & Profit Estimator per gigawatt',
+      'chip-hour': 'Revenue & Profit Estimator',
     },
     betaQualifier: 'Beta',
     description:
       'Estimated revenue, compute cost, model license fee and operator profit for each chip from measured throughput at a target interactivity, per GPU-hour or per gigawatt-year',
-    chartGroup: 'Chart config',
+    chartGroup: 'Chart Config',
     basisLabel: 'Estimate basis',
     basisTooltip:
       'Per GPU-hour shows what one chip earns and costs in an hour. Per gigawatt counts how many of each chip one gigawatt of all-in utility power runs for a year, so chips with different power draw share one budget.',
@@ -211,10 +212,10 @@ const STRINGS = {
       'chip-hour': 'Per GPU-hour',
       'gw-year': 'Per gigawatt',
     } satisfies Record<ProfitBasis, string>,
-    benchmarkGroup: 'Benchmark config',
+    benchmarkGroup: 'Benchmark Config',
     secondaryControls: 'More chart controls',
     changed: 'changed',
-    powerLabel: 'Power estimation',
+    powerLabel: 'Power Estimation',
     powerTooltip:
       'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
     powerOptions: {
@@ -230,51 +231,51 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
     powerDetails: `GPU power is interpolated between the same throughput points. Includes PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled chassis) or ${LIQUID_COOLED_RACK_PUE} (liquid-cooled NVL72) and 10% headroom. Aggregate multinode hosts use the measured deployment mean. NVL72 trays share one modeled rack equally and use measured Grace-socket power when the run has validated socket telemetry (otherwise modeled Grace power); the two are not interpolated together. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.`,
     csvPowerHeaders: ['Power basis', 'Power model revision'],
-    pricingGroup: 'Pricing config',
-    costProviderLabel: 'Cost provider',
+    pricingGroup: 'Pricing Config',
+    costProviderLabel: 'Cost Provider',
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip. Locked rental terms (on demand through 2 year commit) are published in the TCO model.',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: 'Cost provider',
-    priceSourceLabel: 'Token price',
+    priceSourceLabel: 'Token Price',
     priceSourceTooltip:
       "Where the sale price per million tokens comes from. OpenRouter reads the public catalog price for this model; the lab's list price is its published API rate, offered where third-party hosts undercut it; Custom lets you type your own input and output prices.",
     priceSourcePlaceholder: 'Token price',
     inputPriceLabel: 'Input $/M tok',
     outputPriceLabel: 'Output $/M tok',
     cachedPriceLabel: 'Cached input $/M tok',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
-    cacheHitLabel: 'Cache hit rates',
+    cacheHitLabel: 'Cache Hit Rates',
     cacheHitTooltip:
-      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical roofline',
+      theoretical: 'Theoretical Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
-    labCutLabel: 'Model license fee (%)',
+    labCutLabel: 'Model License Fee (%)',
     labCutTooltip:
       'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
     errorLoading: 'Error loading data. Please try a different selection.',
     utilizationShort: 'Utilization',
     labCutShort: 'License fee',
-    highContrast: 'High contrast',
+    highContrast: 'High Contrast',
     pricingLoading: 'Loading OpenRouter pricing…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
-        ? `OpenRouter has no price for ${modelId}. Switch Token price to Custom to enter one.`
-        : 'This model has no OpenRouter listing. Switch Token price to Custom to enter a price.',
-    sellingPriceLabel: 'Selling price per million tokens',
+        ? `OpenRouter has no price for ${modelId}. Switch Token Price to Custom to enter one.`
+        : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
+    sellingPriceLabel: 'Selling Price per Million Tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
+      `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
     sourceLabel: 'Source:',
     formulaTitle: {
-      'gw-year': 'Revenue per gigawatt formula',
-      'chip-hour': 'Revenue per chip-hour formula',
+      'gw-year': 'Revenue per gigawatt Formula',
+      'chip-hour': 'Revenue per Chip-Hour Formula',
     },
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
@@ -308,10 +309,10 @@ const STRINGS = {
       ],
     },
     compareHistory: 'Compare history',
-    gpuConfig: 'Chip config',
+    gpuConfig: 'Chip Config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
-    gpuConfigPlaceholder: 'Select chip config',
-    comparisonDateRange: 'Comparison date range',
+    gpuConfigPlaceholder: 'Select Chip Config',
+    comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above. Dates in between can be added one at a time from the Config Changelog.',
     dateRangePlaceholder: 'Select date range',
@@ -483,6 +484,11 @@ function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
+function parsePositiveTarget(raw: string): number | null {
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export const PROFIT_BASIS_TAB: Record<ProfitBasis, ProfitRouteTab> = {
   'chip-hour': 'profit-estimator',
   'gw-year': 'profit-estimator-per-gigawatt',
@@ -504,7 +510,11 @@ export default function ProfitEstimatorDisplay({
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
         >
-          <ProfitEstimatorInner initialTarget={urlSeed.profitTarget} basis={basis} />
+          <ProfitEstimatorInner
+            initialTarget={urlSeed.profitTarget}
+            profitSeed={urlSeed.profit}
+            basis={basis}
+          />
         </GlobalFilterProvider>
       )}
     </CalculatorUrlSeedBoundary>
@@ -538,15 +548,17 @@ function usePercentField(defaultValue: number, eventName: string) {
 
 function ProfitEstimatorInner({
   initialTarget,
+  profitSeed,
   basis,
 }: {
   initialTarget?: number;
+  profitSeed?: ProfitUrlSeed;
   basis: ProfitBasis;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartStrings = profitEstimatorChartStrings(locale);
-  const { setUrlParam, getUrlParam } = useUrlState();
+  const { setUrlParam } = useUrlState();
   const router = useRouter();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
@@ -563,7 +575,7 @@ function ProfitEstimatorInner({
   const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availableModels, availability } = useGlobalFilterAvailability();
+  const { availableModels, availability, availabilitySettled } = useGlobalFilterAvailability();
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(
     () => profitAgenticModels(PROFIT_BASIS_TAB[basis], availableModels, availability?.lines),
@@ -594,23 +606,18 @@ function ProfitEstimatorInner({
   const [targetValue, setTargetValue] = useState<number>(
     () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
-  const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
   useEffect(() => {
     setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
   }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
   const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
-  const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
+  const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>(
+    profitSeed?.powerBasis ?? 'provisioned',
+  );
   const powerBasis = powerControlsEnabled ? requestedPowerBasis : 'provisioned';
-  useEffect(() => {
-    const value = getUrlParam('c_power');
-    setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
-  }, [getUrlParam]);
-  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(DEFAULT_CACHE_HIT_MODE);
-  useEffect(() => {
-    const value = getUrlParam('c_chmode');
-    setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
-  }, [getUrlParam]);
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(
+    profitSeed?.cacheHitMode ?? DEFAULT_CACHE_HIT_MODE,
+  );
   const isMobile = useIsMobileViewport();
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -624,7 +631,6 @@ function ProfitEstimatorInner({
     defaultsAppliedFor.current = selectedModel;
     const defaults = profitModelDefaults(selectedModel);
     setTargetValue(defaults.interactivity);
-    setTargetRaw(String(defaults.interactivity));
     setPriceSource(defaultPriceSource(selectedModel));
     resetLabCut(defaults.labCutPct);
   }, [selectedModel, resetLabCut]);
@@ -661,26 +667,19 @@ function ProfitEstimatorInner({
     includePower,
   );
 
-  const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
-  const [selectedDateRange, setSelectedDateRange] = useState({
-    startDate: '',
-    endDate: '',
-  });
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [historyHydrated, setHistoryHydrated] = useState(false);
+  // Seeded from the route so a shared link renders its history controls on the server.
+  const [selectedGPUs, setSelectedGPUs] = useState<string[]>(
+    () => profitSeed?.historyGpus.slice(0, PROFIT_HISTORY_MAX_GPUS) ?? [],
+  );
+  const [selectedDateRange, setSelectedDateRange] = useState(
+    () => profitSeed?.historyDateRange ?? { startDate: '', endDate: '' },
+  );
+  const [selectedDates, setSelectedDates] = useState<string[]>(
+    () => profitSeed?.historyDates ?? [],
+  );
   useEffect(() => {
-    const gpus = getUrlParam('i_gpus');
-    if (gpus) setSelectedGPUs(gpus.split(',').filter(Boolean).slice(0, PROFIT_HISTORY_MAX_GPUS));
-    const startDate = getUrlParam('i_dstart') || '';
-    const endDate = getUrlParam('i_dend') || '';
-    if (startDate && endDate) setSelectedDateRange({ startDate, endDate });
-    const dates = getUrlParam('i_dates');
-    if (dates) setSelectedDates(dates.split(',').filter(Boolean));
-    setHistoryHydrated(true);
-  }, [getUrlParam]);
-  useEffect(() => {
-    if (historyHydrated) setUrlParam('i_dates', selectedDates.join(','));
-  }, [historyHydrated, selectedDates, setUrlParam]);
+    setUrlParam('i_dates', selectedDates.join(','));
+  }, [selectedDates, setUrlParam]);
 
   const dbModelKeys = useMemo<string[]>(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
@@ -709,7 +708,7 @@ function ProfitEstimatorInner({
     [availability, dbModelKeys, selectedPrecisions, selectedGPUs],
   );
   useEffect(() => {
-    if (!historyHydrated || !availability || selectedGPUs.length === 0) return;
+    if (!availability || selectedGPUs.length === 0) return;
     const { startDate, endDate } = selectedDateRange;
     if (!startDate || !endDate) return;
     const available = new Set(historyAvailableDates);
@@ -718,14 +717,7 @@ function ProfitEstimatorInner({
     setSelectedDates([]);
     setUrlParam('i_dstart', '');
     setUrlParam('i_dend', '');
-  }, [
-    historyHydrated,
-    availability,
-    selectedGPUs.length,
-    selectedDateRange,
-    historyAvailableDates,
-    setUrlParam,
-  ]);
+  }, [availability, selectedGPUs.length, selectedDateRange, historyAvailableDates, setUrlParam]);
 
   const handleHistoryGpuChange = useCallback(
     (next: string[]) => {
@@ -883,7 +875,7 @@ function ProfitEstimatorInner({
   }, [costProvider, customCostBases, tcoBasis]);
   const handleCostProviderChange = useCallback(
     (next: string) => {
-      if (interceptLockedTier(next)) return;
+      if (interceptLockedTier(next)) return false;
       if (next === 'custom') enterCustomCosts();
       else setCostProvider(next as ProfitCostProvider);
       track('profit_cost_provider_changed', { provider: next });
@@ -964,12 +956,14 @@ function ProfitEstimatorInner({
     }),
     [utilization.value, labCut.value, basis, powerBasis],
   );
+  // The slider and input repaint at once; the estimate and chart follow in the background.
+  const chartTarget = useDeferredValue(targetValue);
 
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
     const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
     const current = getResults(
-      targetValue,
+      chartTarget,
       mode,
       interpolationCostProvider,
       undefined,
@@ -983,7 +977,7 @@ function ProfitEstimatorInner({
             selectedGPUs,
             precisions: selectedPrecisions,
             percentile: selectedPercentile,
-            targetValue,
+            targetValue: chartTarget,
             mode,
             costProvider: interpolationCostProvider,
             powerBasis: curvePowerBasis,
@@ -1001,7 +995,7 @@ function ProfitEstimatorInner({
       pricing,
       assumptions,
       powerBasis,
-      targetValue,
+      chartTarget,
       t.powerBarLabels,
     );
     if (!historyActive) return estimated;
@@ -1019,7 +1013,7 @@ function ProfitEstimatorInner({
     cacheHitMode,
     powerBasis,
     t.powerBarLabels,
-    targetValue,
+    chartTarget,
     mode,
     interpolationCostProvider,
     costPerGpuHourFor,
@@ -1080,24 +1074,10 @@ function ProfitEstimatorInner({
     [fullEstimate, visibleHwKeys],
   );
 
-  const handleTargetChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setTargetRaw(e.target.value);
-    const parsed = Number.parseFloat(e.target.value);
-    if (Number.isFinite(parsed) && parsed > 0) setTargetValue(parsed);
-  }, []);
-
-  const handleTargetSlide = useCallback((value: number) => {
-    setTargetValue(value);
-    setTargetRaw(String(value));
-  }, []);
-
-  const handleTargetBlur = useCallback(() => {
-    const parsed = Number.parseFloat(targetRaw);
-    const next = Number.isFinite(parsed) && parsed > 0 ? parsed : targetValue;
+  const targetInput = useDraftNumberInput(targetValue, parsePositiveTarget, (next, source) => {
     setTargetValue(next);
-    setTargetRaw(String(next));
-    track('profit_target_set', { mode, value: next });
-  }, [targetRaw, targetValue, mode]);
+    if (source === 'blur') track('profit_target_set', { mode, value: next });
+  });
 
   const handleModelChange = useCallback(
     (value: string) => {
@@ -1350,7 +1330,7 @@ function ProfitEstimatorInner({
             getSequenceLabel(Sequence.AgenticTraces, locale),
           )}
           <HeadingQualifier>
-            {profitChartQualifier(locale, percentileLabel, targetValue)}
+            {profitChartQualifier(locale, percentileLabel, chartTarget)}
           </HeadingQualifier>
         </Heading>
         {powerControlsEnabled && (
@@ -1375,7 +1355,7 @@ function ProfitEstimatorInner({
     selectedModel,
     locale,
     percentileLabel,
-    targetValue,
+    chartTarget,
     basis,
     t,
     historyActive,
@@ -1513,7 +1493,14 @@ function ProfitEstimatorInner({
 
   if (!loading && error) {
     console.error(error);
-    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
+    return (
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.title[basis]} />
+        </Card>
+        <EmptyState className="h-64">{t.errorLoading}</EmptyState>
+      </div>
+    );
   }
 
   const secondaryCount =
@@ -1600,6 +1587,7 @@ function ProfitEstimatorInner({
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
+              headingAs="h1"
               title={t.title[basis]}
               qualifier={t.betaQualifier}
               description={t.description}
@@ -1641,8 +1629,11 @@ function ProfitEstimatorInner({
                       label={t.targetAgenticLabel(percentileLabel)}
                       min={ranges.interactivity.min}
                       max={ranges.interactivity.max}
-                      value={targetValue}
-                      onSliderChange={handleTargetSlide}
+                      value={targetInput.sliderValue}
+                      onSliderChange={(next) => {
+                        targetInput.discardDraft();
+                        setTargetValue(next);
+                      }}
                       onSliderCommit={() =>
                         track('profit_target_set', { mode, value: targetValue })
                       }
@@ -1653,9 +1644,7 @@ function ProfitEstimatorInner({
                         onWheel: blurOnWheel,
                         inputMode: 'decimal',
                         min: 1,
-                        value: targetRaw,
-                        onChange: handleTargetChange,
-                        onBlur: handleTargetBlur,
+                        ...targetInput.input,
                       }}
                     />
                   </div>
@@ -1897,7 +1886,9 @@ function ProfitEstimatorInner({
                   selectedPrecisions={selectedPrecisions}
                   modelDbKeys={dbModelKeys}
                   selectedSequence={selectedSequence}
-                  loading={historyChangelogs.loading}
+                  // Reserve the loading height until availability says which dates to query, so
+                  // the list doesn't grow under the chart after hydration.
+                  loading={historyChangelogs.loading || !availabilitySettled}
                   totalDatesQueried={historyChangelogs.totalDatesQueried}
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}
@@ -1915,7 +1906,7 @@ function ProfitEstimatorInner({
 
       {loading && (
         <Card>
-          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-200 w-full" />
         </Card>
       )}
 

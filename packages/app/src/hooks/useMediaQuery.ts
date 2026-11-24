@@ -10,7 +10,8 @@ function canMatch(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function';
 }
 
-export function useMediaQuery(query: string): boolean {
+/** `serverValue` is what the server and hydration render before the viewport can be asked. */
+export function useMediaQuery(query: string, serverValue = false): boolean {
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       if (!canMatch()) return NOOP;
@@ -21,7 +22,7 @@ export function useMediaQuery(query: string): boolean {
     [query],
   );
   const getSnapshot = useCallback(() => canMatch() && window.matchMedia(query).matches, [query]);
-  return useSyncExternalStore(subscribe, getSnapshot, () => false);
+  return useSyncExternalStore(subscribe, getSnapshot, () => serverValue);
 }
 
 export function useIsMobileViewport(): boolean {

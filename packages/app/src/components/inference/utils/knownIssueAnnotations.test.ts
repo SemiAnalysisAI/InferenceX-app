@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import * as d3 from 'd3';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import { KNOWN_CONFIG_ISSUES } from '@/lib/benchmarks/known-issues';
 
@@ -8,10 +8,13 @@ import {
   type AnnotationRenderOptions,
   type KnownIssueAnnotation,
   renderKnownIssueAnnotations,
+  createKnownIssueLayer,
 } from './knownIssueAnnotations';
+import type { RenderContext } from '@/lib/d3-chart/D3Chart/types';
 
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+const actual = { ...(await import('@/lib/d3-chart/dynamic-margins')) };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actual,
   measureTextWidth: (text: string, font: string) =>
     text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
@@ -209,6 +212,27 @@ describe('renderKnownIssueAnnotations dismiss control', () => {
   it('omits the close button when no dismiss handler is provided', () => {
     renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [veraRubinPreview] }));
     expect(g.select('[data-testid="chart-notice-dismiss"]').empty()).toBe(true);
+  });
+
+  it.each([
+    ['screen', 1],
+    ['export', 0],
+  ] as const)('draws %s notices with %i close buttons', (surface, count) => {
+    const layer = createKnownIssueLayer(() => ({
+      ...baseOptions({ annotations: [veraRubinPreview] }),
+      onDismiss: vi.fn(),
+    }));
+    const svg = d3.select(g.node()!.ownerSVGElement!);
+    const ctx = {
+      layout: { g, defs, zoomGroup: g, svg, margin: { top: 0, right: 0, bottom: 0, left: 0 } },
+      xScale: d3.scaleLinear(),
+      yScale: d3.scaleLinear(),
+      width: 800,
+      height: 500,
+      surface: surface === 'export' ? surface : undefined,
+    } as unknown as RenderContext;
+    layer.render?.(g, ctx);
+    expect(g.selectAll('[data-testid="chart-notice-dismiss"]').size()).toBe(count);
   });
 
   it('renders one close button per box, outside the issue link, and reports the annotation', () => {

@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { comparisonExclusion } from '../utils/comparison-exclusion';

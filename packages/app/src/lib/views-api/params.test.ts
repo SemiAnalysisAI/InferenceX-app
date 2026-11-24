@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { VENDOR_ORDER } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_TCO_BASIS } from '@/lib/catalog/constants';
@@ -29,8 +29,8 @@ import {
   parseChipBasisParam,
   resolveModelParam,
   VENDOR_VALUES,
-  VIEWS_MODEL_NAMES,
 } from './params';
+import { MODEL_DISPLAY_NAMES } from '@/lib/catalog/model-name-resolver';
 
 describe('resolveModelParam', () => {
   it('resolves a canonical display name', () => {
@@ -43,8 +43,12 @@ describe('resolveModelParam', () => {
     expect(resolveModelParam('deepseek-v4-pro').displayName).toBe('DeepSeek-V4-Pro');
   });
 
-  it('accepts compare-page slugs and aliases', () => {
+  it('accepts compare-page slugs, DB model keys, and legacy names', () => {
     expect(resolveModelParam('deepseek-v4').displayName).toBe('DeepSeek-V4-Pro');
+    expect(resolveModelParam('dsv4').displayName).toBe('DeepSeek-V4-Pro');
+    expect(resolveModelParam('Qwen3.5-397B-A17B').displayName).toBe('Qwen-3.5-397B-A17B');
+    // Compare-page family aliases keep resolving here, as they always have on the views API.
+    expect(resolveModelParam('deepseek').displayName).toBe('DeepSeek-R1-0528');
   });
 
   it('rejects unknown models with the allowed list', () => {
@@ -54,7 +58,7 @@ describe('resolveModelParam', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ViewsApiParamError);
       expect((error as ViewsApiParamError).param).toBe('model');
-      expect((error as ViewsApiParamError).allowed).toEqual(VIEWS_MODEL_NAMES);
+      expect((error as ViewsApiParamError).allowed).toEqual(MODEL_DISPLAY_NAMES);
     }
   });
 

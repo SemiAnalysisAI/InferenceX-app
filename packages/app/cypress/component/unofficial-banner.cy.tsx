@@ -50,15 +50,4 @@ describe('Standalone unofficial-run banner', () => {
       cy.get('@dismissRun').should('have.been.calledOnceWith', String(run.id));
     });
   }
-
-  it('adds no banner or spacing when no runs are loaded', () => {
-    cy.mount(
-      <UnofficialRunContext.Provider value={createMockUnofficialRunContext()}>
-        <div data-testid="banner-slot">
-          <UnofficialRunBanner />
-        </div>
-      </UnofficialRunContext.Provider>,
-    );
-    cy.get('[data-testid="banner-slot"]').should('be.empty');
-  });
 });

@@ -33,13 +33,14 @@ import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
+import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability';
 
 import ComparePageClient from './page-client';
 
 export const revalidate = 86400;
 
-export function generateStaticParams(): { slug: string }[] {
-  return [];
+export function generateStaticParams(): Promise<{ slug: string }[]> {
+  return getPrerenderedCompareParams();
 }
 
 function comparePath(canonical: string, scenarioSegment?: ScenarioSegment): string {

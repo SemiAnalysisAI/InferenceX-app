@@ -5,10 +5,7 @@ on:
   pull_request:
     branches: [main, master]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/tests-skills.yml'
-      - '.github/workflows/publish-skills.yml'
-      - 'packages/skills/**'
+  merge_group:
 
 permissions: {}
 
@@ -17,10 +14,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changed files
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read # List the pull request's changed files.
+    outputs:
+      run: ${{ steps.match.outputs.run }}
+    steps:
+      # Pull requests skip the suite when nothing it covers changed; the merge queue always runs it.
+      - id: match
+        uses: $/.github/actions/changed-files
+        with:
+          token: ${{ github.token }}
+          pattern: '^(\.github/workflows/(tests|publish)-skills\.yml$|\.github/actions/changed-files/|packages/skills/|bun\.lock$)'
+
   pack-archive:
     name: Pack skills archive (Linux, Node 24)
-    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.pull_request.draft }}
-    timeout-minutes: 5
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' && !github.event.pull_request.draft }}
+    timeout-minutes: 10
     runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
@@ -32,6 +46,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          filter: blob:none
+          sparse-checkout: packages/skills
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -77,15 +93,19 @@ jobs:
         os:
           - id: linux
             name: Linux
-            runner: blacksmith-2vcpu-ubuntu-2404
+            runner: blacksmith-16vcpu-ubuntu-2404
           - id: macos
             name: macOS
-            runner: macos-latest
+            runner: blacksmith-12vcpu-macos-latest
         node-version: ['24', '26']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          filter: blob:none
+          sparse-checkout: |
+            packages/skills
+            patches
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node-version }}
@@ -93,7 +113,7 @@ jobs:
           package-manager-cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - name: Install pinned schema-consumer dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --filter @semianalysisai/inferencex-skills
       - name: Download the exact Node 24 archive
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -160,3 +180,15 @@ jobs:
           path: ${{ runner.temp }}/inferencex-skills-platform-acceptance/
           if-no-files-found: error
           retention-days: 30
+
+  result:
+    name: Skills tests
+    needs: [changes, pack-archive, packed-skills]
+    if: ${{ always() }}
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Fail when a skills job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1

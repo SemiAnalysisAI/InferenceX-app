@@ -14,7 +14,7 @@ import {
   trackMoves,
 } from '@/lib/powerx/ladder';
 import { cn } from '@/lib/shared/utils';
-import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-categories';
 
 import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
@@ -51,8 +51,6 @@ const STRINGS = {
 const HASH_KEY = 'ld';
 const SPARK_W = 136;
 const SPARK_H = 40;
-/** Slider drags ease faster than chip switches so the readouts keep up with the thumb. */
-const SLIDE_MS = 200;
 
 export function LoadWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
@@ -76,7 +74,8 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
   const fraction = gpuWatts / sweep.tdpWatts;
   const targets: Record<string, number> = { gpu: gpuWatts, it: ladder?.itWatts ?? 0 };
   for (const segment of ladder?.segments ?? []) targets[`seg:${segment.category}`] = segment.watts;
-  const shown = useEasedValues(targets, SLIDE_MS);
+  // Ease a chip switch; a slider drag tracks the thumb directly.
+  const shown = useEasedValues(targets, undefined, hardware);
   const shownFraction = shown.gpu / sweep.tdpWatts;
 
   return (

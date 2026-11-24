@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { InferenceData, OverlayData } from '@/components/inference/types';
 import { htmlText as text, pointDetailsText } from './point-details-test-helpers';
@@ -103,8 +103,8 @@ describe.each([
     expect(disabled).not.toContain('CPU 24.2%');
     const partial = render(config({ data: point({ server_gpu_cache_hit_rate: undefined }) }));
     expect(partial).not.toContain('data-hover-cache-bar');
-    expect(text(partial)).toContain('CPU cache hit rate: 24.2%');
-    expect(text(partial)).toContain('Theoretical cache hit rate: 97.3%');
+    expect(text(partial)).toContain('CPU Cache Hit Rate: 24.2%');
+    expect(text(partial)).toContain('Theoretical Cache Hit Rate: 97.3%');
     const zero = render(config({ data: point({ server_gpu_cache_hit_rate: 0 }) }));
     expect(zero).toContain('data-hover-cache-bar');
     expect(text(zero)).toContain('Chip 0.0%');
@@ -190,7 +190,7 @@ describe.each([
     );
     expect(html).toContain('data-token-prompt style="width: 75%;"');
     expect(html).toContain('data-token-generated style="width: 25%;"');
-    expect(html).toContain('Prompt tokens: 75; Generated tokens: 25');
+    expect(html).toContain('Prompt Tokens: 75; Generated Tokens: 25');
     expect(html).toContain('class="pinned-token-count">75</span>');
     expect(html).toContain('class="pinned-token-count">25</span>');
   });
@@ -303,10 +303,10 @@ describe('reader-facing fields', () => {
       'Decode 47 EP31PP37/DCP41/PCP43 2',
       'Prefill TP 3 · EP 5 · DPA on · PP 7 · DCP 11 · PCP 13 · DWDP 17',
       'Decode TP 29 · EP 31 · DPA off · PP 37 · DCP 41 · PCP 43',
-      'Offload type: DRAM',
-      'KV transfer engine: NIXL',
+      'Offload Type: DRAM',
+      'KV Transfer Engine: NIXL',
       'Router: sgl-router 0.3.1',
-      'External cache hit rate: 12.3%',
+      'External Cache Hit Rate: 12.3%',
       'Chip 70.7%',
       'CPU 24.2%',
       'theoretical 97.3%',
@@ -314,7 +314,7 @@ describe('reader-facing fields', () => {
       'Requests: 199 / 200 (100%)',
       '566,443,844',
       '4,180,360',
-      'Power measurement: Validated (current PowerX method)',
+      'Power Measurement: Validated (current PowerX method)',
       'Measured chip power avg 812 W · P75 830 W · P90 845 W · prefill 700 W · decode 900 W',
       'Measured energy 0.51 J/output token · 0.12 J/total token · 0.4 J/input token · 1234 J/query · prefill 0.3 J/input token · decode 0.6 J/output token',
       'Chip telemetry 61 °C avg · 78 °C peak · 84% util · 140 GiB memory',

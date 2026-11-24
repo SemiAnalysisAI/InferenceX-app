@@ -412,6 +412,10 @@ All text keys (model, hardware, framework, precision) have `CHECK (field = lower
 
 Never rewrite an applied migration; add a new numbered file. `runMigrations` (`packages/db/src/lib/migration-runner.ts`) keys `schema_migrations` on the filename only, so an edited file is skipped on every database that already ran it.
 
+Migrations are applied by hand, so a database can fall behind the repository. `bun run admin:db:check-migrations` lists every file in `packages/db/migrations` that `schema_migrations` does not record (all of them when the table is missing) and exits nonzero. The ingest workflow and Apply Run Overrides run it before any database write, so a database that is behind aborts the job with nothing written and a `Pending database migrations` annotation. The post-write `admin:db:verify` reports the same list without failing, so it never turns a committed ingest red or skips cache invalidation.
+
+If a listed file's schema is already in the database, record it with `insert into schema_migrations (filename) values ('<file>')`. Otherwise run `bun run admin:db:migrate`, which applies every file still unrecorded.
+
 ## ETL Design
 
 ### Config Cache
@@ -449,6 +453,27 @@ A raw series in the blob is one `(scrape endpoint × phase block × label set)` 
 The cluster average is then a mean across those logical engines on the union of their scrape instants, with each engine holding its last sample until its next one and contributing only inside its own observed window (and only while that sample is fresher than 5× the engine's own median scrape gap, so a reporting hole drops the engine out of the mean rather than pinning it to a stale reading). Grouping on an exact `start_ns` instead would average whichever engines happened to share that nanosecond — on a disaggregated run that alternates between "prefill only" and "decode only" and reads as a full-scale sawtooth.
 
 Engines are ordered by role, then numeric rank, then worker — never by the composed display string, which would sort `"decode 10"` before `"decode 2"` and scramble DP ranks. The role is only shown when engines actually differ in role, so an aggregated deployment reads `DP 0…DP 3` rather than `decode 0…decode 3`.
+
+### TensorRT-LLM Disaggregated Prompt Counters
+
+A disaggregated TRT-LLM decode worker re-reports prompts received from prefill
+in `trtllm_prompt_tokens`. Older builds count transferred KV as cached;
+[TensorRT-LLM #19743](https://github.com/NVIDIA/TensorRT-LLM/pull/19743)
+changes generation workers to report the prefix reused from their own cache.
+Summing every endpoint counts prompts twice and pushes the aggregate hit rate
+towards `(h + 1) / 2` or `h / 2`, where `h` is the prefill prefix hit rate.
+
+For disaggregated TRT-LLM, aggregate prompt, cached-prompt, prefill-batch and
+hit-rate metrics prefer identified prefill endpoints; without those, they exclude endpoints labelled decode (`disaggregation_mode=decode`
+or `dynamo_component=backend`). Role labels can come from another metric on the
+same endpoint. Per-worker sources retain their own counters, including decode
+measurements. Decode-only scrapes do not supply aggregate prefill measurements.
+
+The same scoped token totals produce chart data and the ingested
+`server_gpu_cache_hit_rate`. `db:backfill-chart-series` refreshes stored chart
+series and linked row rates atomically; failure leaves the previous chart version
+retryable. Merging changes to this parser triggers the existing
+`recompute-agentic-metrics.yml` stale-only repair and cache invalidation workflow.
 
 ### ATOM Server Metrics
 
@@ -838,6 +863,18 @@ current summary, or with one over 32 MiB, are derived from `chart_series` as
 before. A change to the overlay or the payload's series fields bumps
 `SUMMARY_FORMAT`.
 
+`chart_series` must be a jsonb object. Through postgres.js (v3 and v4), JSON text
+bound straight to a jsonb parameter is encoded again and stored as a jsonb
+string, so writers either pass the object (`sql.json`, `jsonbParam`) or cast the
+text first (`${json}::text::jsonb`). Neon's HTTP driver sends the text as-is, so
+the bug only shows on the postgres.js path. Rows written that way before the fix
+(the route's self-heal under postgres.js, and `db:backfill-chart-series` from
+#1649 until #1763) read as stale. The metadata read still serves their summary
+when it is current. Otherwise it recomputes from the blob, as the source read
+always does for them, and the self-heal rewrites the row as an object.
+`db:backfill-chart-series` also selects them, since their `version` reads as
+null.
+
 ### Schema Version Detection
 
 `mapBenchmarkRow()`, `mapEvalRow()`, and `mapAggEvalRow()` all use
@@ -950,10 +987,10 @@ semantics change so cached point payloads are refreshed.
 
 #### Migration and targeted recovery
 
-No workflow or Vercel deploy applies main-database migrations; apply them by hand before deploying code
+No workflow or Vercel deploy applies main-database migrations. Apply them by hand before deploying code
 that needs them, or readers fail until the migration runs. From the
 repository root, with credentials for the reviewed target database, run
-`bun run admin:db:migrate --yes` after checking pending migrations. The app and ingest
+`bun run admin:db:check-migrations` to list unrecorded migrations, record any whose schema is already present (see Append-Only Migrations), then run `bun run admin:db:migrate --yes`. The app and ingest
 process must use the same database.
 
 For a repair, retain the original artifact bytes, sidecars and receipt, and snapshot
@@ -1061,7 +1098,10 @@ postgres.js client code. The workflow step "Check database writes" runs even aft
 an earlier step fails, annotates each entry on the run page, fails on errors, and
 adds a short summary to the Slack failure message. Known failures listed in
 `DB_WRITE_WARNING_RULES` (`etl/skip-tracker.ts`) are warnings instead: they are
-annotated but not counted or fatal.
+annotated but not counted or fatal. A trace replay whose profile or server metrics
+export cannot be read is still written, with the stats or chart series derived from
+that input left empty. Each such input adds a `trace_replay` warning naming the
+agentic config (and concurrency) and the parse error.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database

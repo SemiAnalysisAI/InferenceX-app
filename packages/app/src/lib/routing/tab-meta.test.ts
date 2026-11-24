@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { DASHBOARD_ROUTE_KEYS } from './dashboard-routes';
 import { Model } from '@/lib/catalog/data-mappings';
@@ -113,7 +113,6 @@ describe('dashboard SEO metadata', () => {
         const description = meta.description(route.seoName);
         expect(description.length).toBeLessThanOrEqual(155);
         expect(description).toContain(route.seoName);
-        expect(meta.intro(route.seoName)).toContain(route.seoName);
       }
     }
   });

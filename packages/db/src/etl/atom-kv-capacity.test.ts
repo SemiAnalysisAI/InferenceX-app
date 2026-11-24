@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   ATOM_KV_BLOCKS_METRIC,
@@ -111,9 +111,7 @@ describe('ATOM KV capacity', () => {
       }
       return Promise.resolve(Object.assign([], { count: 1 }));
     };
-    const sql = Object.assign(execute, {
-      array: (values: unknown[]) => values,
-    }) as unknown as Parameters<typeof updateAtomKvCachePoolTokens>[0];
+    const sql = execute as unknown as Parameters<typeof updateAtomKvCachePoolTokens>[0];
     expect(await updateAtomKvCachePoolTokens(sql, [440703], 482735)).toBe(1);
     expect(calls).toHaveLength(3);
     expect(calls[0].text).toContain("c.framework = 'atom' and not c.disagg");

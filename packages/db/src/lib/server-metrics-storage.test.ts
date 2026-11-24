@@ -1,19 +1,20 @@
 import { randomBytes } from 'node:crypto';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { readServerMetricsGz } from './server-metrics-storage';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 let db: PGlite;
 let sql: PgliteSql;
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 });
 afterAll(async () => {
-  await db.close();
+  await sql?.end();
+  await db?.close();
 });
 
 async function traceWith(blob: Buffer | null): Promise<number> {

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { at, loadBundle, type Bundle, type Json } from './bundle';
 import { nativeHardware } from './hardware';
 import { videoHistoryEntry } from './history';
@@ -185,6 +185,7 @@ describe('native srt-slurm H3 bundle', () => {
     expect(nativeHardware({ ci: { runner_name: 'runner-07' } }, 'b200-nscale')).toBe('B200');
     expect(nativeHardware({ ci: { runner_name: 'h200-dgxc-gha-01' } }, 'b200-nscale')).toBe('B200');
     expect(nativeHardware({ ci: { runner_name: 'gb200-nvl72-02' } })).toBe('GB200 NVL72');
+    expect(nativeHardware({ ci: { runner_name: 'a100-cw_00' } }, 'a100-cw')).toBe('A100');
     expect(nativeHardware({ ci: { runner_name: 'runner-07' } })).toBe('');
     expect(nativeHardware({ ci: { runner_name: null } })).toBe('');
     expect(nativeHardware(null)).toBe('');

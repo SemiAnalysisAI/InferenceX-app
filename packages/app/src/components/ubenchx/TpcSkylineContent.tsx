@@ -10,14 +10,15 @@ import { HuaweiSkuConfigurations } from './HuaweiSkuConfigurations';
 import { UbenchxHub } from './UbenchxHub';
 import { TPC_SKYLINE_RUNS } from './tpc-skyline-data';
 import { transformTpcSkylineRun } from './tpc-skyline-transform';
+import { MethodologyFold } from './MethodologyFold';
 
 const STRINGS = {
   en: {
-    nvidia: 'NVIDIA measured TPC groupings',
+    nvidia: 'NVIDIA Measured TPC Groupings',
     product: 'Product',
     gpcs: 'Measured # of GPCs',
     sms: 'Measured # of SMs',
-    grouping: 'Measured TPC groupings',
+    grouping: 'Measured TPC Groupings',
     methodology: 'Methodology',
     methodologyText:
       'gpc_query launches thread-block clusters of every size from 2 up to the hardware maximum and records the SM each block runs on. A cluster always runs within one GPC, so SMs that share a cluster are merged into the same GPC. Each list gives TPCs (two SMs each) per GPC, sorted descending; positions are not physical GPC indices.',
@@ -102,8 +103,9 @@ export function TpcSkylineContent() {
             <div className="mt-3">
               <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
               <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
-                <h3 className="font-medium text-foreground">{t.methodology}</h3>
-                <p>{t.methodologyText}</p>
+                <MethodologyFold title={t.methodology} testId="tpc-skyline">
+                  <p>{t.methodologyText}</p>
+                </MethodologyFold>
               </div>
               <div className="mt-3 overflow-x-auto" data-testid="tpc-skyline-device-specs">
                 <table className="w-full text-left text-xs text-muted-foreground tabular-nums">

@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, type Mock, spyOn } from 'bun:test';
 
+import { stubEnv, unstubAllEnvs } from '../lib/test-helpers';
 import { createWorkflowRunServices } from './workflow-run';
 
 const RUN_ID = 12_345_678_901;
@@ -21,21 +22,21 @@ function runResponse(repo: string): Response {
   });
 }
 
-function stubFetch(...responses: Response[]): Mock {
-  const fetchMock = vi.fn();
+function stubFetch(...responses: Response[]): Mock<(...args: unknown[]) => unknown> {
+  const fetchMock = mock();
   for (const response of responses) fetchMock.mockResolvedValueOnce(response);
-  vi.stubGlobal('fetch', fetchMock);
+  spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
   return fetchMock;
 }
 
 afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
+  mock.restore();
+  unstubAllEnvs();
 });
 
 describe('fetchGithubRun', () => {
   it('searches the primary and then the legacy repository by default', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
+    stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
     const fetchMock = stubFetch(
       new Response(null, { status: 404 }),
       runResponse('InferenceMAX/InferenceMAX'),
@@ -72,7 +73,7 @@ describe('fetchGithubRun', () => {
   });
 
   it('resolves runs from configured source repositories before the legacy repository', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
     const fetchMock = stubFetch(
       new Response(null, { status: 404 }),
       new Response(null, { status: 404 }),
@@ -94,7 +95,7 @@ describe('fetchGithubRun', () => {
   });
 
   it('caches a run that no repository has', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
     const fetchMock = stubFetch(
       new Response(null, { status: 404 }),
       new Response(null, { status: 404 }),
@@ -113,7 +114,7 @@ describe('fetchGithubRun', () => {
   });
 
   it('searches only an explicitly passed repository list', async () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
+    stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
     const fetchMock = stubFetch(runResponse('example-org/single'));
 
     const { fetchGithubRun } = createWorkflowRunServices({} as never, 'test-token', [

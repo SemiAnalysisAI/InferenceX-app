@@ -1,9 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import {
   STAR_COUNT_FAILURE_BACKOFF_MS,
   STAR_COUNT_STORAGE_KEY,
   STAR_COUNT_TTL_MS,
+  STAR_COUNT_URL,
   loadGitHubStarCount,
 } from './github-star-count';
 
@@ -12,25 +14,32 @@ let storage: Map<string, string>;
 
 beforeEach(() => {
   storage = new Map();
-  vi.stubGlobal('localStorage', {
+  stubGlobal('localStorage', {
     getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => storage.set(key, value),
   });
-  vi.stubGlobal('fetch', fetchMock);
+  stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 const ok = (count: number) => ({
   ok: true,
-  json: () => Promise.resolve({ stargazers_count: count }),
+  json: () => Promise.resolve({ stars: count }),
 });
 const rateLimited = { ok: false, json: () => Promise.resolve({}) };
 
 describe('loadGitHubStarCount', () => {
+  it('reads the same-origin route instead of the GitHub API', async () => {
+    fetchMock.mockResolvedValue(ok(42));
+    expect(await loadGitHubStarCount(1_000)).toBe(42);
+    expect(STAR_COUNT_URL).toBe('/api/v1/github-stars');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/github-stars');
+  });
+
   it('caches a successful count for the TTL', async () => {
     fetchMock.mockResolvedValue(ok(42));
     expect(await loadGitHubStarCount(1_000)).toBe(42);

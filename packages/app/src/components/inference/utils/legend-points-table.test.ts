@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 import {
@@ -45,6 +45,14 @@ describe('pointDetailHref', () => {
     const d = pt({ benchmark_type: 'agentic_traces', id: 206863 });
     expect(pointDetailHref(d, false, 'zh')).toEqual({
       href: '/zh/infx/inference/agentic/206863',
+      isExternal: false,
+    });
+  });
+
+  it("names the point's own model so the detail page knows its chart", () => {
+    const d = pt({ benchmark_type: 'agentic_traces', id: 206863, model: 'DeepSeek-V4-Pro' });
+    expect(pointDetailHref(d, false)).toEqual({
+      href: '/infx/inference/agentic/206863?g_model=DeepSeek-V4-Pro',
       isExternal: false,
     });
   });

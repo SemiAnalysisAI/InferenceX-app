@@ -1,42 +1,39 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, mock } from 'bun:test';
 
-import type * as ConstantsModule from '@/lib/catalog/constants';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import { createChartDataPoint } from '@/lib/charts/chart-utils';
 import { computeEnergyFields } from '@/lib/shared/utils';
 
-vi.mock('@/lib/catalog/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof ConstantsModule>();
-  return {
-    ...actual,
-    getHardwareConfig: vi.fn((key: string) => {
-      const configs: Record<
-        string,
-        { name: string; label: string; suffix: string; gpu: string; color: string }
-      > = {
-        h100: { name: 'H100', label: 'H100', suffix: '', gpu: 'H100', color: '#00ff00' },
-        b200: { name: 'B200', label: 'B200', suffix: '', gpu: 'B200', color: '#0000ff' },
-      };
-      return (
-        configs[key] ?? {
-          name: 'Unknown',
-          label: 'Unknown',
-          suffix: '',
-          gpu: 'Unknown',
-          color: '#888',
-        }
-      );
-    }),
-    getGpuSpecs: vi.fn((key: string) => {
-      const specs: Record<string, { power: number; costh: number; costr: number }> = {
-        h100: { power: 1.73, costh: 2.8, costr: 0.7 },
-        b200: { power: 2.17, costh: 3.5, costr: 0.88 },
-      };
-      const base = key.split(/[-_]/u)[0];
-      return specs[base] ?? { power: 1.73, costh: 2.8, costr: 0.7 };
-    }),
-  };
-});
+const actual = { ...(await import('@/lib/catalog/constants')) };
+mock.module('@/lib/catalog/constants', () => ({
+  ...actual,
+  getHardwareConfig: vi.fn((key: string) => {
+    const configs: Record<
+      string,
+      { name: string; label: string; suffix: string; gpu: string; color: string }
+    > = {
+      h100: { name: 'H100', label: 'H100', suffix: '', gpu: 'H100', color: '#00ff00' },
+      b200: { name: 'B200', label: 'B200', suffix: '', gpu: 'B200', color: '#0000ff' },
+    };
+    return (
+      configs[key] ?? {
+        name: 'Unknown',
+        label: 'Unknown',
+        suffix: '',
+        gpu: 'Unknown',
+        color: '#888',
+      }
+    );
+  }),
+  getGpuSpecs: vi.fn((key: string) => {
+    const specs: Record<string, { power: number; costh: number; costr: number }> = {
+      h100: { power: 1.73, costh: 2.8, costr: 0.7 },
+      b200: { power: 2.17, costh: 3.5, costr: 0.88 },
+    };
+    const base = key.split(/[-_]/u)[0];
+    return specs[base] ?? { power: 1.73, costh: 2.8, costr: 0.7 };
+  }),
+}));
 
 function makeEntry(overrides: Partial<AggDataEntry> = {}): AggDataEntry {
   return {

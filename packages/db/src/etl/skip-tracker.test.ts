@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, spyOn } from 'bun:test';
 import { DB_WRITE_KINDS, createSkipTracker } from './skip-tracker';
 
 describe('createSkipTracker', () => {
@@ -227,5 +227,39 @@ describe('database write warning rules', () => {
     tracker.recordDbError('trace_replay', 'glm5 conc 64', err);
     expect(tracker.skips.dbError).toBe(1);
     expect(tracker.dbWriteWarnings).toEqual([]);
+  });
+});
+
+describe('recordDbWarning', () => {
+  it('lists a partial write as a receipt warning without counting a failure', () => {
+    const tracker = createSkipTracker();
+    const print = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      tracker.recordDbWarning('trace_replay', 'glm5 conc 64', 'server metrics unreadable (x)');
+      expect(tracker.skips.dbError).toBe(0);
+      expect(tracker.dbWriteErrors).toEqual([]);
+      expect(tracker.dbWriteWarnings).toEqual([
+        { kind: 'trace_replay', subject: 'glm5 conc 64', message: 'server metrics unreadable (x)' },
+      ]);
+      expect(print).toHaveBeenCalledWith(
+        '  [DB WARNING] trace_replay for glm5 conc 64: server metrics unreadable (x)',
+      );
+    } finally {
+      print.mockRestore();
+    }
+  });
+});
+
+describe('recordTelemetryError', () => {
+  it('counts and prints whatever was thrown', () => {
+    const tracker = createSkipTracker();
+    const print = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      tracker.recordTelemetryError('gpu_metrics for x', 'plain string');
+      expect(tracker.skips.telemetryError).toBe(1);
+      expect(print).toHaveBeenCalledWith('  [TELEMETRY] gpu_metrics for x: plain string');
+    } finally {
+      print.mockRestore();
+    }
   });
 });

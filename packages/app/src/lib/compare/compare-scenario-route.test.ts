@@ -1,14 +1,37 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   compareScenarioPath,
   isAgenticSequence,
+  PRERENDERED_SCENARIO_SEGMENTS,
+  prerenderedScenarioParams,
   SCENARIO_SEGMENT_TO_SEQUENCE,
   SCENARIO_SEGMENTS,
   scenarioSegmentForSequence,
   sequenceForScenarioSegment,
 } from './compare-scenario-route';
 import { Sequence } from '@/lib/catalog/data-mappings';
+
+describe('prerenderedScenarioParams', () => {
+  it('pairs every prerendered slug with the agentic and 8k/1k scenarios', () => {
+    expect(PRERENDERED_SCENARIO_SEGMENTS.map(sequenceForScenarioSegment)).toEqual([
+      Sequence.AgenticTraces,
+      Sequence.EightK_OneK,
+    ]);
+    expect(
+      prerenderedScenarioParams([{ slug: 'a-b200-vs-h100' }, { slug: 'b-b300-vs-gb300' }]),
+    ).toEqual([
+      { slug: 'a-b200-vs-h100', scenario: 'agentic' },
+      { slug: 'a-b200-vs-h100', scenario: '8k-1k' },
+      { slug: 'b-b300-vs-gb300', scenario: 'agentic' },
+      { slug: 'b-b300-vs-gb300', scenario: '8k-1k' },
+    ]);
+  });
+
+  it('builds nothing when no slug is prerendered', () => {
+    expect(prerenderedScenarioParams([])).toEqual([]);
+  });
+});
 
 describe('compare scenario segments', () => {
   it('covers every sequence', () => {

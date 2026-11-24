@@ -1,4 +1,5 @@
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { setChartZoomed } from '@/lib/d3-chart/zoom-state';
 import { Card } from '@/components/ui/card';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
@@ -9,7 +10,15 @@ import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type { CSSProperties } from 'react';
 
+/** Stands in for a mounted chart's zoom hook, which reports whether it left the default view. */
+const ZOOMED_CHART = Symbol('zoomed chart');
+const RESET_EVENTS = ['test_zoom_reset_test-chart', 'test_zoom_reset_responsive-chart'];
+
 describe('ChartButtons', () => {
+  afterEach(() => {
+    for (const name of RESET_EVENTS) setChartZoomed(name, ZOOMED_CHART, false);
+  });
+
   for (const theme of [
     { name: 'light', background: '#ffffff', foreground: '#1e1e1e', pixel: [255, 255, 255, 255] },
     { name: 'dark', background: '#131416', foreground: '#eaebec', pixel: [19, 20, 22, 255] },
@@ -110,13 +119,19 @@ describe('ChartButtons', () => {
       );
     });
 
-    it('zoom reset dispatches custom event', () => {
+    it('keeps zoom reset disabled at the default view and dispatches the reset once zoomed', () => {
       cy.window().then((win) => {
         const handler = cy.stub().as('zoomReset');
         win.addEventListener('test_zoom_reset_test-chart', handler);
       });
-      cy.get('[data-testid="zoom-reset-button"]').click();
+      cy.get('[data-testid="zoom-reset-button"]').should('be.disabled');
+
+      cy.then(() => setChartZoomed('test_zoom_reset_test-chart', ZOOMED_CHART, true));
+      cy.get('[data-testid="zoom-reset-button"]').should('be.enabled').click();
       cy.get('@zoomReset').should('have.been.calledOnce');
+
+      cy.then(() => setChartZoomed('test_zoom_reset_test-chart', ZOOMED_CHART, false));
+      cy.get('[data-testid="zoom-reset-button"]').should('be.disabled');
     });
   });
 
@@ -199,6 +214,7 @@ describe('ChartButtons', () => {
         precision: 'fp4,fp8',
         gpu_count: 3,
       };
+      cy.then(() => setChartZoomed('test_zoom_reset_test-chart', ZOOMED_CHART, true));
       cy.get('[data-testid="zoom-reset-button"]').click();
       cy.get('@capture').should('have.been.calledWith', 'test_zoom_reset_button', properties);
       cy.get('[data-testid="export-button"]').click();
@@ -292,7 +308,7 @@ describe('ChartButtons', () => {
                     { value: 'cumulative', label: 'Cumulative' },
                   ]}
                   onValueChange={onModeChange}
-                  ariaLabel="Submission activity"
+                  ariaLabel="Submission Activity"
                 />
                 <ShareButton />
               </>
@@ -347,6 +363,7 @@ describe('ChartButtons', () => {
       cy.window().then((win) => {
         win.addEventListener('test_zoom_reset_responsive-chart', cy.stub().as('responsiveReset'));
       });
+      cy.then(() => setChartZoomed('test_zoom_reset_responsive-chart', ZOOMED_CHART, true));
       cy.get('[data-testid="zoom-reset-button"]').click();
       cy.get('@responsiveReset').should('have.been.calledOnce');
     });

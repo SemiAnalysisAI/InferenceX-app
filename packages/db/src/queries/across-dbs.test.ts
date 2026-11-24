@@ -1,8 +1,8 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { DOWNSTREAM_ID_START } from '../lib/downstream-ids';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import {
   getLatestBenchmarksAcross,
   mergeBenchmarkHistory,
@@ -97,11 +97,12 @@ describe('getLatestBenchmarksAcross', () => {
     await load(dbs[0]!, [...PUBLIC_RUNS, ...OWN_RUNS]);
     await load(dbs[1]!, PUBLIC_RUNS);
     await load(dbs[2]!, OWN_RUNS);
-    combined = pgliteSql(dbs[0]!);
-    split = [pgliteSql(dbs[1]!), pgliteSql(dbs[2]!)];
+    combined = await pgliteDriverSql(dbs[0]!);
+    split = [await pgliteDriverSql(dbs[1]!), await pgliteDriverSql(dbs[2]!)];
   }, 60_000);
 
   afterAll(async () => {
+    await Promise.all([combined, ...(split ?? [])].map((sql) => sql?.end()));
     await Promise.all(dbs.map((db) => db.close()));
   });
 

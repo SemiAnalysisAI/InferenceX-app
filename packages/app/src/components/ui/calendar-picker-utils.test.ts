@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { type Dispatch, type SetStateAction, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { setSystemTime, useFakeTimers, useRealTimers } from '@/test/helpers';
 
 import {
   CalendarMonthPanel,
@@ -32,10 +33,10 @@ describe('calendar-picker-utils', () => {
     expect(getLatestSelectableDate(['2026-01-10', '2026-03-20'], '2026-02-01')).toBe('2026-03-20');
     expect(getLatestSelectableDate([], '2026-02-01')).toBe('2026-02-01');
 
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-02T12:00:00'));
+    useFakeTimers();
+    setSystemTime(new Date('2026-04-02T12:00:00'));
     expect(getLatestSelectableDate()).toBe('2026-04-02');
-    vi.useRealTimers();
+    useRealTimers();
   });
 
   it('resolves min/max bounds from explicit limits or sorted available dates', () => {

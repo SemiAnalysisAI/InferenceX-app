@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { usePathname } from 'next/navigation';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -81,7 +82,11 @@ import {
 } from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
+import {
+  DEFAULT_Y_AXIS_METRIC,
+  hasExplicitUrlParam,
+  type UrlStateKey,
+} from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { datesOfLines, linesForModels } from '@/lib/benchmarks/availability-index';
 import {
@@ -109,6 +114,7 @@ import {
   exclusionResolutionFamilies,
   resolveExclusionGroups,
   resolveExclusionToggle,
+  type Exclusion,
   type ExclusionConflictPolicy,
 } from '@/lib/benchmarks/exclusion';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
@@ -155,7 +161,7 @@ const InferenceActionsContext = createContext<InferenceActionsContextType | unde
 
 export const INFERENCE_CONTEXT_STRINGS = {
   en: {
-    dateRangeResetTitle: 'Date range reset',
+    dateRangeResetTitle: 'Date Range Reset',
     dateRangeResetDescription:
       'The chip configs are not available in the selected date range. The date range will be reset.',
     ok: 'OK',
@@ -166,6 +172,49 @@ export const INFERENCE_CONTEXT_STRINGS = {
     ok: '确定',
   },
 } as const;
+
+/** Selectable keys a hardware request names; a bare GPU (`b200`) covers every engine on it. */
+export function matchRequestedHw(
+  request: ReadonlySet<string>,
+  selectable: ReadonlySet<string>,
+): Set<string> {
+  const prefixes = [...request].filter((k) => !k.includes('_'));
+  return new Set(
+    [...selectable].filter(
+      (k) => request.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
+    ),
+  );
+}
+
+/**
+ * Engine families dropped from the keys a URL request named outright. Expanding a bare GPU or
+ * falling back to every selectable key is a default, which resolves without a notice.
+ */
+export function requestedHwConflict(
+  request: ReadonlySet<string>,
+  proposed: ReadonlySet<string>,
+  result: ReadonlySet<string>,
+  exclusion: Exclusion,
+): { kept: string[]; dropped: string[]; partial: string[] } | null {
+  const families = exclusionResolutionFamilies(
+    [...proposed].filter((key) => request.has(key)),
+    result,
+    exclusion,
+  );
+  return families.dropped.length > 0 || families.partial.length > 0 ? families : null;
+}
+
+/**
+ * Whether the URL this page was opened with names `key`, read during render. A client navigation
+ * renders the new page before it updates `window.location`, so another path's URL is stale.
+ */
+export function openedUrlNamesParam(key: UrlStateKey, pathname: string | null): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.location.pathname === pathname &&
+    hasExplicitUrlParam(key)
+  );
+}
 
 function useStableInferenceActions(
   actions: InferenceActionsContextType,
@@ -305,9 +354,11 @@ export function InferenceProvider({
     availabilityError,
   } = useGlobalFilterAvailability();
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
-  const { isUnofficialRun } = useUnofficialRun();
+  // The requested flag is known on the first render. Waiting for overlay data would start the
+  // page on official-only rules and flip them (resetting the GPU selection) when it lands.
+  const { isUnofficialRunRequested } = useUnofficialRun();
   const featureGateUnlocked = useFeatureGate();
-  const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
+  const engineGuardLifted = isEngineGuardLifted(isUnofficialRunRequested, featureGateUnlocked);
   const engineConsent = useEngineComparisonConsent(
     `${selectedModel}|${effectiveSequence}|${effectivePrecisions.join(',')}`,
   );
@@ -315,6 +366,7 @@ export function InferenceProvider({
   const comparisonGuardLifted = engineGuardLifted || (consentSupported && engineConsent.accepted);
 
   const { getUrlParam, setUrlParams } = useUrlState();
+  const pathname = usePathname();
   const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
     Boolean(getUrlParam('g_rundate') || getUrlParam('g_runid')),
   );
@@ -386,9 +438,13 @@ export function InferenceProvider({
 
   const [selectedGpuState, setSelectedGpuState] = useState<string[]>([]);
   const [gpuUrlHydrated, setGpuUrlHydrated] = useState(false);
+  // The reader picked these GPUs, here or in a shared URL; remembered or automatic picks are not.
+  const gpuSelectionChosenRef = useRef(false);
   useEffect(() => {
     const urlGpus = getUrlParam('i_gpus');
     if (urlGpus) setSelectedGpuState(urlGpus.split(',').filter(Boolean));
+    // Effects run after the layout-effect URL refresh, so this reads the live URL.
+    gpuSelectionChosenRef.current = Boolean(urlGpus) && hasExplicitUrlParam('i_gpus');
     setGpuUrlHydrated(true);
   }, [getUrlParam]);
   const selectedGpuResolution = useMemo(() => {
@@ -422,7 +478,11 @@ export function InferenceProvider({
     const resolutionKey = `${selectedGpuResolution.selection.join(',')}|${selectedGpuResolution.dropped.join(',')}|${selectedGpuResolution.partial.join(',')}`;
     if (resolutionKey === notifiedGpuResolutionRef.current) return;
     notifiedGpuResolutionRef.current = resolutionKey;
-    if (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0) {
+    // A selection the reader never made resolves silently; the reader's own is explained.
+    if (
+      gpuSelectionChosenRef.current &&
+      (selectedGpuResolution.dropped.length > 0 || selectedGpuResolution.partial.length > 0)
+    ) {
       setEngineConflict({
         kind: 'resolved',
         kept: selectedGpuResolution.kept,
@@ -580,7 +640,9 @@ export function InferenceProvider({
   const [bestPerSkuChoice, setBestPerSku] = useState<boolean | null>(() => {
     if (activeTab !== 'inference') return false;
     const raw = getUrlParam('i_best');
-    return raw === '0' ? false : raw === '1' ? true : null;
+    if (raw === '0' || raw === '1') return raw === '1';
+    // An explicit hardware request would otherwise be replaced by the best-per-SKU set.
+    return getUrlParam('i_active') || initialActiveHwTypes?.length ? false : null;
   });
   const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
   const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
@@ -623,8 +685,12 @@ export function InferenceProvider({
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const presetHwFilterRef = useRef<string[] | null>(null);
 
+  // A page's own hardware outranks a value remembered from an earlier page, not a shared URL.
   const [pendingActiveHwTypes, setPendingActiveHwTypes] = useState<Set<string> | null>(() => {
-    const v = getUrlParam('i_active');
+    const v =
+      openedUrlNamesParam('i_active', pathname) || !initialActiveHwTypes?.length
+        ? getUrlParam('i_active')
+        : undefined;
     if (v) {
       const set = new Set(v.split(',').filter(Boolean));
       return set.size > 0 ? set : null;
@@ -634,9 +700,14 @@ export function InferenceProvider({
     }
     return null;
   });
-  const [hardwareDefaultsOverridden, setHardwareDefaultsOverridden] = useState(() =>
-    Boolean(getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus),
+  // 'page': the page or URL picked the hardware; true: the reader did.
+  const [hardwareDefaultsOverridden, setHardwareDefaultsOverridden] = useState<boolean | 'page'>(
+    () =>
+      getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false,
   );
+  const [requestedHwSelection, setRequestedHwSelection] = useState<Set<string> | null>(null);
+  // The keys the page asked for, kept while that request is still the reader's selection.
+  const requestedHwKeysRef = useRef<ReadonlySet<string> | null>(null);
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
@@ -700,7 +771,7 @@ export function InferenceProvider({
     tcoBasis,
     activeTab === 'inference' &&
       !autoSelectAllGpus &&
-      !isUnofficialRun &&
+      !isUnofficialRunRequested &&
       !hasExplicitRunSelection &&
       selectedRunDateRev === 0,
     powerCompare,
@@ -831,7 +902,10 @@ export function InferenceProvider({
         }
         setBestPerSku(activeTab === 'inference' ? null : false);
         setPendingActiveHwTypes(null);
-        setHardwareDefaultsOverridden(Boolean(initialActiveHwTypes?.length || autoSelectAllGpus));
+        requestedHwKeysRef.current = null;
+        setHardwareDefaultsOverridden(
+          initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false,
+        );
       }
       setSelectedModel(v);
       clearScopedSelectionOnChange();
@@ -870,18 +944,19 @@ export function InferenceProvider({
     [setSelectedYAxisMetric, clearPresetOnChange],
   );
   const setSelectedGPUsAndClear = useCallback(
-    (next: string[]) => {
+    (next: string[]): boolean => {
+      gpuSelectionChosenRef.current = true;
       if (
         requestEngineComparison(next, () => {
           setSelectedGpuState(next);
           clearScopedSelectionOnChange();
         })
       )
-        return;
+        return false;
       if (!exclusion) {
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
-        return;
+        return true;
       }
 
       const previous = new Set(selectedGPUs);
@@ -903,16 +978,16 @@ export function InferenceProvider({
             existing: decision.existing,
           });
           clearPresetOnChange();
-          return;
+          return false;
         }
         if (decision.kind === 'silent-resolve') {
           setSelectedGpuState([...decision.result]);
           clearScopedSelectionOnChange();
-          return;
+          return false;
         }
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
-        return;
+        return true;
       }
 
       const { result, droppedGroups } = resolveExclusionGroups(
@@ -929,6 +1004,7 @@ export function InferenceProvider({
         });
       }
       clearScopedSelectionOnChange();
+      return result.size === proposed.size;
     },
     [
       selectedGPUs,
@@ -1309,36 +1385,43 @@ export function InferenceProvider({
     [selectedModel, hideH200],
   );
 
+  // Other effects may rebuild the same selection as a new Set; the request holds while keys match.
+  const requestStillActive =
+    requestedHwSelection !== null &&
+    requestedHwSelection.size === activeHwTypes.size &&
+    [...requestedHwSelection].every((key) => activeHwTypes.has(key));
+  const requestedHwActiveRef = useRef(false);
+  requestedHwActiveRef.current = requestStillActive;
+
   useEffect(() => {
     if (!pendingActiveHwTypes) return;
     if (pendingHwFilterRef.current) return;
     if (selectableHwTypes.size === 0) return;
-    const prefixes = [...pendingActiveHwTypes].filter((k) => !k.includes('_'));
-    let restored = new Set(
-      [...selectableHwTypes].filter(
-        (k) =>
-          pendingActiveHwTypes.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
-      ),
-    );
-    if (restored.size === 0) restored = selectableHwTypes;
+    let restored = matchRequestedHw(pendingActiveHwTypes, selectableHwTypes);
+    const matchedRequest = restored.size > 0;
+    // Seeded rows can list a subset of the hardware; wait for the full rows before giving up.
+    if (!matchedRequest && chartDataLoading) return;
+    requestedHwKeysRef.current = matchedRequest ? pendingActiveHwTypes : null;
+    if (!matchedRequest) restored = selectableHwTypes;
     if (exclusion) {
       const proposed = restored;
       const resolved = resolveHwSelection(restored, new Set());
       restored = resolved.result;
-      if (resolved.droppedGroups.length > 0) {
-        setEngineConflict({
-          kind: 'resolved',
-          ...exclusionResolutionFamilies(proposed, resolved.result, exclusion),
-        });
-      }
+      const conflict =
+        matchedRequest && hasExplicitUrlParam('i_active')
+          ? requestedHwConflict(pendingActiveHwTypes, proposed, resolved.result, exclusion)
+          : null;
+      if (conflict) setEngineConflict({ kind: 'resolved', ...conflict });
     }
     setActiveHwTypes(restored);
+    setRequestedHwSelection(matchedRequest ? restored : null);
     lastHwResetKeyRef.current = hwResetKey;
     lastHwResetModelRef.current = selectedModel;
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
     selectableHwTypes,
+    chartDataLoading,
     exclusion,
     selectedModel,
     effectiveSequence,
@@ -1363,6 +1446,19 @@ export function InferenceProvider({
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
     if (modelChanged) preferredHwTypesRef.current = new Set();
+    // Loading an overlay changes the scope; keep the page's request instead of the defaults.
+    const request = requestedHwKeysRef.current;
+    if (request && requestedHwActiveRef.current && !bestPerSku) {
+      const matched = matchRequestedHw(request, selectableHwTypes);
+      if (matched.size > 0) {
+        const selection = exclusion
+          ? resolveHwSelection(matched, previousSelection).result
+          : matched;
+        setActiveHwTypes(selection);
+        setRequestedHwSelection(selection);
+        return;
+      }
+    }
     if (presetFilter) {
       const filtered = new Set(
         [...selectableHwTypes].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
@@ -1380,7 +1476,7 @@ export function InferenceProvider({
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
-      if (droppedGroups.length > 0 && hardwareDefaultsOverridden) {
+      if (droppedGroups.length > 0 && hardwareDefaultsOverridden === true) {
         setEngineConflict({
           kind: 'resolved',
           ...exclusionResolutionFamilies(automaticSelection, result, exclusion),
@@ -1773,10 +1869,13 @@ export function InferenceProvider({
     ],
   );
 
+  const requestedHwTypes = requestStillActive ? requestedHwSelection : null;
+
   const filtersValue = useMemo<InferenceFiltersContextType>(
     () => ({
       activeHwTypes,
       bestPerSku,
+      requestedHwTypes,
       blockedHwToggles,
       selectedModel,
       selectedSequence: effectiveSequence,
@@ -1799,6 +1898,7 @@ export function InferenceProvider({
     [
       activeHwTypes,
       bestPerSku,
+      requestedHwTypes,
       blockedHwToggles,
       selectedModel,
       effectiveSequence,

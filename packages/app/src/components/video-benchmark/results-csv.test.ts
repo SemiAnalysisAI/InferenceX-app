@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import retainedHistory from '../../../cypress/fixtures/api/video-history.json';
 import type { VideoHistoryPage } from './history';
 import { namedRunPoints, videoPoints } from './points';
@@ -45,8 +45,6 @@ describe('VideoGenX overview CSV rows', () => {
       video_seconds_per_s: 240 / 3600,
       participating_cost_usd_per_video_s: cell.cost.participating!.perHour / 240,
       allocated_cost_usd_per_video_s: cell.cost.allocated!.perHour / 240,
-      participating_profit_usd_per_hour: null,
-      allocated_profit_usd_per_hour: null,
     });
   });
 });

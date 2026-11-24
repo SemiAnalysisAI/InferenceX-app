@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock, type Mock } from 'bun:test';
+import { stubEnv, unstubAllEnvs } from '@/test/helpers';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -22,10 +23,8 @@ import {
   parseHardwareFrontmatter,
 } from './hardware';
 
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof fs>();
-  return { ...actual, default: { ...actual } };
-});
+const actual = { ...(await import('node:fs')) };
+mock.module('node:fs', () => ({ ...actual, default: { ...actual } }));
 
 const CONTENT_DIR = path.join(process.cwd(), 'content', 'hardware');
 const VR = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
@@ -64,7 +63,10 @@ function mockContent(files: Record<string, string>) {
     'zh',
     ...Object.keys(files).filter((file) => !file.includes('/')),
   ] as never);
-  vi.spyOn(fs, 'readFileSync').mockImplementation((target) => resolve(String(target)) ?? '');
+  // bun:test types spyOn by fs.readFileSync's overloads; this stub only serves string reads.
+  (
+    vi.spyOn(fs, 'readFileSync') as unknown as Mock<(target: fs.PathOrFileDescriptor) => string>
+  ).mockImplementation((target) => resolve(String(target)) ?? '');
 }
 
 const META: HardwarePageMeta = { ...VALID, slug: VR, readingTime: 9 };
@@ -74,7 +76,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
+  unstubAllEnvs();
 });
 
 describe('hardwareFrontmatterErrors', () => {
@@ -219,7 +221,7 @@ describe('reading hardware pages', () => {
   });
 
   it('hides pages whose English publishDate is in the future in production, in both locales', () => {
-    vi.stubEnv('NODE_ENV', 'production');
+    stubEnv('NODE_ENV', 'production');
     mockContent({ ...files, [`zh/${TPU}.mdx`]: files[`${TPU}.mdx`] });
     expect(getAllHardwarePages().map((page) => page.slug)).toEqual([VR]);
     expect(getAllHardwarePages('zh').map((page) => page.slug)).toEqual([VR]);

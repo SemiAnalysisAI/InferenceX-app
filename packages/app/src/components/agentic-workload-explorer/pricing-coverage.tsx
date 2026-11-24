@@ -19,23 +19,23 @@ function coverageColor(value: number | null): string {
 
 const STRINGS = {
   en: {
-    heading: 'Usage with a stored cost estimate',
+    heading: 'Usage with a Stored Cost Estimate',
     description: (days: number) =>
       `Latest ${days} days. Failed or otherwise zero-usage requests are excluded; missing estimates are grouped by the reported model ID below.`,
-    requestCoverage: 'Request coverage',
-    inputSideTokenCoverage: 'Input-side token coverage',
-    outputTokenCoverage: 'Output token coverage',
+    requestCoverage: 'Request Coverage',
+    inputSideTokenCoverage: 'Input-Side Token Coverage',
+    outputTokenCoverage: 'Output Token Coverage',
     priced: 'priced',
     unpriced: 'unpriced',
     tokens: 'tokens',
     allPriced: 'All usage-bearing model IDs have cost estimates',
     unpricedRegionLabel: 'Unpriced model usage',
     caption: 'Usage-bearing requests without a stored cost estimate, grouped by model.',
-    colUnpricedModel: 'Unpriced model',
+    colUnpricedModel: 'Unpriced Model',
     colRequests: 'Requests',
     colInput: 'Input',
-    colCacheRead: 'Cache read',
-    colCacheWrite: 'Cache write',
+    colCacheRead: 'Cache Read',
+    colCacheWrite: 'Cache Write',
     colOutput: 'Output',
   },
   zh: {

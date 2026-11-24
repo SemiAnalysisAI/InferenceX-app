@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
   FRAMEWORK_ALIASES,
@@ -24,6 +24,10 @@ describe('FRAMEWORK_LABELS', () => {
 
   it('labels the canonical tilert framework "TileRT"', () => {
     expect(FRAMEWORK_LABELS['tilert']).toBe('TileRT');
+  });
+
+  it('labels the canonical infera-sglang framework "Infera SGLang"', () => {
+    expect(FRAMEWORK_LABELS['infera-sglang']).toBe('Infera SGLang');
   });
 });
 

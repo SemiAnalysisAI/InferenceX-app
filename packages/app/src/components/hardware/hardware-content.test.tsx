@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
 import type { TocHeading } from '@/lib/blog/blog';
 import type { HardwarePageMeta } from '@/lib/hardware/hardware';
@@ -13,7 +13,7 @@ const withQueryClient = (ui: ReactNode) => (
   <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>
 );
 
-const { VR, TPU, META, PAGES } = vi.hoisted(() => {
+const { VR, TPU, META, PAGES } = (() => {
   const vr = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
   const tpu = 'tpu-v7-ironwood-vs-gb300-nvl72-agentx-results';
   const meta: HardwarePageMeta = {
@@ -38,10 +38,11 @@ const { VR, TPU, META, PAGES } = vi.hoisted(() => {
     { ...meta, slug: tpu, title: 'TPU v7 vs GB300 NVL72 on AgentX' },
   ];
   return { VR: vr, TPU: tpu, META: meta, PAGES: pages };
-});
+})();
 
-vi.mock('@/lib/hardware/hardware', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+const actual = { ...(await import('@/lib/hardware/hardware')) };
+mock.module('@/lib/hardware/hardware', () => ({
+  ...actual,
   getAllHardwarePages: () => PAGES,
 }));
 
@@ -145,7 +146,7 @@ describe('HardwarePageContent', () => {
       'hrefLang="en"',
     );
     expect(html).not.toContain('min read');
-    expect(html).not.toContain('Hardware results');
+    expect(html).not.toContain('Hardware Results');
   });
 });
 
@@ -155,7 +156,7 @@ describe('HardwareIndexContent', () => {
 
     expect(html).toContain('data-testid="hardware-index-page"');
     expect(html).toContain('<h1');
-    expect(html).toContain('Hardware results');
+    expect(html).toContain('Hardware Results');
     expect(count(html, 'data-testid="hardware-card"')).toBe(2);
     expect(html).toContain(`href="/hardware/${VR}"`);
     expect(html).toContain(`href="/hardware/${TPU}"`);

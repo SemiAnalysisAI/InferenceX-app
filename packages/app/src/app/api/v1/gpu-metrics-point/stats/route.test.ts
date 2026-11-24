@@ -1,34 +1,37 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
 import { loadSwingStatsFromSeries } from '@/lib/power/load-swing-stats';
 
-const { readRevision, readCached, stored } = vi.hoisted(() => ({
+const { readRevision, readCached, stored } = {
   readRevision: vi.fn(),
   readCached: vi.fn(),
   stored: vi.fn(),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics-revision', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics-revision', () => ({
   getGpuMetricsPointRevision: readRevision,
 }));
-vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForPoint: vi.fn(),
 }));
-vi.mock('@semianalysisai/inferencex-db/power-series/stored-power-series', () => ({
+mock.module('@semianalysisai/inferencex-db/power-series/stored-power-series', () => ({
   storedPowerSeries: stored,
 }));
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: () => readCached,
   cachedJson: (_request: Request, data: unknown) =>
     Response.json(data, { headers: { 'Cache-Control': 'public, max-age=3600' } }),
   cachedText: (data: string, contentType: string) =>
     new Response(data, { headers: { 'Content-Type': contentType } }),
+  // ../route imports it. The stats handler uses ../route only for CACHE_KEY_PREFIX.
+  notModifiedJson: () => null,
 }));
 
-import { GET } from './route';
+// Imported after mock.module so the route's payload reader is the mocked cachedQuery result.
+const { GET } = await import('./route');
 
 const samples = [
   100, 100, 100, 110, 100, 300, 500, 520, 480, 500, 520, 480, 500, 500, 520, 480, 500, 300, 150,

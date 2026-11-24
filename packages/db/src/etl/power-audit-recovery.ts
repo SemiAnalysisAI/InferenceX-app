@@ -65,10 +65,10 @@ export async function applyAgentxAudits(
 ): Promise<number[]> {
   if (input.writes.length === 0) return [];
   const rows = await sql<{ id: number }[]>`
-    update benchmark_results br set power_audit = planned.audit
+    update benchmark_results br set power_audit = planned.audit::jsonb
     from unnest(
-      ${sql.array(input.writes.map((write) => write.benchmarkResultId))}::bigint[],
-      ${sql.array(input.writes.map((write) => JSON.stringify(write.powerAudit)))}::jsonb[]
+      ${input.writes.map((write) => write.benchmarkResultId)}::bigint[],
+      ${input.writes.map((write) => JSON.stringify(write.powerAudit))}::text[]
     ) as planned(id, audit)
     where br.id = planned.id
       and br.workflow_run_id = ${input.workflowRunId}

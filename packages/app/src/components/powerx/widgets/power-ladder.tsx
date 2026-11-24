@@ -13,7 +13,7 @@ import {
   staggerLabels,
 } from '@/lib/powerx/ladder';
 import { cn } from '@/lib/shared/utils';
-import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
+import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-categories';
 
 import { stepProgress, useBuildClock, useEasedValues } from './motion';
 import { CATEGORY_TITLES } from './strings';

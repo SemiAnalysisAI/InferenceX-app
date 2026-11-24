@@ -20,7 +20,7 @@ jobs:
   zizmor:
     name: Audit GitHub Actions
     if: ${{ !github.event.pull_request.draft }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,6 +30,13 @@ jobs:
           persist-credentials: false
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          # Nothing here is a Python project, so a cache keyed on Python lockfiles would never
+          # refresh, and zizmor@latest is a single small wheel.
+          enable-cache: false
       - name: Audit workflows
-        run: uvx --exclude-newer P1D zizmor@latest --strict-collection --pedantic
+        # Explicitly offline, which is what zizmor already did without a token, minus its warning.
+        # Online mode (GH_TOKEN) needs no extra permissions but adds ref-version-mismatch findings
+        # for every `# vN` pin comment whose tag is really vN.x.y.
+        run: uvx --exclude-newer P1D zizmor@latest --offline --strict-collection --pedantic
           --no-ignores .

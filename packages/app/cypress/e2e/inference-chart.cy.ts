@@ -1,6 +1,7 @@
 import type { AvailabilityRow } from '@/lib/api/api';
 import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
 import type { InferenceData } from '@/components/inference/types';
+import { interceptOpenRouterPricing } from '../support/profit-estimator';
 import {
   interceptVrPublicationData,
   VR_FIXTURE_DATE,
@@ -10,6 +11,7 @@ import {
 import {
   availabilityBody,
   expectNoPageOverflow,
+  fastForwardQueryRetry,
   unlockAgenticGate,
   interceptBenchmarkPresence,
   interceptDerivedAgenticMetrics,
@@ -176,11 +178,11 @@ describe('Inference Chart', () => {
       .find(
         '[data-testid="inference-tco-badges"] tbody th [data-testid="result-context-cost-tier"]',
       )
-      .should('contain.text', 'Owning at large hyperscaler volume');
+      .should('contain.text', 'Owning at Large Hyperscaler Volume');
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
-      .should('not.contain.text', 'Cost tier:')
+      .should('not.contain.text', 'Cost Tier:')
       .and(($ctx) => expect($ctx.text()).to.match(/Updated [A-Z][a-z]{2} \d{1,2}, \d{4}/))
       .and('contain.text', 'SemiAnalysis InferenceX')
       .and('not.contain.text', 'Model:')
@@ -191,20 +193,17 @@ describe('Inference Chart', () => {
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', {
-      statusCode: 200,
-      body: {
-        data: [
-          {
-            id: 'deepseek/deepseek-v4-pro-0813',
-            pricing: {
-              prompt: '0.000001122',
-              input_cache_read: '0.00000008',
-              completion: '0.000003366',
-            },
+    interceptOpenRouterPricing({
+      data: [
+        {
+          id: 'deepseek/deepseek-v4-pro-0813',
+          pricing: {
+            prompt: '0.000001122',
+            input_cache_read: '0.00000008',
+            completion: '0.000003366',
           },
-        ],
-      },
+        },
+      ],
     }).as('openRouterPricing');
     interceptOverlayRun();
     cy.visit(
@@ -273,7 +272,7 @@ describe('Inference Chart', () => {
     cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '3.70');
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').should(
       'contain.text',
-      'Rent – 3-year commit',
+      'Rent – 3-Year Commit',
     );
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     expectNoPageOverflow();
@@ -307,7 +306,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context-cost-tier"]')
-      .should('contain.text', 'Owning at large hyperscaler volume')
+      .should('contain.text', 'Owning at Large Hyperscaler Volume')
       .find('[data-testid="cost-tier-selector"]')
       .should('be.visible');
     cy.scatterPoints(CHART_DISPLAY).should('have.length.greaterThan', 0);
@@ -322,13 +321,22 @@ describe('Inference Chart', () => {
       .and('contain.text', 'all-in cost per chip-hour');
   });
 
-  it('surfaces the error instead of an endless skeleton when availability fails', () => {
-    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
+  it('shows an inline retryable error instead of the error page when availability fails', () => {
+    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 403, body: {} }).as(
       'availabilityFailure',
     );
-    cy.visit('/infx/inference');
+    fastForwardQueryRetry('[data-testid="inference-query-error"]', () => {
+      cy.visit('/infx/inference');
+    });
     cy.wait('@availabilityFailure');
-    cy.contains('h2', 'Something went wrong').should('be.visible');
+    cy.get('[data-testid="inference-query-error"]')
+      .should('be.visible')
+      .and('contain.text', 'Failed to load benchmark data');
+    cy.contains('h2', /something went wrong/i).should('not.exist');
+    cy.intercept('GET', '/api/v1/availability/compact').as('availabilityRetry');
+    cy.get('[data-testid="inference-query-error"]').contains('button', 'Retry').click();
+    cy.wait('@availabilityRetry');
+    cy.get('[data-testid="inference-query-error"]').should('not.exist');
   });
 });
 
@@ -355,7 +363,7 @@ describe('Deprecated model source attribution', () => {
       cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
       cy.get('#chart-0 [data-testid="result-context"]')
         .should('contain.text', 'SemiAnalysis InferenceX™')
-        .and(deprecated ? 'contain.text' : 'not.contain.text', '(deprecated)');
+        .and(deprecated ? 'contain.text' : 'not.contain.text', '(Deprecated)');
       cy.get('.deprecated-watermark').should('not.exist');
     }
   });
@@ -393,7 +401,7 @@ describe('Deprecated model source attribution', () => {
     });
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'SemiAnalysis InferenceX™ (deprecated)',
+      'SemiAnalysis InferenceX™ (Deprecated)',
     );
     let exportedPng = '';
     let exportedCaption = '';
@@ -415,7 +423,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('[data-testid="export-png-button"]').click();
     cy.window().should(() => {
       expect(exportedPng).to.match(/^data:image\/png;base64,/u);
-      expect(exportedCaption).to.contain('SemiAnalysis InferenceX™ (deprecated)');
+      expect(exportedCaption).to.contain('SemiAnalysis InferenceX™ (Deprecated)');
     });
 
     cy.visit(`/infx/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
@@ -426,7 +434,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'SemiAnalysis InferenceX™ + unofficial overlays (deprecated)',
+      'SemiAnalysis InferenceX™ + unofficial overlays (Deprecated)',
     );
     cy.get('#chart-0 .unofficial-watermark-image').should('exist');
     cy.get('.deprecated-watermark').should('not.exist');
@@ -434,7 +442,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'SemiAnalysis InferenceX™ (deprecated)',
+      'SemiAnalysis InferenceX™ (Deprecated)',
     );
 
     cy.viewport(375, 900);

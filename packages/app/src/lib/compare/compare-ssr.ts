@@ -106,12 +106,15 @@ export function buildGpuDataPoints(
     if (row.precision !== precision) continue;
     if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
-    const entry = rowToAggDataEntry(row, { modelPower: false });
+    const entry = rowToAggDataEntry(row);
     const hwKey = getHardwareKey(entry);
     if (!getHardwareConfig(hwKey)) continue;
 
     const m = row.metrics;
     const tput = m.tput_per_gpu ?? 0;
+    const interactivity = m.median_intvty ?? 0;
+    // Output-only sources publish no total throughput. A missing value is no data, not a zero.
+    if (!(tput > 0 && interactivity > 0)) continue;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
     const specs = getGpuSpecs(hwKey);
@@ -119,7 +122,7 @@ export function buildGpuDataPoints(
 
     points.push({
       hwKey,
-      interactivity: m.median_intvty ?? 0,
+      interactivity,
       throughput: tput,
       outputThroughput: outputTput,
       inputThroughput: inputTput,
@@ -156,7 +159,7 @@ function buildAgenticGpuDataPoints(
     if (row.precision !== precision) continue;
     if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
-    const entry = rowToAggDataEntry(row, { modelPower: false });
+    const entry = rowToAggDataEntry(row);
     const hwKey = getHardwareKey(entry);
     if (!getHardwareConfig(hwKey)) continue;
 
@@ -164,6 +167,7 @@ function buildAgenticGpuDataPoints(
     if (!Number.isFinite(interactivity) || interactivity <= 0) continue;
 
     const tput = entry.tput_per_gpu;
+    if (!(tput > 0)) continue;
     const outputTput = entry.output_tput_per_gpu || tput;
     const inputTput = entry.input_tput_per_gpu;
     const specs = getGpuSpecs(hwKey);
@@ -195,7 +199,7 @@ function buildAgenticGpuDataPoints(
   return points;
 }
 
-function buildGpuDataPointsForSequence(
+export function buildGpuDataPointsForSequence(
   rows: BenchmarkRow[],
   hw: string,
   sequence: string,

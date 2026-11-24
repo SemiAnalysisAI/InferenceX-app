@@ -1,0 +1,36 @@
+name: 'Warm CI caches'
+
+# Refreshes the sticky disks Tests (E2E) and Tests (Unit) mount, so pull requests build against
+# the latest main. Blacksmith only persists sticky-disk writes from default-branch jobs.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    name: Warm E2E build caches
+    if: ${{ github.repository == 'SemiAnalysisAI/InferenceX-app' && github.ref == 'refs/heads/main' }}
+    timeout-minutes: 10
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    steps:
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
+        with:
+          persist-credentials: false
+      - uses: $/.github/actions/setup-workspace
+        with:
+          nextjs-cache: 'true'
+          cypress-binary: 'true'
+          commit: on-change
+      - name: Build app
+        run: bun run build
+        env:
+          E2E_FIXTURES: '1'

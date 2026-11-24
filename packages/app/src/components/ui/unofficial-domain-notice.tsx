@@ -10,8 +10,8 @@ import { OFFICIAL_HOSTNAME } from '@/lib/runtime/unofficial-domain';
 
 const STRINGS = {
   en: {
-    title: 'Unofficial deployment',
-    text: 'This copy of InferenceX™ is not affiliated with or endorsed by SemiAnalysis. Its data may be modified or out of date.',
+    title: 'Unofficial Deployment',
+    text: 'This copy of InferenceX™ is not affiliated with or endorsed by SemiAnalysis. Its Data may be modified or out of date.',
     link: 'Official results',
   },
   zh: {

@@ -40,7 +40,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import {
   SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_MODEL_REVISION,
-} from '@/lib/power/system-power-model';
+} from '@/lib/power/system-power-categories';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
@@ -79,14 +79,14 @@ type PowerBreakdownView = 'bars' | 'area';
 
 const STRINGS = {
   en: {
-    title: 'System power breakdown per GPU',
+    title: 'System Power Breakdown per GPU',
     subtitle: 'Each point’s whole-system power per GPU, split by what the meter counts',
     source: 'Hardware',
     view: 'Breakdown view',
     collapse: 'Collapse',
     bars: 'Stacked bars',
     area: 'Stacked area',
-    xAxis: 'Median interactivity (tok/s/user)',
+    xAxis: 'Median Interactivity (tok/s/user)',
     yAxis: 'Power (W/GPU)',
     total: 'All in Measured',
     totalIt: 'IT (no PUE)',

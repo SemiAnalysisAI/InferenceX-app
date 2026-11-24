@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import {

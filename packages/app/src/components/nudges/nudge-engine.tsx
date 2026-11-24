@@ -474,6 +474,9 @@ function setupTrigger(
       }
     };
     document.addEventListener(trigger.event, handler);
+    // A reader can scroll before this trigger is armed; that scroll still counts.
+    if (trigger.event === 'scroll' && !trigger.selector && window.scrollY > 0)
+      handler(new Event('scroll'));
     return () => {
       document.removeEventListener(trigger.event, handler);
       for (const t of delayTimers) window.clearTimeout(t);
@@ -490,7 +493,7 @@ function localized(locale: Locale, en: string, zh?: string): string {
 const RENDERER_STRINGS = {
   en: {
     explore: 'Explore',
-    maybeLater: 'Maybe later',
+    maybeLater: 'Maybe Later',
     close: 'Close',
     dismissBanner: 'Dismiss launch banner',
   },

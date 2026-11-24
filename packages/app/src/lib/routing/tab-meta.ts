@@ -119,73 +119,6 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   },
 };
 
-/**
- * On-page h1 for each tab, in sentence case. `TAB_META[tab].title` stays the SEO `<title>`
- * (Title Case for search results); this is what readers see on the page.
- */
-export const TAB_HEADING: Record<DashboardRouteKey, string> = {
-  powerx: 'PowerX: measured GPU power and energy per token',
-  inference: 'Agentic inference benchmarks',
-  evaluation: 'LLM evaluation results',
-  historical: 'Historical inference trends',
-  calculator: 'Throughput & TCO calculator',
-  fleet: 'Fleet lifecycle economics',
-  'first-token': 'First-token limits',
-  'cache-reuse': 'Prefix cache reuse',
-  'profit-estimator': 'Inference profit estimator',
-  'profit-estimator-per-gigawatt': 'Inference profit estimator per gigawatt',
-  'gpu-specs': 'Chip specifications & comparison',
-  operatorx: 'OperatorX GEMM, attention and MoE benchmarks',
-  collectivex: 'CollectiveX communication benchmarks',
-  'agentic-workload-explorer': 'Agentic workload explorer',
-  'ai-chart': 'Chart generation from a prompt',
-  submissions: 'Benchmark submissions',
-  'current-inferencex-image': 'Current InferenceX image',
-  video: 'H3 video benchmark',
-  feedback: 'User feedback',
-};
-
-export const TAB_INTRO: Record<DashboardRouteKey, string> = {
-  powerx:
-    'PowerX shows measured GPU power, energy per output token and power timelines for every InferenceX benchmark point. GPU power is measured; the rest of the server and facility PUE are modeled.',
-  inference:
-    'InferenceX agentic and fixed-sequence AI inference benchmarks compare throughput (tok/s/chip), interactivity (tok/s/user), time to first token (TTFT) and cost across chips, serving frameworks and models. Agentic results come from AgentX, which replays long-context, multi-turn coding-agent traces with subagents. Every data point comes from a public GitHub Actions workflow, so it is reproducible and auditable.',
-  evaluation:
-    'LLM evaluation results compare accuracy across models and deployment configs on standardized eval sets, checking that inference optimizations do not degrade model quality.',
-  historical:
-    'Historical trends track how AI inference performance has changed over time for each chip, framework and model, quantifying the gains from software stack optimizations.',
-  calculator:
-    'The throughput and total cost of ownership (TCO) calculator uses measured benchmark data to estimate cost per million tokens and performance per dollar for LLM serving on each chip config.',
-  fleet:
-    'Fleet lifecycle economics sizes a fixed fleet against a facility power budget and projects revenue, cost, margin and payback from the model release date, using software config improvements measured in historical benchmarks.',
-  'first-token':
-    'First-token limits find, for each chip vendor, the cheapest measured config per million tokens under time-to-first-token (TTFT) caps such as 2 s, 5 s and 10 s at a chosen minimum interactivity. Every bar is a real run with no interpolation, traceable to its GitHub Actions run.',
-  'cache-reuse':
-    'Prefix cache reuse splits prompt tokens at each concurrency level into chip HBM cache hits, host-tier cache hits and recomputed tokens, with an optional trace upper bound. All values are runtime cache counters traceable to their GitHub Actions run.',
-  'profit-estimator':
-    'The inference profit estimator computes revenue per chip-hour for each chip at a chosen interactivity and utilization, stacked into compute expense (TCO $/chip/hr), the model lab license fee and operator profit.',
-  'profit-estimator-per-gigawatt':
-    'The per-gigawatt profit estimator computes yearly revenue for each chip within a gigawatt all-in power budget at a chosen interactivity and utilization, stacked into compute expense (TCO), the model lab license fee and operator profit.',
-  'gpu-specs':
-    'Chip specifications compare memory capacity, memory bandwidth, FLOPS, interconnect topology and power for NVIDIA, AMD and other AI accelerators.',
-  operatorx:
-    'OperatorX shows measured GEMM, attention and routed MoE TFLOPS per GPU, latency and full test coverage.',
-  'agentic-workload-explorer':
-    'The agentic workload explorer is a frozen snapshot of anonymized coding-agent traces captured by ProxyTrace. It shows session structure, input and output tokens, prefix cache hits, time to first token (TTFT) and tool call distribution. The snapshot no longer updates, so every time window ends at the snapshot cutoff.',
-  collectivex:
-    'CollectiveX compares expert-parallel (EP) communication dispatch, combine and round-trip latency across DeepEP, MoRI, UCCL and NCCL/RCCL reference implementations under a shared workload, correctness checks and sampling protocol.',
-  submissions:
-    'Every benchmark configuration submitted to InferenceX, with submission history, activity trends and datapoint volume by chip vendor.',
-  'ai-chart':
-    'Describe a comparison in plain language and get a chart built from InferenceX benchmark data.',
-  'current-inferencex-image':
-    'The Docker image tags InferenceX currently runs, listed per model, chip SKU and config and compared against the latest upstream vLLM and SGLang releases to spot outdated images.',
-  video:
-    'Reads H3 CI artifacts in the browser to show run status, measurements and comparison verdicts. Comparison thresholds stay uncalibrated until backend labels are calibrated.',
-  feedback:
-    'Internal feedback viewer. Decrypts and shows user-submitted feedback in the browser with a key that never leaves this page.',
-};
-
 const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
 
 export const isValidTab = isDashboardRouteKey;
@@ -199,43 +132,28 @@ export const MODEL_TAB_META: Record<
   ModelRouteTab,
   {
     title: (seoName: string) => string;
-    /** On-page h1, sentence case. `title` stays the SEO `<title>`. */
-    heading: (seoName: string) => string;
     description: (seoName: string) => string;
-    intro: (seoName: string) => string;
   }
 > = {
   historical: {
     title: (seoName) => `${seoName} Historical Inference Trends`,
-    heading: (seoName) => `${seoName} historical inference trends`,
     description: (seoName) =>
       `Track ${seoName} inference performance over time: latency, throughput and cost gains per chip and provider from historical benchmark data.`,
-    intro: (seoName) =>
-      `Historical trends for ${seoName} track how inference performance has changed over time on each chip and framework, quantifying the gains from software stack optimizations.`,
   },
   calculator: {
     title: (seoName) => `${seoName} Throughput & TCO Calculator`,
-    heading: (seoName) => `${seoName} throughput & TCO calculator`,
     description: (seoName) =>
       `Calculate ${seoName} inference throughput and total cost of ownership, and compare chip cost-efficiency across hardware configurations.`,
-    intro: (seoName) =>
-      `The ${seoName} throughput and total cost of ownership (TCO) calculator uses measured benchmark data to estimate cost per million tokens and performance per dollar for serving ${seoName} on each chip config.`,
   },
   'profit-estimator': {
     title: (seoName) => `${seoName} Inference Profit Estimator`,
-    heading: (seoName) => `${seoName} inference profit estimator`,
     description: (seoName) =>
       `Estimate what one chip-hour of ${seoName} agentic inference earns, split into compute (TCO $/chip/hr), model license fee and operator profit.`,
-    intro: (seoName) =>
-      `Estimate revenue per chip-hour for ${seoName} agentic inference on each chip, split into compute expense (TCO $/chip/hr), model license fee and operator profit, with adjustable interactivity, utilization, license fee and token price.`,
   },
   'profit-estimator-per-gigawatt': {
     title: (seoName) => `${seoName} Profit Estimator per GigaWatt`,
-    heading: (seoName) => `${seoName} profit estimator per gigawatt`,
     description: (seoName) =>
       `Estimate what one gigawatt-year of ${seoName} agentic inference earns per chip, split into compute expense (TCO), license fee and operator profit.`,
-    intro: (seoName) =>
-      `Estimate yearly revenue for ${seoName} agentic inference on each chip within a gigawatt all-in power budget, split into compute expense (TCO), model license fee and operator profit, with adjustable interactivity, utilization, license fee and token price.`,
   },
 };
 

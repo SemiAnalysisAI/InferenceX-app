@@ -53,6 +53,8 @@ import {
   hardwareLabel,
   measuredHardware,
   operatorXColors,
+  removeHardwareSelection,
+  restoresAllHardware,
   toggleHardwareSelection,
 } from '../compare/hardware';
 import { METRICS, metricById } from '../compare/metrics';
@@ -979,16 +981,18 @@ const SlotDetail = memo(
       const view = subView(model.view, familyIndices);
       const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
       const op = slot.op as ComparisonOp;
+      // only the GPUs that measured this op's shapes
+      const hardware = model.hardware.filter((hw) => measured.includes(hw));
       return {
         op,
         model: buildModel(
           view,
           model.metric,
           {
-            // only the GPUs that measured this op's shapes
-            hardware: model.hardware.filter((hw) => measured.includes(hw)),
+            hardware,
             available: measured,
-            toggle: model.toggle,
+            toggle: (hw) => (restoresAllHardware(hardware, hw) ? model.reset() : model.toggle(hw)),
+            remove: model.remove,
             reset: model.reset,
           },
           model.colors,
@@ -1174,10 +1178,18 @@ export function ModelView({
   const toggle = useCallback(
     (hw: string, placement: 'diagram' | 'chart') => {
       track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement });
-      const next = toggleHardwareSelection(hardware, hw);
-      if (next !== hardware) setPickedHardware(next);
+      const next = toggleHardwareSelection(hardware, hw, available);
+      if (next !== hardware) setPickedHardware(next.length === available.length ? null : next);
     },
-    [hardware],
+    [hardware, available],
+  );
+  const remove = useCallback(
+    (hw: string) => {
+      track('operatorx_gpu_removed', { op: 'model', gpu: hw, placement: 'chart' });
+      const next = removeHardwareSelection(hardware, hw);
+      if (next !== hardware) setPickedHardware(next.length === available.length ? null : next);
+    },
+    [hardware, available],
   );
   const models = useMemo(() => {
     const reset = () => {
@@ -1189,7 +1201,7 @@ export function ModelView({
         ? buildModel(
             view,
             metric,
-            { hardware, available, toggle: (hw) => toggle(hw, 'chart'), reset },
+            { hardware, available, toggle: (hw) => toggle(hw, 'chart'), remove, reset },
             colors,
             null,
             {
@@ -1199,7 +1211,7 @@ export function ModelView({
           )
         : null;
     return { gemm: build(gemmView), moe: build(moeView), attention: build(attentionView) };
-  }, [gemmView, moeView, attentionView, metric, hardware, available, colors, toggle]);
+  }, [gemmView, moeView, attentionView, metric, hardware, available, colors, toggle, remove]);
   const slotIndices = useMemo(() => {
     const opViews = { gemm: gemmView, moe: moeView, attention: attentionView };
     return blocks.map((block) =>

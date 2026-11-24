@@ -13,7 +13,12 @@ import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
 import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/routing/client-navigation';
-import { AGENTX_ROUTE, DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/routing/dashboard-routes';
+import {
+  AGENTX_ROUTE,
+  DASHBOARD_ROUTES,
+  DEFAULT_INFERENCE_MODEL_SLUG,
+  getDashboardRoute,
+} from '@/lib/routing/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { isEmbedPathname } from '@/lib/embed/embed-route';
@@ -46,6 +51,8 @@ const NAV_LINKS: readonly NavLink[] = [
   },
   {
     href: getDashboardRoute('inference').path,
+    // The bare Inference path 307-redirects here; linking straight to it saves that round trip.
+    path: `${getDashboardRoute('inference').path}/${DEFAULT_INFERENCE_MODEL_SLUG}`,
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
@@ -184,9 +191,9 @@ export const Header = () => {
               <Image
                 src="/brand/logo-color.webp"
                 alt={isZh ? 'SemiAnalysis 标志' : 'SemiAnalysis logo'}
-                width={64}
+                width={90}
                 height={27}
-                className="inline h-auto lg:w-20"
+                className="inline h-auto lg:w-28"
               />
             </span>
           </Link>

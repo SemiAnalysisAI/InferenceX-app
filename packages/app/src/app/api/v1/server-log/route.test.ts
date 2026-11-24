@@ -1,22 +1,22 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, mock } from 'bun:test';
 
-const { mockGetBoundedServerLog, mockGetServerLogChunk, mockGetDb } = vi.hoisted(() => ({
+const { mockGetBoundedServerLog, mockGetServerLogChunk, mockGetDb } = {
   mockGetBoundedServerLog: vi.fn(),
   mockGetServerLogChunk: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   getBoundedServerLog: mockGetBoundedServerLog,
   getServerLogChunk: mockGetServerLogChunk,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (
     _request: Request,
@@ -49,8 +49,10 @@ function bounded(
   return { fileName, bytes, serverLog };
 }
 
-import { GET } from './route';
 import { NextRequest } from 'next/server';
+
+// Imported after mock.module so the route builds its readers from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
@@ -81,6 +83,18 @@ describe('GET /api/v1/server-log', () => {
     const body = await res.json();
     expect(body.error).toBe('id is required (benchmark_result_id)');
   });
+
+  // `Number('1e21')` is finite, so these used to reach Postgres as an invalid bigint and answer 500.
+  it.each(['1e21', '9007199254740993', '-5', '1.5'])(
+    'returns 400 for id=%s, which is not a positive safe integer',
+    async (id) => {
+      const res = await GET(req(`/api/v1/server-log?id=${id}`));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('id is required (benchmark_result_id)');
+      expect(mockGetBoundedServerLog).not.toHaveBeenCalled();
+    },
+  );
 
   it('returns 404 when server log not found', async () => {
     mockGetBoundedServerLog.mockResolvedValueOnce(null);
@@ -287,12 +301,18 @@ describe('GET /api/v1/server-log', () => {
   });
 
   it('returns 500 when query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetBoundedServerLog.mockRejectedValueOnce(new Error('Connection reset'));
 
     const res = await GET(req('/api/v1/server-log?id=42'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching server log:',
+      expect.objectContaining({ message: 'Connection reset' }),
+    );
+    logged.mockRestore();
   });
 
   it('handles large numeric id', async () => {

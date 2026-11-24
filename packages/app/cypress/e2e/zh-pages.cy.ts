@@ -135,14 +135,12 @@ describe('Chinese (/zh) pages', () => {
       cy.visit('/zh/infx/inference');
     });
 
-    it('renders the Chinese h1 without an intro box', () => {
+    it('renders the Chinese h1', () => {
       cy.location('pathname').should('eq', '/zh/infx/inference/kimi-k31-pro');
       cy.get('[data-testid="inference-page-heading"]').should(
         'have.text',
         'Kimi K3.1 Pro 推理基准测试',
       );
-      cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
-
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
@@ -277,7 +275,7 @@ describe('Chinese (/zh) pages', () => {
         const homeLinks = [...document.querySelectorAll<HTMLAnchorElement>('a[href="/"]')];
 
         expect(status).to.eq(404);
-        expect(document.querySelector('h1')?.textContent).to.eq('Page not found');
+        expect(document.querySelector('h1')?.textContent).to.eq('Page Not Found');
         expect(homeLinks.some((link) => link.textContent === 'Go back home')).to.eq(true);
         expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).to.include(
           'noindex',

@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { computeGpuMetricStats } from './gpu-metrics-csv';
 import {
@@ -14,7 +14,7 @@ import {
 } from './gpu-metrics-ingest';
 
 import type { DbClient } from '../connection';
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getGpuMetricsForPoint, getGpuMetricsForRun } from '../queries/gpu-metrics';
 import { getGpuMetricsPointRevision } from '../queries/gpu-metrics-revision';
 
@@ -24,17 +24,21 @@ const roots: string[] = [];
 
 async function storedSeries(seriesId: number) {
   return {
-    metadata: await sql`select * from gpu_metric_series where id = ${seriesId}`,
-    samples: await sql`select * from gpu_metric_samples where series_id = ${seriesId}
-      order by sampled_at, gpu_index`,
-    links: await sql`select * from benchmark_result_gpu_metrics where series_id = ${seriesId}
-      order by benchmark_result_id`,
+    metadata: [...(await sql`select * from gpu_metric_series where id = ${seriesId}`)],
+    samples: [
+      ...(await sql`select * from gpu_metric_samples where series_id = ${seriesId}
+      order by sampled_at, gpu_index`),
+    ],
+    links: [
+      ...(await sql`select * from benchmark_result_gpu_metrics where series_id = ${seriesId}
+      order by benchmark_result_id`),
+    ],
   };
 }
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 20_000);
 
 beforeEach(async () => {
@@ -54,6 +58,7 @@ afterEach(() => {
 });
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 
@@ -397,7 +402,7 @@ describe('ingestGpuMetricsArtifact', () => {
     const kept = await storedSeries(appended.seriesIds[0]!);
     expect(kept.links).toHaveLength(1);
     const dropped = await storedSeries(first.seriesIds[0]!);
-    expect(dropped.links).toMatchObject([{ benchmark_result_id: 11 }]);
+    expect(dropped.links.map((row) => Number(row.benchmark_result_id))).toEqual([11]);
   });
 
   it('stores series, samples and point links; reruns are no-ops', async () => {

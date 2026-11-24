@@ -11,11 +11,11 @@ import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
+import { svgBBox } from '@/lib/d3-chart/svg-measure';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
-import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
+import { GRADIENT_NUDGE_EVENT, NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
 import {
   useInferenceActions,
@@ -489,27 +489,27 @@ const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'poi
 
 const SCATTER_STRINGS = {
   en: {
-    logScale: 'Log scale',
-    optimalOnly: 'Optimal only',
-    paretoFrontier: 'Pareto frontier',
+    logScale: 'Log Scale',
+    optimalOnly: 'Optimal Only',
+    paretoFrontier: 'Pareto Frontier',
     paretoFrontierInfo:
       'Dotted line connecting the best visible results, with green shading beyond it. Switch off and on again for a sunny butterfly castle background; repeat to return to green.',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: '# of GPUs Label',
-    highContrast: 'High contrast',
-    parallelismLabels: 'Parallelism labels',
+    highContrast: 'High Contrast',
+    parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
-    gradientLabels: 'Gradient labels',
-    lineLabels: 'Line labels',
-    frameworkLabel: 'Framework line label',
-    offloadingLabel: 'Offloading label',
-    perfRuler: 'Perf ruler',
+    gradientLabels: 'Gradient Labels',
+    lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
+    offloadingLabel: 'Offloading Label',
+    perfRuler: 'Perf Ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
-    quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
+    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
@@ -2731,12 +2731,12 @@ const ScatterGraph = React.memo(
             .style('opacity', (d) => (d.visible ? 1 : 0));
 
           plSel.each(function (d) {
-            d3.select(this).select<SVGTextElement>('.pl-text').text(d.label);
+            d3.select(this).select<SVGTextElement>(':scope > text.pl-text').text(d.label);
           });
           const plMeasured: { node: SVGGElement; d: LabelSeg; bbox: DOMRect }[] = [];
           plSel.each(function (d) {
-            const text = this.querySelector<SVGTextElement>('.pl-text');
-            if (text) plMeasured.push({ node: this, d, bbox: text.getBBox() });
+            const bbox = svgBBox(this.querySelector(':scope > text.pl-text'));
+            if (bbox) plMeasured.push({ node: this, d, bbox });
           });
           for (const { node, d, bbox } of plMeasured) {
             const px = 4;
@@ -2869,6 +2869,7 @@ const ScatterGraph = React.memo(
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
             occluders: showLineLabels ? pillOccluders(xScale, yScale) : [],
+            labelEverySeries: ctx.surface === 'export',
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -2947,9 +2948,10 @@ const ScatterGraph = React.memo(
                     whiteSpace: 'pre-wrap',
                   }),
               );
+              // Translators can insert tspans without bound data; those match no key and exit.
               text
-                .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
-                .data(fitted, (segment) => segment.className)
+                .selectAll<SVGTSpanElement, (typeof segments)[number] | undefined>('tspan')
+                .data(fitted, (segment) => segment?.className ?? '')
                 .join('tspan')
                 .attr('class', (segment) => segment.className)
                 .attr('fill', (segment) => segment.fill)

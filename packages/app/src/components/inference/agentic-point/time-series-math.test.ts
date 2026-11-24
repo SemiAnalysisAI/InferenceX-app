@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
 
 import {
   averageSequenceLengthInFlight,
   buildThroughputChartSeries,
+  cachedRollingRequestMetric,
   cumulativeAverage,
   cumulativeCompletedRequests,
   cumulativeDifferenceMonotonic,
@@ -13,12 +14,15 @@ import {
   inflightUniqueTokens,
   interpAt,
   maxTimeSeriesValue,
+  quantile,
   rollingAverage,
   rollingRatioFromComponents,
   rollingRatioOfSums,
   rollingRequestMetric,
   timeRollingAverage,
   toggleThroughputSeries,
+  type RequestMetric,
+  type RequestPercentile,
 } from './time-series-math';
 
 describe('maxTimeSeriesValue', () => {
@@ -145,6 +149,139 @@ describe('rollingRequestMetric', () => {
     const result = rollingRequestMetric(requests, 'ttft', 'p90');
     expect(result.cumulative).toHaveLength(requests.length);
     expect(result.cumulative.at(-1)?.value).toBeCloseTo(22.5001, 4);
+  });
+});
+
+// The slice-and-sort trend this module used before the sliding window. The sliding window
+// must reproduce it bit for bit.
+function referenceTrend(
+  requests: readonly RequestRecord[],
+  metric: RequestMetric,
+  percentile: RequestPercentile,
+  windowSize: number,
+): { t: number; value: number }[] {
+  const q = percentile === 'p75' ? 0.75 : 0.9;
+  const samples = requests
+    .filter((r) => !r.cancelled)
+    .flatMap((r) => {
+      const latencyMs =
+        metric === 'ttft' ? r.ttftMs : metric === 'e2e' ? (r.end - r.start) / 1e6 : r.tpotMs;
+      if (latencyMs === null || !Number.isFinite(latencyMs) || latencyMs <= 0) return [];
+      return [{ t: r.end / 1e9, latencyMs }];
+    })
+    .toSorted((a, b) => a.t - b.t);
+  return samples.map(({ t }, i) => {
+    const start = Math.max(0, i - Math.max(1, windowSize) + 1);
+    const sorted = samples
+      .slice(start, i + 1)
+      .map((s) => s.latencyMs)
+      .toSorted((a, b) => a - b);
+    const latencyMs = quantile(sorted, q);
+    return { t, value: metric === 'interactivity' ? 1000 / latencyMs : latencyMs / 1000 };
+  });
+}
+
+// Deterministic Park-Miller PRNG so a failure reproduces. Every product stays below 2^53.
+function prng(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state * 48_271) % 2_147_483_647;
+    return state / 2_147_483_647;
+  };
+}
+
+function randomRequests(seed: number, count: number): RequestRecord[] {
+  const random = prng(seed);
+  // A small value pool forces many duplicate latencies, the case where removal must find an
+  // equal value rather than the exact sample.
+  const pool = Array.from({ length: 7 }, () => 1 + Math.floor(random() * 500));
+  return Array.from({ length: count }, () => {
+    const roll = random();
+    const latency =
+      roll < 0.3
+        ? pool[Math.floor(random() * pool.length)]!
+        : roll < 0.35
+          ? null
+          : roll < 0.38
+            ? 0
+            : random() * 2000;
+    return request(
+      // Out-of-order end times exercise the sort, and repeats exercise ties.
+      Math.floor(random() * count) / 4,
+      latency,
+      latency === null ? null : latency / 10,
+      { start: Math.floor(random() * 1e9), cancelled: random() < 0.05 },
+    );
+  });
+}
+
+describe('rollingRequestMetric sliding window', () => {
+  const metrics: RequestMetric[] = ['interactivity', 'ttft', 'e2e'];
+  const percentiles: RequestPercentile[] = ['p75', 'p90'];
+
+  it('matches the slice-and-sort trend on randomized inputs', () => {
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const requests = randomRequests(seed, 20 + seed * 15);
+      for (const windowSize of [1, 2, 3, 7, 50, 1000]) {
+        for (const metric of metrics) {
+          for (const percentile of percentiles) {
+            expect(rollingRequestMetric(requests, metric, percentile, windowSize).trend).toEqual(
+              referenceTrend(requests, metric, percentile, windowSize),
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it('treats zero and negative window sizes as a window of one, like the reference', () => {
+    const requests = randomRequests(99, 120);
+    for (const windowSize of [0, -5]) {
+      const { trend, raw } = rollingRequestMetric(requests, 'ttft', 'p90', windowSize);
+      expect(trend).toEqual(referenceTrend(requests, 'ttft', 'p90', windowSize));
+      expect(trend).toEqual(raw);
+    }
+  });
+
+  it('handles empty, single, all-equal and fully excluded inputs', () => {
+    const cases: RequestRecord[][] = [
+      [],
+      [request(1, 250, 25)],
+      Array.from({ length: 80 }, (_, i) => request(i, 42, 4.2)),
+      [request(1, null, null), request(2, 0, 0), request(3, 100, 10, { cancelled: true })],
+    ];
+    for (const requests of cases) {
+      for (const percentile of percentiles) {
+        expect(rollingRequestMetric(requests, 'ttft', percentile, 50).trend).toEqual(
+          referenceTrend(requests, 'ttft', percentile, 50),
+        );
+      }
+    }
+  });
+
+  it('matches on a strictly decreasing series longer than the window', () => {
+    const requests = Array.from({ length: 5_000 }, (_, i) => request(i + 1, 5_000 - i, 1));
+    expect(rollingRequestMetric(requests, 'ttft', 'p90', 50).trend).toEqual(
+      referenceTrend(requests, 'ttft', 'p90', 50),
+    );
+  });
+});
+
+describe('cachedRollingRequestMetric', () => {
+  it('reuses the result for the same requests array and parameters', () => {
+    const requests = randomRequests(7, 200);
+    const first = cachedRollingRequestMetric(requests, 'ttft', 'p90');
+    expect(cachedRollingRequestMetric(requests, 'ttft', 'p90')).toBe(first);
+    expect(first).toEqual(rollingRequestMetric(requests, 'ttft', 'p90'));
+  });
+
+  it('keys by metric, percentile, window size and array identity', () => {
+    const requests = randomRequests(8, 200);
+    const base = cachedRollingRequestMetric(requests, 'ttft', 'p90', 50);
+    expect(cachedRollingRequestMetric(requests, 'ttft', 'p75', 50)).not.toBe(base);
+    expect(cachedRollingRequestMetric(requests, 'e2e', 'p90', 50)).not.toBe(base);
+    expect(cachedRollingRequestMetric(requests, 'ttft', 'p90', 10)).not.toBe(base);
+    expect(cachedRollingRequestMetric([...requests], 'ttft', 'p90', 50)).not.toBe(base);
   });
 });
 

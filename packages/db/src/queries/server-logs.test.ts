@@ -1,4 +1,4 @@
-import { describe, expect, it, type Mock, vi } from 'vitest';
+import { describe, expect, it, mock, type Mock } from 'bun:test';
 
 import type { DbClient } from '../connection.js';
 import {
@@ -18,7 +18,9 @@ import {
 } from '../server-log-blocks';
 import { termBloomGroups } from './server-log-block-search';
 
-function withoutBlockStorage(call: Mock): DbClient {
+type SqlCall = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
+
+function withoutBlockStorage(call: Mock<SqlCall>): DbClient {
   return ((strings: TemplateStringsArray, ...values: unknown[]) =>
     strings.join('').includes('server_log_block_files')
       ? Promise.reject(Object.assign(new Error('no blocks'), { code: '42P01' }))
@@ -26,9 +28,7 @@ function withoutBlockStorage(call: Mock): DbClient {
 }
 
 function mockSql(rows: unknown[]) {
-  const call = vi.fn((_strings: TemplateStringsArray, ..._values: unknown[]) =>
-    Promise.resolve(rows),
-  );
+  const call = mock<SqlCall>(() => Promise.resolve(rows));
   return { sql: call as unknown as DbClient, call };
 }
 
@@ -467,8 +467,7 @@ describe('getServerLogFileNames', () => {
 
 describe('searchServerLogs', () => {
   it('maps bounded matches across files and reports truncation', async () => {
-    const call = vi
-      .fn()
+    const call = mock()
       .mockResolvedValueOnce([{ file_name: 'results/router.log' }])
       .mockResolvedValueOnce([
         {
@@ -515,8 +514,7 @@ describe('searchServerLogs', () => {
   });
 
   it('returns an empty non-truncated result when no file matches', async () => {
-    const call = vi
-      .fn()
+    const call = mock()
       .mockResolvedValueOnce([{ file_name: 'results/router.log' }])
       .mockResolvedValueOnce([
         {
@@ -538,8 +536,7 @@ describe('searchServerLogs', () => {
   });
 
   it('overlaps slices so a match crossing a chunk boundary is not skipped', async () => {
-    const call = vi
-      .fn()
+    const call = mock()
       .mockResolvedValueOnce([{ file_name: 'results/router.log' }])
       .mockResolvedValueOnce([
         {
@@ -582,8 +579,7 @@ describe('searchServerLogs', () => {
   });
 
   it('stops at the scan budget and reports the search as incomplete', async () => {
-    const call = vi
-      .fn()
+    const call = mock()
       .mockResolvedValueOnce([{ file_name: 'results/router.log' }, { file_name: 'b.log' }])
       .mockResolvedValue([noMatchRow(100, true)]);
     const sql = withoutBlockStorage(call);
@@ -596,8 +592,7 @@ describe('searchServerLogs', () => {
   });
 
   it('counts earlier files against the scan budget', async () => {
-    const call = vi
-      .fn()
+    const call = mock()
       .mockResolvedValueOnce([{ file_name: 'a.log' }, { file_name: 'b.log' }])
       .mockResolvedValueOnce([noMatchRow(300, false)]);
     const sql = withoutBlockStorage(call);
@@ -610,8 +605,7 @@ describe('searchServerLogs', () => {
 
   it('throws a timeout error once the wall-clock budget is spent', async () => {
     let clock = 0;
-    const call = vi
-      .fn()
+    const call = mock()
       .mockResolvedValueOnce([{ file_name: 'results/router.log' }])
       .mockImplementation(() => {
         clock += 10;

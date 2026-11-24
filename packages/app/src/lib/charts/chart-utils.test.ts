@@ -1,15 +1,17 @@
 import { hsl } from 'd3';
 import { generateVendorColors } from './dynamic-colors';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, mock } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import iwanthue from 'iwanthue';
 
-import type * as ConstantsModule from '@/lib/catalog/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
   buildAvailabilityHwKey,
   getNestedYValue,
+  remapInferencePoint,
+  requestsPowerChartFields,
   getHardwareKey,
   normalizeEvalHardwareKey,
   createChartDataPoint,
@@ -26,16 +28,16 @@ import {
 } from '@/lib/charts/chart-utils';
 import { generateHighContrastColors } from '@/lib/charts/high-contrast-colors';
 
-vi.mock('@/lib/catalog/constants', async (importOriginal) => {
-  const actual = await importOriginal<typeof ConstantsModule>();
-  return {
-    ...actual,
-    getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costr: 0.7 })),
-  };
-});
+const actual = { ...(await import('@/lib/catalog/constants')) };
+mock.module('@/lib/catalog/constants', () => ({
+  ...actual,
+  getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
+  getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costr: 0.7 })),
+}));
 
-vi.mock('iwanthue', { spy: true });
+// Keeps iwanthue's real palettes and records each call, as Vitest's spy mode did.
+const iwanthueSpy = vi.fn(iwanthue);
+mock.module('iwanthue', () => ({ default: iwanthueSpy }));
 
 function pt(
   x: number,
@@ -200,6 +202,11 @@ describe('buildAvailabilityHwKey', () => {
       'mi355x_mori-sglang_mtp',
     );
   });
+
+  it('appends the framework to hardware the registry does not know, disaggregated or not', () => {
+    expect(buildAvailabilityHwKey('foo-x', 'sglang', undefined, true)).toBe('foo_sglang');
+    expect(buildAvailabilityHwKey('foo-x', 'sglang', undefined, false)).toBe('foo_sglang');
+  });
 });
 
 function parseRgb(color: string): [number, number, number] {
@@ -352,33 +359,33 @@ describe('generateHighContrastColors', () => {
   it('caches palettes — a repeated request does not re-run iwanthue', () => {
     const keys = ['h100_vllm', 'h200_vllm', 'b200_vllm', 'b300_vllm', 'gb200_vllm'];
 
-    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const callsBefore = mocked(iwanthue).mock.calls.length;
     const first = generateHighContrastColors(keys, 'light');
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
 
     const second = generateHighContrastColors(keys, 'light');
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
     expect(second).toEqual(first);
   });
 
   it('cache is key-name independent — same vendor/count/theme reuses the palette', () => {
-    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const callsBefore = mocked(iwanthue).mock.calls.length;
     const result = generateHighContrastColors(
       ['h100_sglang', 'h200_sglang', 'b200_sglang', 'b300_sglang', 'gb300_sglang'],
       'light',
     );
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore);
     expect(Object.keys(result)).toHaveLength(5);
     expect(new Set(Object.values(result)).size).toBe(5);
   });
 
   it('a different count is a different cache entry', () => {
-    const callsBefore = vi.mocked(iwanthue).mock.calls.length;
+    const callsBefore = mocked(iwanthue).mock.calls.length;
     generateHighContrastColors(
       ['h100_trt', 'h200_trt', 'b200_trt', 'b300_trt', 'gb200_trt', 'gb300_trt', 'gb200_vllm'],
       'light',
     );
-    expect(vi.mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
+    expect(mocked(iwanthue).mock.calls.length).toBe(callsBefore + 1);
   });
 });
 
@@ -408,6 +415,57 @@ describe('getNestedYValue', () => {
 
   it('returns 0 when the top-level key maps to a non-object for dot notation', () => {
     expect(getNestedYValue(point, 'x.y' as never)).toBe(0);
+  });
+
+  it('returns 0 for a nested key that is present without a value', () => {
+    const unset = { ...point, tpPerGpu: { y: undefined } } as unknown as InferenceData;
+    expect(getNestedYValue(unset, 'tpPerGpu.y')).toBe(0);
+  });
+});
+
+const remapSource = (overrides: Record<string, unknown> = {}) =>
+  paretoPt(7, 3, { tpPerGpu: { y: 100, roof: true }, ...overrides } as Partial<InferenceData>);
+
+describe('remapInferencePoint', () => {
+  it('reads y and roof from the metric and x from the axis field', () => {
+    expect(
+      remapInferencePoint(remapSource({ median_intvty: 42 }), 'tpPerGpu', 'median_intvty'),
+    ).toMatchObject({ x: 42, y: 100, roof: true });
+  });
+
+  it('keeps the point’s own x, and its y unroofed, when the axis field or metric is missing', () => {
+    expect(remapInferencePoint(remapSource(), 'outputTputPerGpu', 'median_intvty')).toMatchObject({
+      x: 7,
+      y: 3,
+      roof: false,
+    });
+  });
+
+  it('keeps any number an ordinary axis field holds', () => {
+    const zero = remapSource({ median_intvty: 0 });
+    expect(remapInferencePoint(zero, 'tpPerGpu', 'median_intvty').x).toBe(0);
+  });
+
+  it('hides points without a positive finite measured value on a latency axis', () => {
+    for (const field of ['p90_ttft', 'mean_e2el', 'mean_tpot_intvty'] as const) {
+      for (const value of [2.5, 0.5]) {
+        const { x } = remapInferencePoint(remapSource({ [field]: value }), 'tpPerGpu', field);
+        expect(x, `${field} = ${value}`).toBe(value);
+      }
+      for (const missing of [undefined, 0, -1, Infinity, Number.NaN]) {
+        const { x } = remapInferencePoint(remapSource({ [field]: missing }), 'tpPerGpu', field);
+        expect(x, `${field} = ${missing}`).toBeNaN();
+      }
+    }
+  });
+});
+
+describe('requestsPowerChartFields', () => {
+  it('is true only when a measured or power-boundary metric is requested', () => {
+    expect(requestsPowerChartFields(['tpPerGpu', 'costh', 'jTotal', 'tpPerMw'])).toBe(false);
+    expect(requestsPowerChartFields(['tpPerGpu', 'measuredAvgPower'])).toBe(true);
+    expect(requestsPowerChartFields(['reconstructedPrefillJPerOutputToken'])).toBe(true);
+    expect(requestsPowerChartFields(['itModeledWatts'])).toBe(true);
   });
 });
 
@@ -482,26 +540,35 @@ describe('getHardwareKey', () => {
       'mi355x_atom',
     );
   });
+
+  it('appends the framework to hardware the registry does not know, disaggregated or not', () => {
+    expect(getHardwareKey(entry({ hw: 'foo-x', framework: 'sglang', disagg: true }))).toBe(
+      'foo_sglang',
+    );
+    expect(getHardwareKey(entry({ hw: 'foo-x', framework: 'sglang', disagg: false }))).toBe(
+      'foo_sglang',
+    );
+  });
 });
 
 describe('normalizeEvalHardwareKey', () => {
   it('lowercases and replaces dashes with underscores', () => {
-    expect(normalizeEvalHardwareKey('H100')).not.toBe('unknown');
+    expect(normalizeEvalHardwareKey('H100')).toBe('h100');
+    expect(normalizeEvalHardwareKey('GB200-NVL72', 'dynamo-trt', 'MTP')).toBe(
+      'gb200_nvl72_dynamo_trt_mtp',
+    );
   });
 
   it('strips qualifier suffixes like "NB", "CW", "NV"', () => {
-    const result = normalizeEvalHardwareKey('B200 NB');
-    expect(result).not.toContain('nb');
+    expect(normalizeEvalHardwareKey('B200 NB')).toBe('b200');
   });
 
   it('appends framework to form a specific config key', () => {
-    const result = normalizeEvalHardwareKey('H100', 'vllm');
-    expect(result === 'h100_vllm' || result === 'h100').toBe(true);
+    expect(normalizeEvalHardwareKey('H100', 'vllm')).toBe('h100_vllm');
   });
 
   it('appends spec_decoding after framework', () => {
-    const result = normalizeEvalHardwareKey('H100', 'vllm', 'mtp');
-    expect(['h100_vllm_mtp', 'h100_vllm', 'h100'].includes(result)).toBe(true);
+    expect(normalizeEvalHardwareKey('H100', 'vllm', 'mtp')).toBe('h100_vllm_mtp');
   });
 
   it('returns "unknown" when hardware is not in HARDWARE_CONFIG', () => {
@@ -509,18 +576,15 @@ describe('normalizeEvalHardwareKey', () => {
   });
 
   it('does not append spec_decoding when it is "none"', () => {
-    const result = normalizeEvalHardwareKey('H100', 'vllm', 'none');
-    expect(result).not.toContain('none');
+    expect(normalizeEvalHardwareKey('H100', 'vllm', 'none')).toBe('h100_vllm');
   });
 
   it('handles empty framework gracefully', () => {
-    const result = normalizeEvalHardwareKey('H100', '');
-    expect(result === 'h100' || result === 'unknown').toBe(true);
+    expect(normalizeEvalHardwareKey('H100', '')).toBe('h100');
   });
 
   it('strips "amd" qualifier', () => {
-    const result = normalizeEvalHardwareKey('MI300X AMD');
-    expect(result).not.toContain('amd');
+    expect(normalizeEvalHardwareKey('MI300X AMD')).toBe('mi300x');
   });
 });
 
@@ -854,6 +918,33 @@ describe('deploymentChipCount', () => {
     expect(deploymentChipCount(topology, 'tpuv7')).toBe(4);
     expect(deploymentChipCount(topology, 'tpuv7_vllm')).toBe(4);
     expect(deploymentChipCount(topology, 'tpuv7x_vllm')).toBe(8);
+  });
+
+  it('adds the pools of a real prefill/decode split', () => {
+    const split = { disagg: true, num_prefill_gpu: 4, num_decode_gpu: 8, tp: 8, pp: 1 };
+    expect(deploymentChipCount(split, 'h100')).toBe(12);
+  });
+
+  it('counts a legacy unsplit disaggregated deployment once', () => {
+    const legacy = { disagg: true, num_prefill_gpu: 16, num_decode_gpu: 16, tp: 8, pp: 1 };
+    expect(deploymentChipCount(legacy, 'h100')).toBe(16);
+  });
+
+  it('counts tp × pp without recorded pools, and the prefill pool without a decode pool', () => {
+    const noPools = { disagg: false, num_prefill_gpu: 0, num_decode_gpu: 0, tp: 4 };
+    expect(deploymentChipCount({ ...noPools, pp: 2 }, 'h100')).toBe(8);
+    expect(deploymentChipCount({ ...noPools, pp: 1 }, 'h100')).toBe(4);
+    expect(deploymentChipCount(noPools, 'h100')).toBe(4);
+    expect(deploymentChipCount({ ...noPools, num_prefill_gpu: 6, pp: 1 }, 'h100')).toBe(6);
+    expect(deploymentChipCount({ ...noPools, tp: 0, pp: 1 }, 'h100')).toBe(0);
+  });
+
+  it('counts even one allocated TPU v7 chip, and tp × pp when none is recorded', () => {
+    const tpu = { disagg: false, num_prefill_gpu: 0, num_decode_gpu: 0, tp: 8, pp: 1 };
+    expect(deploymentChipCount({ ...tpu, num_decode_gpu: 1 }, 'tpuv7')).toBe(1);
+    expect(deploymentChipCount({ ...tpu, num_prefill_gpu: 1 }, 'tpuv7')).toBe(1);
+    expect(deploymentChipCount({ ...tpu, num_prefill_gpu: 2 }, 'tpuv7')).toBe(2);
+    expect(deploymentChipCount(tpu, 'tpuv7')).toBe(8);
   });
 });
 
@@ -1293,6 +1384,54 @@ describe('createChartDataPoint output cost edge cases', () => {
     expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
     expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
+
+  it('prices output and input tokens at both rates', () => {
+    const e = entry({ tput_per_gpu: 1000, output_tput_per_gpu: 400, input_tput_per_gpu: 600 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // 400 and 600 tok/s are 1.44 and 2.16 M tok/h.
+    expect(point.costhOutput!.y).toBeCloseTo(2.8 / 1.44, 9);
+    expect(point.costrOutput!.y).toBeCloseTo(0.7 / 1.44, 9);
+    expect(point.costhi.y).toBeCloseTo(2.8 / 2.16, 9);
+    expect(point.costri.y).toBeCloseTo(0.7 / 2.16, 9);
+  });
+
+  it('gives no tokens per dollar for hardware without a price', () => {
+    const e = entry({ tput_per_gpu: 1000, output_tput_per_gpu: 400, input_tput_per_gpu: 600 });
+    const keys = [
+      'tokensPerDollarH',
+      'tokensPerDollarR',
+      'outputTokensPerDollarH',
+      'outputTokensPerDollarR',
+      'inputTokensPerDollarH',
+      'inputTokensPerDollarR',
+    ] as const;
+    const unpriced = { power: 700, tdp: 700, costh: 0, costr: 0 };
+    expect(buildDerivedChartFields(e, 'h100', keys, undefined, unpriced)).toEqual(
+      Object.fromEntries(keys.map((key) => [key, { y: 0, roof: false }])),
+    );
+  });
+
+  it('treats missing throughputs as zero and omits the output and input series', () => {
+    const e = entry({
+      tput_per_gpu: undefined,
+      output_tput_per_gpu: undefined,
+      input_tput_per_gpu: undefined,
+    });
+    expect(
+      buildDerivedChartFields(e, 'h100', [
+        'tpPerGpu',
+        'outputTputPerGpu',
+        'inputTputPerGpu',
+        'costh',
+        'jTotal',
+      ]),
+    ).toEqual({
+      tpPerGpu: { y: 0, roof: false },
+      costh: { y: 0, roof: false },
+      jTotal: { y: 0, roof: false },
+    });
+    expect(createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100').y).toBe(0);
+  });
 });
 
 describe('normalizeEvalHardwareKey trtllm substitution', () => {
@@ -1404,6 +1543,15 @@ describe('paretoFrontUpperRight', () => {
     expect(result[0]).toBe(a);
     expect(result[1]).toBe(b);
   });
+
+  it('keeps the first of identical points', () => {
+    const result = paretoFrontUpperRight([
+      paretoPt(1, 2, { conc: 0 }),
+      paretoPt(2, 5, { conc: 1 }),
+      paretoPt(2, 5, { conc: 2 }),
+    ]);
+    expect(result.map((p) => p.conc)).toEqual([0, 1]);
+  });
 });
 
 describe('paretoFrontUpperLeft', () => {
@@ -1481,6 +1629,16 @@ describe('paretoFrontUpperLeft', () => {
     const input = [paretoPt(3, 2), paretoPt(1, 5), paretoPt(2, 3)];
     paretoFrontUpperLeft(input);
     expect(input.map((p) => p.x)).toEqual([1, 2, 3]);
+  });
+
+  it('keeps the first of identical points and drops lower points at an x already on the front', () => {
+    const result = paretoFrontUpperLeft([
+      paretoPt(1, 5, { conc: 0 }),
+      paretoPt(2, 3, { conc: 1 }),
+      paretoPt(2, 3, { conc: 2 }),
+      paretoPt(2, 1, { conc: 3 }),
+    ]);
+    expect(result.map((p) => p.conc)).toEqual([0, 1]);
   });
 });
 
@@ -1695,7 +1853,7 @@ describe('metricChartTitle', () => {
       'Total Tokens per $1 TCO',
     );
     expect(metricTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
-      'Total Tokens per $1 TCO (Owning at large hyperscaler volume)',
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
     );
     expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'zh')).toBe(
       '每 1 美元 TCO 对应的总 token 数',

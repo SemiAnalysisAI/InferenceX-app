@@ -158,7 +158,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       },
     },
     en: {
-      typeLabel: 'Whitepaper · Executive summary',
+      typeLabel: 'Whitepaper · Executive Summary',
       title: 'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year',
       subtitle: 'Executive Summary - Agentic Inference Serving Economics Analysis',
       description:
@@ -269,7 +269,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       figureQualifier: profitChartQualifier('en', 'P90', 45),
       figures: [
         {
-          costTier: 'Owning at large hyperscaler volume',
+          costTier: 'Owning at Large Hyperscaler Volume',
           caption:
             'Figure 1. Revenue and profit per GW-year, owned at hyperscaler volume ($1.50 per chip-hour). The bar totals $32.6B of revenue; segments from bottom to top are compute expense ($6.3B), model license fee ($9.8B), and profit ($16.5B, 50.7% margin).',
           alt: 'Figure 1: stacked bar of revenue per GW-year for MI355X on Kimi K3 2.8T, owned at $1.50 per GPU-hour. $32.6B of revenue splits into $6.3B compute expense, $9.8B model license fee, and $16.5B profit at a 50.7% margin.',
@@ -450,32 +450,32 @@ export const WHITEPAPER_COPY = {
     indexIntro:
       'Short research papers on inference serving economics, measured on the live AgentX benchmark and published as downloadable PDFs.',
     indexEmpty: 'No whitepapers yet',
-    backToIndex: 'Back to whitepapers',
+    backToIndex: 'Back to Whitepapers',
     downloadPdf: 'Download PDF',
     readSummary: 'Read the page',
     openEstimator: 'Open the profit estimator per gigawatt',
     summary: 'Summary',
-    keyFindings: 'Key findings',
+    keyFindings: 'Key Findings',
     method: 'Method',
     assumptions: 'Assumptions',
     assumptionItem: 'Item',
     assumptionValue: 'Value',
     sources: 'Sources',
-    closingHeading: 'Get the full executive summary',
+    closingHeading: 'Get the Full Executive Summary',
     closingBody: 'The two-page PDF includes both figures, the assumptions table, and source links.',
     pages: (count: number) => `${count} pages`,
     dataAsOf: (date: string) => `Data as of ${date}`,
     tags: 'Tags',
     openFullSize: 'Open full-size image in a new tab',
-    keyNumbers: 'Key numbers',
+    keyNumbers: 'Key Numbers',
     figures: 'Figures',
-    onThisPage: 'On this page',
-    pdfCardTitle: 'Executive summary',
+    onThisPage: 'On This Page',
+    pdfCardTitle: 'Executive Summary',
     pdfCardMeta: (count: number) => `Executive summary · ${count} pages · PDF`,
     tcoBadgesLabel: 'TCO $/chip/hr:',
-    sellingPriceLabel: 'Selling price per million tokens:',
+    sellingPriceLabel: 'Selling Price per Million Tokens:',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
+      `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
   },
   zh: {
     indexTitle: '白皮书',

@@ -48,12 +48,12 @@ import {
 
 const STRINGS = {
   en: {
-    title: 'Current InferenceX image',
+    title: 'Current InferenceX Image',
     description:
       'Docker image tags for each actively benchmarked model, scenario, and chip configuration. Retired models and scenarios are not listed.',
     benchmarkGroup: 'Configuration',
     runtimeGroup: 'Hardware & runtime',
-    imageVersions: 'Images & versions',
+    imageVersions: 'Images & Versions',
     configuration: 'Configuration',
     resultsCount: (count: number) => `${count} configuration${count === 1 ? '' : 's'}`,
     sortHint: 'Oldest submission first',
@@ -75,26 +75,26 @@ const STRINGS = {
     tooltipPrecision: 'Numerical precision used for model weights.',
     labelIslOsl: 'ISL / OSL',
     tooltipIslOsl: 'Input Sequence Length / Output Sequence Length in tokens.',
-    labelSpecDecode: 'Spec decode',
+    labelSpecDecode: 'Spec Decode',
     tooltipSpecDecode: 'Speculative decoding method. MTP = Multi-Token Prediction.',
     labelGpuSku: 'Chip SKU',
-    tooltipGpuSku: 'Filter by chip model (e.g. H200, MI300X, B200).',
-    labelNodeType: 'Node type',
+    tooltipGpuSku: 'Filter by Chip model (e.g. H200, MI300X, B200).',
+    labelNodeType: 'Node Type',
     labelFramework: 'Framework',
     tooltipFramework:
       'Filter by inference engine (sglang, vllm, TensorRT, atom). Disaggregated framework variants collapse into their base engine. Empty = all frameworks.',
-    allModels: 'All models',
+    allModels: 'All Models',
     all: 'All',
-    singleNode: 'Single node',
+    singleNode: 'Single Node',
     disagg: 'Disaggregated',
     allFrameworks: 'All frameworks',
     thModel: 'Model',
     thPrecision: 'Precision',
     thGpuSku: 'Chip SKU',
-    thSpecDecode: 'Spec decode',
-    thCurrentTag: 'Current InferenceX image tag',
-    thActualLatest: 'Actual latest tag',
-    thDaysSince: 'Days since update',
+    thSpecDecode: 'Spec Decode',
+    thCurrentTag: 'Current InferenceX Image Tag',
+    thActualLatest: 'Actual Latest Tag',
+    thDaysSince: 'Days Since Update',
     off: 'Off',
     lastSubmission: 'Last submission:',
     days: (count: number) => `${count}d`,
@@ -267,11 +267,7 @@ export function CurrentImageContent() {
   return (
     <div className="w-full min-w-0">
       <Card className="mb-6 gap-4">
-        <DashboardSectionHeader
-          headingAs={locale === 'zh' ? 'h2' : 'h1'}
-          title={t.title}
-          description={t.description}
-        />
+        <DashboardSectionHeader headingAs="h1" title={t.title} description={t.description} />
 
         {options && (
           <TooltipProvider delayDuration={0}>

@@ -4,7 +4,11 @@ import type {
   ApiResponse,
   ApiSchema,
 } from '@/lib/api/api-documentation';
-import { API_BASE_URL, SUPPORTED_BENCHMARK_MODELS } from '@/lib/api/api-documentation-base';
+import {
+  API_BASE_URL,
+  MODEL_PARAM_FORMS,
+  SUPPORTED_BENCHMARK_MODELS,
+} from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -39,8 +43,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Display model name (case-insensitive) or compare-page slug. Default: every ranked model; models without measurable rows are dropped there but kept when requested explicitly.',
-      '模型显示名称（不区分大小写）或对比页 slug。默认为全部有排名的模型；无可测数据的模型在全量结果中会被省略，显式指定时则保留。',
+      `${MODEL_PARAM_FORMS.en} Default: every ranked model; models without measurable rows are dropped there but kept when requested explicitly.`,
+      `${MODEL_PARAM_FORMS.zh}默认为全部有排名的模型；无可测数据的模型在全量结果中会被省略，显式指定时则保留。`,
     ),
     schema: { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
     example: 'DeepSeek-V4-Pro',

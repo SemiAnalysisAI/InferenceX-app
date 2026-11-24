@@ -1,17 +1,27 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
+import {
+  advanceTimersByTime,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 
-const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh' }));
+const mocks = { locale: 'en' as 'en' | 'zh' };
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
 
+import * as DynamicMargins from '@/lib/d3-chart/dynamic-margins';
 import { D3ChartWrapper, TOUCH_PRIMARY_QUERY, resolveChartInstructions } from './d3-chart-wrapper';
 
-vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+// Snapshot of the real exports, taken before mock.module swaps them in place.
+const actualDynamicMargins = { ...DynamicMargins };
+mock.module('@/lib/d3-chart/dynamic-margins', () => ({
+  ...actualDynamicMargins,
   measureTextWidth: (text: string, font: string) =>
     text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
 }));
@@ -31,7 +41,7 @@ const ZH_MOUSE = '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以�
 const ZH_TOUCH = '双指捏合以缩放 · 双指拖动以平移 · 双击以重置';
 
 function stubTouchPrimary(matches: boolean) {
-  vi.stubGlobal(
+  stubGlobal(
     'matchMedia',
     (query: string) =>
       ({
@@ -78,7 +88,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('D3ChartWrapper default interaction guidance', () => {
@@ -321,18 +331,18 @@ describe('D3ChartWrapper zoom hint placement', () => {
   });
 
   it('fades the hint out after an animated double-click zoom settles', () => {
-    vi.useFakeTimers();
+    useFakeTimers();
     try {
       const svg = renderWrapper().current!;
       zoomed(svg);
       fire(svg, new MouseEvent('dblclick', { bubbles: true }));
-      act(() => vi.advanceTimersByTime(50));
+      act(() => advanceTimersByTime(50));
       expect(hint()?.dataset.dismissed).toBeUndefined();
       zoomed(svg, { k: 2, x: 0, y: 0 });
-      act(() => vi.advanceTimersByTime(400));
+      act(() => advanceTimersByTime(400));
       expect(hint()?.dataset.dismissed).toBe('');
     } finally {
-      vi.useRealTimers();
+      useRealTimers();
     }
   });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { OperatingState, WorkloadState } from './power_model';
 import { OSSAllinPowerModel } from './power_model/models/advanced/model';

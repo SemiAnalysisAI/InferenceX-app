@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { TocHeading } from '@/lib/blog/blog';
 import { BlogToc } from './blog-toc';
@@ -12,6 +12,6 @@ describe('shared Blog localization chrome', () => {
 
     expect(toc).toContain('aria-label="本页目录"');
     expect(toc).not.toContain('Table of contents');
-    expect(toc).not.toContain('On this page');
+    expect(toc).not.toContain('On This Page');
   });
 });

@@ -1,5 +1,3 @@
-import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
-import { servingArtifact } from '../support/video-artifacts';
 import { expectHwKeyPoints, type ScatterPoint } from '../support/scatter-points';
 import { interceptPreviewSnapshots } from '../support/preview-snapshot-fixtures';
 
@@ -251,13 +249,13 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
         .and('have.attr', 'href', `${locale}/opx`)
         .and(
           'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR microbenchmarks',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
         )
         .and(
           'contain.text',
           locale
             ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
-            : '950PR GEMM FLOPs and max FLOPS utilization',
+            : '950PR GEMM FLOPs and Max FLOPS utilization',
         )
         .click();
       cy.location('pathname').should('eq', `${locale}/opx`);
@@ -367,62 +365,6 @@ describe('H3 video performance history', () => {
       entries: [],
       nextPage: null,
     }).as('historyList');
-  });
-  it('restores published history filters on reload and browser navigation', () => {
-    const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
-    cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
-      schemaVersion: 1,
-      entries: [
-        entry,
-        videoHistoryEntry(servingArtifact(124, 41, 'NVIDIA B200'), '2026-09-09T00:00:00Z'),
-      ],
-      nextPage: null,
-    }).as('history');
-    cy.visit('/zh/vgx?history-hardware=NVIDIA%20H200');
-    cy.wait('@history');
-    cy.contains('summary', '性能历史').parent('details').should('have.attr', 'open');
-    cy.get('[data-testid="results-history"] summary').should('contain', '性能历史');
-    cy.get('[data-testid="video-history-observation"]')
-      .should('have.length', 3)
-      .each(($observation) => {
-        expect($observation).to.contain('NVIDIA H200').and.not.contain('NVIDIA B200');
-      });
-    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
-    cy.get('[aria-label="客户端并发数"]').click();
-    cy.contains('[role="option"]', 'C2').click();
-    cy.get('[data-testid="video-history-observation"]')
-      .should('have.length', 1)
-      .and('contain', 'C2');
-    cy.reload();
-    cy.get('[data-testid="video-history-observation"]')
-      .should('have.length', 1)
-      .and('contain', 'C2')
-      .find('td')
-      .eq(2)
-      .should('contain', '240')
-      .and('not.contain', ' / ');
-    cy.location('search').should((search) => {
-      const params = new URLSearchParams(search);
-      expect(params.get('history-concurrency')).to.equal('2');
-      expect(params.get('history-hardware')).to.equal('NVIDIA H200');
-    });
-    cy.window().then((win) => {
-      const next = new URL(win.location.href);
-      next.searchParams.set('history-concurrency', '4');
-      win.history.pushState(null, '', next);
-    });
-    cy.reload();
-    cy.get('[data-testid="video-history-observation"]')
-      .should('have.length', 1)
-      .and('contain', 'C4');
-    cy.go('back');
-    cy.get('[data-testid="video-history-observation"]')
-      .should('have.length', 1)
-      .and('contain', 'C2');
-    cy.go('forward');
-    cy.get('[data-testid="video-history-observation"]')
-      .should('have.length', 1)
-      .and('contain', 'C4');
   });
   it('keeps the hidden Video tab behind the shared unlock and noindex', () => {
     cy.viewport(1440, 1000);

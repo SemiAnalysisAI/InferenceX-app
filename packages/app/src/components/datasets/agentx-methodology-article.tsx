@@ -91,8 +91,8 @@ const FIGURE_ASSETS = {
 
 const CONTENT = {
   en: {
-    eyebrow: 'Field guide / AI infrastructure',
-    title: 'AgentX methodology',
+    eyebrow: 'Field Guide / AI Infrastructure',
+    title: 'AgentX Methodology',
     lead: 'AgentX converts opt-in Claude Code proxy traces into deterministic AIPerf workloads. This page documents how collection metadata becomes a replay and which controls define a valid benchmark result.',
     facts: [
       { value: '393', label: 'published sessions' },
@@ -100,51 +100,51 @@ const CONTENT = {
       { value: '1 hour', label: 'profiling window' },
       { value: '25–75%', label: 'seeded start range' },
     ],
-    collectionTitle: 'Dataset collection',
+    collectionTitle: 'Dataset Collection',
     collectionParagraphs: [
       'Participants opt in to an HTTP proxy that records request arrival and completion times, input and output token counts, conversation IDs, and subagent IDs. The published corpus does not contain prompts, source code, tool arguments, or tool results.',
       'The proxy represents each input as session-scoped chained hashes in 64-token blocks. Matching block IDs preserve shared prefixes within a session. AIPerf replaces the blocks with deterministic synthetic coding and tool-use tokens before replay.',
       'The client cannot see provider-side chat templates, proprietary tokenizers, server tools, encrypted reasoning content, or the exact token expansion of images and documents. Model-specific padding and deterministic placeholders approximate those fields. The placeholders and padding do not contain original prompts, code, or tool payloads.',
     ],
-    datasetTitle: 'The v1.0 dataset',
+    datasetTitle: 'The v1.0 Dataset',
     datasetParagraphs: [
       'The v1.0 release contains 393 sessions built on June 21, 2026. Each selected session has at least 20 requests, uses Claude Code 2.1.139 or newer, and has no more than 10 concurrent subagents. Processing removes exact duplicates, short classifier calls used for security monitoring or title generation, and requests whose reconstructed input exceeds 990k tokens.',
       'The full variant retains contexts up to 1M tokens. The 256k variant removes requests above its cap while retaining the relative timing and subagent overlap of the requests that remain. Both use the WEKA trace format consumed by AIPerf.',
     ],
-    replayTitle: 'From trace to replay graph',
+    replayTitle: 'From Trace to Replay Graph',
     replayParagraphs: [
       'AIPerf converts each trace into a directed acyclic graph (DAG). Main-agent requests form a linear chain. Subagent requests form separate chains that spawn after an eligible parent request and join before the next dependent main-agent request. One-off auxiliary requests can run without a join edge.',
       'The trace contains request timestamps and observed branch IDs, not the tool-level event that caused each branch. Replay therefore preserves recorded ordering, branch overlap, and inter-turn delays without claiming a provider-internal causal history.',
     ],
-    measurementTitle: 'Concurrency and reported metrics',
+    measurementTitle: 'Concurrency and Reported Metrics',
     measurementParagraphs: [
       'Concurrency is the number of live agent clients. It is not a fixed HTTP request batch because one client can fan out into several subagent requests. The server can have more in-flight requests than the configured client concurrency.',
       'AgentX runs closed loop: a client submits its next eligible request after dependencies complete. Faster systems progress farther through their sampled sessions during the same hour, so the exact request mix can vary, especially at low concurrency. Results should report throughput with time to first token (TTFT) and interactivity. A single latency value does not describe the run.',
     ],
-    warmupTitle: 'Warmup, timing, and determinism',
+    warmupTitle: 'Warmup, Timing, and Determinism',
     warmupParagraphs: [
       'A fixed seed selects each replay start uniformly from 25% to 75% of the recorded session duration. A max_tokens=1 primer materializes the active main-agent and subagent prefixes. Each replay lane then completes 10 additional warmup requests before the measurement barrier opens.',
       'Only the following one-hour profiling window contributes reported metrics. The seed fixes session sampling, start points, and synthetic payloads. A unique cache-bust marker is added to each recycled play so unrelated replays cannot accumulate a shared prefix.',
     ],
-    acceptanceTitle: 'Synthetic payloads and speculative decoding',
+    acceptanceTitle: 'Synthetic Payloads and Speculative Decoding',
     acceptanceParagraphs: [
       'Synthetic tokens preserve input length and prefix structure, but their draft-token acceptance does not match natural model output. AgentX therefore uses a measured acceptance length from the coding category of SPEED-Bench for each model, speculative method, draft length, and thinking mode.',
       'The serving engines expose a forced-acceptance control, and InferenceX records the selected values in versioned golden acceptance-length files. This separates serving-system performance from acceptance variation caused by the synthetic payload. AgentX does not evaluate model answer quality.',
     ],
-    dramTitle: 'DRAM offload rules',
+    dramTitle: 'DRAM Offload Rules',
     dramParagraphs: [
       'KV-cache offload changes the capacity available to long-running sessions. Servers without a standardized DRAM configuration are capped at 3 TB. Standard GB200 NVL72, GB300 NVL72, and TPUv7 systems may use their installed capacity.',
       'A benchmark configuration can access only the fraction of host DRAM proportional to its GPU allocation. This prevents a small GPU partition from claiming the memory budget of the entire server.',
     ],
-    limitsTitle: 'Scope and reproducibility',
+    limitsTitle: 'Scope and Reproducibility',
     limits:
       'The replay preserves client-visible request lengths, timing, branch structure, and KV-prefix reuse. It cannot reproduce provider-hidden transformations or the semantic content of the original session. Use the published corpus and locked scenario settings when comparing systems.',
-    sourcesTitle: 'Primary sources',
+    sourcesTitle: 'Primary Sources',
     sources: [
       { label: 'AgentX v1.0 full dataset', target: 'dataset-full' },
       { label: 'AgentX v1.0 256k dataset', target: 'dataset-256k' },
       { label: 'AIPerf WEKA trace replay guide', target: 'aiperf-weka' },
-      { label: 'SPEED-bench paper', target: 'speed-bench' },
+      { label: 'SPEED-Bench paper', target: 'speed-bench' },
       { label: 'SGLang forced acceptance control', target: 'sglang-pr' },
       { label: 'TensorRT-LLM forced acceptance control', target: 'trtllm-pr' },
       { label: 'vLLM synthetic acceptance control', target: 'vllm-pr' },

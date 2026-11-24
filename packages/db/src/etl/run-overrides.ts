@@ -259,6 +259,71 @@ export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [
     offloadMode: 'on',
     recipeFingerprint: null,
   },
+  // 2026-11-24 | Point 448449 | MiniMax-M3.1-Flash FP4 GB200 Dynamo-SGLang disagg linker, 1P DEP8 x 1D DEP16, conc 288 (InferenceX PR #4695).
+  // Reason: broke the MODELS.md DRAM rule. Four 150 GB Mooncake stores ran on the infra node, which hosts no inference worker and so has a DRAM allowance of zero.
+  {
+    githubRunId: 44263569706,
+    runAttempt: 1,
+    configId: 3374,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 288,
+    offloadMode: 'on',
+    recipeFingerprint: 'aa2c30fe5d04a68ec1bbf9a59080ccab24c22c1689c5531910452b3d16e436e4',
+  },
+  // 2026-11-24 | Point 448450 | MiniMax-M3.1-Flash FP4 GB200 Dynamo-SGLang disagg linker, 1P DEP8 x 1D DEP16, conc 320 (InferenceX PR #4695).
+  // Reason: broke the MODELS.md DRAM rule. Four 150 GB Mooncake stores ran on the infra node, which hosts no inference worker and so has a DRAM allowance of zero.
+  {
+    githubRunId: 44263569706,
+    runAttempt: 1,
+    configId: 3374,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 320,
+    offloadMode: 'on',
+    recipeFingerprint: 'aa2c30fe5d04a68ec1bbf9a59080ccab24c22c1689c5531910452b3d16e436e4',
+  },
+  // 2026-11-24 | Point 448451 | MiniMax-M3.1-Flash FP4 GB200 Dynamo-SGLang disagg linker, 1P DEP8 x 1D DEP16, conc 352 (InferenceX PR #4695).
+  // Reason: broke the MODELS.md DRAM rule. Four 150 GB Mooncake stores ran on the infra node, which hosts no inference worker and so has a DRAM allowance of zero.
+  {
+    githubRunId: 44263569706,
+    runAttempt: 1,
+    configId: 3374,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 352,
+    offloadMode: 'on',
+    recipeFingerprint: 'aa2c30fe5d04a68ec1bbf9a59080ccab24c22c1689c5531910452b3d16e436e4',
+  },
+  // 2026-11-24 | Point 448452 | MiniMax-M3.1-Flash FP4 GB200 Dynamo-SGLang disagg linker, 2P DEP8 x 1D DEP16, conc 448 (InferenceX PR #4695).
+  // Reason: broke the MODELS.md DRAM rule. Four 150 GB Mooncake stores ran on the infra node, which hosts no inference worker and so has a DRAM allowance of zero.
+  {
+    githubRunId: 44263569706,
+    runAttempt: 1,
+    configId: 3375,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 448,
+    offloadMode: 'on',
+    recipeFingerprint: '3624d3b7ef2eb998905c0e13bf5851c564acf6655ee5b866db8c25a85901033b',
+  },
+  // 2026-11-24 | Point 448453 | MiniMax-M3.1-Flash FP4 GB200 Dynamo-SGLang disagg linker, 2P DEP8 x 1D DEP16, conc 480 (InferenceX PR #4695).
+  // Reason: broke the MODELS.md DRAM rule. Four 150 GB Mooncake stores ran on the infra node, which hosts no inference worker and so has a DRAM allowance of zero.
+  {
+    githubRunId: 44263569706,
+    runAttempt: 1,
+    configId: 3375,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 480,
+    offloadMode: 'on',
+    recipeFingerprint: '3624d3b7ef2eb998905c0e13bf5851c564acf6655ee5b866db8c25a85901033b',
+  },
 ];
 
 interface AuditedBackfill {

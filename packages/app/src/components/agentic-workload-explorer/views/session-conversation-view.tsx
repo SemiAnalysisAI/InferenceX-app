@@ -16,7 +16,7 @@ import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    exitReplay: 'Exit replay',
+    exitReplay: 'Exit Replay',
     replay: 'Replay',
     loadingRequests: (loaded: number, total: number) =>
       `Loading all requests (${loaded} / ${total})...`,

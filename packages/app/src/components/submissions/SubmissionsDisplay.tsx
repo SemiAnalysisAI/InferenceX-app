@@ -12,6 +12,7 @@ import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { ResultContext } from '@/components/ui/result-context';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Stat } from '@/components/ui/stat';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { submissionsVolumeToCsv } from '@/lib/export/csv-export-helpers';
@@ -23,10 +24,12 @@ import SubmissionsTable from './SubmissionsTable';
 import { computeTotalStats } from './submissions-utils';
 
 const CHART_ID = 'submissions-chart';
+const STATS_GRID_STYLE =
+  'mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/30 pt-4 md:grid-cols-4';
 
 const STRINGS = {
   en: {
-    heading: 'Benchmark submissions',
+    heading: 'Benchmark Submissions',
     description:
       'All benchmark configurations submitted to InferenceX, with submission history, activity trends and datapoint volumes',
     modeWeekly: 'Weekly',
@@ -37,19 +40,19 @@ const STRINGS = {
     noChartData: 'No submission activity data is available',
     noTableData: 'No submission records are available',
     chartModeAria: 'Chart mode',
-    chartCaption: 'Submission activity',
-    qualifierWeekly: 'Weekly datapoints by vendor',
-    qualifierCumulative: 'Cumulative datapoints by vendor',
+    chartCaption: 'Submission Activity',
+    qualifierWeekly: 'Weekly Datapoints by vendor',
+    qualifierCumulative: 'Cumulative Datapoints by vendor',
     chartSource: 'SemiAnalysis InferenceX™',
-    statDatapoints: 'Datapoints generated',
-    statConfigs: 'Distinct configurations',
-    statModels: 'Unique models',
-    statHardware: 'Unique hardware',
+    statDatapoints: 'Datapoints Generated',
+    statConfigs: 'Distinct Configurations',
+    statModels: 'Unique Models',
+    statHardware: 'Unique Hardware',
     subtitleResults: 'results',
     subtitleTested: 'tested',
     subtitleLLMs: 'LLMs',
     subtitleSKUs: 'SKUs',
-    tableCaption: 'Submission records',
+    tableCaption: 'Submission Records',
     tableHint: 'Search, sort, or expand a row to inspect the exact benchmark configuration',
   },
   zh: {
@@ -126,12 +129,17 @@ export default function SubmissionsDisplay() {
 
   if (error) {
     return (
-      <RetryableQueryError
-        message={t.errorText}
-        analyticsEvent="submissions_retry_clicked"
-        onRetry={refetch}
-        testId="submissions-error"
-      />
+      <div className="flex flex-col gap-4">
+        <Card>
+          <DashboardSectionHeader headingAs="h1" title={t.heading} />
+        </Card>
+        <RetryableQueryError
+          message={t.errorText}
+          analyticsEvent="submissions_retry_clicked"
+          onRetry={refetch}
+          testId="submissions-error"
+        />
+      </div>
     );
   }
 
@@ -140,12 +148,26 @@ export default function SubmissionsDisplay() {
       <section>
         <Card>
           <DashboardSectionHeader
+            headingAs="h1"
             title={t.heading}
             description={t.description}
             actions={<ChartShareActions />}
           />
+          {isLoading && (
+            <dl className={STATS_GRID_STYLE} data-testid="submissions-stats-loading">
+              {Array.from({ length: 4 }, (_, i) => (
+                <Stat
+                  key={i}
+                  size="lg"
+                  label={<Skeleton className="h-4 w-28" />}
+                  value={<Skeleton className="h-8 w-16" />}
+                  detail={<Skeleton className="h-4 w-12" />}
+                />
+              ))}
+            </dl>
+          )}
           {stats && (
-            <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/30 pt-4 md:grid-cols-4">
+            <dl className={STATS_GRID_STYLE}>
               {[
                 {
                   label: t.statDatapoints,

@@ -412,7 +412,8 @@ describe('Video results clip stage', () => {
   it('keeps native rerun media and PSNR separate from the original CI performance', () => {
     cy.viewport(390, 900);
     mountResultsClips(['b200', 'h100'], '/vgx', true);
-    cy.get('[data-prompt="diag:drum-taps"]')
+    // At this width the strip under the stage is the prompt picker.
+    cy.get('[data-strip-prompt="diag:drum-taps"]')
       .should('have.attr', 'aria-pressed', 'true')
       .and('contain', 'Matched-noise rerun');
     cy.get('[data-side="a"]').should('contain', '4 GPU');
@@ -432,14 +433,13 @@ describe('Video results clip stage', () => {
     cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
-    cy.get('[data-prompt="drum-taps"]').click();
+    cy.get('[data-strip-prompt="drum-taps"]').click();
     // The board's reference order: quality first, then latency and one cost, then energy.
     readoutOrder(['psnr', 'wall', 'cost', 'energy']);
     readoutValue('psnr').should('have.text', '25 dB');
     readoutValue('wall').should('have.text', '120 s');
-    readoutValue('energy').should('have.text', '301,088 J');
-    readoutValue('cost').should('have.text', '$0.1');
-    readoutValue('cost', 1).should('have.text', '$0.02 / video-s');
+    readoutValue('energy').should('have.text', '301 kJ');
+    readoutValue('cost').should('have.text', '$0.100');
     cy.get(`${readout} [data-metric="cost"]`)
       .should('have.attr', 'title')
       .and('contain', 'On the allocated GPUs: not measured yet.');
@@ -467,7 +467,7 @@ describe('Video results clip stage', () => {
       .should('contain', 'A drummer taps a snare drum.')
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
-    readoutValue('cost').should('have.text', '$0.1');
+    readoutValue('cost').should('have.text', '$0.100');
 
     cy.get('[data-testid="video-results-stage"]').click('right');
     load('[data-testid="video-results-start"]');
@@ -634,7 +634,7 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-difference"]').should('not.exist');
   });
 
-  it('plays web renditions outside Difference and sealed originals in it, also for an overlay', () => {
+  it('plays web renditions in every view, Difference included, also for an overlay', () => {
     mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId, [
       'b200',
       'h200',
@@ -648,7 +648,7 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-sources"] summary').click();
     cy.get('[data-testid="video-results-sources"]').should(
       'contain',
-      'Playback uses a web encode; Difference, PSNR and the media link use the original.',
+      'Playback and Difference use a web encode; PSNR and the media link use the original.',
     );
     cy.get('@original-b200').then((url) =>
       cy
@@ -662,14 +662,14 @@ describe('Video results clip stage', () => {
     expectClipsAt(0.8);
 
     cy.get('[data-testid="video-results-view-diff"]').click();
-    cy.get('@original-b200').then((url) => sideVideo('a').should('have.attr', 'src', url));
-    sideVideo('b')
-      .invoke('attr', 'src')
-      .then((src) => cy.get('@preview-url').should('not.equal', src));
-    // Swapping to the original reloads each side; it must resume at the group's time, not 0.
+    cy.get('@preview-url').then((url) => {
+      sideVideo('a').should('have.attr', 'src', url);
+      sideVideo('b').should('have.attr', 'src', url);
+    });
     expectClipsAt(0.8);
-    // Both renditions are the same stand-in, so only the originals differ.
-    expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
+    // Both renditions are the same stand-in while the originals differ, so a black difference
+    // shows Difference read the renditions.
+    expectDifference((rgba) => expect(rgba).to.deep.equal([0, 0, 0, 255]));
 
     cy.get('[data-testid="video-results-view-toggle"]').click();
     cy.get('@preview-url').then((url) => sideVideo('a').should('have.attr', 'src', url));
@@ -807,10 +807,10 @@ describe('Video results clip stage', () => {
     cy.get(`${readout} [data-readout-side="h100"]`).should('not.contain', 'Unofficial run');
     readoutLines('wall').should('have.length', 2).last().should('have.text', 'H100 120 s');
     readoutValue('speed').should('have.text', '2.15× faster');
-    readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167.3 s');
-    readoutValue('psnr', 2).should('have.text', 'H100 25 dB');
-    readoutValue('cost', 1).should('have.text', '$0.02 / video-s');
-    readoutValue('cost', 2).should('have.text', 'H100 $0.3');
+    readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167 s');
+    readoutValue('psnr', 1).should('have.text', 'H100 25 dB');
+    // Cost says how the subject stands against the pair, then the pair's value.
+    readoutValue('cost', 1).should('have.text', '3× cheaper than H100 · $0.300');
   });
 
   it('shows a dash, not a pending score or stray times, where a lossy pair has nothing to compare', () => {
@@ -843,10 +843,9 @@ describe('Video results clip stage', () => {
     cy.get(`${readout} [data-metric="paired"] dt`).should('have.text', 'Paired scores');
     readoutValue('paired').should('have.text', 'Planned');
     cy.get(`${readout} [data-metric="paired"]`).invoke('text').should('not.match', /\d/u);
-    readoutValue('cost').should('have.text', '$0.04');
-    readoutValue('cost', 1).should('have.text', '$0.01 / video-s');
-    readoutValue('cost', 2).should('have.text', 'B200 lossless $0.1');
-    readoutValue('psnr', 2).should('have.text', 'B200 lossless 25 dB');
+    readoutValue('cost').should('have.text', '$0.040');
+    readoutValue('cost', 1).should('have.text', '2.5× cheaper than B200 lossless · $0.100');
+    readoutValue('psnr', 1).should('have.text', 'B200 lossless 25 dB');
   });
 
   it('falls back to the sealed original when a web rendition cannot be played', () => {

@@ -108,7 +108,7 @@ const STRINGS = {
     },
     all: 'All',
     loading: 'Resolving CollectiveX run…',
-    unavailable: 'CollectiveX run unavailable',
+    unavailable: 'CollectiveX Run Unavailable',
     loadError: 'The CollectiveX dataset failed to load',
     retry: 'Retry',
     description: (
@@ -164,7 +164,7 @@ const STRINGS = {
     payloadBandwidthNote:
       'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per chip — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-chip bandwidth term, α = fixed overhead).',
     atLatency: (percentile: string) => `at ${percentile} latency`,
-    chartControlsHeading: 'Chart filters',
+    chartControlsHeading: 'Chart Filters',
   },
   zh: {
     operation: {

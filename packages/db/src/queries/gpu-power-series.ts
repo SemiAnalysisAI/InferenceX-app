@@ -72,9 +72,11 @@ function groupByArtifact(rows: readonly RawSeriesRow[]): Map<string, RawSeriesRo
 }
 
 function decodeSeries(value: unknown): GpuPowerSeries[] {
-  if (!(value instanceof Uint8Array)) throw new Error('gpu_power_series.series_gz is not bytea');
+  if (!(value instanceof Uint8Array))
+    throw new TypeError('gpu_power_series.series_gz is not bytea');
   const parsed: unknown = JSON.parse(gunzipSync(value).toString('utf8'));
-  if (!Array.isArray(parsed)) throw new Error('gpu_power_series.series_gz is not a series array');
+  if (!Array.isArray(parsed))
+    throw new TypeError('gpu_power_series.series_gz is not a series array');
   return parsed as GpuPowerSeries[];
 }
 

@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { mocked } from '@/test/helpers';
 
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import {
@@ -144,14 +145,14 @@ describe('temporary UMBP MoRI SGLang label for run 35879254139', () => {
     const point = { hwKey, framework: 'mori-sglang', run_url: targetUrl };
     const generic = getHardwareConfig(hwKey);
     for (const now of [Date.parse('2026-10-09T12:00:00-04:00'), expiresAt - 1]) {
-      vi.mocked(Date.now).mockReturnValue(now);
+      mocked(Date.now).mockReturnValue(now);
       expect(getInferenceHardwareConfig(hwKey, undefined, [point]).suffix).toBe(
         '(UMBP MoRI SGLang)',
       );
       expect(getInferenceRunLabel('✕ gamma6', [point])).toBe('✕ gamma6 (UMBP MoRI SGLang)');
     }
     for (const now of [expiresAt, expiresAt + 1, expiresAt + 86_400_000]) {
-      vi.mocked(Date.now).mockReturnValue(now);
+      mocked(Date.now).mockReturnValue(now);
       expect(inferenceFrameworkLabelOverride('mori-sglang', targetUrl)).toBeUndefined();
       expect(getInferenceHardwareConfig(hwKey, undefined, [point])).toBe(generic);
       expect(getPointHardwareConfig(point, generic)).toBe(generic);
@@ -200,10 +201,10 @@ describe('temporary DSpark UMBP run label', () => {
   });
 
   it('returns to the standard label at the exact cutoff in all shared display paths', () => {
-    vi.mocked(Date.now).mockReturnValue(expiresAt - 1);
+    mocked(Date.now).mockReturnValue(expiresAt - 1);
     expect(inferenceFrameworkLabelOverride('mori-sglang', dsparkUrl)).toBe('MoRI UMBP SGLang');
     for (const now of [expiresAt, expiresAt + 1, expiresAt + 86_400_000]) {
-      vi.mocked(Date.now).mockReturnValue(now);
+      mocked(Date.now).mockReturnValue(now);
       expect(inferenceFrameworkLabelOverride('mori-sglang', dsparkUrl)).toBeUndefined();
       const point = { hwKey, framework: 'mori-sglang', run_url: dsparkUrl };
       const generic = getHardwareConfig(hwKey);
@@ -271,10 +272,10 @@ describe.each([
   });
 
   it('returns to the standard label at the exact cutoff in all shared display paths', () => {
-    vi.mocked(Date.now).mockReturnValue(expiresAt - 1);
+    mocked(Date.now).mockReturnValue(expiresAt - 1);
     expect(inferenceFrameworkLabelOverride('mori-sglang', linkerUrl)).toBe('UMBP MoRI SGLang');
     for (const now of [expiresAt, expiresAt + 1, expiresAt + 86_400_000]) {
-      vi.mocked(Date.now).mockReturnValue(now);
+      mocked(Date.now).mockReturnValue(now);
       expect(inferenceFrameworkLabelOverride('mori-sglang', linkerUrl)).toBeUndefined();
       const point = { hwKey, framework: 'mori-sglang', run_url: linkerUrl };
       const generic = getHardwareConfig(hwKey);
@@ -286,7 +287,7 @@ describe.each([
   });
 
   it('keeps the earlier DSpark window independent of the new cutoff', () => {
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-10-09T01:32:00Z'));
+    mocked(Date.now).mockReturnValue(Date.parse('2026-10-09T01:32:00Z'));
     expect(inferenceFrameworkLabelOverride('mori-sglang', dsparkUrl)).toBeUndefined();
     expect(inferenceFrameworkLabelOverride('mori-sglang', linkerUrl)).toBe('UMBP MoRI SGLang');
   });

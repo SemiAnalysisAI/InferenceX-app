@@ -33,11 +33,10 @@ import {
 import {
   mergeOverviewControlHref,
   OVERVIEW_CLIENT_ONLY_KEYS,
-  OVERVIEW_SEARCH_ORDER,
   type OverviewClientOnlySearchKey,
   overviewHref,
-  type OverviewSearchKey,
 } from '@/lib/overview/overview-links';
+import { OVERVIEW_SEARCH_ORDER, type OverviewSearchKey } from '@/lib/overview/overview-search-keys';
 
 const OVERVIEW_SERVER_SEARCH_KEYS = OVERVIEW_SEARCH_ORDER.filter(
   (key): key is Exclude<OverviewSearchKey, OverviewClientOnlySearchKey> =>

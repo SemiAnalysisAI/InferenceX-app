@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { isModelVisible, Model, MODEL_OPTIONS } from '@/lib/catalog/data-mappings';
 import { getCompareModelBySlug, PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';

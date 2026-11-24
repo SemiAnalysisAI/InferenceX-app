@@ -31,7 +31,7 @@ describe('AgentX telemetry tutorial — English page', () => {
 
   it('renders the article, every section, and every figure', () => {
     cy.get('[data-testid="agentx-telemetry-article"]').should('be.visible');
-    cy.contains('h1', 'Exploring agentic workloads: detailed telemetry').should('be.visible');
+    cy.contains('h1', 'Exploring Agentic Workloads: Detailed Telemetry').should('be.visible');
 
     for (const id of SECTION_IDS) {
       cy.get(`[data-testid="agentx-telemetry-section-${id}"]`).should('exist');
@@ -54,7 +54,7 @@ describe('AgentX telemetry tutorial — English page', () => {
       .should('be.visible')
       .and('have.attr', 'href', '/infx/inference?i_seq=agentic-traces');
 
-    cy.contains('a', 'AgentX datasets').click();
+    cy.contains('a', 'AgentX Datasets').click();
     cy.location('pathname').should('eq', '/infx/agentx');
   });
 });
@@ -139,6 +139,9 @@ describe('AgentX telemetry tutorial — popup on the agentic point-detail page',
   });
 
   it('is the only card in the corner — dashboard nudges stay off this route', () => {
+    // The card waits for the first scroll so it cannot become the page's LCP element.
+    cy.get('[data-testid="detail-view-logs"]').should('exist');
+    cy.scrollTo(0, 200);
     cy.get('[data-testid="telemetry-tutorial-modal"]').should('be.visible');
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');

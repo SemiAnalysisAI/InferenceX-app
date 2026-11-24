@@ -1,7 +1,7 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import {
   EditableTcoBadges,
@@ -140,7 +140,7 @@ describe('TcoPriceTable', () => {
     act(() =>
       root.render(
         <TcoPriceTableSlotsProvider
-          rowLabel={<span data-testid="tier">Rent – 3-year commit</span>}
+          rowLabel={<span data-testid="tier">Rent – 3-Year Commit</span>}
           footnote={<span data-testid="source">Prices: model</span>}
         >
           <TcoPriceTable
@@ -155,7 +155,7 @@ describe('TcoPriceTable', () => {
         </TcoPriceTableSlotsProvider>,
       ),
     );
-    expect(container.querySelector('tbody th')?.textContent).toBe('Rent – 3-year commit');
+    expect(container.querySelector('tbody th')?.textContent).toBe('Rent – 3-Year Commit');
     const footnote = container.querySelector('[data-testid="table"]')?.nextElementSibling;
     expect([...(footnote?.children ?? [])].map((el) => (el as HTMLElement).dataset.testid)).toEqual(
       ['source', 'reset'],

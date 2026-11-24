@@ -1,8 +1,16 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import { StrictMode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import {
+  advanceTimersByTimeAsync,
+  runOnlyPendingTimersAsync,
+  stubGlobal,
+  unstubAllGlobals,
+  useFakeTimers,
+  useRealTimers,
+} from '@/test/helpers';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 
 interface Deferred<T> {
@@ -53,8 +61,8 @@ let root: Root;
 let mounted: boolean;
 
 beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.useFakeTimers();
+  stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  useFakeTimers();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -64,9 +72,9 @@ beforeEach(() => {
 afterEach(() => {
   if (mounted) act(() => root.unmount());
   container.remove();
-  vi.useRealTimers();
+  useRealTimers();
   vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function view() {
@@ -89,7 +97,7 @@ async function renderHarness(props: HarnessProps, strictMode = false) {
 
 async function flushRequestTimers() {
   await act(async () => {
-    await vi.runOnlyPendingTimersAsync();
+    await runOnlyPendingTimersAsync();
   });
 }
 
@@ -129,7 +137,7 @@ describe('useDashboardData', () => {
     expect(view()).toEqual({ loading: false, error: '', value: 'initial' });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(31 * 24 * 60 * 60 * 1_000);
+      await advanceTimersByTimeAsync(31 * 24 * 60 * 60 * 1_000);
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });

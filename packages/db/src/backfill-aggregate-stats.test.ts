@@ -1,21 +1,24 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock } from 'bun:test';
 
-import type * as BackfillRunner from './lib/backfill-runner.js';
+import * as BackfillRunner from './lib/backfill-runner.js';
+import * as TraceProfileStorage from './lib/trace-profile-storage';
 
-const state = vi.hoisted(() => ({
-  sql: vi.fn(),
+const state = {
+  sql: mock(),
   main: undefined as (() => Promise<void>) | undefined,
   profile: Buffer.alloc(0),
-}));
+};
 
-vi.mock('./etl/db-utils.js', () => ({ createAdminSql: () => state.sql }));
-vi.mock('./lib/trace-profile-storage', () => ({
+mock.module('./etl/db-utils.js', () => ({ createAdminSql: () => state.sql }));
+// Bun rejects imports of exports a module mock omits, so keep the real ones alongside the stub.
+mock.module('./lib/trace-profile-storage', () => ({
+  ...TraceProfileStorage,
   readTraceProfileChunks: () => [state.profile],
 }));
-vi.mock('./lib/backfill-runner.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof BackfillRunner>()),
+mock.module('./lib/backfill-runner.js', () => ({
+  ...BackfillRunner,
   parseLimitForceFlags: () => ({ force: false, limit: null, shardCount: 1, shardIndex: 0 }),
   parseRunIdFlag: () => undefined,
   jsonbParam: (_sql: unknown, value: unknown) => value,

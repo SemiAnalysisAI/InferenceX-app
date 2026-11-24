@@ -10,7 +10,7 @@ const MODEL_LABELS = [
 ];
 
 const PLATFORM_HEADERS = [
-  'Model · scenario',
+  'Model · Scenario',
   'B200 · Reference',
   'MI355X',
   'B300',
@@ -22,10 +22,10 @@ const PLATFORM_HEADERS = [
 const SINGLE_TURN = 'single_turn_8k1k';
 const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
-const AGENTX_LABEL = 'Long-context multi-turn realistic agentic scenario (AgentX)';
+const AGENTX_LABEL = 'Long-Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_SHORT = 'AgentX';
 
-const PAGE_TITLE = 'Agentic inference costs';
+const PAGE_TITLE = 'Agentic Inference Costs';
 const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
 const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
@@ -177,6 +177,25 @@ describe('Overview page', () => {
       cy.reload();
       cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '50');
       cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
+    });
+  }
+
+  for (const locale of ['', '/zh']) {
+    it(`shares the current overview selections in ${locale || 'en'}`, () => {
+      const search = '?tier=50&engine=all&compare=hardware&models=all';
+      cy.visit(`${locale}/overview${search}`);
+      cy.get('[data-testid="share-button"]').first().click();
+      cy.get('[data-testid="share-url-input"]')
+        .invoke('val')
+        .then((value) => {
+          const shared = new URL(String(value));
+          expect(shared.pathname).to.eq(`${locale}/overview`);
+          expect(shared.search).to.eq(search);
+          cy.visit(shared.pathname + shared.search);
+        });
+      cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '50');
+      cy.get('[data-overview-comparison="hardware"]').should('have.attr', 'aria-current', 'true');
+      cy.location('search').should('eq', search);
     });
   }
 
@@ -384,25 +403,42 @@ describe('Overview page', () => {
   });
 
   it('sends one RSC request when a slow language switch preserves overview state', () => {
-    let zhOverviewRscRequests = 0;
+    let zhOverviewRscFetches = 0;
 
     cy.intercept('GET', '/zh/overview*', (request) => {
       if (request.query._rsc === undefined && request.headers.rsc !== '1') return;
-
-      zhOverviewRscRequests += 1;
       request.continue((response) => {
         response.setDelay(600);
       });
     });
 
-    cy.visit('/overview?ref=b300&compare=hardware');
+    // Count the app's fetch calls. In Chrome, cy.intercept runs on the browser's network layer and
+    // can see one fetch twice when the browser sends it again, which the old proxy never saw.
+    cy.visit('/overview?ref=b300&compare=hardware', {
+      onBeforeLoad(win) {
+        const fetch = win.fetch.bind(win);
+        win.fetch = (input, init) => {
+          const url = new URL(
+            input instanceof win.Request ? input.url : String(input),
+            win.location.href,
+          );
+          if (
+            url.pathname === '/zh/overview' &&
+            (url.searchParams.has('_rsc') || new win.Headers(init?.headers).get('rsc') === '1')
+          ) {
+            zhOverviewRscFetches += 1;
+          }
+          return fetch(input, init);
+        };
+      },
+    });
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?ref=b300&compare=hardware')
       .click();
 
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?ref=b300&compare=hardware');
-    cy.then(() => expect(zhOverviewRscRequests).to.equal(1));
+    cy.then(() => expect(zhOverviewRscFetches).to.equal(1));
   });
 
   it('switches between B200 and 30-day comparison without losing page state', () => {
@@ -571,7 +607,7 @@ describe('Overview page', () => {
         cy.visit(href);
 
         cy.get('[data-testid="inference-chart-display"]').should('exist');
-        cy.contains('Comparison date range').should('be.visible');
+        cy.contains('Comparison Date Range').should('be.visible');
         cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
         cy.get('[data-testid="model-selector"]').click();
         cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T').click();
@@ -600,7 +636,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison date range').should('be.visible');
+        cy.contains('Comparison Date Range').should('be.visible');
         cy.contains('button', 'Select date range')
           .should('not.have.class', 'animate-pulse')
           .and('not.have.class', 'border-red-500');
@@ -622,7 +658,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison date range').should('not.exist');
+        cy.contains('Comparison Date Range').should('not.exist');
       });
   });
 
@@ -657,13 +693,20 @@ describe('Overview page', () => {
   it('narrows the matrix when the row filter is clicked in either comparison mode', () => {
     cy.viewport(1280, 900);
 
-    for (const [href, attribute, key, sentence] of [
-      ['/overview?tier=50', 'data-overview-row-scope', 'rows=changed', 'no 30-day change'],
+    for (const [href, attribute, key, sentence, hideChip] of [
+      [
+        '/overview?tier=50',
+        'data-overview-row-scope',
+        'rows=changed',
+        'no 30-day change',
+        'Hide unchanged',
+      ],
       [
         '/overview?tier=50&compare=hardware',
         'data-overview-hardware-row-scope',
         'hwrows=priced',
         'no result on any platform',
+        'Hide blanks',
       ],
     ] as const) {
       cy.visit(href);
@@ -685,7 +728,11 @@ describe('Overview page', () => {
           cy.get(`a[${attribute}]`)
             .should('contain.text', 'Show all rows')
             .and('contain.text', String(hidden))
-            .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
+            .and(
+              'have.attr',
+              'aria-label',
+              `Show all rows ${hidden}. Show ${hidden} rows with ${sentence}`,
+            );
           cy.window().then((win) => {
             win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
             win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
@@ -693,7 +740,7 @@ describe('Overview page', () => {
           cy.get(`a[${attribute}]`).should(
             'have.attr',
             'aria-label',
-            `Show ${hidden + 1} rows with ${sentence}`,
+            `Show all rows ${hidden + 1}. Show ${hidden + 1} rows with ${sentence}`,
           );
           cy.get('[data-testid="overview-desktop-model"]').should(
             'have.length',
@@ -704,13 +751,17 @@ describe('Overview page', () => {
             win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
           });
           cy.get(`a[${attribute}]`)
-            .should('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`)
+            .should(
+              'have.attr',
+              'aria-label',
+              `Show all rows ${hidden}. Show ${hidden} rows with ${sentence}`,
+            )
             .click();
           cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
           cy.get(`a[${attribute}]`).should(
             'have.attr',
             'aria-label',
-            `Hide ${hidden} rows with ${sentence}`,
+            `${hideChip} ${hidden}. Hide ${hidden} rows with ${sentence}`,
           );
         });
     }
@@ -726,16 +777,16 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Open-source community engines (vLLM/SGLang)')
+          .and('have.text', 'Open-Source Community Engines (vLLM/SGLang)')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
           .should('have.attr', 'href', '/overview?tier=50&engine=all&compare=hardware')
-          .and('have.text', 'All platforms');
+          .and('have.text', 'All Platforms');
       });
 
     cy.get('[data-testid="overview-controls-panel"]')
       .should('match', 'fieldset')
-      .and('contain.text', 'Benchmark config')
+      .and('contain.text', 'Benchmark Config')
       .within(() => {
         cy.get('label').should('contain.text', 'SLO (tok/s/user)');
         cy.get('label').should('contain.text', 'Engine scope');

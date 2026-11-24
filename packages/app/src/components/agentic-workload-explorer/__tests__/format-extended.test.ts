@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'bun:test';
+import { useRealTimers } from '@/test/helpers';
 import { formatExplorerDateTime, formatTime } from '@/lib/agentic-workload-explorer/format';
 
 describe('formatTime', () => {
   afterEach(() => {
-    vi.useRealTimers();
+    useRealTimers();
   });
 
   it('formats a date string to time only', () => {

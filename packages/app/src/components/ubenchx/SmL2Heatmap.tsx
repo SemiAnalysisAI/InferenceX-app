@@ -19,12 +19,14 @@ import { Heading } from '@/components/ui/heading';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { Stat } from '@/components/ui/stat';
 
+import { heatmapDataUrl } from './heatmap-image';
 import { SM_L2_RUNS } from './sm-l2-data';
 import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';
+import { MethodologyFold } from './MethodologyFold';
 
 const STRINGS = {
   en: {
-    heatmapTitle: 'SM-SM L2 latency difference',
+    heatmapTitle: 'SM-SM L2 Latency Difference',
     colorBarLabel: 'mean |diff| per address (clock64 cycles)',
     tooltipSm: 'SM',
     tooltipGpc: 'GPC',
@@ -89,6 +91,11 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
     () => d3.scaleSequential(d3.interpolateViridis).domain([0, result.stats.max]),
     [result.stats.max],
   );
+  // Only read by the draw effect, so the server render never needs a canvas.
+  const cellsHref = useMemo(
+    () => (typeof document === 'undefined' ? null : heatmapDataUrl(result.matrix, colorScale)),
+    [result.matrix, colorScale],
+  );
 
   const drawChart = useCallback(() => {
     const svg = d3.select(svgRef.current);
@@ -112,19 +119,19 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
 
     const g = svg.append('g').attr('transform', `translate(${marginLeft},${marginTop})`);
 
-    const matrix = result.matrix;
+    g.append('image')
+      .attr('href', cellsHref)
+      .attr('width', chartSize)
+      .attr('height', chartSize)
+      .attr('preserveAspectRatio', 'none')
+      .style('image-rendering', 'pixelated');
     for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        g.append('rect')
-          .attr('x', j * cellSize)
-          .attr('y', i * cellSize)
-          .attr('width', cellSize)
-          .attr('height', cellSize)
-          .attr('fill', i === j ? 'var(--background)' : colorScale(matrix[i][j]))
-          .attr('data-i', i)
-          .attr('data-j', j)
-          .attr('class', 'heatmap-cell');
-      }
+      g.append('rect')
+        .attr('x', i * cellSize)
+        .attr('y', i * cellSize)
+        .attr('width', cellSize)
+        .attr('height', cellSize)
+        .attr('fill', 'var(--background)');
     }
 
     const dieASms = result.dieACount;
@@ -332,7 +339,7 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         sm_col: result.smInfo[j].sm,
       });
     });
-  }, [n, colorScale, result, t, pinnedCell]);
+  }, [n, colorScale, cellsHref, result, t, pinnedCell]);
 
   useEffect(() => {
     drawChart();
@@ -423,8 +430,9 @@ export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
               <div className="mt-3">
                 <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
                 <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
-                  <h3 className="font-medium text-foreground">{t.methodology}</h3>
-                  <p>{t.methodologyText}</p>
+                  <MethodologyFold title={t.methodology} testId="sm-l2">
+                    <p>{t.methodologyText}</p>
+                  </MethodologyFold>
                 </div>
                 <div className="mt-3 overflow-x-auto" data-testid="sm-l2-device-specs">
                   <table className="w-full text-left text-xs text-muted-foreground tabular-nums">

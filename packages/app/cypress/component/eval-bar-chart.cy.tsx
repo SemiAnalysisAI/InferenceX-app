@@ -55,7 +55,7 @@ describe('EvalBarChartD3', () => {
           .should('match', /^TP8(?!.*DP\d)/);
         cy.get('tbody tr').eq(1).find('td').eq(index).should('contain.text', 'DP8');
       });
-    cy.contains('thead th', 'Physical chips')
+    cy.contains('thead th', 'Physical Chips')
       .invoke('index')
       .then((index) => {
         cy.get('tbody tr').each(($row) => {

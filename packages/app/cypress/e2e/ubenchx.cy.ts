@@ -12,17 +12,17 @@ describe('uBenchX hub and test routes', () => {
   it('opens /ubx on the mem-bw view with the Beta title badge and test selector', () => {
     cy.visit('/ubx', dismissModal);
     cy.url().should('include', '/ubx/mem-bw');
-    cy.contains('h1', 'uBenchX microbenchmarks').should('be.visible');
+    cy.contains('h1', 'uBenchX Microbenchmarks').should('be.visible');
     cy.get('h1 [data-slot="badge"]').should('have.text', 'Beta');
     cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubx/mem-bw');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM bandwidth');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM Bandwidth');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.contains('H100 SXM').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
-    cy.contains('h2', 'Memory bandwidth utilization').should('be.visible');
+    cy.contains('h2', 'Memory Bandwidth Utilization').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
+    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'TB/s');
   });
 
@@ -45,10 +45,10 @@ describe('uBenchX hub and test routes', () => {
       .should('include', '/zh/ubx/mem-bw');
 
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.contains('[role="option"]', 'Core Memory-Access Profiles').click();
     cy.url().should('include', '/ubx/core-memory-profiles');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core memory-access profiles');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core Memory-Access Profiles');
   });
 
   it('switches to the TPC Skyline table with the test selector', () => {
@@ -56,13 +56,13 @@ describe('uBenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'TPC Skyline').click();
     cy.url().should('include', '/ubx/tpc-skyline');
-    cy.contains('h2', 'NVIDIA measured TPC groupings').should('be.visible');
+    cy.contains('h2', 'NVIDIA Measured TPC Groupings').should('be.visible');
     cy.get('[data-testid="tpc-skyline-table"] th').then(($th) => {
       expect([...$th].map((th) => th.textContent)).to.deep.equal([
         'Product',
         'Measured # of GPCs',
         'Measured # of SMs',
-        'Measured TPC groupings',
+        'Measured TPC Groupings',
       ]);
     });
     cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
@@ -81,6 +81,29 @@ describe('uBenchX hub and test routes', () => {
       '[10, 10, 10, 9, 9, 9, 9, 5, 1, 1, 1]',
     );
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
+  });
+
+  it('collapses methodology notes by default on every uBenchX test and expands them on click', () => {
+    const cases = [
+      ['/ubx/mem-bw', 'ubenchx', 'triton.testing.do_bench'],
+      ['/ubx/tpc-skyline', 'tpc-skyline', null],
+      ['/ubx/core-memory-profiles', 'sm-l2', null],
+      ['/ubx/core-memory-profiles', 'core-profile', 'Six passes are averaged'],
+    ] as const;
+    for (const [path, testId, text] of cases) {
+      cy.visit(path, dismissModal);
+      const toggle = `[data-testid="${testId}-methodology-toggle"]`;
+      cy.get(toggle)
+        .first()
+        .should('have.attr', 'aria-expanded', 'false')
+        .and('contain', 'Methodology');
+      cy.get(`[data-testid="${testId}-methodology"]`).first().find('p').should('not.exist');
+      if (text) cy.contains(text).should('not.exist');
+      cy.get(toggle).first().click();
+      cy.get(toggle).first().should('have.attr', 'aria-expanded', 'true');
+      cy.get(`[data-testid="${testId}-methodology"]`).first().find('p').should('be.visible');
+      if (text) cy.contains(text).should('be.visible');
+    }
   });
 
   it('keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves', () => {
@@ -147,7 +170,7 @@ describe('Ascend core memory-access profiles', () => {
   it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
     cy.visit('/ubx/mem-bw', dismiss);
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.contains('[role="option"]', 'Core Memory-Access Profiles').click();
     cy.url().should('include', '/ubx/core-memory-profiles');
     cy.contains('SYS_CNT ticks are not clock64 cycles').should('be.visible');
     cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg')
@@ -168,7 +191,9 @@ it('omits idle selection controls from all core-profile panels on /', () => {
     .each(($output) => {
       cy.wrap($output).should('be.empty').and('not.be.visible');
     });
-  cy.get('[data-testid="ascend-core-profiles"] button').should('not.exist');
+  cy.get('[data-testid="ascend-core-profiles"] button')
+    .not('[data-testid="core-profile-methodology-toggle"]')
+    .should('not.exist');
   cy.contains('Hover or focus a heatmap').should('not.exist');
 });
 
@@ -176,11 +201,19 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.visit('/ubx/core-memory-profiles', dismiss);
   const panel = '[data-testid="profile-scalar_128MiB_cube_isolated"]';
   const value = '[data-testid="profile-scalar_128MiB_cube_isolated-value"]';
-  cy.get(`${panel} svg rect`).eq(1).click();
+  // The cells are one image, so click a cell by its spot in the 420-unit viewBox
+  // (matrix from x 54 / y 22, 320 units across 28 cores).
+  const clickCell = (i: number, j: number) =>
+    cy.get(`${panel} svg`).then(($svg) => {
+      const scale = $svg[0].getBoundingClientRect().width / 420;
+      const step = 320 / 28;
+      cy.wrap($svg).click((54 + (j + 0.5) * step) * scale, (22 + (i + 0.5) * step) * scale);
+    });
+  clickCell(0, 1);
   cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 1: 19.03');
-  cy.get(`${panel} svg rect`).eq(2).click();
+  clickCell(0, 2);
   cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 2: 15.30');
-  cy.get(`${panel} svg rect`).eq(2).click();
+  clickCell(0, 2);
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg`)
     .trigger('keydown', { key: 'ArrowRight' })
@@ -188,10 +221,10 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(value).should('contain', 'Pinned core pair:');
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
   cy.get(value).should('be.empty').and('not.be.visible');
-  cy.get(`${panel} svg rect`).eq(1).click();
-  cy.contains('h1', 'uBenchX microbenchmarks').click();
+  clickCell(0, 1);
+  cy.contains('h1', 'uBenchX Microbenchmarks').click();
   cy.get(value).should('be.empty').and('not.be.visible');
-  cy.get(`${panel} svg rect`).eq(1).click();
+  clickCell(0, 1);
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
   cy.get(value).should('be.empty').and('not.be.visible');
 });
@@ -244,7 +277,7 @@ describe('Huawei copy-bandwidth evidence', () => {
       .should('have.length', 9);
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
+    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
     cy.visit('/zh/ubx/mem-bw', dismiss);
     cy.contains('Huawei 950PR').should('be.visible');
     cy.contains('910B3').should('not.exist');

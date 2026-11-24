@@ -44,6 +44,7 @@ import {
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { transformChartRowsForPrecisions } from '@/lib/benchmarks/benchmark-transform';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
@@ -274,6 +275,7 @@ export function buildInferenceSeries(
     percentile,
     options.tcoBasis,
     options.chipBasis,
+    modelSystemPower,
   );
   const matchedHwKeys = [
     ...new Set(

@@ -11,14 +11,13 @@ import {
   ChartLegend,
   LEGEND_BASELINE_OFFSET,
   PERCENTILE_COLORS,
+  chartPadForYTicks,
   fmtCount,
   type ChartLegendEntry,
 } from './chart-shared';
 import { layoutChartLegend } from './chart-legend';
 import { logHistogram, logTicks, positiveValues } from './lognormal';
 import { niceAxis, quantile } from './time-series-math';
-
-const PAD = CHART_PAD;
 
 const GUIDES = [
   { label: 'p50', q: 0.5, color: PERCENTILE_COLORS.p50 },
@@ -96,6 +95,8 @@ export function Distribution({
     color,
     swatch: 'dashed-line',
   }));
+  const { top: yMax, ticks: yTickVals } = niceAxis(Math.max(...counts, 1), { integer: true });
+  const PAD = chartPadForYTicks(yTickVals.map(fmtCount), true, CHART_PAD);
   const innerW = W - PAD.left - PAD.right;
   const legend = layoutChartLegend(
     legendEntries.map((e) => e.label),
@@ -108,8 +109,6 @@ export function Distribution({
   const min = edges[0]!;
   const max = edges.at(-1)!;
   const nBins = counts.length;
-
-  const { top: yMax, ticks: yTickVals } = niceAxis(Math.max(...counts, 1), { integer: true });
 
   const lnSpan = lnMax - lnMin;
   const xScale = (v: number) =>

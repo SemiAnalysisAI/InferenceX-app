@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { stablePowerPointIdentity } from './power-publication';
 
 import {
@@ -76,7 +76,7 @@ describe('telemetry completeness accounting', () => {
     });
   });
 
-  it.each([
+  it.each<Partial<TelemetryReceipt>>([
     { expectedSource: 'unknown' as const },
     {
       expectationErrors: [
@@ -126,7 +126,7 @@ describe('telemetry API verification', () => {
     const receipt = receiptFixture();
     receipt.points = [receipt.points[0]!];
     receipt.points[0]!.api = { status: 'unknown' };
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+    const fetcher = mock<typeof fetch>().mockResolvedValue(
       Response.json(
         {
           benchmarkResultId: id,
@@ -151,7 +151,7 @@ describe('telemetry API verification', () => {
     receipt.points[1]!.benchmarkResultId = null;
     receipt.points[1]!.api = { status: 'unknown' };
     const matching = { sampleCount: 2, data: [{ power: 100 }, { power: 100 }] };
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+    const fetcher = mock<typeof fetch>().mockResolvedValue(
       Response.json({
         benchmarkResultId: 10,
         series: [
@@ -175,7 +175,7 @@ describe('telemetry API verification of not-collected points', () => {
     receipt.points[0]!.series = [];
     receipt.points[0]!.api = { status: 'unknown' };
     receipt.points[1]!.api = { status: 'unknown' };
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+    const fetcher = mock<typeof fetch>().mockResolvedValue(
       Response.json({
         benchmarkResultId: 11,
         series: [{ id: 1, sampleCount: 2, data: [{ power: 100 }, { power: 100 }] }],
@@ -196,9 +196,10 @@ describe('persisted telemetry receipts', () => {
   let sql: PgliteSql;
   beforeAll(async () => {
     db = await migratedPglite();
-    sql = pgliteSql(db);
+    sql = await pgliteDriverSql(db);
   }, 20_000);
   afterAll(async () => {
+    await sql?.end();
     await db?.close();
   });
   beforeEach(async () => {

@@ -1,23 +1,23 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
-import type * as MediaQueryHooks from '@/hooks/useMediaQuery';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 
 let locale: 'en' | 'zh' = 'en';
 const track = vi.fn();
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
-vi.mock('@/lib/analytics/analytics', () => ({
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
+mock.module('@/lib/analytics/analytics', () => ({
   track: (...args: unknown[]) => track(...args),
 }));
 // jsdom has no media queries: render the desktop list.
-vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
-  ...(await importOriginal<typeof MediaQueryHooks>()),
+const actual = { ...(await import('@/hooks/useMediaQuery')) };
+mock.module('@/hooks/useMediaQuery', () => ({
+  ...actual,
   useIsMobileViewport: () => false,
 }));
 

@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
 import { mapBenchmarkRow, type BenchmarkParams } from '../etl/benchmark-mapper';
 import { createSkipTracker } from '../etl/skip-tracker';
@@ -13,7 +13,7 @@ import {
   readMappedBenchmarkRows,
 } from './benchmark-result-lookup';
 import { collectMissingTelemetryExpectations } from './gpu-metrics-backfill';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -47,7 +47,7 @@ function mapped(raw: Record<string, unknown>): BenchmarkParams {
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
+  sql = await pgliteDriverSql(db);
 }, 30_000);
 
 afterEach(() => {
@@ -55,6 +55,7 @@ afterEach(() => {
 });
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   pairedGroup,
   parseStage,
@@ -43,20 +43,36 @@ const point = (hardwareKey: string, runId = 'official') =>
 describe('clip stage', () => {
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
     const search = stageSearch(
-      { prompt: 'crane', view: 'wipe', clip: null },
-      '?r_y=videosPerGpuHour&r_view=side&r_clip=1:old',
+      { prompt: 'crane', view: 'wipe', clip: null, vs: null, swap: false, sheet: null },
+      '?r_y=videosPerGpuHour&r_view=side&r_clip=1:old&r_vs=h200&r_swap=1',
     );
     expect(Object.fromEntries(search)).toEqual({ r_y: 'videosPerGpuHour', r_prompt: 'crane' });
     expect(parseStage('?r_view=zoom&r_prompt=')).toEqual({
       prompt: null,
       view: 'wipe',
       clip: null,
+      vs: null,
+      swap: false,
+      sheet: null,
     });
-    const clip = stageSearch({ prompt: null, view: 'side', clip: '34341996789:abc:c1' }, '');
+    const clip = stageSearch(
+      {
+        prompt: null,
+        view: 'side',
+        clip: '34341996789:abc:c1',
+        vs: null,
+        swap: false,
+        sheet: null,
+      },
+      '',
+    );
     expect(parseStage(`?${clip}`)).toEqual({
       prompt: null,
       view: 'side',
       clip: '34341996789:abc:c1',
+      vs: null,
+      swap: false,
+      sheet: null,
     });
   });
 

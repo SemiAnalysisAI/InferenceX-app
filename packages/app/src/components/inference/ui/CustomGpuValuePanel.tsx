@@ -31,7 +31,7 @@ type GpuValuePanelKind = 'powers';
 const STRINGS = {
   en: {
     reset: 'Reset',
-    resetToDefaults: 'Reset to defaults',
+    resetToDefaults: 'Reset to Defaults',
     calculate: 'Calculate',
     invalidNumber: 'Must be a valid number',
     nonNegative: 'Must be a non-negative number',
@@ -61,7 +61,7 @@ const PANEL_CONFIG: Record<
   }
 > = {
   powers: {
-    title: 'Custom chip powers',
+    title: 'Custom Chip Powers',
     titleZh: '自定义芯片功耗',
     description:
       'Enter your own Token Throughput per All in Utility MW (tok/s/MW) values for each chip. These values will be used to calculate custom power metrics.',

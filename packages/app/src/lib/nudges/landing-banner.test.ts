@@ -1,5 +1,6 @@
 import { runInNewContext } from 'node:vm';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
+import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import {
   assignedLandingBannerVariant,
@@ -12,7 +13,7 @@ import {
 } from './landing-banner';
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -119,7 +120,7 @@ describe('landing banner pre-paint style', () => {
 describe('assignedLandingBannerVariant', () => {
   it('reads the arm from the document and ignores unknown values', () => {
     let value: string | null = 'operatorx';
-    vi.stubGlobal('document', { documentElement: { getAttribute: () => value } });
+    stubGlobal('document', { documentElement: { getAttribute: () => value } });
     expect(assignedLandingBannerVariant()).toBe('operatorx');
     value = 'other';
     expect(assignedLandingBannerVariant()).toBeNull();

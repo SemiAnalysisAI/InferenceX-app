@@ -86,33 +86,33 @@ const MODEL_ROUTE_DROPPED_PARAMS = ['g_model'];
 
 const STRINGS = {
   en: {
-    measuredPower: 'Measured power',
-    measuredEnergy: 'Measured energy',
+    measuredPower: 'Measured Power',
+    measuredEnergy: 'Measured Energy',
     measuredGroup: 'Measured',
-    benchmarkControls: 'Benchmark config',
-    chartControls: 'Chart config',
+    benchmarkControls: 'Benchmark Config',
+    chartControls: 'Chart Config',
     compareHistory: 'Compare history',
-    yAxisMetric: 'Y-axis metric',
+    yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
       "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 TCO, and custom user-defined values.",
-    xAxisMetric: 'X-axis metric',
+    xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
-    xAxisScale: 'X-axis scale',
+    xAxisScale: 'X-Axis Scale',
     xAxisScaleTooltip:
       'The scale type for the X-axis. Auto automatically chooses between linear and logarithmic based on the data range. Linear uses a linear scale. Logarithmic uses a log scale for better visualization of wide-ranging values.',
     scaleAuto: 'Auto',
     scaleLinear: 'Linear',
     scaleLog: 'Logarithmic',
-    gpuConfig: 'Chip config',
+    gpuConfig: 'Chip Config',
     gpuConfigTooltip:
       'Select up to 4 chip configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
-    gpuConfigPlaceholder: 'Select chip config',
-    comparisonDateRange: 'Comparison date range',
+    gpuConfigPlaceholder: 'Select Chip Config',
+    comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
     dateRangePlaceholder: 'Select date range',
-    revenuePriceSource: 'Token price source',
+    revenuePriceSource: 'Token Price Source',
     revenuePriceSourceTooltip:
       'Choose the token sale prices used for revenue. For Agentic traces, measured cache hits use a separate cached-input price. Normalized pricing uses $1/M uncached input and output plus $0.10/M cached input. OpenRouter uses the selected model’s current public prices, falling back to 10% of its input price when no cache-read price is published.',
     normalizedPrice: 'Normalized ($1/M uncached + output, $0.10/M cached)',
@@ -455,12 +455,13 @@ export default function ChartControls({
   };
 
   const handleGPUChange = (value: string[]) => {
-    setSelectedGPUs(value);
+    const applied = setSelectedGPUs(value);
     track('inference_gpu_selected', {
       ...analyticsContext,
       gpus: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
+    return applied;
   };
 
   const handleXAxisMetricChange = (value: string) => {

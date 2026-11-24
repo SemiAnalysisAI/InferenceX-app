@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { PointHitGrid, hitAreaPath } from './canvas-point-hit';
 
@@ -15,11 +15,17 @@ function bruteHit(
   y: number,
 ): number {
   if (!(x >= 0 && x <= width && y >= 0 && y <= height)) return -1;
+  // Nearest interactive point within the radius; the later (topmost) one wins a tie.
   let best = -1;
+  let bestDistance = RADIUS * RADIUS;
   for (let index = 0; index < count; index++) {
     const dx = xs[index] - x;
     const dy = ys[index] - y;
-    if (interactive[index] && dx * dx + dy * dy <= RADIUS * RADIUS) best = index;
+    const distance = dx * dx + dy * dy;
+    if (interactive[index] && distance <= bestDistance) {
+      best = index;
+      bestDistance = distance;
+    }
   }
   return best;
 }

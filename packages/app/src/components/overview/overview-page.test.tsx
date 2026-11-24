@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @test-environment jsdom
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { settle, stubGlobal, unstubAllGlobals } from '@/test/helpers';
 
 import type { OverviewPageData } from '@/lib/overview/overview-data';
 
@@ -49,7 +50,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe('OverviewPageContent failure states', () => {
@@ -57,6 +58,8 @@ describe('OverviewPageContent failure states', () => {
     ['en', 'No overview results match this selection'],
     ['zh', '没有符合当前筛选条件的总览结果'],
   ] as const)('renders the localized empty state for %s', (locale, message) => {
+    // Render on the route the page is served from. A zh page at /overview reloads its controls.
+    window.history.replaceState({}, '', locale === 'zh' ? '/zh/overview' : '/overview');
     renderPage(locale);
 
     const empty = container.querySelector('[data-testid="overview-empty-state"]');
@@ -71,7 +74,7 @@ describe('OverviewPageContent failure states', () => {
   ] as const)(
     'renders a localized recoverable navigation alert for %s',
     async (locale, message) => {
-      vi.stubGlobal(
+      stubGlobal(
         'fetch',
         vi.fn(() => Promise.reject(new Error('network down'))),
       );
@@ -83,11 +86,8 @@ describe('OverviewPageContent failure states', () => {
       );
       expect(scopeLink).not.toBeNull();
 
-      await act(async () => {
-        scopeLink?.click();
-        await Promise.resolve();
-        await Promise.resolve();
-      });
+      act(() => scopeLink?.click());
+      await settle();
 
       const alert = container.querySelector('[role="alert"]');
       expect(alert?.textContent).toBe(message);

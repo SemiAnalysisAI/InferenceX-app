@@ -1,108 +1,17 @@
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { precisionPngResponse } from '@/lib/compare/variant-png';
 
-import { trackServer } from '@/lib/analytics/analytics-server';
-import { getCachedBenchmarks } from '@/lib/compare/compare-ssr';
-import {
-  computeVariantCompareImageRows,
-  computeVariantCompareTableData,
-  pickVariantPairDefaults,
-} from '@/lib/compare/compare-variant-ssr';
-import {
-  canonicalPrecisionCompareSlug,
-  parsePrecisionCompareSlug,
-  precisionDisplayLabel,
-} from '@/lib/compare/compare-variant-slug';
-import { getLogoSrc } from '@/lib/seo/og-assets';
-import { renderComparePngChart } from '@/lib/compare/png-chart';
-
-export const dynamic = 'force-dynamic';
+// Matches the page. Its benchmark reads are tagged only through the Blob purge generation.
+export const revalidate = 3600;
 export const runtime = 'nodejs';
 
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
+
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
-  const lang = new URL(request.url).searchParams.get('lang') === 'zh' ? 'zh' : 'en';
   const { slug } = await params;
-  const parsed = parsePrecisionCompareSlug(slug);
-  if (
-    !parsed ||
-    canonicalPrecisionCompareSlug(parsed.model.slug, parsed.gpu, parsed.precA, parsed.precB) !==
-      slug.toLowerCase()
-  ) {
-    return new Response('Not found', { status: 404 });
-  }
-
-  const sideA = { precision: parsed.precA };
-  const sideB = { precision: parsed.precB };
-  const [rows, logoSrc] = await Promise.all([
-    getCachedBenchmarks(parsed.model.dbKeys),
-    getLogoSrc(),
-  ]);
-  const { sequence } = pickVariantPairDefaults('precision', rows, parsed.gpu, sideA, sideB);
-  const { ssrRows, interactivityRange } = computeVariantCompareTableData(
-    rows,
-    parsed.gpu,
-    sequence,
-    sideA,
-    sideB,
-  );
-  const plottedRows = ssrRows.filter((row) => row.a || row.b);
-  const imageRows = computeVariantCompareImageRows(
-    rows,
-    parsed.gpu,
-    sequence,
-    sideA,
-    sideB,
-    interactivityRange,
-    plottedRows.map((row) => row.target),
-  ).filter((row) => row.a || row.b);
-  const curveRows = imageRows.length > 0 ? imageRows : plottedRows;
-
-  const gpuMeta = HW_REGISTRY[parsed.gpu];
-  const gpuLabel = gpuMeta?.label ?? parsed.gpu.toUpperCase();
-  const aLabel = precisionDisplayLabel(parsed.precA);
-  const bLabel = precisionDisplayLabel(parsed.precB);
-
-  try {
-    return await renderComparePngChart({
-      curveRows,
-      plottedRows,
-      logoSrc,
-      aLabel,
-      bLabel,
-      eyebrow: lang === 'zh' ? 'InferenceX 精度对比' : 'InferenceX Precision Comparison',
-      title: `${parsed.model.label} · ${gpuLabel}`,
-      subtitle:
-        lang === 'zh'
-          ? `${aLabel} 与 ${bLabel}｜每百万 token 成本`
-          : `${aLabel} vs ${bLabel} | Cost per Million Tokens`,
-      workload: sequence ?? '',
-      rangeNote:
-        lang === 'zh'
-          ? '虚线延伸至各精度对应的运行区间'
-          : "Dashed segments extend to each precision's operating envelope",
-      footer:
-        lang === 'zh'
-          ? '精度对比｜数据由基准测试结果插值得出'
-          : 'Precision comparison | interpolated from benchmark results',
-      lang,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    trackServer('compare_precision_png_render_failed', {
-      route_template: '/compare-precision/[slug]/precision-comparison.png',
-      slug,
-      model: parsed.model.slug,
-      gpu: parsed.gpu,
-      precisions: [parsed.precA, parsed.precB],
-      sequence,
-      error_name: error instanceof Error ? error.name : 'Unknown',
-      error_message: message.slice(0, 500),
-    });
-    return new Response('PNG render failed', {
-      status: 502,
-      headers: { 'Cache-Control': 'public, s-maxage=60' },
-    });
-  }
+  return precisionPngResponse(slug, 'en');
 }

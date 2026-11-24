@@ -16,10 +16,26 @@ export interface StageState {
   view: StageView;
   /** `resultsPointKey` of the chart point the stage plays; null or an undrawn point plays the default. */
   clip: string | null;
+  /**
+   * `StageOption.value` the subject is compared with; null, or a value the subject does not
+   * offer, pairs it by `defaultPairing`.
+   */
+  vs: string | null;
+  /** The two sides have exchanged places on the stage. */
+  swap: boolean;
+  /** `resultsPointKey` of the chart point whose sheet a touch screen has open; null with none. */
+  sheet: string | null;
 }
 
 /** The stage's own URL keys. VideoDashboard's `commit` rewrites every other `r_` key and keeps these. */
-const STAGE_PARAMS: readonly string[] = ['r_prompt', 'r_view', 'r_clip'];
+const STAGE_PARAMS: readonly string[] = [
+  'r_prompt',
+  'r_view',
+  'r_clip',
+  'r_vs',
+  'r_swap',
+  'r_sheet',
+];
 export const isStageParam = (key: string) => STAGE_PARAMS.includes(key);
 
 export function parseStage(search: string): StageState {
@@ -29,6 +45,9 @@ export function parseStage(search: string): StageState {
     prompt: params.get('r_prompt') || null,
     view: STAGE_VIEWS.find((item) => item === view) ?? 'wipe',
     clip: params.get('r_clip') || null,
+    vs: params.get('r_vs') || null,
+    swap: params.get('r_swap') === '1',
+    sheet: params.get('r_sheet') || null,
   };
 }
 
@@ -41,6 +60,12 @@ export function stageSearch(state: StageState, search: string): URLSearchParams 
   else params.set('r_view', state.view);
   if (state.clip) params.set('r_clip', state.clip);
   else params.delete('r_clip');
+  if (state.vs) params.set('r_vs', state.vs);
+  else params.delete('r_vs');
+  if (state.swap) params.set('r_swap', '1');
+  else params.delete('r_swap');
+  if (state.sheet) params.set('r_sheet', state.sheet);
+  else params.delete('r_sheet');
   return params;
 }
 
@@ -203,6 +228,31 @@ export function officialCounterpart(
 export const defaultPairing = (subject: VideoPoint, own: VideoPoint | null) =>
   isLossy(subject) ? 'twin' : (own?.hardwareKey ?? 'reference');
 
+/**
+ * The pairing a phone opens with when the link names none and `defaultPairing` is the reference:
+ * of the offered hardware on the subject's workload, engine and GPU count that may have clips,
+ * the one with the highest median latency. Null when there is none, which keeps the reference.
+ */
+export function phonePairing(
+  subject: VideoPoint,
+  options: readonly StageOption[],
+  hasClips: (point: VideoPoint) => boolean,
+): string | null {
+  const slowest = options
+    .flatMap((option) => (option.kind === 'hardware' && option.point ? [option.point] : []))
+    .filter(
+      (point) =>
+        point.hardwareKey !== subject.hardwareKey &&
+        point.workload === subject.workload &&
+        runtimeKey(point) === runtimeKey(subject) &&
+        point.participating === subject.participating &&
+        point.p50 !== null &&
+        hasClips(point),
+    )
+    .toSorted((a, b) => b.p50! - a.p50!)[0];
+  return slowest?.hardwareKey ?? null;
+}
+
 /** A config's Compare-row id: its hardware, its runtime when lossy, and whether it is `namedRun`'s. */
 export const configId = (p: VideoPoint, namedRun?: string) =>
   `${p.hardwareKey ?? ''}${isLossy(p) ? `+${runtimeKey(p)}` : ''}${p.runId === namedRun ? '-overlay' : ''}`;
@@ -259,4 +309,8 @@ export interface StagePair {
   baseline: string | null;
   /** First frames of the shown prompt by chart point key for read points; null when one has none. */
   posters: Readonly<Record<string, string | null>>;
+  /** What plays for the shown prompt by chart point key, a web rendition where one exists. */
+  media?: Readonly<Record<string, string | null>>;
+  /** The shown prompt's case id and seed. */
+  prompt?: { id: string; seed: number } | null;
 }

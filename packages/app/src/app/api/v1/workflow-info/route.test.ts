@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, mock } from 'bun:test';
 
 const {
   mockGetWorkflowRunsByDate,
@@ -6,33 +6,35 @@ const {
   mockGetDateConfigs,
   mockGetRunConfigsByDate,
   mockGetDb,
-} = vi.hoisted(() => ({
+} = {
   mockGetWorkflowRunsByDate: vi.fn(),
   mockGetChangelogByDate: vi.fn(),
   mockGetDateConfigs: vi.fn(),
   mockGetRunConfigsByDate: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+};
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+mock.module('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@semianalysisai/inferencex-db/queries/workflow-info', () => ({
+mock.module('@semianalysisai/inferencex-db/queries/workflow-info', () => ({
   getWorkflowRunsByDate: mockGetWorkflowRunsByDate,
   getChangelogByDate: mockGetChangelogByDate,
   getDateConfigs: mockGetDateConfigs,
   getRunConfigsByDate: mockGetRunConfigsByDate,
 }));
 
-vi.mock('@/lib/cache/api-cache', () => ({
+mock.module('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
-import { GET } from './route';
 import { NextRequest } from 'next/server';
+
+// Imported after mock.module so the route builds its readers from the mocked cachedQuery.
+const { GET } = await import('./route');
 
 function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
@@ -121,6 +123,7 @@ describe('GET /api/v1/workflow-info', () => {
   );
 
   it('returns 500 when any query throws', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockGetWorkflowRunsByDate.mockRejectedValueOnce(new Error('Timeout'));
     mockGetChangelogByDate.mockResolvedValueOnce([]);
     mockGetDateConfigs.mockResolvedValueOnce([]);
@@ -130,5 +133,10 @@ describe('GET /api/v1/workflow-info', () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
+    expect(logged).toHaveBeenCalledWith(
+      'Error fetching workflow info:',
+      expect.objectContaining({ message: 'Timeout' }),
+    );
+    logged.mockRestore();
   });
 });
