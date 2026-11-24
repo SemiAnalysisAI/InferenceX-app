@@ -36,7 +36,7 @@ import {
   resolveMountedFilterRequest,
   visibleSelectedModel,
 } from '@/providers/GlobalFilterContext';
-import { parseUnofficialRunIds } from '@/providers/unofficial-run-provider';
+import { parseUnofficialRunIds } from '@/lib/routing/unofficial-runs';
 
 import type { InferenceRoute, InferenceRoutePage } from './inference-route-data';
 

@@ -9,7 +9,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github/github-artifacts';
 import { loadFixture } from '@/lib/testing/test-fixtures';
-import { localVideoReplayResponse } from '@/lib/video/video-replay';
+import { fixtureHistoryPage, localVideoReplayResponse } from '@/lib/video/video-replay';
 import { bearerMatches } from '@/lib/api/bearer-auth';
 import {
   VIDEO_HISTORY_MAX_PAGES,
@@ -99,11 +99,11 @@ export async function GET(request: NextRequest) {
   const publishedOnly = query.get('format') === 'published';
   const media = query.get('format') === 'media' || publishedOnly;
   if (
-    (runId && !id(runId)) ||
+    (runId !== null && !id(runId)) ||
     (artifactId && (!runId || !id(artifactId))) ||
     !id(page) ||
     !Number.isSafeInteger(Number(page)) ||
-    (history && (runId || artifactId)) ||
+    (history && artifactId !== null) ||
     (live && !runId) ||
     !/^[1-9]$/u.test(pages) ||
     Number(pages) > VIDEO_HISTORY_MAX_PAGES ||
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ schemaVersion: 1, entries: [], nextPage: null }, { headers });
     const fixture = loadFixture<VideoHistoryPage>('video-history');
     return NextResponse.json(
-      Number(page) === 1 ? fixture : { schemaVersion: 1, entries: [], nextPage: null },
+      fixtureHistoryPage(fixture.entries, Number(page), Number(pages), runId),
       { headers: { ...headers, 'X-VideoGenX-Replay': '1' } },
     );
   }
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
       if (artifactId) {
         url.searchParams.set('artifact', artifactId);
         url.searchParams.set('format', 'published');
-      } else if (!runId) url.searchParams.set('page', page);
+      } else if (history || !runId) url.searchParams.set('page', page);
       if (pages !== '1') url.searchParams.set('pages', pages);
       const response = await fetch(url, {
         cache: 'no-store',
@@ -174,7 +174,10 @@ export async function GET(request: NextRequest) {
             throw new Error('Published artifact identity mismatch');
         } else if (
           history
-            ? data.schemaVersion !== 1 || !Array.isArray(data.entries)
+            ? data.schemaVersion !== 1 ||
+              !Array.isArray(data.entries) ||
+              (runId !== null &&
+                data.entries.some((entry: { runId?: unknown } | null) => entry?.runId !== runId))
             : runId
               ? String(data.run?.id) !== runId || !Array.isArray(data.artifacts)
               : !Array.isArray(data.runs)
@@ -182,10 +185,16 @@ export async function GET(request: NextRequest) {
           throw new Error('Published run identity mismatch');
         }
       }
-      return NextResponse.json(data, { status: response.status, headers });
+      return NextResponse.json(data, {
+        status: response.status,
+        headers:
+          history && response.headers.get('X-VideoGenX-Incomplete') === '1'
+            ? { ...headers, 'X-VideoGenX-Incomplete': '1' }
+            : headers,
+      });
     }
     if (history) {
-      const read = await cachedVideoHistory(Number(page), Number(pages));
+      const read = await cachedVideoHistory(Number(page), Number(pages), runId ?? undefined);
       return NextResponse.json(read.page, {
         headers: read.complete ? headers : { ...headers, 'X-VideoGenX-Incomplete': '1' },
       });

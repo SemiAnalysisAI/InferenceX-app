@@ -84,6 +84,60 @@ describe('VideoGenX results routes', () => {
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
   });
 
+  it('opens the linked deployment after retrying an unavailable named run', () => {
+    const runId = '34341996789';
+    resultHistory().then((history) => {
+      const entry = history.entries.find((row) => row.runId === runId)!;
+      const cell = entry.sources
+        .flatMap((source) => source.observations)
+        .find((p) => p.cell === 'c1')!;
+      const point = `${runId}:${cell.id}`;
+      const search = new URLSearchParams({
+        unofficialRun: runId,
+        r_workload: 'minimax-h3',
+        r_point: point,
+        r_y: 'videosPerGpuHour',
+      });
+      const hasLinkedPoint = () =>
+        cy.location('search').should((value) => {
+          expect(new URLSearchParams(value).get('r_point')).to.equal(point);
+        });
+      cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
+        body: { ...history, entries: history.entries.filter((row) => row.runId !== runId) },
+      });
+      const liveEntry = {
+        ...entry,
+        artifact: { ...entry.artifact, stored: false },
+        approved: false,
+        publishedAt: null,
+      };
+      const pending = Promise.withResolvers<void>();
+      let tries = 0;
+      cy.intercept('GET', `/api/video-runs?run=${runId}&format=live`, async (request) => {
+        if (++tries === 1) {
+          await pending.promise;
+          request.reply({ statusCode: 502 });
+        } else {
+          request.reply({
+            body: { ...history, entries: [liveEntry] },
+          });
+        }
+      });
+      cy.visit(`/vgx?${search}`);
+      cy.wrap(null).should(() => expect(tries, 'live read is pending').to.equal(1));
+      const banner = '[data-testid="results-overlay"]';
+      cy.get(banner).should('contain', 'Loading video results');
+      hasLinkedPoint();
+      cy.then(() => pending.resolve());
+      cy.contains(`${banner} button`, 'Retry').should('be.visible');
+      hasLinkedPoint();
+      cy.contains(`${banner} button`, 'Retry').click();
+      cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
+      cy.get('[data-testid="video-results-detail"]').should('contain', runId);
+      hasLinkedPoint();
+    });
+  });
+
   it('preserves the selected published overlay through filtering and dismisses it explicitly', () => {
     cy.visit('/vgx?unofficialrun=34342452354&other=1&r_y=videosPerGpuHour');
     cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');

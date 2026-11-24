@@ -1174,6 +1174,10 @@ Example: `/api/v1/views/video?view=overview&r_tier=r&r_deadline=120`.
 
 The plural shared-link alias accepts exactly one positive run ID in this overview. Multiple IDs or both aliases together return HTTP 400; no extra source is ingested.
 
+When the overview cohort is truncated, a named run lookup reads its own stored pages before trying live artifacts. A partial read returns available results and the HTTP header `X-VideoGenX-Incomplete: 1` for both JSON and CSV.
+
+中文：全局 History 超出读取范围时，指定运行先查自己的全部存储页，再按需读取实时产物。读取不完整时 JSON 和 CSV 都返回已取得的数据及响应头 `X-VideoGenX-Incomplete: 1`。
+
 Default points require a matching publication approval. The named channel never
 admits another run and clearing it cannot promote unapproved evidence. Dismissal
 retains a workload selector only if it remains in the approved choices. Approved

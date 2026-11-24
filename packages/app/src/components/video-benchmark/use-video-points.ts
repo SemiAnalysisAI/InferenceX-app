@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
-import { namedRunPoints, videoPoints } from './points';
+import { videoPoints } from './points';
+import { cachedNamedVideoRun, resolveNamedVideoRun, type NamedVideoRun } from './named-run';
 import type { VideoHistoryData } from './initial-data';
 
-/** Where the named run's overlay comes from; `live` is an unstored run read from GitHub. */
-type NamedRunSource = 'none' | 'pending' | 'history' | 'live';
+const EMPTY_POINTS: NamedVideoRun['points'] = [];
 
 /**
  * `pending` means the server is still streaming the cohort for this render, so
@@ -22,7 +22,8 @@ export function useVideoPoints(
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replay, setReplay] = useState(initial?.replay ?? false);
   const [attempt, setAttempt] = useState(0);
-  const [live, setLive] = useState<{ key: string; page: VideoHistoryPage | null } | null>(null);
+  const [namedAttempt, setNamedAttempt] = useState(0);
+  const [resolved, setResolved] = useState<{ key: string; run: NamedVideoRun } | null>(null);
   useEffect(() => {
     if (pending || (initial && attempt === 0)) return;
     const controller = new AbortController();
@@ -55,38 +56,38 @@ export function useVideoPoints(
     return () => controller.abort();
   }, [attempt, initial, pending]);
   const points = useMemo(() => videoPoints(pages), [pages]);
-  const storedNamed = useMemo(() => namedRunPoints(pages, runId), [pages, runId]);
-  const readLive = !loading && !loadError && storedNamed.length === 0 && runId !== null;
-  // Retry and reselecting a dismissed run read again, so a transient failure is not final.
-  const liveKey = runId === null ? null : `${attempt}:${runId}`;
-  if (runId === null && live !== null) setLive(null);
+  const cached = useMemo(() => {
+    if (!runId) return null;
+    const local = cachedNamedVideoRun(pages, runId, loadError === null);
+    return local?.source === 'incomplete' && !loadError ? null : local;
+  }, [loadError, pages, runId]);
+  if (resolved && resolved.run.runId !== runId) setResolved(null);
+  const key = JSON.stringify([runId, attempt, namedAttempt]);
   useEffect(() => {
-    if (!readLive || runId === null || liveKey === null || live?.key === liveKey) return;
+    if (!runId || loading || loadError || cached) return;
     const controller = new AbortController();
-    (async () => {
-      const response = await fetch(`/api/video-runs?run=${encodeURIComponent(runId)}&format=live`, {
+    void resolveNamedVideoRun(pages, runId, (params) =>
+      fetch(`/api/video-runs?${new URLSearchParams(params)}`, {
         signal: controller.signal,
         cache: 'no-store',
-      });
-      const data = response.ok ? ((await response.json()) as VideoHistoryPage) : null;
-      return data?.schemaVersion === 1 && Array.isArray(data.entries) ? data : null;
-    })()
-      .catch(() => null)
-      .then((page) => {
-        if (!controller.signal.aborted) setLive({ key: liveKey, page });
-      });
+      }),
+    ).then((run) => {
+      if (!controller.signal.aborted) setResolved({ key, run });
+    });
     return () => controller.abort();
-  }, [readLive, live?.key, liveKey, runId]);
-  const livePage = readLive && live?.key === liveKey ? live.page : null;
-  const namedPoints = useMemo(
-    () => (livePage ? namedRunPoints([livePage], runId) : storedNamed),
-    [livePage, runId, storedNamed],
-  );
-  let namedSource: NamedRunSource = 'none';
-  if (storedNamed.length > 0) namedSource = 'history';
-  else if (runId !== null && (loading || (readLive && live?.key !== liveKey)))
-    namedSource = 'pending';
-  else if (namedPoints.length > 0) namedSource = 'live';
+  }, [runId, key, cached, loadError, loading, pages]);
+  const named = cached ?? (resolved?.key === key ? resolved.run : null);
+  const namedSource = named?.source ?? (runId ? 'pending' : 'none');
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { points, namedPoints, namedSource, loading, error: loadError, replay, retry };
+  const retryNamed = useCallback(() => setNamedAttempt((n) => n + 1), []);
+  return {
+    points,
+    namedPoints: named?.points ?? EMPTY_POINTS,
+    namedSource,
+    loading,
+    error: loadError,
+    replay,
+    retry,
+    retryNamed: loadError ? retry : retryNamed,
+  };
 }

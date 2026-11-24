@@ -17,8 +17,8 @@ const live: VideoHistoryPage = {
 const initial = { pages: [empty], replay: false };
 
 function Probe({ runId }: { runId: string | null }) {
-  const { namedSource } = useVideoPoints(runId, initial);
-  return createElement('output', null, namedSource);
+  const { namedSource, retryNamed } = useVideoPoints(runId, initial);
+  return createElement('button', { onClick: retryNamed }, namedSource);
 }
 
 let root: Root;
@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe('useVideoPoints live overlay', () => {
-  it('reads a dismissed run again after a failed live read', async () => {
+  it('retries a failed named read in place', async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 502 }))
@@ -45,9 +45,8 @@ describe('useVideoPoints live overlay', () => {
     };
 
     await render('123');
-    expect(container.textContent).toBe('none');
-    await render(null);
-    await render('123');
+    expect(container.textContent).toBe('incomplete');
+    await act(() => container.querySelector('button')!.click());
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(container.textContent).toBe('live');
   });

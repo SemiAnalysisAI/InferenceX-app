@@ -1,5 +1,6 @@
 'use client';
 
+import { isUnofficialRunParam } from '@/lib/routing/unofficial-runs';
 import { ChevronRight } from 'lucide-react';
 import {
   Activity,
@@ -49,7 +50,6 @@ import type { VideoPoint } from './metrics';
 import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
-  isUnofficialRunParam,
   MAX_CHIP_CONFIGS,
   parseResultsState,
   resultProjection,
@@ -157,6 +157,7 @@ const STRINGS = {
     overlay: 'Unofficial run',
     overlayMissing:
       'No matching stored observation for this run. Loading it does not publish or generate media.',
+    overlayIncomplete: 'Some run data could not be loaded.',
     overlayLive: 'Unpublished run read live from its GitHub artifacts; media is not shown.',
     dismiss: 'Dismiss',
     sources: 'Read-only data',
@@ -218,6 +219,7 @@ const STRINGS = {
       '尚未测量：服务端阶段耗时、主机内存及未记录的 GPU 显存、SSIM、VBench、CLIP 与 VLM 质量评估、持续负载、模型加载、首次请求延迟、LoRA 切换时间，以及各 GPU 数量下的最优拓扑。',
     overlay: '非官方运行',
     overlayMissing: '这个运行没有匹配的已存储观测；加载不会发布或生成媒体。',
+    overlayIncomplete: '这个运行的部分数据未能加载。',
     overlayLive: '该运行尚未发布，数据直接从其 GitHub 产物实时读取；不显示媒体。',
     dismiss: '移除',
     sources: '只读数据',
@@ -306,11 +308,8 @@ export default function VideoDashboard({
   const phone = useMediaQuery(MOBILE_VIEWPORT_QUERY, phoneGuess);
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
   const latest = useRef(state);
-  const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
-    state.unofficialRun,
-    initialData?.history,
-    pending,
-  );
+  const { points, namedPoints, namedSource, loading, error, replay, retry, retryNamed } =
+    useVideoPoints(state.unofficialRun, initialData?.history, pending);
   // Until the reader sets the switch, a phone's narrow plot leaves the GPU-count labels off.
   const [labelsPick, setLabels] = useState<boolean | null>(null);
   const labels = labelsPick ?? !phone;
@@ -519,10 +518,21 @@ export default function VideoDashboard({
           )
           .toSorted((a, b) => compareDeployments(a.point, b.point));
   // Left in the URL, a dead key would reopen its detail once its hardware is shown again.
-  const deadPoint = state.point !== null && !loading && !error && detailCell === undefined;
+  const deadPoint =
+    state.point !== null &&
+    !loading &&
+    !error &&
+    namedSource !== 'pending' &&
+    namedSource !== 'incomplete' &&
+    detailCell === undefined;
   useEffect(() => {
-    if (deadPoint) commit({ ...latest.current, point: null }, 'replace');
-  }, [deadPoint, commit]);
+    if (
+      deadPoint &&
+      latest.current.point === state.point &&
+      latest.current.unofficialRun === state.unofficialRun
+    )
+      commit({ ...latest.current, point: null }, 'replace');
+  }, [deadPoint, commit, state.point, state.unofficialRun]);
   const detailHardware = detailCell?.point.hardwareKey ?? null;
   const shownDetail = useRef<string | null>(null);
   useEffect(() => {
@@ -984,6 +994,15 @@ export default function VideoDashboard({
               </span>
               {namedSource === 'pending' ? (
                 <span className="text-muted-foreground">{s.loading}</span>
+              ) : namedSource === 'incomplete' ? (
+                <>
+                  <span className="text-muted-foreground" role="status">
+                    {s.overlayIncomplete}
+                  </span>
+                  <Button variant="outline" size="sm" onClick={retryNamed}>
+                    {s.retry}
+                  </Button>
+                </>
               ) : namedSource === 'live' ? (
                 <span className="text-muted-foreground">{s.overlayLive}</span>
               ) : (

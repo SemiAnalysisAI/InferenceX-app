@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import { parseUnofficialRunIds } from '@/lib/routing/unofficial-runs';
+
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
@@ -9,7 +11,6 @@ import { buildChartData } from './unofficial-chart-data';
 import {
   overlaySelectionReducer,
   parseAvailableModelsAndSequences,
-  parseUnofficialRunIds,
   type OverlaySelectionState,
 } from './unofficial-run-provider';
 

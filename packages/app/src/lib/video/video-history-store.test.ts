@@ -189,6 +189,13 @@ describe('published video history', () => {
     expect(
       new Set(dashboardCells(videoPoints([page])).cells.map((cell) => cell.hardwareKey)),
     ).toEqual(new Set(['h100', 'h200']));
+    // A named run takes no older entries.
+    const named = await publishedVideoHistoryRead(1, VIDEO_HISTORY_MAX_PAGES, '150');
+    expect(named.page.entries.map(({ runId, approved }) => [runId, approved])).toEqual([
+      ['150', true],
+    ]);
+    expect(named.page.nextPage).toBeNull();
+    expect(named.complete).toBe(true);
   });
 
   it('lists every index page, orders by publication date, and reads only ten unapproved indexes', async () => {
@@ -213,6 +220,17 @@ describe('published video history', () => {
     expect(page.nextPage).toBe(2);
     expect(artifactReads()).toBe(10);
     expect(put).not.toHaveBeenCalled();
+    // Run 100 is outside page 1. Only its own index and receipt should determine this read.
+    mocked(list).mockClear();
+    const named = await publishedVideoHistoryRead(1, 1, '100');
+    expect(named.complete).toBe(true);
+    expect(named.page.entries.map(({ runId, approved }) => [runId, approved])).toEqual([
+      ['100', false],
+    ]);
+    expect(named.page.nextPage).toBeNull();
+    expect(mocked(list).mock.calls.map(([options]) => options?.prefix)).toEqual([
+      'h3-video-media/v1/runs/100/',
+    ]);
   });
 
   it('reads several pages in one call exactly as consecutive single pages', async () => {
@@ -372,15 +390,10 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 6,
-      // Re-pinned after the lazy power model loader gained failure and retry states (reached only
-      // through type imports), fetchJson learned to take an early document-load response,
-      // data_query_failed stopped reporting failed background refetches that keep their data,
-      // dashboard-routes gained the default Inference model slug, inference topology labels
-      // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey),
-      // the inference setSelectedGPUs action type now returns whether picks applied, and the
-      // unofficial run provider gained a requested-overlay flag. None of these feed recorded
-      // entries, so they are unchanged.
-      sources: '9ed1467c433c994d3a2d8a58b1387e15afc78dadeaec8ad2320f233caf884011',
+      // Re-pinned after History reads gained a run filter and the unofficial-run URL helpers moved to
+      // one module. The filter changes which indexes are listed, not how an entry is projected, so
+      // recorded entries are unchanged.
+      sources: '57281d793819cddf4414fbb7c40c58a11e32603bed242bc43c8fe0e5a8644991',
     });
   });
 });

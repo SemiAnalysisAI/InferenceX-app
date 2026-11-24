@@ -288,6 +288,41 @@ describe('published VideoGenX dashboard projection', () => {
     expect(clips).toEqual([source0.observations[0].id]);
   });
 
+  it('reads an approved run past the cohort window and marks both exports when a later run page fails', async () => {
+    const run = referenceQualityFixture(20).stored;
+    const entry = { ...videoHistoryEntry(run, '2026-01-01T00:00:00Z'), approved: true };
+    let broken = true;
+    source.mockImplementation((req: NextRequest) => {
+      const query = req.nextUrl.searchParams;
+      if (query.get('format') === 'published') return Response.json(run);
+      expect(query.get('format')).toBe('history');
+      if (!query.has('run')) return Response.json({ schemaVersion: 1, entries: [], nextPage: 6 });
+      expect(query.get('run')).toBe('123');
+      if (query.get('page') === '1')
+        return Response.json({ schemaVersion: 1, entries: [entry], nextPage: 6 });
+      expect(query.get('page')).toBe('6');
+      return broken
+        ? new Response(null, { status: 502 })
+        : Response.json({ schemaVersion: 1, entries: [], nextPage: null });
+    });
+    const query = 'view=overview&unofficialrun=123';
+    const json = await GET(request(query));
+    expect(json.headers.get('X-VideoGenX-Incomplete')).toBe('1');
+    const partialBody = await json.json();
+    expect(partialBody.overlayCells[0].point).toMatchObject({
+      runId: '123',
+      approved: true,
+    });
+    const csv = await GET(request(`${query}&format=csv`));
+    expect(csv.headers.get('X-VideoGenX-Incomplete')).toBe('1');
+    expect(await csv.text()).toContain(entry.sources[0].observations[0].id);
+    broken = false;
+    const complete = await GET(request(query));
+    expect(complete.headers.get('X-VideoGenX-Incomplete')).toBeNull();
+    const completeBody = await complete.json();
+    expect(completeBody.overlayCells[0].point.approved).toBe(true);
+  });
+
   it('overlays an unstored named run from its live artifact read without approving it', async () => {
     const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64)).stored;
     const history: VideoHistoryPage = {
