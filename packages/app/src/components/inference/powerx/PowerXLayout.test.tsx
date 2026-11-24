@@ -6,7 +6,7 @@ import { describe, expect, it, vi, mock } from 'bun:test';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { InferenceData } from '@/components/inference/types';
-import { type PowerXSelection } from './powerx-views';
+import { POWER_PERCENT_TDP_METRIC, type PowerXSelection } from './powerx-views';
 
 const mocks = {
   locale: 'en' as 'en' | 'zh',
@@ -26,12 +26,8 @@ declare global {
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-import {
-  defaultReadoutPoint,
-  PowerXCountControls,
-  PowerXReadout,
-  PowerXSplitBy,
-} from './PowerXLayout';
+import { defaultReadoutPoint, PowerXCountControls, PowerXReadout } from './PowerXLayout';
+import type { PowerXRole } from './powerx-role';
 
 const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
   mocks.locale = locale;
@@ -40,8 +36,6 @@ const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
   return container;
 };
 const noop = () => {};
-
-const where: PowerXSelection = { metric: 'y_measuredAvgPower', compare: 'breakdown' };
 
 describe('PowerXCountControls', () => {
   it('disables the IT and facility Counts unless energy is per output token', () => {
@@ -80,19 +74,21 @@ describe('PowerXCountControls', () => {
   });
 });
 
-describe('PowerXSplitBy', () => {
-  it('disables Prefill vs decode with the reason when there is no role telemetry', () => {
-    const container = render(
-      <PowerXSplitBy selection={where} onSelectionChange={noop} rolesHaveData={false} />,
-    );
-    const buttons = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-split"] button'),
-    ];
-    expect(buttons.map((button) => button.textContent)).toEqual(['Boundary', 'Prefill vs decode']);
-    expect(buttons[1].disabled).toBe(true);
-    expect(
-      container.querySelector('[data-testid="powerx-roles-unavailable"]')?.textContent,
-    ).toContain('No validated prefill/decode telemetry');
+const pinned = (selection: PowerXSelection, role: PowerXRole) =>
+  [
+    ...render(
+      <PowerXCountControls selection={selection} onSelectionChange={noop} role={role} />,
+    ).querySelectorAll<HTMLElement>('[data-testid$="-pinned"]'),
+  ].map((node) => node.dataset.testid);
+
+describe('pinned controls under a GPU role', () => {
+  it('pins the controls a role fixes and says why, leaving All untouched', () => {
+    const energy = { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' } as const;
+    expect(pinned(energy, 'decode')).toEqual(['powerx-count-pinned', 'powerx-per-pinned']);
+    expect(pinned(energy, 'all')).toEqual([]);
+    // % of TDP is read per pool under a role.
+    const tdp = { metric: POWER_PERCENT_TDP_METRIC, compare: 'none' } as const;
+    expect(pinned(tdp, 'split')).toEqual(['powerx-count-pinned', 'powerx-headroom-pinned']);
   });
 });
 

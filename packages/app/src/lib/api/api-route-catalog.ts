@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'b2c8119694ae3e98b349b22016ffa0b02149f90e4b6280ec8329080934bd6993',
+    sourceSha256: '97f393d3bc9ab963ea38d5f286e4969f746c3aad3eeb4d66343d433c25e2dc77',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -972,7 +972,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-point-stats',
-    sourceSha256: '2fc7e52dd60a3dcb19e73beebad561b9f989444267f72812c97a480bf2957415',
+    sourceSha256: '5615caabd087dc5c810c0f454a25e131f60035d985b67a805819288edb4a1f02',
   },
   {
     source: 'src/app/api/v1/reproduce/route.ts',
@@ -1518,7 +1518,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-breakdown.ts',
-    sourceSha256: '56f74b5fd6d1bd4dc301834eb8dcd70c76f9973ea10d4d45977018f1da4d928c',
+    sourceSha256: '3645f92110a9e2231192b806e649ff79a079f8d3f52f7c7ac69168ce8da3943e',
     reviewArea: {
       en: 'Per-point system power breakdown: measured GPU and Grace parts, then the modeled CPU, memory, NIC, NVSwitch, storage, PCIe/misc, fan, PSU-loss, scale-out network and PUE overhead parts, summing to All in Measured W/GPU; the IT (no PUE) boundary is the same stack without the facility part.',
       zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分，以及建模的 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他、风扇、电源损耗、横向扩展网络与 PUE 开销部分，合计等于 All in Measured W/GPU；IT（不含 PUE）边界即去掉数据中心开销后的同一堆叠。',
@@ -1900,7 +1900,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '6435027256cd93a5a22f2d579b3e184c234b9014a0d3fe23c47e049e8e815b0e',
+    sourceSha256: '71afa3c44a3a23d12b61381aaee3445aaf035cb7e8e9469589cb03e055c587b2',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1909,7 +1909,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '8aeb6c8f774c998f04c701f0e5d47c6db2be0cbddb07324683b9dae62f64a9e4',
+    sourceSha256: '6bef3593d1b551b1a1e131c4f005c126e36e2628b2a45b5b48629eeda8511c50',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

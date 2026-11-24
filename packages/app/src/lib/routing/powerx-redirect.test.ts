@@ -40,4 +40,13 @@ describe('powerXRedirectUrl', () => {
     expect(redirect('/infx/inference/not-a-model?i_metric=y_measuredAvgPower')).toBe(null);
     expect(redirect('/pwx?i_metric=y_measuredAvgPower')).toBe(null);
   });
+
+  it('moves the GPU role of an old link onto i_role, keeping an explicit i_role', () => {
+    expect(redirect('/infx/inference?i_metric=y_measuredAvgPower&i_pcompare=roles')).toBe(
+      '/pwx?i_metric=y_measuredAvgPower&i_pcompare=breakdown&i_role=split',
+    );
+    expect(redirect('/infx/inference?i_metric=y_measuredPrefillAvgPower&i_role=split')).toBe(
+      '/pwx?i_metric=y_measuredAvgPower&i_role=split',
+    );
+  });
 });

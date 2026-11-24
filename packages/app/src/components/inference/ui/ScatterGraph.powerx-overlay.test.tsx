@@ -10,9 +10,11 @@ import {
   baseInferenceState,
   baseOverlayState,
   inferenceState,
+  legendState,
   mountChart,
   overlayState,
   point,
+  scatterPoints,
 } from './ScatterGraph.test-harness';
 
 // The chart renders inside the PowerX tab.
@@ -107,6 +109,81 @@ describe('PowerX headroom on unofficial overlays', () => {
     overlayState.current = { ...overlayState.current, activeOverlayHwTypes: new Set<string>() };
     rerender();
     expect(bands().map((band) => band.dataset.runIndex)).toEqual([undefined]);
+    unmount();
+  });
+});
+
+// h100 runs aggregated: every GPU does both, so there is no pool line to draw.
+const aggregated = (x: number): InferenceData => ({
+  ...point('h100', 'fp8', x, 500, 8),
+  measuredAvgPower: metric(500),
+});
+
+// One disaggregated row per x, expanded the way the roles compare draws it: the base
+// all-GPU row plus a prefill and a flat decode clone.
+const rolePoint = (x: number, run_url?: string): InferenceData[] => {
+  const base = {
+    ...point('b200', 'fp8', x, 600 + x, 8),
+    disagg: true,
+    ...(run_url ? { run_url } : {}),
+    measuredAvgPower: metric(600 + x),
+    measuredPrefillAvgPower: metric(500 + x),
+    measuredDecodeAvgPower: metric(701.5),
+  };
+  return [
+    base,
+    { ...base, y: 500 + x, powerVariant: { kind: 'role', id: 'prefill' } },
+    { ...base, y: 701.5, powerVariant: { kind: 'role', id: 'decode' } },
+  ];
+};
+const variantOf = (d: InferenceData) => d.powerVariant?.id ?? '';
+
+describe('PowerX GPU role on the main chart', () => {
+  it('draws only the pool the role reads and lists aggregated chips dimmed, keyed by that pool', () => {
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    inferenceState.current = {
+      ...baseInferenceState(),
+      selectedYAxisMetric: 'y_measuredAvgPower',
+      powerCompare: 'roles',
+      powerRole: 'prefill',
+      hideNonOptimal: false,
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set(['b200']),
+      allOverlayHwTypes: new Set(['b200']),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'powerx', url: runUrl }],
+    };
+    const { container, unmount } = mountChart({
+      chartDefinition: chartDefinitions[0],
+      data: [...[10, 20, 40].flatMap((x) => rolePoint(x)), aggregated(10), aggregated(20)],
+      overlayData: {
+        data: [15, 30].flatMap((x) => rolePoint(x, runUrl)),
+        hardwareConfig: { b200: { ...HARDWARE_CONFIG.b200, suffix: '' } },
+        label: 'prefill role',
+      },
+    });
+    const official = scatterPoints(container).map(({ datum }) => datum as InferenceData);
+    expect(official.map(variantOf)).toEqual(['prefill', 'prefill', 'prefill']);
+    expect(official.map((d) => d.y).toSorted((a, b) => a - b)).toEqual([510, 520, 540]);
+    const overlay = [
+      ...container.querySelectorAll<SVGGElement & { __data__: InferenceData }>(
+        '.unofficial-overlay-pt',
+      ),
+    ].map((element) => element.__data__);
+    expect(overlay.map(variantOf)).toEqual(['prefill', 'prefill']);
+
+    // Aggregated chips stay listed, dimmed and explained; one key entry names the pool.
+    const items: { hw: string; label: string; isActive: boolean; blockedReason?: string }[] =
+      legendState.current!.legendItems;
+    const h100 = items.find((item) => item.hw === 'h100');
+    expect(h100).toMatchObject({ isActive: false, label: expect.stringContaining('aggregated') });
+    expect(h100?.blockedReason).toContain('every GPU does both');
+    expect(items.find((item) => item.hw === 'b200')?.isActive).toBe(true);
+    const roleKey = items.filter((item) => /prefill|decode/u.test(item.hw));
+    expect(roleKey.map((item) => item.label)).toEqual(['Prefill GPUs']);
     unmount();
   });
 });

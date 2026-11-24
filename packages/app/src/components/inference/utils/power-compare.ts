@@ -37,11 +37,32 @@ export type PowerSeriesField = keyof Pick<
   | 'measuredDecodeAvgPower'
   | 'measuredDecodeJPerOutputToken'
   | 'reconstructedPrefillJPerOutputToken'
+  | 'measuredPrefillJPerInputToken'
 >;
 
 export interface PowerCompareSeries {
   variant: PowerVariant;
-  field: PowerSeriesField;
+  /** The row field the series plots, or null for a value derived from several fields. */
+  field: PowerSeriesField | null;
+  value: (point: InferenceData) => { y: number; roof: boolean } | undefined;
+}
+
+function fieldSeries(variant: PowerVariant, field: PowerSeriesField): PowerCompareSeries {
+  return { variant, field, value: (point) => point[field] };
+}
+
+/**
+ * % of TDP of one GPU pool, from the pool's average draw: the row's whole-deployment
+ * % of TDP scaled by the pool's W over the all-GPU W (TDP is per GPU, so the ratio holds).
+ */
+export function poolPercentTdp(
+  point: Pick<InferenceData, 'measuredPowerPercentTdp' | 'measuredAvgPower'>,
+  poolWatts: { y: number; roof: boolean } | undefined,
+): { y: number; roof: boolean } | undefined {
+  const pct = point.measuredPowerPercentTdp?.y;
+  const all = point.measuredAvgPower?.y;
+  if (!poolWatts || !Number.isFinite(pct) || !Number.isFinite(all) || !all) return undefined;
+  return { y: (pct! * poolWatts.y) / all!, roof: poolWatts.roof };
 }
 
 const ROLES = ['all', 'prefill', 'decode'] as const satisfies readonly PowerRole[];
@@ -92,10 +113,13 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
   }
   if (config.basis !== 'gpu-measured') return null;
   if (config.family === 'power') {
+    if (config.display === 'tdp') return { kind: 'role', id: 'all' };
     return config.statistic === 'average' && config.display === 'watts'
       ? { kind: 'role', id: config.scope }
       : null;
   }
+  // J per input token splits for the prefill GPUs only: decode reads no input tokens.
+  if (config.denominator === 'input' && config.scope === 'all') return { kind: 'role', id: 'all' };
   return config.denominator === 'output' && config.unit === 'joules' && config.scope !== 'prefill'
     ? { kind: 'role', id: config.scope }
     : null;
@@ -138,14 +162,22 @@ export function powerCompareVariants(metric: string, mode: PowerCompare): PowerC
     return POWER_BASES.flatMap((basis): PowerCompareSeries[] => {
       if (basis === base.id || !bases.includes(basis)) return [];
       const field = POWER_BASIS_FIELDS[basis][quantity];
-      return field ? [{ variant: { kind: 'basis', id: basis }, field }] : [];
+      return field ? [fieldSeries({ kind: 'basis', id: basis }, field)] : [];
     });
   }
+  const others = ROLES.filter((role) => role !== base.id);
+  if (config.family === 'power' && config.display === 'tdp') {
+    return others.map((role) => ({
+      variant: { kind: 'role', id: role },
+      field: null,
+      value: (point: InferenceData) => poolPercentTdp(point, point[ROLE_WATT_FIELDS[role]]),
+    }));
+  }
+  if (config.family === 'energy' && config.denominator === 'input') {
+    return [fieldSeries({ kind: 'role', id: 'prefill' }, 'measuredPrefillJPerInputToken')];
+  }
   const fields = config.family === 'power' ? ROLE_WATT_FIELDS : ROLE_ENERGY_FIELDS;
-  return ROLES.filter((role) => role !== base.id).map((role) => ({
-    variant: { kind: 'role', id: role },
-    field: fields[role],
-  }));
+  return others.map((role) => fieldSeries({ kind: 'role', id: role }, fields[role]));
 }
 
 export function powerCompareAvailable(metric: string, mode: PowerCompare): boolean {
@@ -160,9 +192,9 @@ export function expandPowerCompareSeries(
   const series = powerCompareVariants(metric, mode);
   if (series.length === 0) return [...points];
   const result: InferenceData[] = [...points];
-  for (const { variant, field } of series) {
+  for (const { variant, value: read } of series) {
     for (const point of points) {
-      const value = point[field];
+      const value = read(point);
       if (!value || !Number.isFinite(value.y)) continue;
       result.push({ ...point, y: value.y, roof: value.roof, powerVariant: variant });
     }

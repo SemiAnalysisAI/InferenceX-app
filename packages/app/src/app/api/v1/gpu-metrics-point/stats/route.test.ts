@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
+import { poolSubsetSeries } from '@/components/inference/utils/powerTimeline';
 import { loadSwingStatsFromSeries } from '@/lib/power/load-swing-stats';
 
 const { readRevision, readCached, stored } = {
@@ -66,6 +67,11 @@ const payload = {
 
 function request(query: string) {
   return new NextRequest(`http://localhost/api/v1/gpu-metrics-point/stats?${query}`);
+}
+
+async function getBody(query: string, as: 'json' | 'text' = 'json') {
+  const response = await GET(request(query));
+  return as === 'json' ? response.json() : response.text();
 }
 
 beforeEach(() => {
@@ -162,5 +168,55 @@ describe('GET /api/v1/gpu-metrics-point/stats', () => {
     expect(noSeries.status).toBe(404);
     const noCsv = await GET(request('id=7&format=csv'));
     expect(noCsv.status).toBe(404);
+  });
+
+  describe('GPU role pools', () => {
+    const disagg: GpuPowerSeries = {
+      ...series,
+      gpus: [0, 1, 2],
+      power: [samples, samples.map((v) => v - 20), samples.map((v) => v + 40)],
+      devices: (['prefill', 'decode', 'decode'] as const).map((role) => ({ id: role, role })),
+    };
+
+    it('computes each pool from only its GPU rows, with the same function as the lanes', async () => {
+      readRevision.mockResolvedValue('rev-1');
+      readCached.mockResolvedValue(payload);
+      stored.mockReturnValue([disagg]);
+      const decode = await getBody('id=7&role=decode');
+      expect(decode.role).toBe('decode');
+      expect(decode.series).toHaveLength(1);
+      expect(decode.series[0]).toMatchObject({ role: 'decode', gpuCount: 2 });
+      expect(decode.series[0].stats).toEqual(
+        loadSwingStatsFromSeries(
+          poolSubsetSeries(disagg, 'decode')!,
+          startMs + 7000,
+          startMs + 16000,
+        ),
+      );
+      const split = await getBody('id=7&role=split');
+      expect(split.series.map((entry: { role: string }) => entry.role)).toEqual([
+        'prefill',
+        'decode',
+      ]);
+      // The prefill pool is GPU 0 alone, so its peak is that GPU's 520 W, not the 510 W mean.
+      expect(split.series[0].stats.peak).toBe(520);
+      const csv = await getBody('id=7&role=prefill&format=csv', 'text');
+      expect(csv.split(/\r?\n/u)[0]).toBe(
+        'artifact,source,role,t_s,since_serving_s,in_validated_window,w_per_gpu',
+      );
+    });
+
+    it('returns 404 for a role on an aggregated trace instead of the all-GPU numbers', async () => {
+      const badRole = await GET(request('id=7&role=roles'));
+      expect(badRole.status).toBe(400);
+      readRevision.mockResolvedValue('rev-1');
+      readCached.mockResolvedValue(payload);
+      const response = await GET(request('id=7&role=prefill'));
+      expect(response.status).toBe(404);
+      const body = await response.json();
+      expect(body.error).toContain('aggregated');
+      const csv = await GET(request('id=7&role=decode&format=csv'));
+      expect(csv.status).toBe(404);
+    });
   });
 });

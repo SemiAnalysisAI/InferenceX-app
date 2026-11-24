@@ -6,6 +6,7 @@ import type { InferenceData } from '@/components/inference/types';
 import {
   powerTimelineStatus,
   prioritizeRuns,
+  traceLanes,
   summarizeTraceWindow,
   tracePools,
   windowPhase,
@@ -193,5 +194,33 @@ describe('powerTimelineStatus', () => {
       missing: 2,
       blocking: true,
     });
+  });
+});
+
+describe('traceLanes', () => {
+  const disagg = {
+    power: [[500], [520], [300], [320], [340]],
+    devices: [
+      { id: 'p/0', role: 'prefill' as const },
+      { id: 'p/1', role: 'prefill' as const },
+      { id: 'd/0', role: 'decode' as const },
+      { id: 'd/1', role: 'decode' as const },
+      { id: 'd/2', role: 'decode' as const },
+    ],
+  };
+  const aggregated = { power: [[400], [410]], devices: [{ id: 'g/0' }, { id: 'g/1' }] };
+
+  it.each([
+    ['all', disagg, ['lane:all:0,1,2,3,4']],
+    ['prefill', disagg, ['lane:prefill:0,1']],
+    ['decode', disagg, ['lane:decode:2,3,4']],
+    ['split', disagg, ['context:all:0,1,2,3,4', 'lane:prefill:0,1', 'lane:decode:2,3,4']],
+    // An aggregated trace has no role pools: one dimmed all-GPU lane under every role.
+    ['split', aggregated, ['aggregated:all:0,1']],
+  ] as const)('draws the %s lanes', (role, series, lanes) => {
+    const shape = traceLanes(series, role).map(
+      (lane) => `${lane.kind}:${lane.role}:${lane.rows.join(',')}`,
+    );
+    expect(shape).toEqual([...lanes]);
   });
 });

@@ -28,6 +28,7 @@ export function exportFirstChart(): void {
 }
 
 export function readCapturedCsv(): Cypress.Chainable<string> {
+  cy.window().its('__capturedCsvBlob');
   return cy.window().then((win) => {
     const blob = (win as CsvCaptureWindow).__capturedCsvBlob;
     expect(blob, 'captured CSV Blob').to.be.instanceOf(win.Blob);

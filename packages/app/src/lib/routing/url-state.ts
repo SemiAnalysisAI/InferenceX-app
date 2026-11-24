@@ -67,6 +67,7 @@ const URL_STATE_KEYS = [
   'i_ptconc',
   'i_rulers',
   'i_pcompare',
+  'i_role',
   'i_overview_current',
   'i_overview_baseline',
   'e_rundate',
@@ -160,6 +161,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_ptconc: '',
   i_rulers: '',
   i_pcompare: '',
+  i_role: '',
   i_overview_current: '',
   i_overview_baseline: '',
   e_rundate: '',
@@ -446,7 +448,11 @@ export function chartStateHref(overrides: Record<string, string>): string {
   const staleRunKeys = [...merged.keys()].filter((key) => UNOFFICIAL_RUN_PARAM_RE.test(key));
   for (const key of staleRunKeys) merged.delete(key);
   for (const [key, value] of collectTabParams()) merged.set(key, value);
-  for (const [key, value] of Object.entries(overrides)) merged.set(key, value);
+  // An empty override drops the key, as an empty URL-state value does.
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value) merged.set(key, value);
+    else merged.delete(key);
+  }
   const query = merged.toString();
   return `${origin}${pathname}${query ? `?${query}` : ''}${hash}`;
 }

@@ -27,6 +27,12 @@ import {
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
+  GPU_POOL_DIMMED_OPACITY,
+  GPU_POOLS,
+  gpuPoolEmphasis,
+  gpuPoolSegments,
+  type GpuPool,
+  type GpuPoolSegment,
   MEASURED_POWER_BANDS,
   POWER_BANDS,
   powerBreakdownInteractivity,
@@ -41,6 +47,7 @@ import { chipsWithoutSystemModel } from '../utils/power-chip-coverage';
 import { formatInteractivity } from '../utils/interactivity-format';
 import { PowerBasisPill } from '../powerx/PowerBasisPill';
 import { FACILITY_PUE_NOTE } from '@/lib/power/facility-pue';
+import { powerXRolePools, type PowerXRole } from '../powerx/powerx-role';
 import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
@@ -71,6 +78,16 @@ const STRINGS = {
       network: 'Network share',
       facility: 'Facility (PUE)',
     } satisfies Record<PowerBand, string>,
+    pools: { prefill: 'Prefill GPUs', decode: 'Decode GPUs' } satisfies Record<GpuPool, string>,
+    poolShare: (prefill: string, decode: string) => `Prefill ${prefill} · Decode ${decode}`,
+    poolCount: (gpus: number, w: string) => `${gpus} × ${w} W`,
+    aggregated: 'Aggregated',
+    aggregatedNote:
+      'Aggregated: every GPU does both prefill and decode, so its GPU layer stays whole.',
+    noPoolTelemetry: 'No pool telemetry',
+    noPoolTelemetryNote: 'No per-pool GPU telemetry for this run, so its GPU layer stays whole.',
+    roleNote:
+      'Only the measured GPU layer splits by role; server, network and facility are modeled for the whole deployment.',
     perGpu: 'W per GPU, all-in',
     perGpuIt: 'W per GPU, IT (no PUE)',
     itSubtotal: (watts: string) => `IT ${watts} W`,
@@ -114,6 +131,14 @@ const STRINGS = {
       network: '网络分摊',
       facility: '机房开销（PUE）',
     } satisfies Record<PowerBand, string>,
+    pools: { prefill: '预填充 GPU', decode: '解码 GPU' } satisfies Record<GpuPool, string>,
+    poolShare: (prefill: string, decode: string) => `预填充 ${prefill} · 解码 ${decode}`,
+    poolCount: (gpus: number, w: string) => `${gpus} × ${w} W`,
+    aggregated: '聚合',
+    aggregatedNote: '聚合部署：每个 GPU 同时承担预填充和解码，因此其 GPU 层保持完整。',
+    noPoolTelemetry: '无分池遥测',
+    noPoolTelemetryNote: '该运行没有按 GPU 池的遥测数据，因此其 GPU 层保持完整。',
+    roleNote: '只有实测的 GPU 层按角色拆分；服务器、网络和机房开销均按整个部署建模。',
     perGpu: '每 GPU 整体功耗（W）',
     perGpuIt: '每 GPU IT 功耗（W，不含 PUE）',
     itSubtotal: (watts: string) => `IT ${watts} W`,
@@ -148,6 +173,24 @@ const LEGEND_COLOR = 'var(--muted-foreground)';
 /** The slider's accent, on the pin glyph and the pinned row's point so both read as "off the slider". */
 export const PIN_ACCENT_CLASS = 'text-secondary dark:text-primary';
 
+/**
+ * A GPU pool as a CSS box: the GPU layer's solid step, outlined dashed (prefill) or
+ * dotted (decode) like the chart's role lines, and faded when the role leaves it out.
+ */
+export function gpuPoolSwatchStyle(
+  pool: GpuPool,
+  color: string,
+  dimmed: boolean,
+  highlight: PowerLayerHighlight | null = null,
+): React.CSSProperties {
+  const base = swatchStyle('gpu', color, highlight);
+  return {
+    ...base,
+    border: `1px ${pool === 'prefill' ? 'dashed' : 'dotted'} ${color}`,
+    opacity: Number(base.opacity ?? 1) * (dimmed ? GPU_POOL_DIMMED_OPACITY : 1),
+  };
+}
+
 export default function PowerChipCompare({
   data,
   overlayData = [],
@@ -162,6 +205,7 @@ export default function PowerChipCompare({
   comparedPoints = {},
   onUnpinComparedPoint,
   onTargetChange,
+  role = 'all',
 }: {
   data: InferenceData[];
   /** Unofficial-run overlay points within `data`: their bars take the run's colour. */
@@ -183,6 +227,12 @@ export default function PowerChipCompare({
   onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
   /** The slider moved (the global control): the owner drops every pinned point. */
   onTargetChange?: () => void;
+  /**
+   * The PowerX GPU role. Off All GPUs, each disaggregated chip's measured GPU layer splits
+   * into its prefill and decode pools (the pool the role leaves out dimmed); aggregated
+   * chips stay listed with their GPU layer whole and dimmed.
+   */
+  role?: PowerXRole;
 }) {
   const locale = useLocale();
   const analyticsContext = useInferenceAnalyticsContext();
@@ -202,7 +252,11 @@ export default function PowerChipCompare({
       buildPowerBreakdownsWithOverlays(
         data,
         overlayData.length > 0
-          ? { points: overlayData, runIndexByUrl, runInfos: unofficialRunInfos ?? [] }
+          ? {
+              points: overlayData,
+              runIndexByUrl,
+              runInfos: unofficialRunInfos ?? [],
+            }
           : undefined,
         locale,
         interactivity,
@@ -213,6 +267,8 @@ export default function PowerChipCompare({
     [data, overlayData, runIndexByUrl, unofficialRunInfos, locale, interactivity, includeFacility],
   );
   const layers = usePowerLayerHighlight(layerHighlight, onLayerHighlight);
+  const pools = powerXRolePools(role);
+  const splitByRole = pools.length > 0;
   const unmodeled = useMemo(() => chipsWithoutSystemModel(data, series), [data, series]);
   const hwKeys = useMemo(() => [...new Set(series.map((entry) => entry.hwKey))], [series]);
   const { resolveColor } = useThemeColors({
@@ -269,6 +325,7 @@ export default function PowerChipCompare({
     color: string;
     band: PowerBand;
     point: (typeof rows)[number]['entry'];
+    pool?: GpuPoolSegment;
   } | null>(null);
   const hoveredParts = segmentHover ? bandPartsAt(segmentHover.point, segmentHover.band) : [];
   // No chip in this selection has a whole-system model: say so instead of leaving a gap.
@@ -323,19 +380,24 @@ export default function PowerChipCompare({
         aria-label={t.legend}
         data-testid="power-chip-compare-legend"
       >
-        {bands.map((band) => {
+        {bands.flatMap((band) => {
           const pinned =
             layers.highlight?.pinned === true &&
             layers.highlight.band === band &&
             layers.highlight.category === null;
           const emphasis = powerLayerEmphasis(band, layers.highlight);
           const basis = MEASURED_POWER_BANDS.has(band) ? t.measured : t.modeled;
-          return (
-            <li key={band} className="flex min-w-0">
+          const items: { key: string; pool: GpuPool | null }[] =
+            band === 'gpu' && splitByRole
+              ? GPU_POOLS.map((pool) => ({ key: `gpu-${pool}`, pool }))
+              : [{ key: band, pool: null }];
+          return items.map(({ key, pool }) => (
+            <li key={key} className="flex min-w-0">
               <button
                 type="button"
                 data-testid="power-chip-compare-legend-item"
                 data-band={band}
+                data-pool={pool ?? undefined}
                 data-emphasis={emphasis}
                 aria-pressed={pinned}
                 onMouseEnter={() => layers.hover(bandTarget(band))}
@@ -353,19 +415,30 @@ export default function PowerChipCompare({
                   aria-hidden
                   className="inline-block size-3 shrink-0 rounded-[2px]"
                   title={`${basis}${pinned ? ` · ${t.pinned}` : ''}`}
-                  style={swatchStyle(band, LEGEND_COLOR, layers.highlight)}
+                  style={
+                    pool
+                      ? gpuPoolSwatchStyle(
+                          pool,
+                          LEGEND_COLOR,
+                          gpuPoolEmphasis(pools, pool) === 'dimmed',
+                          layers.highlight,
+                        )
+                      : swatchStyle(band, LEGEND_COLOR, layers.highlight)
+                  }
                 />
                 <span
                   className={`whitespace-nowrap ${
-                    emphasis === 'faded' ? '' : 'font-medium text-foreground'
+                    emphasis === 'faded' || (pool && gpuPoolEmphasis(pools, pool) === 'dimmed')
+                      ? ''
+                      : 'font-medium text-foreground'
                   }`}
                 >
-                  {t.bands[band]}
+                  {pool ? t.pools[pool] : t.bands[band]}
                 </span>
                 <span className="whitespace-nowrap opacity-70">· {basis}</span>
               </button>
             </li>
-          );
+          ));
         })}
       </ul>
 
@@ -383,6 +456,16 @@ export default function PowerChipCompare({
             // The bar whose drill-down is open is the active one.
             const active = entry.key === (expandedKey ?? selectedKey);
             const gpuShare = point.wattsPerGpu.gpu / point.totalWattsPerGpu;
+            // Off All GPUs the GPU layer splits by pool; a chip that cannot split (aggregated,
+            // or no per-pool telemetry) stays listed with its layer whole, dimmed.
+            const poolSegments = splitByRole ? gpuPoolSegments(point) : null;
+            const unsplit = splitByRole && poolSegments === null;
+            const shareLine = poolSegments
+              ? t.poolShare(
+                  pct(poolSegments[0].layerWatts / point.totalWattsPerGpu),
+                  pct(poolSegments[1].layerWatts / point.totalWattsPerGpu),
+                )
+              : t.gpuShare(pct(gpuShare));
             const chipName = (
               <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
                 <span
@@ -421,12 +504,68 @@ export default function PowerChipCompare({
                 >
                   {t.at(point.concurrency, rate(point.interactivity))}
                 </span>
+                {unsplit && (
+                  <span
+                    data-testid="power-chip-compare-unsplit"
+                    data-reason={point.point.disagg ? 'no-pool-telemetry' : 'aggregated'}
+                    title={point.point.disagg ? t.noPoolTelemetryNote : t.aggregatedNote}
+                    className="rounded-sm border border-border/70 px-1 text-2xs text-muted-foreground"
+                  >
+                    {point.point.disagg ? t.noPoolTelemetry : t.aggregated}
+                  </span>
+                )}
               </span>
             );
+            // Every segment, pool or band, opens the same hover card and follows the pointer.
+            const segmentHoverProps = (band: PowerBand, pool?: GpuPoolSegment) => ({
+              onMouseEnter: (event: React.MouseEvent) => {
+                layers.hover(bandTarget(band));
+                setSegmentHover({
+                  x: event.clientX,
+                  y: event.clientY,
+                  label: entry.label,
+                  color,
+                  band,
+                  point,
+                  pool,
+                });
+              },
+              onMouseMove: (event: React.MouseEvent) =>
+                setSegmentHover((prev) => prev && { ...prev, x: event.clientX, y: event.clientY }),
+              onMouseLeave: () => {
+                layers.hover(null);
+                setSegmentHover(null);
+              },
+            });
             // The stacked bar's segments: the layer steps and hatches; the watt labels only
             // in the 28 px desktop bar, never in the 8 px phone bar.
+            const poolSpans = (labels: boolean) =>
+              (poolSegments ?? []).map((segment) => {
+                const dimmed = gpuPoolEmphasis(pools, segment.pool) === 'dimmed';
+                return (
+                  <span
+                    key={`gpu-${segment.pool}`}
+                    data-testid="power-chip-compare-segment"
+                    data-band="gpu"
+                    data-pool={segment.pool}
+                    data-pool-emphasis={dimmed ? 'dimmed' : 'shown'}
+                    data-emphasis={powerLayerEmphasis('gpu', layers.highlight)}
+                    {...segmentHoverProps('gpu', segment)}
+                    className="flex h-full items-center justify-center text-2xs font-medium tabular-nums text-foreground"
+                    style={{
+                      width: `${(segment.layerWatts / point.totalWattsPerGpu) * 100}%`,
+                      ...gpuPoolSwatchStyle(segment.pool, color, dimmed, layers.highlight),
+                    }}
+                  >
+                    {labels && !dimmed && segment.layerWatts / maxTotal >= MIN_LABEL_SHARE
+                      ? watts(segment.layerWatts)
+                      : ''}
+                  </span>
+                );
+              });
             const segments = (labels: boolean) =>
-              rowBands.map((band) => {
+              rowBands.flatMap((band) => {
+                if (band === 'gpu' && poolSegments) return poolSpans(labels);
                 const w = bandWattsPerGpu(point, band);
                 const share = w / maxTotal;
                 return (
@@ -435,30 +574,12 @@ export default function PowerChipCompare({
                     data-testid="power-chip-compare-segment"
                     data-band={band}
                     data-emphasis={powerLayerEmphasis(band, layers.highlight)}
-                    onMouseEnter={(event) => {
-                      layers.hover(bandTarget(band));
-                      setSegmentHover({
-                        x: event.clientX,
-                        y: event.clientY,
-                        label: entry.label,
-                        color,
-                        band,
-                        point,
-                      });
-                    }}
-                    onMouseMove={(event) =>
-                      setSegmentHover(
-                        (prev) => prev && { ...prev, x: event.clientX, y: event.clientY },
-                      )
-                    }
-                    onMouseLeave={() => {
-                      layers.hover(null);
-                      setSegmentHover(null);
-                    }}
+                    {...segmentHoverProps(band)}
                     className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                     style={{
                       width: `${(w / point.totalWattsPerGpu) * 100}%`,
                       ...swatchStyle(band, color, layers.highlight),
+                      ...(unsplit && band === 'gpu' ? { opacity: GPU_POOL_DIMMED_OPACITY } : {}),
                     }}
                   >
                     {labels && share >= MIN_LABEL_SHARE ? watts(w) : ''}
@@ -481,12 +602,15 @@ export default function PowerChipCompare({
                       return;
                     }
                     onSelectKey(entry.key);
-                    track('inference_power_compare_chip_selected', { ...analyticsContext });
+                    track('inference_power_compare_chip_selected', {
+                      ...analyticsContext,
+                    });
                   }}
                   aria-pressed={active}
                   aria-expanded={expanded}
                   data-testid="power-chip-compare-row"
                   data-pinned={pinnedPoint ? 'true' : undefined}
+                  data-role-split={splitByRole ? (poolSegments ? 'split' : 'whole') : undefined}
                   data-layout={compactRows ? 'compact' : undefined}
                   className={cn(
                     compactRows
@@ -508,12 +632,14 @@ export default function PowerChipCompare({
                         {includeFacility
                           ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
                           : ''}
-                        {t.gpuShare(pct(gpuShare))}
+                        {shareLine}
                       </span>
                       <span className="col-span-2 flex h-2 min-w-0 items-stretch overflow-hidden rounded-sm">
                         <span
                           className="flex h-full"
-                          style={{ width: `${(point.totalWattsPerGpu / maxTotal) * 100}%` }}
+                          style={{
+                            width: `${(point.totalWattsPerGpu / maxTotal) * 100}%`,
+                          }}
                         >
                           {segments(false)}
                         </span>
@@ -528,7 +654,9 @@ export default function PowerChipCompare({
                       <span className="flex h-7 min-w-0 items-stretch overflow-hidden rounded-sm">
                         <span
                           className="flex h-full"
-                          style={{ width: `${(point.totalWattsPerGpu / maxTotal) * 100}%` }}
+                          style={{
+                            width: `${(point.totalWattsPerGpu / maxTotal) * 100}%`,
+                          }}
                         >
                           {segments(true)}
                         </span>
@@ -542,7 +670,7 @@ export default function PowerChipCompare({
                           {includeFacility
                             ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
                             : ''}
-                          {t.gpuShare(pct(gpuShare))}
+                          {shareLine}
                         </span>
                       </span>
                     </>
@@ -569,25 +697,32 @@ export default function PowerChipCompare({
         >
           <ChartHoverCardBody
             title={segmentHover.label}
-            subtitle={`${t.bands[segmentHover.band]} · ${
-              MEASURED_POWER_BANDS.has(segmentHover.band) ? t.measured : t.modeled
-            }`}
+            subtitle={`${
+              segmentHover.pool ? t.pools[segmentHover.pool.pool] : t.bands[segmentHover.band]
+            } · ${MEASURED_POWER_BANDS.has(segmentHover.band) ? t.measured : t.modeled}`}
             color={segmentHover.color}
             metrics={[
               {
-                value: watts(bandWattsPerGpu(segmentHover.point, segmentHover.band)),
+                value: watts(
+                  segmentHover.pool?.layerWatts ??
+                    bandWattsPerGpu(segmentHover.point, segmentHover.band),
+                ),
                 label: 'W/GPU',
               },
               {
                 value: pct(
-                  bandWattsPerGpu(segmentHover.point, segmentHover.band) /
+                  (segmentHover.pool?.layerWatts ??
+                    bandWattsPerGpu(segmentHover.point, segmentHover.band)) /
                     segmentHover.point.totalWattsPerGpu,
                 ),
                 label: t.ofTotal,
               },
             ]}
             summary={[
-              ...(hoveredParts.length > 1
+              ...(segmentHover.pool
+                ? [t.poolCount(segmentHover.pool.gpus, watts(segmentHover.pool.watts))]
+                : []),
+              ...(!segmentHover.pool && hoveredParts.length > 1
                 ? hoveredParts.map(
                     (part) => `${t.categories[part.category]} ${watts(part.watts)} W`,
                   )
@@ -612,6 +747,25 @@ export default function PowerChipCompare({
         {outOfRange.length > 0 &&
           ` · ${t.outOfRange(outOfRange.map((entry) => entry.label).join(', '))}`}
       </p>
+      {splitByRole && rows.some((row) => !row.entry.point.disagg) && (
+        <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-unsplit-note">
+          {t.aggregatedNote}
+        </p>
+      )}
+      {splitByRole &&
+        rows.some((row) => row.entry.point.disagg && gpuPoolSegments(row.entry) === null) && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="power-chip-compare-unsplit-note"
+          >
+            {t.noPoolTelemetryNote}
+          </p>
+        )}
+      {splitByRole && (
+        <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-role-note">
+          {t.roleNote}
+        </p>
+      )}
       <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-facility-note">
         {FACILITY_PUE_NOTE[locale]}
       </p>

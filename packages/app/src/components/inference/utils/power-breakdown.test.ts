@@ -11,6 +11,8 @@ import {
   buildPowerBreakdowns,
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
+  gpuPoolSegments,
+  gpuPoolSplit,
   POWER_PART_BEHAVIOUR,
   powerBandOf,
   powerBandsOf,
@@ -451,5 +453,42 @@ describe('buildPowerBreakdownsWithOverlays', () => {
     expect(
       buildPowerBreakdownsWithOverlays([h200, mi355x], undefined).map((entry) => entry.hwKey),
     ).toEqual(['mi355x_sglang', 'h200_sglang']);
+  });
+});
+
+describe('gpuPoolSplit', () => {
+  const disagg = {
+    disagg: true,
+    num_prefill_gpu: 16,
+    num_decode_gpu: 48,
+    measuredPrefillAvgPower: metric(900),
+    measuredDecodeAvgPower: metric(600),
+  };
+
+  it('weights each pool by GPU count × measured W, not by GPU count or W alone', () => {
+    const split = gpuPoolSplit(disagg)!;
+    // 16 × 900 = 14 400 W prefill, 48 × 600 = 28 800 W decode.
+    expect(split.prefill.share).toBeCloseTo(1 / 3);
+    expect(split.decode.share).toBeCloseTo(2 / 3);
+    expect(split.prefill).toMatchObject({ gpus: 16, watts: 900 });
+    expect(split.decode).toMatchObject({ gpus: 48, watts: 600 });
+  });
+
+  it('never splits an aggregated run or one missing a pool, so it is not drawn as 0 W', () => {
+    expect(gpuPoolSplit({ ...disagg, disagg: false })).toBeNull();
+    expect(gpuPoolSplit({ ...disagg, measuredDecodeAvgPower: undefined })).toBeNull();
+    expect(gpuPoolSplit({ ...disagg, num_prefill_gpu: 0 })).toBeNull();
+  });
+
+  it('cuts the GPU layer into pools that stack prefill under decode and sum to the layer', () => {
+    const entry = {
+      point: disagg as unknown as InferenceData,
+      wattsPerGpu: { gpu: 750 } as PowerBreakdownPoint['wattsPerGpu'],
+    };
+    const [prefill, decode] = gpuPoolSegments(entry)!;
+    expect(prefill).toMatchObject({ pool: 'prefill', y0: 0 });
+    expect(prefill.layerWatts).toBeCloseTo(250);
+    expect(decode.y0).toBeCloseTo(250);
+    expect(decode.y1).toBeCloseTo(750);
   });
 });

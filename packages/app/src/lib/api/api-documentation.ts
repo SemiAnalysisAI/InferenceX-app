@@ -3147,8 +3147,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/gpu-metrics-point/stats',
     summary: text('Read power load-swing statistics', '读取功耗负载波动统计'),
     description: text(
-      'Load-swing statistics of the PowerX power trace recorded while one benchmark point ran, from the stored one-second buckets of the per-GPU mean: peak, min, idle floor (P5 before the serving window), window mean, P5/P95, largest 1 s and 5 s change, ramp up/down per second and volatility (std ÷ mean), with the recorded serving window and the count of telemetry gaps that were skipped rather than bridged. One entry per linked power series (a single-node artifact, or one validation window of a sweep bundle). The same function serves the PowerX Over time view. scale=nvl72 multiplies by 72 into kW per rack as an upper bound that assumes every GPU swings together. format=csv returns the per-second trace instead. Every read checks the live telemetry revision; responses are no-store.',
-      '一个基准测试点运行期间记录的 PowerX 功耗曲线的负载波动统计，基于已存的每 GPU 均值一秒桶：峰值、最小值、空闲底线（服务窗口前的 P5）、窗口均值、P5/P95、最大 1 秒与 5 秒变化、每秒上升/下降速率以及波动率（标准差 ÷ 均值），并附记录的服务窗口和被跳过（而非补插）的遥测间断数。每个关联功耗序列（单节点产物，或 sweep bundle 的一个验证窗口）各一条。PowerX 的“随时间变化”视图使用同一函数。scale=nvl72 乘以 72 换算为每机架 kW，是假设全部 GPU 同步波动的上限。format=csv 改为返回逐秒曲线。每次读取都核对实时遥测版本；响应为 no-store。',
+      'Load-swing statistics of the PowerX power trace recorded while one benchmark point ran, from the stored one-second buckets of the per-GPU mean: peak, min, idle floor (P5 before the serving window), window mean, P5/P95, largest 1 s and 5 s change, ramp up/down per second and volatility (std ÷ mean), with the recorded serving window and the count of telemetry gaps that were skipped rather than bridged. One entry per linked power series (a single-node artifact, or one validation window of a sweep bundle). The same function serves the PowerX Over time view. scale=nvl72 multiplies by 72 into kW per rack as an upper bound that assumes every GPU swings together. format=csv returns the per-second trace instead. role=prefill|decode computes the same statistics over only that worker pool’s GPU rows of disaggregated traces (the Over time lane of the PowerX GPU role control); role=split returns one entry per pool. Every read checks the live telemetry revision; responses are no-store.',
+      '一个基准测试点运行期间记录的 PowerX 功耗曲线的负载波动统计，基于已存的每 GPU 均值一秒桶：峰值、最小值、空闲底线（服务窗口前的 P5）、窗口均值、P5/P95、最大 1 秒与 5 秒变化、每秒上升/下降速率以及波动率（标准差 ÷ 均值），并附记录的服务窗口和被跳过（而非补插）的遥测间断数。每个关联功耗序列（单节点产物，或 sweep bundle 的一个验证窗口）各一条。PowerX 的“随时间变化”视图使用同一函数。scale=nvl72 乘以 72 换算为每机架 kW，是假设全部 GPU 同步波动的上限。format=csv 改为返回逐秒曲线。role=prefill|decode 仅对分离式曲线中该工作池的 GPU 行计算同样的统计（即 PowerX GPU 角色控件下“随时间变化”的对应通道）；role=split 为每个池各返回一条。每次读取都核对实时遥测版本；响应为 no-store。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -3183,6 +3183,16 @@ export const apiOperations: readonly ApiOperation[] = [
         { type: 'string', enum: ['gpu', 'nvl72'], default: 'gpu' },
         'gpu',
       ),
+      parameter(
+        'role',
+        'query',
+        false,
+        'enum',
+        'GPU role (PowerX i_role). all: every GPU of the trace. prefill / decode: only that worker pool’s GPU rows (devices[].role), same buckets, window and function. split: one entry per pool. Traces without role pools (aggregated serving: every GPU does both) are skipped; 404 when none has the pool. CSV adds a role column for roles other than all.',
+        'GPU 角色（PowerX i_role）。all：曲线中的全部 GPU。prefill / decode：仅该工作池的 GPU 行（devices[].role），使用同样的数据桶、窗口与函数。split：每个池各一条。没有分池的曲线（聚合部署：每块 GPU 同时承担两者）会被跳过；均无该池时返回 404。非 all 角色的 CSV 增加 role 列。',
+        { type: 'string', enum: ['all', 'prefill', 'decode', 'split'], default: 'all' },
+        'decode',
+      ),
     ],
     responses: [
       success(
@@ -3192,6 +3202,7 @@ export const apiOperations: readonly ApiOperation[] = [
           benchmarkResultId: safePositiveIdSchema,
           apiVersion: { type: 'string', enum: ['v1'] },
           scale: { type: 'string', enum: ['gpu', 'nvl72'] },
+          role: { type: 'string', enum: ['all', 'prefill', 'decode', 'split'] },
           unit: { type: 'string', enum: ['W per GPU', 'kW per NVL72 rack'] },
           gpusPerRack: integerSchema,
           definitions: mapSchema(stringSchema),
@@ -3199,6 +3210,7 @@ export const apiOperations: readonly ApiOperation[] = [
           series: arraySchema(
             objectSchema({
               artifact: stringSchema,
+              role: { type: 'string', enum: ['all', 'prefill', 'decode'] },
               source: nullableStringSchema,
               gpuCount: integerSchema,
               window: {
@@ -3233,6 +3245,7 @@ export const apiOperations: readonly ApiOperation[] = [
           benchmarkResultId: 445805,
           apiVersion: 'v1',
           scale: 'gpu',
+          role: 'all',
           unit: 'W per GPU',
           gpusPerRack: 72,
           definitions: {
@@ -3250,6 +3263,7 @@ export const apiOperations: readonly ApiOperation[] = [
           series: [
             {
               artifact: 'gpu_metrics_dsv4pro_8k1k_fp4_vllm_tp8_c64',
+              role: 'all',
               source: null,
               gpuCount: 8,
               window: { startSeconds: 212, endSeconds: 1407 },
@@ -3286,14 +3300,14 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'id is missing or not a positive safe integer, or format / scale is not an allowed value.',
-        'id 缺失或不是正安全整数，或 format / scale 不是允许的值。',
+        'id is missing or not a positive safe integer, or format / scale / role is not an allowed value.',
+        'id 缺失或不是正安全整数，或 format / scale / role 不是允许的值。',
         PUBLIC_API_ERRORS.idRequired,
       ),
       errorResponse(
         '404',
-        'The point has no linked telemetry or no usable power series.',
-        '该数据点没有关联遥测或没有可用的功耗序列。',
+        'The point has no linked telemetry or no usable power series, or (role other than all) no trace has the requested worker pool.',
+        '该数据点没有关联遥测或没有可用的功耗序列，或（非 all 角色）没有曲线包含所请求的工作池。',
         PUBLIC_API_ERRORS.notFound,
       ),
       errorResponse(

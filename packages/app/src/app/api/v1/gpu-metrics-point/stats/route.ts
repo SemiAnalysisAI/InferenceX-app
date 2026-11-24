@@ -7,7 +7,8 @@ import {
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 import { storedPowerSeries } from '@semianalysisai/inferencex-db/power-series/stored-power-series';
 
-import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
+import type { GpuPowerRole, GpuPowerSeries } from '@/components/gpu-power/power-series';
+import { poolSubsetSeries } from '@/components/inference/utils/powerTimeline';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 import {
@@ -26,6 +27,33 @@ export const dynamic = 'force-dynamic';
 export const LOAD_SWING_SCALES = ['gpu', 'nvl72'] as const;
 export type LoadSwingScale = (typeof LOAD_SWING_SCALES)[number];
 const FORMATS = ['json', 'csv'] as const;
+/**
+ * GPU role of the PowerX control: every GPU (`all`), one worker pool of a disaggregated run,
+ * or both pools as separate rows (`split`).
+ */
+export const LOAD_SWING_ROLES = ['all', 'prefill', 'decode', 'split'] as const;
+export type LoadSwingRole = (typeof LOAD_SWING_ROLES)[number];
+/** Returned as 404 when no trace of the point has the requested worker pool. */
+export const LOAD_SWING_NO_ROLE_POOLS =
+  'No prefill/decode GPU pools in this trace (aggregated serving: every GPU does both)';
+
+type LoadSwingPool = 'all' | GpuPowerRole;
+
+function rolePools(role: LoadSwingRole): readonly LoadSwingPool[] {
+  if (role === 'split') return ['prefill', 'decode'];
+  return [role];
+}
+
+/** The series one role reads: the whole trace, or each pool's GPU rows on their own. */
+function roleSeries(
+  series: GpuPowerSeries,
+  role: LoadSwingRole,
+): { pool: LoadSwingPool; series: GpuPowerSeries }[] {
+  return rolePools(role).flatMap((pool) => {
+    const subset = pool === 'all' ? series : poolSubsetSeries(series, pool);
+    return subset ? [{ pool, series: subset }] : [];
+  });
+}
 
 export const LOAD_SWING_DEFINITIONS = {
   peak_min_delta_ramp: 'whole run, per-GPU mean of each one-second bucket',
@@ -43,6 +71,8 @@ export const LOAD_SWING_CAVEATS = [
 
 export interface LoadSwingSeriesEntry {
   artifact: string;
+  /** GPU pool the row covers: every GPU, or the prefill or decode workers. */
+  role: LoadSwingPool;
   /** Validation window file for bundle sweeps; absent for single-node CSV artifacts. */
   source: string | null;
   gpuCount: number;
@@ -55,6 +85,7 @@ export interface LoadSwingResponse {
   benchmarkResultId: number;
   apiVersion: 'v1';
   scale: LoadSwingScale;
+  role: LoadSwingRole;
   unit: LoadSwingStats['unit'];
   gpusPerRack: number;
   definitions: typeof LOAD_SWING_DEFINITIONS;
@@ -102,31 +133,37 @@ export function buildLoadSwingResponse(
   id: number,
   payload: GpuMetricsPointPayload,
   scale: LoadSwingScale,
+  role: LoadSwingRole = 'all',
 ): LoadSwingResponse | null {
   const series = storedPowerSeries(payload.series);
   const entries: LoadSwingSeriesEntry[] = [];
-  for (const entry of series) {
-    const window = windowForSeries(entry, payload);
-    const stats = loadSwingStatsFromSeries(entry, window?.startMs ?? null, window?.endMs ?? null);
-    if (!stats) continue;
-    entries.push({
-      artifact: entry.artifact,
-      source: entry.source ?? null,
-      gpuCount: entry.gpus.length,
-      window: window
-        ? {
-            startSeconds: (window.startMs - entry.startMs) / 1000,
-            endSeconds: (window.endMs - entry.startMs) / 1000,
-          }
-        : null,
-      stats: scale === 'nvl72' ? scaleLoadSwingStatsToRack(stats) : stats,
-    });
+  for (const full of series) {
+    // The window comes from the whole trace; a pool shares its buckets and audit.
+    const window = windowForSeries(full, payload);
+    for (const { pool, series: entry } of roleSeries(full, role)) {
+      const stats = loadSwingStatsFromSeries(entry, window?.startMs ?? null, window?.endMs ?? null);
+      if (!stats) continue;
+      entries.push({
+        artifact: entry.artifact,
+        role: pool,
+        source: entry.source ?? null,
+        gpuCount: entry.gpus.length,
+        window: window
+          ? {
+              startSeconds: (window.startMs - entry.startMs) / 1000,
+              endSeconds: (window.endMs - entry.startMs) / 1000,
+            }
+          : null,
+        stats: scale === 'nvl72' ? scaleLoadSwingStatsToRack(stats) : stats,
+      });
+    }
   }
   if (entries.length === 0) return null;
   return {
     benchmarkResultId: id,
     apiVersion: 'v1',
     scale,
+    role,
     unit: entries[0].stats.unit,
     gpusPerRack: NVL72_GPUS_PER_RACK,
     definitions: LOAD_SWING_DEFINITIONS,
@@ -138,23 +175,34 @@ export function buildLoadSwingResponse(
 export function buildLoadSwingCsv(
   payload: GpuMetricsPointPayload,
   scale: LoadSwingScale,
+  role: LoadSwingRole = 'all',
 ): Record<string, number | string>[] {
-  return storedPowerSeries(payload.series).flatMap((entry) => {
-    const window = windowForSeries(entry, payload);
-    return loadSwingTraceRows(entry, window?.startMs ?? null, window?.endMs ?? null, scale).map(
-      (row) => ({ artifact: entry.artifact, source: entry.source ?? '', ...row }),
+  return storedPowerSeries(payload.series).flatMap((full) => {
+    const window = windowForSeries(full, payload);
+    return roleSeries(full, role).flatMap(({ pool, series: entry }) =>
+      loadSwingTraceRows(entry, window?.startMs ?? null, window?.endMs ?? null, scale).map(
+        (row) => ({
+          artifact: entry.artifact,
+          source: entry.source ?? '',
+          ...(role === 'all' ? {} : { role: pool }),
+          ...row,
+        }),
+      ),
     );
   });
 }
 
 /**
- * GET /api/v1/gpu-metrics-point/stats?id=N[&format=json|csv][&scale=gpu|nvl72]
+ * GET /api/v1/gpu-metrics-point/stats?id=N[&format=json|csv][&scale=gpu|nvl72][&role=all|prefill|decode|split]
  *
  * Load-swing statistics of the PowerX power trace recorded while one benchmark
  * point ran, computed from the same stored one-second buckets the Over time
  * view draws and with the same `lib/power/load-swing-stats` function, so the
  * dashboard and the API cannot diverge. `format=csv` returns the per-second
- * trace (per-GPU mean) instead. 404 when the point has no linked telemetry.
+ * trace (per-GPU mean) instead. `role=prefill|decode` computes the same statistics over only
+ * that worker pool's GPU rows (the Over time lane of the GPU role control); `split` returns
+ * one row per pool. 404 when the point has no linked telemetry, or no trace carries the
+ * requested pool (aggregated serving).
  */
 export async function GET(request: NextRequest): Promise<Response> {
   const response = await handle(request);
@@ -177,17 +225,28 @@ async function handle(request: NextRequest): Promise<Response> {
   if (!LOAD_SWING_SCALES.includes(scale as LoadSwingScale)) {
     return publicApiError('scale must be gpu or nvl72', 400);
   }
+  const role = params.get('role') ?? 'all';
+  if (!LOAD_SWING_ROLES.includes(role as LoadSwingRole)) {
+    return publicApiError('role must be all, prefill, decode or split', 400);
+  }
+  const notFound = () =>
+    publicApiError(role === 'all' ? PUBLIC_API_ERRORS.notFound : LOAD_SWING_NO_ROLE_POOLS, 404);
   try {
     const revision = await getGpuMetricsPointRevision(await getPayloadDb(id), id);
     const payload = revision === null ? null : await getCachedGpuMetricsForPoint(id, revision);
     if (!payload) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
     if (format === 'csv') {
-      const rows = buildLoadSwingCsv(payload, scale as LoadSwingScale);
-      if (rows.length === 0) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
+      const rows = buildLoadSwingCsv(payload, scale as LoadSwingScale, role as LoadSwingRole);
+      if (rows.length === 0) return notFound();
       return csvResponse(rows);
     }
-    const body = buildLoadSwingResponse(id, payload, scale as LoadSwingScale);
-    if (!body) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
+    const body = buildLoadSwingResponse(
+      id,
+      payload,
+      scale as LoadSwingScale,
+      role as LoadSwingRole,
+    );
+    if (!body) return notFound();
     return cachedJson(request, body);
   } catch (error) {
     console.error('Error computing gpu metrics point load-swing stats:', error);
