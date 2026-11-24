@@ -15,7 +15,7 @@ import { getLogoSrc } from '@/lib/seo/og-assets';
 import { renderComparePngChart } from '@/lib/compare/png-chart';
 
 // Bump when the per-dollar PNG drawing changes, so the hero srcSet URLs change on that deploy.
-export const PER_DOLLAR_PNG_RENDER_REVISION = 1;
+export const PER_DOLLAR_PNG_RENDER_REVISION = 2;
 
 /** What the hero PNG draws for a pair, from the page's own cached pair data. */
 async function perDollarChartRows({ model, a, b }: CompareSlug) {
