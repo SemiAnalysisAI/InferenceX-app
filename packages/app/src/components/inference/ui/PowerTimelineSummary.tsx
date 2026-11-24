@@ -146,21 +146,11 @@ export default function PowerTimelineSummary({
       className: 'w-1/4 align-top',
       spanGroup: true,
       cell: ({ trace }) => {
-        const { point } = trace;
-        const attempt = runAttemptFromUrl(point.run_url);
-        const name = telemetryNameForPoint(point);
+        const name = telemetryNameForPoint(trace.point);
         const source = responses.get(trace.runId)?.source;
         return (
           <>
-            <a
-              href={point.run_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline decoration-dotted"
-            >
-              {`run ${trace.runId}`}
-            </a>
-            {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
+            <TraceRunLink trace={trace} />
             {/* The file name is provenance, not something to read in a table:
                 one truncated line, full name on hover. */}
             <span
@@ -242,6 +232,25 @@ export default function PowerTimelineSummary({
   );
 }
 
+/** The trace's run link, then the attempt when the run was retried. */
+function TraceRunLink({ trace }: { trace: PowerTimelineTrace }) {
+  const t = STRINGS[useLocale()];
+  const attempt = runAttemptFromUrl(trace.point.run_url);
+  return (
+    <>
+      <a
+        href={trace.point.run_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline decoration-dotted"
+      >
+        {`run ${trace.runId}`}
+      </a>
+      {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
+    </>
+  );
+}
+
 interface SummaryRow {
   trace: PowerTimelineTrace;
   summary: ReturnType<typeof summarizeTraceWindow>;
@@ -276,7 +285,6 @@ function PowerTimelineSummaryCards({
       <ul className="space-y-2" data-testid="power-timeline-summary-cards">
         {rows.map(({ trace, summary }) => {
           const { point } = trace;
-          const attempt = runAttemptFromUrl(point.run_url);
           const name = telemetryNameForPoint(point);
           const source = responses.get(trace.runId)?.source;
           const tdp = HW_REGISTRY[point.hwKey.split('_')[0]]?.tdp ?? 0;
@@ -296,15 +304,7 @@ function PowerTimelineSummaryCards({
                 {isOverlay(point) ? ` · ${t.unofficial}` : ''}
               </p>
               <p className="mt-1">
-                <a
-                  href={point.run_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline decoration-dotted"
-                >
-                  {`run ${trace.runId}`}
-                </a>
-                {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
+                <TraceRunLink trace={trace} />
               </p>
               <p className="whitespace-nowrap">
                 {t.window}:{' '}
