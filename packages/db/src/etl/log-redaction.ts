@@ -9,10 +9,16 @@ import { isIPv6 } from 'node:net';
 export const REDACTED = '***REDACTED***';
 
 /**
- * Lookbehind for a token that may follow an ANSI SGR colour code (`\x1b[0m` ends in the word
- * character `m`) or an escaped `\n`, `\r` or `\t` in a repr, as well as a non-word character.
+ * The introducer of an ANSI CSI sequence: the ESC character, or its escaped spelling in a repr
+ * or JSON (`\x1b`, `\u001b`, `\033`), then `[`.
  */
-const AFTER_ESCAPE = String.raw`(?<=\x1b\[[0-9;]{0,16}m|\\[nrt])`;
+const CSI_INTRO = String.raw`(?:\x1b|\\x1b|\\u001b|\\033)\[`;
+/**
+ * Lookbehind for a token that may follow an ANSI CSI sequence (colour `\x1b[0m`, erase `\x1b[2K`,
+ * cursor `\x1b[1A`, all ending in a letter) or an escaped `\n`, `\r` or `\t`, as well as a
+ * non-word character.
+ */
+const AFTER_ESCAPE = String.raw`(?<=${CSI_INTRO}[0-9;?]{0,16}[A-Za-z]|\\[nrt])`;
 const START = String.raw`(?:(?<![A-Za-z0-9_])|${AFTER_ESCAPE})`;
 const startingToken = (body: string, flags = 'gu') => new RegExp(START + body, flags);
 
@@ -27,19 +33,41 @@ const SECRET_PATTERNS = [
   // A JWT: base64url `{"…` header and payload, then a signature (e.g. HF Xet access tokens).
   startingToken(String.raw`eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}`),
 ];
-/** `Authorization: Bearer|Basic|Token <value>`, and a bare `Bearer` with a long token. */
+/** `Authorization: Bearer|Basic|Token <value>`, quoted or JSON-escaped. */
 const AUTHORIZATION = startingToken(
-  String.raw`(?<prefix>(?:authorization["']?[ \t]{0,4}[:=][ \t]{0,4}["']?(?:bearer|basic|token)|bearer(?=[ \t]{1,4}[A-Za-z0-9._~+/-]{20}))[ \t]{1,4})[^\s"',;]{8,}`,
+  String.raw`(?<prefix>authorization\\?["']?[ \t]{0,4}[:=][ \t]{0,4}\\?["']?(?:bearer|basic|token)[ \t]{1,4})[^\s"',;\\]{8,}`,
   'giu',
 );
-/** `HF_TOKEN=…`, `"OPENAI_API_KEY": "…"` and the like; `sanitizeAssignment` skips placeholders. */
-const SECRET_ASSIGNMENT = startingToken(
-  String.raw`(?<prefix>[A-Z][A-Z0-9_]{0,63}_(?:TOKEN|API_?KEY|SECRET(?:_KEY)?|ACCESS_KEY|PASSWORD|PASSWD)["']?[ \t]{0,4}[=:][ \t]{0,4}["']?)(?<value>[^\s"',;}]{8,})`,
+/** A bare `Bearer <value>`; `sanitizeBearer` keeps values that do not look like tokens. */
+const BEARER = startingToken(
+  String.raw`(?<prefix>bearer[ \t]{1,4})(?<value>[A-Za-z0-9._~+/=-]{20,})`,
+  'giu',
 );
-const PLACEHOLDER_VALUE = /^(?:[$<{%*[]|(?:none|null|true|false|unset|changeme|x+|\d+)$)/iu;
-/** `scheme://user:password@`, also JSON-escaped as `https:\/\/user:password@`. */
-const URL_PASSWORD = startingToken(
-  String.raw`(?<userinfo>[A-Za-z][A-Za-z0-9+.-]{0,31}:(?:\/\/|\\\/\\\/)[^\s:/@"',;<>\\]*:)[^\s@/"',;<>]+@`,
+const UPPER_SECRET_KEY = String.raw`(?:TOKEN|API_?KEY|SECRET(?:_KEY)?|ACCESS_KEY|PASSWORD|PASSWD)`;
+const LOWER_SECRET_KEY = String.raw`(?:token|api_?key|secret|secret_key|password|passwd)`;
+/**
+ * `HF_TOKEN=…`, `"OPENAI_API_KEY": "…"`, `\"MY_SECRET_TOKEN\":\"…\"`, lower-case `hf_token=…`,
+ * `api_key: …` and the like; `sanitizeSecretValue` keeps placeholders. The match starts at the key
+ * word and checks the rest of the key with a lookbehind, which keeps the scan cheap.
+ */
+const SECRET_ASSIGNMENT = new RegExp(
+  String.raw`(?:${UPPER_SECRET_KEY}(?<=${START}(?:[A-Z][A-Z0-9_]{0,63}_)?${UPPER_SECRET_KEY})` +
+    String.raw`|${LOWER_SECRET_KEY}(?<=${START}(?:[a-z][a-z0-9]{0,31}_){0,3}${LOWER_SECRET_KEY}))` +
+    String.raw`\\?["']?[ \t]{0,4}[=:][ \t]{0,4}\\?["']?(?<value>[^\s"',;}\\]{8,})`,
+  'gu',
+);
+/** `--hf-token <value>`, `--api-key=<value>` and other command-line secrets. */
+const SECRET_FLAG = startingToken(
+  String.raw`--(?:[a-z0-9]{1,32}-){0,4}(?:token|api-key|secret|password)(?:=|[ \t]{1,4})["']?(?<value>[^\s"',;}\\]{8,})`,
+);
+const PLACEHOLDER_VALUE = /^(?:[$<{%*[]|(?:none|null|true|false|unset|changeme|x+|[\d.]+)$)/iu;
+/**
+ * `scheme://user:password@`, also JSON-escaped as `https:\/\/user:password@`. The match starts at
+ * the `:` and checks the scheme with a lookbehind, so long runs without `://` cost nothing.
+ */
+const URL_PASSWORD = new RegExp(
+  String.raw`(?<=${START}[A-Za-z][A-Za-z0-9+.-]{0,31})(?<userinfo>:(?:\/\/|\\\/\\\/)[^\s:/@"',;<>\\]*:)[^\s@/"',;<>]+@`,
+  'gu',
 );
 const LABEL = String.raw`[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?`;
 /**
@@ -49,12 +77,14 @@ const LABEL = String.raw`[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?`;
  * cut short to look like one. `sanitizeEmail` keeps internal TLDs.
  */
 const EMAIL = new RegExp(
-  String.raw`(?:(?<![A-Za-z0-9._%+\\-])(?<!\x1b\[[0-9;]{0,16})|${AFTER_ESCAPE})(?<!:\/\/)` +
+  String.raw`(?:(?<![A-Za-z0-9._%+\\-])(?<!${CSI_INTRO}[0-9;?]{0,16})|${AFTER_ESCAPE})(?<!:\/\/)` +
     String.raw`[A-Za-z0-9._%+-]{1,64}@${LABEL}(?:\.${LABEL}){0,8}\.[A-Za-z]{2,24}` +
     String.raw`(?![A-Za-z0-9_-]|\.[A-Za-z0-9]|:\S|\()`,
   'gu',
 );
 const INTERNAL_TLD = /\.(?:internal|local|lan|localdomain)$/iu;
+/** Text with no `@` followed by a dotted domain holds no email, so `EMAIL` is skipped. */
+const EMAIL_HINT = /@[A-Za-z0-9-]{1,63}\.[A-Za-z]/u;
 const ORACLE_VCN = new RegExp(
   String.raw`\b(?<host>${LABEL})(?:\.[A-Za-z0-9-]{1,63}){0,8}\.oraclevcn\.com\b`,
   'giu',
@@ -76,9 +106,11 @@ const PIP_SATISFIED = 'Requirement already satisfied:';
 /**
  * The package column before a version column in `pip list`, `conda list` or torch's
  * `[conda]`/`[pip3]` environment dump: a name with `-` or `_` padded by two or more spaces.
+ * `isVersionContext` also requires a lower-case letter and no address-like word in the name, so
+ * aligned key/value lines such as `MASTER_ADDR   203.0.113.7` or `node-a   203.0.113.9` do not pass.
  */
 const PACKAGE_TABLE_ROW =
-  /^(?:\[(?:conda|pip3?)\][ \t]+[A-Za-z0-9][A-Za-z0-9._+-]*[-_][A-Za-z0-9._+-]*[ \t]+|[A-Za-z0-9][A-Za-z0-9._+-]*[-_][A-Za-z0-9._+-]*[ \t]{2,})$/u;
+  /^(?:\[(?:conda|pip3?)\][ \t]+(?<listed>[A-Za-z0-9][A-Za-z0-9._+-]*[-_][A-Za-z0-9._+-]*)[ \t]+|(?<name>[A-Za-z0-9][A-Za-z0-9._+-]*[-_][A-Za-z0-9._+-]*)[ \t]{2,})$/u;
 /** Line rules look this far back, so a huge single-line file costs a bounded slice per match. */
 const LINE_WINDOW = 1024;
 const ADDRESS_KEY = /host|addr|ip|url|uri|endpoint|server|peer|remote|bind|master|node|target/iu;
@@ -121,7 +153,9 @@ function isVersionContext(text: string, start: number, end: number): boolean {
     if (linePrefix(text, start)?.includes(PIP_SATISFIED)) return true;
   } else if ((open === ' ' || open === '\t') && (close === undefined || WHITESPACE.test(close))) {
     const prefix = linePrefix(text, start);
-    if (prefix !== null && PACKAGE_TABLE_ROW.test(prefix)) return true;
+    const row = prefix === null ? null : PACKAGE_TABLE_ROW.exec(prefix);
+    const name = row?.groups?.['listed'] ?? row?.groups?.['name'];
+    if (name !== undefined && /[a-z]/u.test(name) && !ADDRESS_KEY.test(name)) return true;
   }
   if (close !== '"') return false;
   const key = jsonValueKey(text, start);
@@ -149,16 +183,31 @@ function sanitizeIpv6(match: string): string {
   return first >> 13 === 1 ? REDACTED : match;
 }
 
+/** A bare `Bearer` value is a token unless it is a slash path without digits (`src/auth/…`). */
+function sanitizeBearer(match: string, prefix: string, value: string): string {
+  return value.includes('/') && !/\d/u.test(value) ? match : prefix + REDACTED;
+}
+
+/**
+ * Keep placeholders. Lower-case keys and flags also name ordinary settings (`initial-cluster-token`,
+ * `bytes_per_full_token`), so their values count as secrets only when they mix letters and digits.
+ */
+function sanitizeSecretValue(match: string, value: string): string {
+  if (PLACEHOLDER_VALUE.test(value)) return match;
+  if (!/^[A-Z]/u.test(match) && !(/[A-Za-z]/u.test(value) && /\d/u.test(value))) return match;
+  return match.slice(0, match.length - value.length) + REDACTED;
+}
+
 /** Sanitize `text`. The output is a fixed point: sanitizing it again changes nothing. */
 export function redactText(text: string): string {
   let out = text;
   for (const pattern of SECRET_PATTERNS) out = out.replaceAll(pattern, REDACTED);
   out = out.replaceAll(AUTHORIZATION, `$<prefix>${REDACTED}`);
-  out = out.replaceAll(SECRET_ASSIGNMENT, (match: string, prefix: string, value: string) =>
-    PLACEHOLDER_VALUE.test(value) ? match : prefix + REDACTED,
-  );
+  out = out.replaceAll(BEARER, sanitizeBearer);
+  out = out.replaceAll(SECRET_ASSIGNMENT, sanitizeSecretValue);
+  out = out.replaceAll(SECRET_FLAG, sanitizeSecretValue);
   out = out.replaceAll(URL_PASSWORD, `$<userinfo>${REDACTED}@`);
-  if (out.includes('@')) {
+  if (EMAIL_HINT.test(out)) {
     out = out.replaceAll(EMAIL, (match: string) => (INTERNAL_TLD.test(match) ? match : REDACTED));
   }
   if (ORACLE_VCN_HINT.test(out)) out = out.replaceAll(ORACLE_VCN, `$<host>.${REDACTED}`);

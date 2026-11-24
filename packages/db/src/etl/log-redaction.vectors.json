@@ -267,8 +267,8 @@
     },
     {
       "name": "placeholder and numeric assignments kept",
-      "input": "HF_TOKEN=$HF_TOKEN DB_PASSWORD=<your-password> MAX_NUM_BATCHED_TOKEN=16384 SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token hf_token=lowercase-value",
-      "output": "HF_TOKEN=$HF_TOKEN DB_PASSWORD=<your-password> MAX_NUM_BATCHED_TOKEN=16384 SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token hf_token=lowercase-value"
+      "input": "HF_TOKEN=$HF_TOKEN DB_PASSWORD=<your-password> MAX_NUM_BATCHED_TOKEN=16384 SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token hf_token=None",
+      "output": "HF_TOKEN=$HF_TOKEN DB_PASSWORD=<your-password> MAX_NUM_BATCHED_TOKEN=16384 SGLANG_SIMULATE_ACC_TOKEN_MODE: real-draft-token hf_token=None"
     },
     {
       "name": "nvidia api key",
@@ -319,6 +319,66 @@
       "name": "non-ascii text next to an ip and a token",
       "input": "地址198.51.100.7 密钥hf_abcdefghijklmnopqrstuvwxyzABCDEF12",
       "output": "地址***REDACTED*** 密钥***REDACTED***"
+    },
+    {
+      "name": "aligned address key/value lines",
+      "input": "MASTER_ADDR   203.0.113.7\nmq_connect_ip  203.0.113.8\nnode-a    203.0.113.9\nWORKER_PUBLIC_V4   198.51.100.30",
+      "output": "MASTER_ADDR   ***REDACTED***\nmq_connect_ip  ***REDACTED***\nnode-a    ***REDACTED***\nWORKER_PUBLIC_V4   ***REDACTED***"
+    },
+    {
+      "name": "aligned package rows kept",
+      "input": "opencv-python-headless    4.13.0.92\nnvidia-cublas-cu12        12.8.4.1",
+      "output": "opencv-python-headless    4.13.0.92\nnvidia-cublas-cu12        12.8.4.1"
+    },
+    {
+      "name": "public ipv4 after erase-line code",
+      "input": "\u001b[2K198.51.100.7 up",
+      "output": "\u001b[2K***REDACTED*** up"
+    },
+    {
+      "name": "hf token after cursor-up code",
+      "input": "\u001b[1Ahf_abcdefghijklmnopqrstuvwxyzABCDEF12",
+      "output": "\u001b[1A***REDACTED***"
+    },
+    {
+      "name": "escaped ansi codes in a repr",
+      "input": "'\\x1b[0m198.51.100.7' '\\033[1;31m203.0.113.4'",
+      "output": "'\\x1b[0m***REDACTED***' '\\033[1;31m***REDACTED***'"
+    },
+    {
+      "name": "email after escaped unicode ansi code keeps the code",
+      "input": "\"\\u001b[32mjane@example.com\"",
+      "output": "\"\\u001b[32m***REDACTED***\""
+    },
+    {
+      "name": "json-escaped secret assignment",
+      "input": "{\\\"MY_SECRET_TOKEN\\\":\\\"abcdef1234567890\\\"}",
+      "output": "{\\\"MY_SECRET_TOKEN\\\":\\\"***REDACTED***\\\"}"
+    },
+    {
+      "name": "lower-case secret assignments",
+      "input": "hf_token=abcdefgh12345678 api_key: sk_live_abcdefgh1234 my_secret_token=zyxwvut98765",
+      "output": "hf_token=***REDACTED*** api_key: ***REDACTED*** my_secret_token=***REDACTED***"
+    },
+    {
+      "name": "command-line secret flags",
+      "input": "--hf-token abcdefgh12345678 --model x --api-key=abcdefgh12345678",
+      "output": "--hf-token ***REDACTED*** --model x --api-key=***REDACTED***"
+    },
+    {
+      "name": "tokenizer settings and placeholder flags kept",
+      "input": "eos_token=</s> pad_token=<pad> unk_token=[UNK] max_num_batched_tokens=16384 hf_token=None api_key=EMPTY --api-key EMPTY --tokenizer-mode auto --max-num-batched-tokens 8192",
+      "output": "eos_token=</s> pad_token=<pad> unk_token=[UNK] max_num_batched_tokens=16384 hf_token=None api_key=EMPTY --api-key EMPTY --tokenizer-mode auto --max-num-batched-tokens 8192"
+    },
+    {
+      "name": "bearer before a source path kept",
+      "input": "bearer src/auth/middleware/handlers.py",
+      "output": "bearer src/auth/middleware/handlers.py"
+    },
+    {
+      "name": "bearer token with slashes and digits",
+      "input": "Bearer abcdefghijklmnop/qrst1234",
+      "output": "Bearer ***REDACTED***"
     }
   ]
 }
