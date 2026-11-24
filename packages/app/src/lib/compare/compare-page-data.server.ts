@@ -61,7 +61,13 @@ function buildComparePageDerivedData(
   requestedPrecision: string | null,
   fallbackSequence: string | null,
 ): Omit<ComparePageDerivedData, 'initialPairBenchmarkRows'> {
-  const defaults = pickPairDefaults(rows, a, b, fallbackSequence ?? undefined);
+  const defaults = pickPairDefaults(
+    rows,
+    a,
+    b,
+    fallbackSequence ?? undefined,
+    requestedSequence ?? undefined,
+  );
   const sequence = requestedSequence ?? defaults.sequence;
   const precision = requestedPrecision ?? defaults.precision;
   const { defaultTargets, ssrRows, interactivityRange } = computeCompareTableData(
