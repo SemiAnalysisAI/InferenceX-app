@@ -1835,16 +1835,8 @@
     },
     {
       "spec": "cypress/component/powerx-point-details.cy.tsx",
-      "duration": 1199,
+      "duration": 643,
       "tests": [
-        {
-          "title": [
-            "PowerX point details",
-            "opens the full point details in the legend slot when a dot is clicked"
-          ],
-          "duration": 556,
-          "attempts": 1
-        },
         {
           "title": [
             "PowerX point details",
@@ -1856,7 +1848,7 @@
         {
           "title": [
             "PowerX point details",
-            "restores the legend and releases the pinned point when the details close"
+            "keeps the pinned point and its details in the legend slot under Strict Mode until closed"
           ],
           "duration": 361,
           "attempts": 1

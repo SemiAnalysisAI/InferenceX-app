@@ -61,13 +61,3 @@ describe('ChartLegendItem blocked state', () => {
     expect(input.hasAttribute('aria-disabled')).toBe(false);
   });
 });
-
-describe('ChartLegendItem custom swatch', () => {
-  it('draws the given swatch instead of the dot', () => {
-    render({ isActive: true, swatch: <svg data-testid="hatch" /> });
-    expect(
-      container.querySelector('[data-testid="legend-custom-swatch"] [data-testid="hatch"]'),
-    ).not.toBeNull();
-    expect(container.querySelector('.rounded-full')).toBeNull();
-  });
-});

@@ -8,13 +8,6 @@ import { renderHorizontalBars } from '@/lib/d3-chart/layers/horizontal-bars';
 
 const PLOT_WIDTH = 600;
 
-// The shared ChartLegend measures its list; jsdom has no ResizeObserver.
-globalThis.ResizeObserver ??= class {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-} as unknown as typeof ResizeObserver;
-
 interface StubLayer {
   type?: string;
   data?: unknown[];

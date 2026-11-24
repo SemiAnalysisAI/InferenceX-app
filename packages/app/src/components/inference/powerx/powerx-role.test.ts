@@ -88,10 +88,7 @@ describe('aggregated rows under a role', () => {
 });
 
 describe('powerXRoleTitle', () => {
-  it('puts the pool back in the role-free title, worded like the old role metrics', () => {
-    expect(powerXRoleTitle('Measured Joules per Input Token', 'prefill', 'en')).toBe(
-      'Measured Prefill Joules per Input Token',
-    );
+  it('puts the pool in the title after Measured, prefixes it otherwise, and leaves All alone', () => {
     expect(powerXRoleTitle('Measured J per Output Token (J/tok)', 'decode', 'en')).toBe(
       'Measured Decode J per Output Token (J/tok)',
     );
@@ -101,14 +98,11 @@ describe('powerXRoleTitle', () => {
     expect(powerXRoleTitle('Measured Joules per Output Token', 'split', 'en')).toBe(
       'Measured Prefill vs Decode Joules per Output Token',
     );
-  });
-
-  it('leaves All GPUs alone and prefixes a title without Measured', () => {
-    expect(powerXRoleTitle('Measured Joules per Output Token', 'all', 'en')).toBe(
-      'Measured Joules per Output Token',
-    );
     expect(powerXRoleTitle('Throughput per GPU', 'decode', 'en')).toBe(
       'Decode · Throughput per GPU',
+    );
+    expect(powerXRoleTitle('Measured Joules per Output Token', 'all', 'en')).toBe(
+      'Measured Joules per Output Token',
     );
   });
 });

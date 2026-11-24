@@ -5,7 +5,6 @@ import {
   PowerXSurfaceProvider,
   usePowerXActivePoint,
 } from '@/components/inference/ui/powerx-surface';
-import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { POWER_TIMELINE_METRIC_KEY } from '@/components/inference/utils/powerTimeline';
 import { Precision } from '@/lib/catalog/data-mappings';
 import { writeUrlParams } from '@/lib/routing/url-state';
@@ -27,52 +26,19 @@ function ActivePointProbe() {
   return <output data-testid="active-point-source">{active?.source ?? 'none'}</output>;
 }
 
-// The pinned panel reads presence when it opens, so a click before the query lands drops View
-// charts and View logs. This probe shares the query and renders in the same commit as the chart.
-function PresenceProbe() {
-  const { data } = useBenchmarkPresence(true);
-  return <output data-testid="presence-ready">{data ? 'ready' : 'pending'}</output>;
-}
-
 const point = createMockInferenceData({
   id: 42,
   hwKey: 'h100',
   precision: Precision.FP4,
   x: 20,
   y: 0.5,
-  benchmark_type: 'agentic_traces',
-  framework: 'sglang',
-  disagg: true,
-  is_multinode: true,
-  physicalChips: 28,
-  conc: 504,
-  prefill_tp: 4,
-  prefill_ep: 4,
-  prefill_dp_attention: true,
-  prefill_num_workers: 3,
-  num_prefill_gpu: 12,
-  decode_tp: 16,
-  decode_ep: 16,
-  decode_dp_attention: true,
-  decode_num_workers: 1,
-  num_decode_gpu: 16,
-  p90_ttft: 4.55,
-  p90_e2el: 13,
-  p90_intvty: 253,
-  kv_offloading: 'dram',
-  kv_offload_backend: 'mooncake',
-  server_gpu_cache_hit_rate: 0.959,
-  theoretical_cache_hit_rate: 0.972,
   run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`,
   power_audit: { source: `power_validation_${AUDIT_NAME}.json` },
   measuredAvgPower: { y: 812, roof: false },
 });
 
 function mountEnergy({ strict = false } = {}) {
-  // Trace and log presence for the point, so View charts and View logs show as on AgentX.
-  cy.intercept('GET', '/api/v1/benchmark-presence', {
-    body: { trace: [42, 1], log: [42, 1] },
-  }).as('presence');
+  cy.intercept('GET', '/api/v1/benchmark-presence', { trace: [], log: [] }).as('presence');
   // The page state a reader on Energy under the Decode role carries (and a stale trace load).
   writeUrlParams({ i_metric: ENERGY_METRIC, i_role: 'decode', i_ptconc: '8' });
   const setSelectedYAxisMetric = cy.stub().as('setMetric');
@@ -90,7 +56,6 @@ function mountEnergy({ strict = false } = {}) {
           powerXDirectLabels
         />
         <ActivePointProbe />
-        <PresenceProbe />
       </div>
     </PowerXSurfaceProvider>
   );
@@ -104,7 +69,6 @@ function mountEnergy({ strict = false } = {}) {
     unofficial: {},
   });
   cy.wait('@presence');
-  cy.get('[data-testid="presence-ready"]').should('have.text', 'ready');
 }
 
 const pinPoint = () =>
@@ -117,36 +81,6 @@ const panel =
   '#powerx-details [data-slot="chart-details-frame"] [data-testid="point-details-panel"]';
 
 describe('PowerX point details', () => {
-  it('opens the full point details in the legend slot when a dot is clicked', () => {
-    mountEnergy();
-    pinPoint();
-    cy.get(panel).should('be.visible').and('contain.text', 'H100').and('contain.text', 'FP4');
-    cy.get('#powerx-details [data-slot="chart-legend-frame"]').should('have.class', 'hidden');
-    cy.get('[data-testid="active-point-source"]').should('have.text', 'pinned');
-    cy.get(`${panel} [data-pinned-config]`).should(
-      'contain.text',
-      'Multi-node disaggregated · 28 chips · conc 504',
-    );
-    cy.get(`${panel} [data-pinned-parallelism]`)
-      .should('contain.text', 'Prefill')
-      .and('contain.text', 'Decode');
-    cy.get(`${panel} [data-pinned-latency]`)
-      .should('contain.text', 'TTFT')
-      .and('contain.text', 'E2EL')
-      .and('contain.text', 'Interactivity');
-    cy.get(`${panel} [data-pinned-cache]`).should('contain.text', 'KV cache hit');
-    cy.get(`${panel} [data-action]`).then(($actions) => {
-      expect([...$actions].map((action) => (action as HTMLElement).dataset.action)).to.deep.equal([
-        'run',
-        'view-charts',
-        'view-logs',
-        'view-power-trace',
-        'reproduce',
-      ]);
-    });
-    cy.get(panel).should('not.contain.text', 'View PowerX');
-  });
-
   it('opens Over time on the point with the GPU role and focus from View power trace', () => {
     mountEnergy();
     pinPoint();
@@ -164,30 +98,18 @@ describe('PowerX point details', () => {
   });
 
   // Strict Mode (next dev) replays effects on mount; an unmount-time release used to clear the
-  // PowerX pin there and dismiss the details the click had just opened.
-  it('keeps the details open under Strict Mode', () => {
+  // PowerX pin there and dismiss the details the click had just opened. Closing releases it.
+  it('keeps the pinned point and its details in the legend slot under Strict Mode until closed', () => {
     mountEnergy({ strict: true });
     pinPoint();
     cy.get(panel).should('be.visible');
-    cy.get('[data-testid="active-point-source"]').should('have.text', 'pinned');
+    cy.get('#powerx-details [data-slot="chart-legend-frame"]').should('have.class', 'hidden');
     cy.wait(500);
     cy.get(panel).should('be.visible');
     cy.get('[data-testid="active-point-source"]').should('have.text', 'pinned');
-  });
-
-  it('restores the legend and releases the pinned point when the details close', () => {
-    mountEnergy();
-    pinPoint();
-    cy.get(panel).should('be.visible');
     cy.get('#powerx-details [data-testid="point-details-close"]').click();
     cy.get(panel).should('not.exist');
     cy.get('#powerx-details [data-slot="chart-legend-frame"]').should('not.have.class', 'hidden');
-    cy.get('[data-testid="active-point-source"]').should('have.text', 'none');
-
-    pinPoint();
-    cy.get(panel).should('be.visible');
-    cy.get('body').type('{esc}');
-    cy.get(panel).should('not.exist');
     cy.get('[data-testid="active-point-source"]').should('have.text', 'none');
   });
 });

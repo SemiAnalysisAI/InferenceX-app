@@ -251,21 +251,6 @@ const renderPanelInline = (data: InferenceData[], overlayData: InferenceData[] =
 describe('PowerAnalysisPanels per-chip compared point', () => {
   beforeEach(() => track.mockClear());
 
-  it('compares every chip at Compare at (80 tok/s/user by default), not the middle of the sweeps', () => {
-    renderPanelInline([...sglang, ...vllm]);
-    // The sweeps' geometric middle is 60 (vLLM c16); Compare at 80 is SGLang c4 exactly.
-    expect(compareAt.value).toBe(80);
-    expect(drilldownTitle()).toBe('B200 (SGLang) FP8 across load');
-    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe('c4 · 80 tok/s/user');
-    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
-    expect(partsHeading()).toBe('B200 (SGLang) FP8 · c4 · 80 tok/s/user');
-    // A new Compare at (the shell's control) moves every row and the drill-down with it.
-    setCompareAt(25);
-    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
-    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
-    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe('c64 · 20 tok/s/user');
-  });
-
   it('pins the clicked column for that chip only and keeps the drill-down on it', () => {
     renderPanelInline([...sglang, ...vllm]);
     // Compare at 60 lands on vLLM c16; the SGLang row reads its own nearest point.

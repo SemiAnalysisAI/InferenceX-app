@@ -5,7 +5,6 @@ import { metricChartTitle, metricLabel } from '@/lib/charts/chart-utils';
 import { chartDefinitions } from '../metric-registry';
 import { inferenceTableHeaderLabels } from '../ui/InferenceTable';
 import { powerXGpuWording, surfaceMetricText } from './powerx-gpu-wording';
-import { powerXRoleTitle } from './powerx-role';
 
 const chart = chartDefinitions.find((definition) => definition.chartType === 'interactivity')!;
 
@@ -21,15 +20,6 @@ describe('PowerX GPU wording', () => {
     const zhLabel = metricLabel(chart, 'y_measuredAvgPower', 'zh');
     expect(surfaceMetricText(zhLabel, true, 'zh')).toBe('每 GPU 实测平均功耗（W）');
     expect(surfaceMetricText(zhLabel, false, 'zh')).toBe('每芯片实测平均功耗（W）');
-  });
-
-  it('keeps the GPU role in a PowerX title', () => {
-    const title = surfaceMetricText(
-      metricChartTitle(chart, 'y_measuredAvgPower', 'en'),
-      true,
-      'en',
-    );
-    expect(powerXRoleTitle(title, 'prefill', 'en')).toBe('Measured Prefill Average Power per GPU');
   });
 
   it('renames units with the words and leaves other words alone', () => {

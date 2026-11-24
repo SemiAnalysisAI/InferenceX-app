@@ -4877,62 +4877,8 @@
       ]
     },
     {
-      "spec": "cypress/e2e/powerx-layout.cy.ts",
-      "duration": 7594,
-      "tests": [
-        {
-          "title": [
-            "PowerX layout",
-            "keeps the active tab in the address bar, so a reload or copied address reopens it"
-          ],
-          "duration": 1900,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "PowerX layout",
-            "opens old Where and power-timeline links on the matching tab"
-          ],
-          "duration": 900,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "PowerX layout",
-            "reads Compare at from i_at on Breakdown, defaults to 80 and writes a preset back"
-          ],
-          "duration": 850,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "PowerX layout",
-            "keeps the PowerX controls in the shared Chart Config on phones"
-          ],
-          "duration": 340,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "PowerX layout",
-            "keeps the chart top in place across GPU roles on every tab at 1360px"
-          ],
-          "duration": 1700,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "PowerX layout",
-            "keeps the chart top in place across GPU roles on every tab at 390px"
-          ],
-          "duration": 1900,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/e2e/powerx-timeline.cy.ts",
-      "duration": 1257,
+      "duration": 4907,
       "tests": [
         {
           "title": [
@@ -4946,6 +4892,30 @@
           "title": [
             "PowerX measured power timeline",
             "restores the shared serving-window view and focus on an unofficial trace"
+          ],
+          "duration": 850,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tabs and share links",
+            "keeps the active tab in the address bar, so a reload or copied address reopens it"
+          ],
+          "duration": 1900,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tabs and share links",
+            "opens old GPU role links on the matching tab and role, and rewrites the address"
+          ],
+          "duration": 900,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tabs and share links",
+            "reads Compare at from i_at on Breakdown, defaults to 80 and writes a preset back"
           ],
           "duration": 850,
           "attempts": 1

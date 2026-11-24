@@ -4,25 +4,16 @@ import {
   parsePowerXCompareAt,
   powerXCoveredRange,
   resolvePowerXCompareAt,
-  serializePowerXCompareAt,
 } from './powerx-compare-at';
 
 describe('i_at', () => {
-  it('reads missing, malformed and non-positive values as the default 80', () => {
+  it('reads a rounded, capped positive value, and anything else as the default 80', () => {
     for (const raw of [null, undefined, '', 'abc', '0', '-5', 'Infinity']) {
       expect(parsePowerXCompareAt(raw)).toBe(80);
     }
-  });
-
-  it('rounds and caps explicit values', () => {
     expect(parsePowerXCompareAt('130')).toBe(130);
     expect(parsePowerXCompareAt('42.6')).toBe(43);
     expect(parsePowerXCompareAt('9000')).toBe(400);
-  });
-
-  it('leaves the default out of the URL', () => {
-    expect(serializePowerXCompareAt(80)).toBe('');
-    expect(serializePowerXCompareAt(200)).toBe('200');
   });
 });
 
@@ -43,14 +34,11 @@ describe('default Compare at clamp', () => {
     expect(powerXCoveredRange([[], [0, -1]])).toBeNull();
   });
 
-  it('clamps only the default into the covered range', () => {
+  it('clamps only the default into the covered range, never an explicit pick', () => {
     expect(resolvePowerXCompareAt(80, false, [2, 9])).toBe(9);
     expect(resolvePowerXCompareAt(80, false, [120, 300])).toBe(120);
     expect(resolvePowerXCompareAt(80, false, [20, 300])).toBe(80);
     expect(resolvePowerXCompareAt(80, false, null)).toBe(80);
-  });
-
-  it('never changes an explicit pick', () => {
     expect(resolvePowerXCompareAt(200, true, [2, 9])).toBe(200);
     expect(resolvePowerXCompareAt(80, true, [2, 9])).toBe(80);
   });

@@ -216,3 +216,58 @@ describe('PowerX measured power timeline', () => {
     assertShareLinkParams({ i_ptfocus: null, i_ptlines: 'gpu', i_ptwindow: 'window' });
   });
 });
+
+const tab = (value: string) => cy.get(`[data-testid="powerx-tab-${value}"]`);
+const expectTab = (value: string) => tab(value).should('have.attr', 'aria-selected', 'true');
+
+describe('PowerX tabs and share links', () => {
+  beforeEach(() => {
+    cy.viewport(1360, 900);
+  });
+
+  it('keeps the active tab in the address bar, so a reload or copied address reopens it', () => {
+    visitChart('');
+    expectTab('energy');
+    for (const value of ['power', 'breakdown', 'time', 'energy'] as const) {
+      tab(value).click();
+      expectTab(value);
+      // The live address bar follows the tab without a history entry.
+      cy.location('search').should((search) => {
+        const params = new URLSearchParams(search);
+        if (value === 'breakdown') expect(params.get('i_pcompare')).to.eq('breakdown');
+        if (value === 'time') expect(params.get('i_metric')).to.eq('y_measuredPowerTimeline');
+        if (value === 'power') expect(params.get('i_metric')).to.match(/Power|Watts/u);
+        if (value === 'energy') expect(params.get('i_metric')).to.match(/^y_measuredJPer/u);
+      });
+      cy.reload();
+      expectTab(value);
+    }
+  });
+
+  it('opens old GPU role links on the matching tab and role, and rewrites the address', () => {
+    visitChart('&i_metric=y_measuredAvgPower&i_pcompare=roles');
+    expectTab('breakdown');
+    cy.get('[data-testid="powerx-role-split"]').should('have.attr', 'aria-pressed', 'true');
+    cy.location('search').should('contain', 'i_role=split').and('not.contain', 'roles');
+    visitChart('&i_metric=y_measuredDecodeJPerOutputToken');
+    expectTab('energy');
+    cy.get('[data-testid="powerx-role-decode"]').should('have.attr', 'aria-pressed', 'true');
+  });
+
+  it('reads Compare at from i_at on Breakdown, defaults to 80 and writes a preset back', () => {
+    visitChart('');
+    // Compare at only moves the Breakdown bars, so the other tabs leave it out of Chart Config.
+    cy.get('[data-testid="powerx-chart-config"]').should('exist');
+    cy.get('[data-testid="powerx-compare-at"]').should('not.exist');
+    tab('breakdown').click();
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '80');
+    cy.location('search').should('not.contain', 'i_at=');
+    visitChart('&i_pcompare=breakdown&i_at=30');
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '30').click();
+    cy.get('[data-testid="powerx-compare-at-preset-50"]').click();
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '50');
+    cy.location('search').should('contain', 'i_at=50');
+    cy.reload();
+    cy.get('[data-testid="powerx-compare-at"]').should('contain.text', '50');
+  });
+});
