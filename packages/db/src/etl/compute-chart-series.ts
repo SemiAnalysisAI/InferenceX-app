@@ -1,4 +1,5 @@
 import { collectMetricPhases } from './gzip-json-stream';
+import { redactText } from './log-redaction';
 import {
   selectServerMetricsAdapter,
   type MetricSource,
@@ -248,7 +249,8 @@ function engineDiscriminator(
 ): string | null {
   const worker = preferEndpoint ? null : labelOrNull(labels, 'worker_id');
   if (worker) return worker.length > 4 ? worker.slice(-4) : worker;
-  return endpointHostPort(endpointUrl);
+  const hostPort = endpointHostPort(endpointUrl);
+  return hostPort === null ? null : redactText(hostPort);
 }
 
 const MIRROR_MEAN_TOLERANCE = 0.02;
@@ -968,6 +970,9 @@ function buildChartData(
         groupedMetric.series!.push(series);
       }
     }
+    // Sources are grouped by their raw identity; only the served copy is sanitized like stored logs,
+    // and two sources whose ids sanitize alike stay apart as `id#2`, `id#3`…
+    const servedIds = new Set<string>();
     for (const { source, metrics: workerMetrics } of grouped.values()) {
       const sourceSeries = buildChartData(
         workerMetrics,
@@ -975,8 +980,16 @@ function buildChartData(
         false,
         originStartNs ?? startNs,
       ).series;
+      const baseId = redactText(source.id);
+      let id = baseId;
+      for (let n = 2; servedIds.has(id); n++) id = `${baseId}#${n}`;
+      servedIds.add(id);
       metricSources.push({
-        source,
+        source: {
+          ...source,
+          id,
+          endpointUrl: source.endpointUrl === null ? null : redactText(source.endpointUrl),
+        },
         kvCacheUsage: sourceSeries.kvCacheUsage,
         prefixCacheHitRate: sourceSeries.prefixCacheHitRate,
         queueDepth: sourceSeries.queueDepth,
