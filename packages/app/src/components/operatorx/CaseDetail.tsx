@@ -4,7 +4,7 @@ import { ticks } from 'd3';
 import { ChevronRight } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 import {
@@ -274,6 +274,7 @@ function GpuTimeline({
 }) {
   const strings = STRINGS[useLocale()];
   const [hovered, setHovered] = useState<number | null>(null);
+  const lanes = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(() => new Set());
   const colorOf = (name: number) => (timeline ? palette[timeline.categories[name]] : OTHER);
   const event = timeline && hovered !== null ? timeline.events[hovered] : null;
@@ -314,7 +315,13 @@ function GpuTimeline({
       )}
       {timeline ? (
         <>
-          <div className="space-y-1" onMouseLeave={() => setHovered(null)}>
+          {/* Pointer events, so a tapped bar keeps its tooltip: a touch's pointerleave is ignored
+              and a tap outside the lanes dismisses it. */}
+          <div
+            ref={lanes}
+            className="space-y-1"
+            onPointerLeave={(e) => e.pointerType !== 'touch' && setHovered(null)}
+          >
             {timeline.lanes.map((lane, li) => (
               <div key={lane} className="flex items-center">
                 <span className="w-20 shrink-0 truncate pr-2 text-3xs text-muted-foreground">
@@ -331,7 +338,7 @@ function GpuTimeline({
                           width: `max(2px, ${(dur / scaleUs) * 100}%)`,
                           background: colorOf(name),
                         }}
-                        onMouseEnter={() => setHovered(ei)}
+                        onPointerEnter={() => setHovered(ei)}
                       />
                     ) : null,
                   )}
@@ -352,6 +359,9 @@ function GpuTimeline({
                         collisionPadding={10}
                         updatePositionStrategy="always"
                         className={SYMBOL_TOOLTIP}
+                        onPointerDownOutside={(e) =>
+                          lanes.current?.contains(e.target as Node) && e.preventDefault()
+                        }
                       >
                         {timeline.names[event[0]]}
                       </TooltipContent>
@@ -453,11 +463,18 @@ function GpuTimeline({
                       </td>
                     </tr>
                     {open && (
-                      <tr className="border-b border-border/30 last:border-0">
+                      <tr
+                        className="border-b border-border/30 last:border-0"
+                        data-testid="operatorx-kernel-name"
+                      >
+                        {/* One cell per breakpoint: spanning more columns than are visible
+                            would add empty ones and squeeze the narrow table. */}
+                        <td colSpan={4} className="break-all pb-1.5 pl-8 font-mono md:hidden">
+                          {name}
+                        </td>
                         <td
                           colSpan={8}
-                          className="break-all pb-1.5 pl-8 font-mono"
-                          data-testid="operatorx-kernel-name"
+                          className="hidden break-all pb-1.5 pl-8 font-mono md:table-cell"
                         >
                           {name}
                         </td>

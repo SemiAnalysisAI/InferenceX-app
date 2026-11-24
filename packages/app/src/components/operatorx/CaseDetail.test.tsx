@@ -84,6 +84,8 @@ let container: HTMLDivElement;
 const dialog = () => document.querySelector<HTMLElement>('[data-testid="operatorx-case-detail"]')!;
 const toggle = () => dialog().querySelector<HTMLButtonElement>('tbody button')!;
 const tooltip = () => document.querySelector('[role="tooltip"]');
+const pointer = (target: Element, type: string, pointerType: string) =>
+  act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType })));
 
 beforeEach(() => {
   tracked.length = 0;
@@ -151,9 +153,16 @@ describe('CaseDetail kernel names', () => {
   it('expands the full, selectable name when the row is tapped and collapses it again', () => {
     const row = toggle().closest('tr')!;
     act(() => row.lastElementChild!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    const full = dialog().querySelector('[data-testid="operatorx-kernel-name"]');
-    expect(full?.textContent).toBe(LONG);
-    expect(full?.closest('button')).toBeNull();
+    const full = dialog().querySelector<HTMLTableRowElement>(
+      '[data-testid="operatorx-kernel-name"]',
+    )!;
+    // One cell per breakpoint, each spanning exactly the columns visible there.
+    const headers = [...dialog().querySelectorAll('thead th')];
+    expect([...full.cells].map((td) => [td.colSpan, td.textContent])).toEqual([
+      [headers.filter((th) => !th.classList.contains('hidden')).length, LONG],
+      [headers.length, LONG],
+    ]);
+    expect(full.querySelector('button')).toBeNull();
     expect(toggle().getAttribute('aria-expanded')).toBe('true');
 
     act(() => toggle().click());
@@ -165,10 +174,23 @@ describe('CaseDetail kernel names', () => {
     ]);
   });
 
-  it('shows the hovered timeline bar’s full name', async () => {
+  it('shows a timeline bar’s full name on hover, and keeps a tapped one until a tap elsewhere', async () => {
     const bar = dialog().querySelector('[data-testid="operatorx-timeline"] .h-5 > span')!;
-    act(() => bar.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+    pointer(bar, 'pointerover', 'mouse');
     await settle();
     expect(tooltip()?.textContent).toBe(LONG);
+    pointer(bar, 'pointerout', 'mouse');
+    expect(tooltip()).toBeNull();
+
+    // A tap ends with the pointer leaving, which must not hide the name it revealed.
+    pointer(bar, 'pointerover', 'touch');
+    pointer(bar, 'pointerout', 'touch');
+    await settle();
+    expect(tooltip()?.textContent).toBe(LONG);
+    // Pressing a bar does not dismiss it; pressing anywhere else does.
+    pointer(bar, 'pointerdown', 'mouse');
+    expect(tooltip()?.textContent).toBe(LONG);
+    pointer(document.body, 'pointerdown', 'mouse');
+    expect(tooltip()).toBeNull();
   });
 });
