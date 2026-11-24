@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import type { PGlite } from '@electric-sql/pglite';
 import {
   afterAll,
@@ -10,8 +14,13 @@ import {
   mock,
   spyOn,
 } from 'bun:test';
+import type { TransactionSql } from 'postgres';
 
-import { writeTextAsBlocks } from '../etl/server-log-block-writer';
+import {
+  compactStoredServerLogFile,
+  SERVER_LOG_FILE_LOCK_SPACE,
+  writeTextAsBlocks,
+} from '../etl/server-log-block-writer';
 import { readServerLogBlocks } from '../server-log-blocks';
 import {
   backfillLogRedaction,
@@ -29,6 +38,8 @@ const REDACTED =
 
 let db: PGlite;
 let sql: PgliteSql;
+const urlMapDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ix-run-url-map-'));
+const urlMapFile = path.join(urlMapDir, 'private', 'run-urls.jsonl');
 
 beforeAll(async () => {
   db = await migratedPglite();
@@ -38,10 +49,12 @@ beforeAll(async () => {
 afterAll(async () => {
   await sql?.end();
   await db?.close();
+  fs.rmSync(urlMapDir, { recursive: true, force: true });
 });
 
 beforeEach(async () => {
   await db.exec('TRUNCATE workflow_runs, configs, server_logs RESTART IDENTITY CASCADE');
+  fs.rmSync(path.dirname(urlMapFile), { recursive: true, force: true });
 });
 
 function redactStored(file: StoredServerLogFile, write: boolean) {
@@ -74,6 +87,14 @@ async function decodedBlocks(logId: number, fileName: string, length: number) {
     0,
     length,
   );
+}
+
+/** The server-log file advisory locks `tx` holds. */
+function advisoryLocks(tx: TransactionSql) {
+  return tx<{ key: string }[]>`
+    select objid::text as key from pg_locks
+    where locktype = 'advisory' and classid = ${SERVER_LOG_FILE_LOCK_SPACE}::oid
+  `;
 }
 
 async function storedLogs() {
@@ -150,6 +171,54 @@ describe('redactStoredServerLogFile', () => {
     expect(
       await sql`select log_text from server_log_files where file_name = 'results/server.log'`,
     ).toEqual([{ log_text: 'child ***REDACTED***\n' }]);
+  });
+
+  it('rebuilds blocks that a racing compaction built from the raw text', async () => {
+    await sql`update server_log_files set log_text = ${REDACTED}`;
+
+    expect(await redactFile('results/router.log', false, false)).toEqual({
+      changed: true,
+      blockBacked: true,
+    });
+    expect(await redactFile('results/router.log', false, true)).toEqual({
+      changed: true,
+      blockBacked: true,
+    });
+    expect(await decodedBlocks(1, 'results/router.log', REDACTED.length)).toBe(REDACTED);
+    expect(await redactFile('results/router.log', false, true)).toEqual({
+      changed: false,
+      blockBacked: false,
+    });
+  });
+
+  it('holds the file advisory lock that compaction also takes', async () => {
+    const [{ key }] = await sql<{ key: string }[]>`
+      select (hashtext('1/results/router.log')::bigint & 4294967295)::text as key
+    `;
+    const file = {
+      logId: '1',
+      fileName: 'results/router.log',
+      primary: false,
+      shadowed: false,
+      repositories: [],
+    };
+
+    expect(
+      await sql.begin(async (tx) => {
+        await redactStoredServerLogFile(tx, file, true);
+        return advisoryLocks(tx);
+      }),
+    ).toEqual([{ key }]);
+    await db.exec(`DELETE FROM server_log_block_files; DELETE FROM server_log_blocks;`);
+    expect(
+      await sql.begin(async (tx) => {
+        expect(await compactStoredServerLogFile(tx, '1', 'results/router.log', false)).toEqual({
+          chars: REDACTED.length,
+          written: true,
+        });
+        return advisoryLocks(tx);
+      }),
+    ).toEqual([{ key }]);
   });
 });
 
@@ -235,7 +304,7 @@ describe('runs from repositories that are not public', () => {
       },
     ]);
     for (const file of files) await redactStored(file, true);
-    expect(await sanitizeRunUrls(sql, undefined, true)).toBe(1);
+    expect(await sanitizeRunUrls(sql, undefined, true, urlMapFile)).toBe(1);
 
     expect(await stored()).toEqual({
       runs: [
@@ -252,7 +321,7 @@ describe('runs from repositories that are not public', () => {
       files: [
         {
           log_text:
-            'pip install private-repo-tools\n/_work/***REDACTED***/***REDACTED***/router.py\n',
+            'pip install ***REDACTED***-tools\n/_work/***REDACTED***/***REDACTED***/router.py\n',
         },
       ],
     });
@@ -275,8 +344,9 @@ describe('runs from repositories that are not public', () => {
       changed.push(result.changed);
     }
     expect(changed).toEqual([false, true, true]);
-    expect(await sanitizeRunUrls(sql, undefined, false)).toBe(1);
-    expect(await sanitizeRunUrls(sql, 102, true)).toBe(0);
+    expect(await sanitizeRunUrls(sql, undefined, false, urlMapFile)).toBe(1);
+    expect(await sanitizeRunUrls(sql, 102, true, urlMapFile)).toBe(0);
+    expect(fs.existsSync(urlMapFile)).toBe(false);
     expect(await stored()).toEqual(before);
     expect(before.runs).toEqual([
       { github_run_id: 101, html_url: PRIVATE_URL },
@@ -311,7 +381,7 @@ describe('backfillLogRedaction', () => {
   const PRIVATE_SERVER =
     'clone https://github.com/example-org/private-repo\n' +
     'token hf_abcdefghijklmnopqrstuvwxyzABCDEF12 from 203.0.113.5\n';
-  const quiet = { log: () => {}, error: () => {} };
+  const quiet = { log: () => {}, error: () => {}, urlMapFile };
 
   beforeEach(async () => {
     spyOn(globalThis, 'fetch').mockImplementation(githubVisibility);
@@ -369,6 +439,13 @@ describe('backfillLogRedaction', () => {
     ).toEqual({ files: 5, changed: 0, blockBacked: 0, failed: 0, runUrls: 0 });
     expect(await snapshot()).toEqual(once);
 
+    // The cleared URL is recorded once, owner-only, before it is cleared.
+    expect(fs.readFileSync(urlMapFile, 'utf8')).toBe(
+      `${JSON.stringify({ github_run_id: '101', run_attempt: 1, html_url: PRIVATE_URL })}\n`,
+    );
+    expect(fs.statSync(urlMapFile).mode & 0o777).toBe(0o600);
+    expect(fs.statSync(path.dirname(urlMapFile)).mode & 0o777).toBe(0o700);
+
     // Rows other than log text are untouched; run URLs change only for the private run.
     expect(once.configs).toEqual(before.configs);
     expect(once.benchmark_results).toEqual(before.benchmark_results);
@@ -393,7 +470,7 @@ describe('backfillLogRedaction', () => {
       files: [
         {
           log_text:
-            'pip install private-repo-tools\n/_work/***REDACTED***/***REDACTED***/router.py\n',
+            'pip install ***REDACTED***-tools\n/_work/***REDACTED***/***REDACTED***/router.py\n',
         },
         { log_text: 'router up on ***REDACTED***:8000\n' },
       ],
@@ -414,5 +491,38 @@ describe('backfillLogRedaction', () => {
     expect(after.server_logs!.filter((log) => log.id !== 2)).toEqual(
       before.server_logs!.filter((log) => log.id !== 2),
     );
+  });
+
+  it('keeps repository names and run URLs on a downstream database', async () => {
+    const fetchMock = spyOn(globalThis, 'fetch');
+
+    expect(
+      await backfillLogRedaction(sql, {
+        runId: undefined,
+        write: true,
+        concurrency: 1,
+        downstream: true,
+        ...quiet,
+      }),
+    ).toEqual({ files: 5, changed: 3, blockBacked: 2, failed: 0, runUrls: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fs.existsSync(urlMapFile)).toBe(false);
+    expect(await stored()).toEqual({
+      runs: [
+        { github_run_id: 101, html_url: PRIVATE_URL },
+        { github_run_id: 102, html_url: PUBLIC_URL },
+        { github_run_id: 103, html_url: null },
+      ],
+      logs: [
+        {
+          server_log:
+            'clone https://github.com/example-org/private-repo\n' +
+            'token ***REDACTED*** from ***REDACTED***\n',
+        },
+        { server_log: REDACTED },
+        { server_log: 'nothing to hide on 10.0.0.4\n' },
+      ],
+      files: [{ log_text: PRIVATE_CHILD }, { log_text: 'router up on ***REDACTED***:8000\n' }],
+    });
   });
 });

@@ -1,7 +1,38 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 
 import type { ArtifactMeta } from './github-artifacts';
-import { repositoryFromRunUrl, selectBenchmarkArtifacts } from './runtime-metadata-artifacts';
+import {
+  repositoryFromRunUrl,
+  selectBenchmarkArtifacts,
+  storedRunRepository,
+} from './runtime-metadata-artifacts';
+import { stubEnv, unstubAllEnvs } from './test-helpers';
+
+afterEach(() => {
+  unstubAllEnvs();
+});
+
+describe('storedRunRepository', () => {
+  it('reads the repository from the run URL', () => {
+    expect(
+      storedRunRepository({
+        github_run_id: 1,
+        html_url: 'https://github.com/example-org/example-repo/actions/runs/1',
+      }),
+    ).toBe('example-org/example-repo');
+  });
+
+  it('reports a run without a URL instead of guessing INGEST_REPO', () => {
+    stubEnv('INGEST_REPO', 'example-org/public-repo');
+    const error = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(storedRunRepository({ github_run_id: 101, html_url: null })).toBeNull();
+      expect(String(error.mock.calls[0]?.[0])).toContain('run 101: no GitHub run URL');
+    } finally {
+      error.mockRestore();
+    }
+  });
+});
 
 const artifact = (name: string, created_at = '2026-07-16T00:00:00Z'): ArtifactMeta => ({
   name,

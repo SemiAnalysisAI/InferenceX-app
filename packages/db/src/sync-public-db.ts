@@ -17,7 +17,9 @@
  * public backfills of existing rows (e.g. recomputed `aggregate_stats`) do not
  * propagate. Source columns the target schema lacks (newer public migrations)
  * are skipped and reported. Copied server-log text is sanitized as ingest does,
- * and further for runs from repositories that are not public.
+ * and further for runs from repositories that are not public. Those runs are
+ * stored without `html_url`; the URL is first appended to an operator-only JSONL
+ * file (`--url-map <path>`, default under `~/.inferencex/redacted-run-urls/`).
  *
  * Each run commits in its own transaction, so an interrupted sync resumes by
  * rerunning the command.
@@ -59,6 +61,7 @@ import {
   type RunSummary,
   type RunSyncPlan,
 } from './lib/public-db-sync.js';
+import { recordRedactedRunUrls, redactedRunUrlsPath } from './lib/redacted-run-urls.js';
 import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 
 type Row = Record<string, postgres.ParameterOrJSON<never>>;
@@ -120,6 +123,7 @@ const PASSTHROUGH_TYPES = {
 const { limit } = parseLimitForceFlags();
 const dryRun = process.argv.includes('--dry-run');
 const toPublic = process.argv.includes('--to-public');
+const urlMapFile = redactedRunUrlsPath();
 const runIdIndex = process.argv.indexOf('--run-id');
 let runSelectors: RunSelector[] | null = null;
 if (runIdIndex !== -1) {
@@ -880,6 +884,13 @@ async function syncRun(plan: RunSyncPlan, configIds: Map<string, string>): Promi
   const runUrl = sourceRun.html_url;
   const repository = await nonPublicRepository(typeof runUrl === 'string' ? runUrl : null);
   const repositories = repository === null ? [] : [repository];
+  if (repository !== null && !dryRun) {
+    // The target stores no URL for this run, and --to-public deletes the source run afterwards.
+    recordRedactedRunUrls(urlMapFile, [
+      { github_run_id: String(github_run_id), run_attempt, html_url: String(runUrl) },
+    ]);
+    console.log(`  run ${github_run_id}: private repository URL recorded in ${urlMapFile}`);
+  }
 
   // Restore counters on rollback so the summary reports committed rows only.
   const committed = { ...inserted };

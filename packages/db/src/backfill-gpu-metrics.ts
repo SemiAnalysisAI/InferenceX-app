@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
+import { hasNoSslFlag } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
@@ -43,7 +43,7 @@ import {
   collectMissingTelemetryExpectations,
   type GpuMetricsArtifactPair,
 } from './lib/gpu-metrics-backfill.js';
-import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
+import { storedRunRepository } from './lib/runtime-metadata-artifacts.js';
 import {
   gpuMetricsRunCoverage,
   type GpuMetricSeriesCoverageRow,
@@ -355,7 +355,11 @@ async function main(): Promise<void> {
     let failedRuns = 0;
     for (const run of runs) {
       try {
-        const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
+        const repository = storedRunRepository(run);
+        if (repository === null) {
+          failedRuns++;
+          continue;
+        }
         const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
         if (artifacts === null) {
           goneRuns++;
@@ -407,7 +411,11 @@ async function main(): Promise<void> {
 
   for (const [runIndex, run] of runs.entries()) {
     const runId = run.github_run_id;
-    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
+    const repository = storedRunRepository(run);
+    if (repository === null) {
+      runFailures++;
+      continue;
+    }
     const runStart = Date.now();
     const manifest = flags.receipt === null ? null : readReceipt(flags.receipt, run);
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));

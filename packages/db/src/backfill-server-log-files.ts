@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
+import { hasNoSslFlag } from './cli-utils.js';
 import { insertServerLogFilePaths } from './etl/benchmark-ingest.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { listServerLogFilePaths, serverLogArtifactRoot } from './etl/server-log-artifacts.js';
@@ -20,7 +20,7 @@ import {
 } from './lib/backfill-runner.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
 import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
-import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
+import { storedRunRepository } from './lib/runtime-metadata-artifacts.js';
 import { pairServerLogArtifacts } from './lib/server-log-backfill.js';
 
 const RETENTION_DAYS = 90;
@@ -172,7 +172,11 @@ async function main(): Promise<void> {
   let githubRuns = 0;
   for (const [runIndex, run] of runs.entries()) {
     const runId = Number(run.github_run_id);
-    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
+    const repository = storedRunRepository(run);
+    if (repository === null) {
+      runFailures++;
+      continue;
+    }
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `server-log-backfill-${runId}-`));
     try {
       let source: Exclude<ArtifactSource, 'auto'> | null = null;

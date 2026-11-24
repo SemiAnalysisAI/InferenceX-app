@@ -2,16 +2,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
+import { hasNoSslFlag } from './cli-utils.js';
 import { mapBenchmarkRow } from './etl/benchmark-mapper.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { createSkipTracker } from './etl/skip-tracker.js';
 import { downloadArtifact, listRunArtifacts } from './lib/github-artifacts.js';
 import { confirmProceed, runBackfillMain } from './lib/backfill-runner.js';
-import {
-  repositoryFromRunUrl,
-  selectBenchmarkArtifacts,
-} from './lib/runtime-metadata-artifacts.js';
+import { storedRunRepository, selectBenchmarkArtifacts } from './lib/runtime-metadata-artifacts.js';
 
 const FIRST_METADATA_DATE = '2026-07-13';
 const RUNTIME_KEYS = [
@@ -105,7 +102,11 @@ async function main(): Promise<void> {
   // oxlint-disable-next-line no-unreachable-loop -- runs are intentionally processed sequentially
   for (const [index, run] of runs.entries()) {
     const runId = Number(run.github_run_id);
-    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
+    const repository = storedRunRepository(run);
+    if (repository === null) {
+      process.exitCode = 1;
+      continue;
+    }
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `runtime-metadata-${runId}-`));
     try {
       const artifacts = selectBenchmarkArtifacts(listRunArtifacts(repository, String(runId)));
