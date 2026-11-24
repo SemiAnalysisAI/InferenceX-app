@@ -142,6 +142,7 @@ export type HeaderNavHref =
   | '/overview'
   | Extract<DashboardRoute, { key: 'inference' }>['path']
   | '/ubx'
+  | Extract<DashboardRoute, { key: 'operatorx' }>['path']
   | '/about';
 
 export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
@@ -149,6 +150,7 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/overview': '总览',
   [getDashboardRoute('inference').path]: '仪表板',
   '/ubx': 'uBenchX',
+  [getDashboardRoute('operatorx').path]: 'OperatorX',
   [AGENTX_ROUTE.path]: 'AgentX',
   '/about': '关于',
 };
