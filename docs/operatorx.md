@@ -125,14 +125,35 @@ kernel's category comes from the op's own name (`gmm_v2...` is the routed expert
 `router_topk` routing, `all-reduce` reduce), then from the profile's `hlo_category`
 (`convolution fusion` is GEMM; loop fusions, copies and data formatting are elementwise/memory).
 That category is looked up by op name, because timeline events can cut the op text shorter than
-the kernel list does. GPU kernel names keep their rules, so stored timelines are unchanged and
-`TIMELINE_VERSION` stays 4.
+the kernel list does. GPU kernel names keep their rules, so that change left stored timelines
+as they were.
 
 中文：TPU profile 以 HLO 文本命名 XLA 算子（如 `%fusion.3 = bf16[...] fusion(%a, %b)`），因此 kernel
 类别先按算子自身名称判断（`gmm_v2...` 为路由 expert，`router_topk` 为路由，`all-reduce` 为归约），
 再按 profile 中的 `hlo_category` 判断（`convolution fusion` 为 GEMM，loop fusion、拷贝和数据格式转换
 归为逐元素/访存）。时间线事件中的算子文本可能比 kernel 列表截得更短，所以按算子名称查找类别。
-GPU kernel 名称的规则不变，已存储的时间线不受影响，`TIMELINE_VERSION` 仍为 4。
+GPU kernel 名称的规则不变，这项改动没有影响已存储的时间线。
+
+The harness flushes the cache before each profiled replay and removes that flush from the
+profile by the fill kernel `zero_()` launched up to torch 2.14. From torch 2.15 `zero_()` is a
+device memset, which the profiler leaves in: one `Memset (Device)` per call (about 85 us on
+B200 and B300), closing
+the replay. `withoutHarnessFlush` (`packages/db/src/operatorx/timeline.ts`) removes it from the
+kernel list and the timeline and re-times the replay, for any profile that has a memset and
+reports fewer excluded flushes than replays. The comparison's kernel name and the timeline both
+read the repaired profile, so `TIMELINE_VERSION` is 5 and `OPERATORX_COMPARISON_VERSION` is 7.
+Measured latency never included the flush. Two things stay as profiled. Where the op launches
+fill kernels of its own, the profiler removed two of those as the flush. A replay longer than
+the 64 events a timeline keeps still counts the flush in its span.
+
+中文：harness 在每次 profiling 重放前清空缓存，并按 torch 2.14 及更早版本中 `zero_()` 所用的 fill
+kernel 把这次清空从 profile 中剔除。torch 2.15 起 `zero_()` 改用设备端 memset，profiler 无法识别，
+于是每次调用多出一次 `Memset (Device)`（B200 和 B300 上约 85 us），排在重放末尾。`withoutHarnessFlush` 会在 profile
+含 memset 且已剔除的清空次数少于重放次数时，把它从 kernel 列表和时间线中去掉并重新计算重放耗时。
+比较数据中的 kernel 名称和时间线都读取修正后的 profile，因此 `TIMELINE_VERSION` 为 5，
+`OPERATORX_COMPARISON_VERSION` 为 7。实测延迟从不包含这次清空。有两处仍保持 profiling 原样：算子自身
+launch fill kernel 时，profiler 误把其中两个当作清空剔除；重放超过时间线保留的 64 个事件时，span
+仍计入这次清空。
 
 ### Rollout and backfill
 

@@ -95,4 +95,28 @@ describe('OperatorX normalization', () => {
     });
     expect(normalized.run.counts).toMatchObject({ ok: 0, error: 1, missing: 1 });
   });
+
+  it('names the top kernel and times the replay without a leaked harness flush', () => {
+    const raw = bundle();
+    const doc = raw.shards[0].docs[0] as { rows: { metrics: Record<string, unknown> }[] };
+    doc.rows[0].metrics.profile = {
+      iters: 3,
+      span_us: 94,
+      busy_us: 92,
+      gap_us: 2,
+      kernels: [
+        { name: 'Memset (Device)', cat: 'gpu_memset', count_per_call: 1, us_per_call: 84 },
+        { name: 'nvjet_tst', cat: 'kernel', count_per_call: 1, us_per_call: 8 },
+      ],
+      timeline: [
+        { name: 'nvjet_tst', start_us: 0, dur_us: 8 },
+        { name: 'Memset (Device)', start_us: 10, dur_us: 84 },
+      ],
+    };
+
+    expect(normalizeBundle(raw).results[0]).toMatchObject({
+      kernel: 'nvjet_tst',
+      timing: { spanUs: 8, busyUs: 8, gapUs: 0 },
+    });
+  });
 });

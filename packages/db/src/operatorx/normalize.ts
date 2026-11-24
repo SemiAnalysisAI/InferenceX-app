@@ -1,6 +1,7 @@
 import { type OperatorXRawBundle, type OperatorXRunPlan, planFromManifest } from './bundle';
 import { opLabels, usefulFlops } from './describe';
 import { canonicalArgs } from './parallel';
+import { withoutHarnessFlush } from './timeline';
 
 export type OperatorXStatus = 'ok' | 'unsupported' | 'error' | 'missing';
 
@@ -96,7 +97,7 @@ function chosenKernel(metrics: Obj): string | null {
     if (k) return k;
     if (typeof meta.vllm_quant_method === 'string') return meta.vllm_quant_method;
   }
-  const profile = isObj(metrics.profile) ? metrics.profile : null;
+  const profile = isObj(metrics.profile) ? withoutHarnessFlush(metrics.profile) : null;
   const top =
     profile && Array.isArray(profile.kernels) && isObj(profile.kernels[0])
       ? profile.kernels[0]
@@ -105,7 +106,7 @@ function chosenKernel(metrics: Obj): string | null {
 }
 
 function timingShape(metrics: Obj): OperatorXTimingShape | null {
-  const p = isObj(metrics.profile) ? metrics.profile : null;
+  const p = isObj(metrics.profile) ? withoutHarnessFlush(metrics.profile) : null;
   if (!p || num(p.span_us) === null) return null;
   return {
     spanUs: num(p.span_us)!,
