@@ -2,8 +2,11 @@
 import * as d3 from 'd3';
 import { describe, expect, it } from 'bun:test';
 
+import type { ChartLayout } from '@/lib/d3-chart/types';
+import { renderTopAxis, stickTopAxis, unstickTopAxis } from '@/lib/d3-chart/sticky-top-axis';
 import type { EvaluationChartData } from '../types';
 import {
+  drawScoreAxisBreak,
   evaluationChartBlockingState,
   evaluationChartIsInitializing,
   evaluationPointDetails,
@@ -198,5 +201,62 @@ describe('evaluation chart initialization state', () => {
         isEvaluationDataSettled: true,
       }),
     ).toBe(false);
+  });
+});
+
+/** Vertical span a break mark's cover rect takes in its axis group, transform included. */
+const coverSpan = (mark: Element) => {
+  const transform = mark.getAttribute('transform') ?? '';
+  const shift = Number(/translate\([^,]+,(?<y>[^)]+)\)/u.exec(transform)?.groups?.y ?? 0);
+  const rect = mark.querySelector('rect')!;
+  const top = shift + Number(rect.getAttribute('y'));
+  return [top, top + Number(rect.getAttribute('height'))];
+};
+const covers = ([top, bottom]: number[], y: number) => top <= y && y <= bottom;
+const placeSvg = (svgNode: SVGSVGElement, top: number) =>
+  Object.defineProperty(svgNode, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => new DOMRect(0, top, 824, 2102),
+  });
+
+describe('score axis break on the sticky top axis', () => {
+  it('covers the pinned axis line in the gap, and the plot border at rest', () => {
+    const svgNode = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    document.body.append(svgNode);
+    const svg = d3.select(svgNode);
+    const g = svg.append('g');
+    const layout = {
+      svg,
+      g,
+      zoomGroup: g.append('g'),
+      xAxisGroup: g.append('g').attr('class', 'x-axis'),
+      width: 600,
+      height: 2000,
+      margin: { top: 50, right: 24, bottom: 52, left: 200 },
+    } as unknown as ChartLayout;
+    const xScale = d3.scaleLinear().domain([0, 1]).range([0, 600]);
+    renderTopAxis(layout, xScale, { tickCount: 5, tickFormat: String });
+    drawScoreAxisBreak(layout.zoomGroup, xScale, layout.height, [0.1, 0.13]);
+
+    const topMark = svgNode.querySelector('.x-axis-top .evaluation-axis-break-mark')!;
+    const bottomMark = svgNode.querySelector('.x-axis .evaluation-axis-break-mark')!;
+    const edgeY = Number(svgNode.querySelector('.x-axis-top-edge')!.getAttribute('y1'));
+
+    // Scrolled far past the plot top, so the axis is pinned and its edge line is the axis line.
+    placeSvg(svgNode, -800);
+    stickTopAxis(svgNode);
+    expect(covers(coverSpan(topMark), edgeY)).toBe(true);
+    expect(covers(coverSpan(bottomMark), 0)).toBe(true);
+
+    // At rest the top axis shows no line of its own, so the mark sits on the plot's top border.
+    placeSvg(svgNode, 400);
+    stickTopAxis(svgNode);
+    expect(covers(coverSpan(topMark), 0)).toBe(true);
+
+    placeSvg(svgNode, -800);
+    stickTopAxis(svgNode);
+    unstickTopAxis(layout);
+    expect(covers(coverSpan(topMark), 0)).toBe(true);
+    svgNode.remove();
   });
 });

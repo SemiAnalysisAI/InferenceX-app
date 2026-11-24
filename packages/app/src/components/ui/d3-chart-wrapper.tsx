@@ -12,7 +12,8 @@ import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { cn } from '@/lib/shared/utils';
 
 const ZOOM_HINT_SETTLE_MS = 400;
-const HINT_MIN_TOP_MARGIN_PX = 18;
+/** Top margin a chart needs above its plot (or its top axis) to show the zoom hint there. */
+export const HINT_MIN_TOP_MARGIN_PX = 18;
 const HINT_FONT_PX = 11;
 
 const DEFAULT_CHART_INSTRUCTIONS = {
@@ -251,7 +252,10 @@ export function D3ChartWrapper({
       const bounds = svg.getBoundingClientRect();
       const xDomain = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
       const yDomain = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
-      const topMargin = Math.round((yDomain?.top ?? bounds.top) - bounds.top);
+      // The hint sits above a top axis band rather than over its tick labels.
+      const topAxis = svg.querySelector<SVGGElement>('.x-axis-top');
+      const topAxisBand = Number(topAxis?.dataset.bandHeight ?? 0);
+      const topMargin = Math.round((yDomain?.top ?? bounds.top) - bounds.top) - topAxisBand;
       const plotWidth = xDomain?.width ?? bounds.width;
       const next =
         topMargin < HINT_MIN_TOP_MARGIN_PX ||

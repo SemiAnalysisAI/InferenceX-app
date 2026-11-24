@@ -379,6 +379,16 @@ Playback, shading and memes are presentation-only and have no API parameter.
 
 D3 axis domains are computed from only the visible (non-hidden) data points. Using all points (including toggled-off GPUs) would leave large blank areas when most GPUs are hidden, wasting chart space. This means axes rescale when toggling GPUs — intentional behavior that maximizes data density.
 
+## Accuracy Score Axis Break
+
+Accuracy scores cluster near the top of 0 to 1, so the evaluation chart (`evaluationScoreAxis` in `src/components/evaluation/score-axis.ts`) zooms its x-axis to the main cluster of rows. 0 stays in a short compressed stub behind a marked break, a card-coloured gap across the plot with slashes on both x-axes, and the legend notes where the break sits. Failed runs (a score of 0 on a model that otherwise scores 0.96) stay visible in that stub. A score is left behind the break only when the gap below the next score is at least 0.05 and wider than the spread of everything above it, and at most 10% of rows may sit there. When the low scores are no small minority, or the break would not double the resolution, the axis runs on a true scale from 0. The stub still appears when nothing sits in it, as the cue that the axis does not start at 0.
+
+## Sticky Top Axis
+
+Charts with one row per config grow taller than the screen. `renderTopAxis`, `stickTopAxis` and `useStickyTopAxis` in `src/lib/d3-chart/sticky-top-axis.ts` repeat the x-axis above the plot and pin it under the site header while the plot scrolls past. The throughput calculator and evaluation charts use it. Reserve `TOP_AXIS_BAND_PX + 4 + HINT_MIN_TOP_MARGIN_PX` as the top margin so the zoom hint sits above the axis instead of over its tick labels.
+
+At rest the top axis shows no line of its own, so marks on it sit on the plot's top border at y = 0. While it is pinned, a line under its band reads as the axis line. Give a mark that belongs on the axis line (such as the evaluation chart's break slashes) the `TOP_AXIS_LINE_MARK_CLASS` class, and `stickTopAxis` moves it onto that line.
+
 ## Zoom Transform Preservation
 
 When Effect 2 rebuilds the SVG (data shape change), the current zoom transform is saved at the start and re-applied after rebuild. Without this, users would lose their zoom position every time comparison dates are added or overlay data loads.
