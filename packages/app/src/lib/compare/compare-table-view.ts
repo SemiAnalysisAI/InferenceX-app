@@ -16,7 +16,9 @@ export function emptyCompareTableData(): CompareTableData {
 export function fmtCost(v: number): string {
   if (v >= 10) return `$${v.toFixed(1)}`;
   if (v >= 0.1) return `$${v.toFixed(2)}`;
-  return `$${v.toFixed(3)}`;
+  if (v >= 0.001) return `$${v.toFixed(3)}`;
+  // Cache-heavy AgentX runs cost fractions of a tenth of a cent, which three decimals print as $0.000.
+  return `$${v.toPrecision(2)}`;
 }
 
 export function fmtTput(v: number): string {
@@ -34,6 +36,27 @@ function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number }
   return { min, max };
 }
 
+interface InteractivityRange {
+  min: number;
+  max: number;
+}
+
+function overlapOf(a: InteractivityRange, b: InteractivityRange): InteractivityRange | null {
+  const min = Math.max(a.min, b.min);
+  const max = Math.min(a.max, b.max);
+  return min < max ? { min, max } : null;
+}
+
+/** Interactivity span where both sides have measured points, or null when there is none. */
+export function sharedInteractivityRange(
+  pointsA: GPUDataPoint[],
+  pointsB: GPUDataPoint[],
+): InteractivityRange | null {
+  const rangeA = interactivityRangeOf(pointsA);
+  const rangeB = interactivityRangeOf(pointsB);
+  return rangeA && rangeB ? overlapOf(rangeA, rangeB) : null;
+}
+
 /**
  * Default target columns, interpolated cells, and input range for the two sides of a
  * comparison. The server uses it for the default sequence and the client uses it for
@@ -49,12 +72,9 @@ export function compareTableDataFromPoints(
 
   let globalMin: number, globalMax: number;
   if (rangeA && rangeB) {
-    globalMin = Math.max(rangeA.min, rangeB.min);
-    globalMax = Math.min(rangeA.max, rangeB.max);
-    if (globalMin >= globalMax) {
-      globalMin = Math.min(rangeA.min, rangeB.min);
-      globalMax = Math.max(rangeA.max, rangeB.max);
-    }
+    const shared = overlapOf(rangeA, rangeB);
+    globalMin = shared ? shared.min : Math.min(rangeA.min, rangeB.min);
+    globalMax = shared ? shared.max : Math.max(rangeA.max, rangeB.max);
   } else {
     const r = rangeA ?? rangeB!;
     globalMin = r.min;

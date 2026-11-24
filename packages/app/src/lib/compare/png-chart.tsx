@@ -67,7 +67,8 @@ const SHARED_COPY = {
 export function money(value: number): string {
   if (value >= 10) return `$${value.toFixed(1)}`;
   if (value >= 1) return `$${value.toFixed(2)}`;
-  return `$${value.toFixed(3)}`;
+  if (value >= 0.001) return `$${value.toFixed(3)}`;
+  return `$${value.toPrecision(2)}`;
 }
 
 export function decimalsForStep(step: number): number {
