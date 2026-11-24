@@ -123,6 +123,14 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'aria-current', 'page');
   });
 
+  it('highlights OperatorX, and no longer Dashboard, on OperatorX pages', () => {
+    mountHeader('/zh/opx/gemm');
+    cy.get('[data-testid="nav-link-operatorx"]')
+      .should('have.attr', 'href', '/zh/opx')
+      .and('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.attr', 'aria-current');
+  });
+
   it('keeps AgentX in the Chinese navigation tree', () => {
     mountHeader('/zh/infx/agentx');
     cy.get('[data-testid="nav-link-agentx"]')
@@ -144,8 +152,8 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu-toggle"]').should('have.attr', 'aria-label', '导航菜单');
   });
 
-  it('orders the nav as Home, Overview, Dashboard, AgentX, uBenchX, About', () => {
-    const expected = ['Home', 'Overview', 'Dashboard', 'AgentX', 'uBenchX', 'About'];
+  it('orders the nav as Home, Overview, Dashboard, AgentX, uBenchX, OperatorX, About', () => {
+    const expected = ['Home', 'Overview', 'Dashboard', 'AgentX', 'uBenchX', 'OperatorX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
       const labels = [...$links].map((link) => (link.textContent ?? '').replace('New', '').trim());
       expect(labels).to.deep.equal(expected);
@@ -250,7 +258,7 @@ describe('Header', () => {
   });
 
   it('keeps every primary link inside the header at the desktop nav breakpoint', () => {
-    cy.viewport(1120, 720);
+    cy.viewport(1216, 720);
     cy.get('[data-testid="header"]').then(($header) => {
       const header = $header[0];
       const bounds = header.getBoundingClientRect();

@@ -90,11 +90,22 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/zh/pwx')?.key).toBe('powerx');
   });
 
-  it('exposes OperatorX in primary navigation for both locales', () => {
-    expect(getDashboardRoute('operatorx').navGroup).toBe('primary');
+  it('moves OperatorX to the header and resolves it in both locales', () => {
+    expect(getDashboardRoute('operatorx').navGroup).toBe('header');
     expect(dashboardRouteForPathname('/opx')?.key).toBe('operatorx');
     expect(dashboardRouteForPathname('/zh/opx')?.key).toBe('operatorx');
   });
+
+  it.each(['/opx', '/zh/opx', '/opx/gemm'])(
+    'hides the dashboard tab strip on OperatorX, a header tab of its own, at %s',
+    (pathname) => {
+      expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
+        providers: { globalFilters: false, unofficialRuns: false },
+        dashboardNudge: true,
+        tabNav: false,
+      });
+    },
+  );
 
   it('declares the standalone and self-seeded provider capabilities', () => {
     expect(getDashboardRoute('collectivex').providers).toEqual({

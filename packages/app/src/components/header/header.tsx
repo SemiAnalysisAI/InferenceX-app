@@ -30,7 +30,9 @@ import { GitHubStars } from './GithubStars';
 import { InferenceXWordmark } from './inferencex-wordmark';
 import { SiteSearchButton } from './site-search-button';
 
-const DASHBOARD_TABS = DASHBOARD_ROUTES.map((route) => route.path);
+const DASHBOARD_TABS = DASHBOARD_ROUTES.filter((route) => route.navGroup !== 'header').map(
+  (route) => route.path,
+);
 
 interface NavLink {
   href: HeaderNavHref;
@@ -69,6 +71,12 @@ const NAV_LINKS: readonly NavLink[] = [
     label: 'uBenchX',
     testId: 'nav-link-ubenchx',
     event: 'header_ubenchx_clicked',
+  },
+  {
+    href: getDashboardRoute('operatorx').path,
+    label: 'OperatorX',
+    testId: 'nav-link-operatorx',
+    event: 'header_operatorx_clicked',
   },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
@@ -199,7 +207,7 @@ export const Header = () => {
           </Link>
 
           <nav
-            className="hidden min-w-0 items-center gap-1 overflow-hidden min-[1120px]:flex"
+            className="hidden min-w-0 items-center gap-1 overflow-hidden min-[1216px]:flex"
             {...analyticsPlacement('header_desktop')}
           >
             {navLinks.map(({ href, displayHref, label, testId, event }) => (
@@ -243,7 +251,7 @@ export const Header = () => {
             </span>
             <ModeToggle />
 
-            <div ref={menuRef} className="relative min-[1120px]:hidden">
+            <div ref={menuRef} className="relative min-[1216px]:hidden">
               <button
                 type="button"
                 data-testid="mobile-menu-toggle"

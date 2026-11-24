@@ -1,4 +1,4 @@
-export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only';
+export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only' | 'header';
 export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
 
 export interface DashboardProviderCapabilities {
@@ -89,6 +89,13 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
+    tabNav: false,
+  },
+  {
+    path: '/opx',
+    includeChildren: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    dashboardNudge: true,
     tabNav: false,
   },
 ] as const satisfies readonly DashboardShellCapabilityRoute[];
@@ -242,7 +249,7 @@ export const DASHBOARD_ROUTES = [
     path: '/opx',
     canonicalPath: '/opx',
     legacyPath: '/operatorx',
-    navGroup: 'primary',
+    navGroup: 'header',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
