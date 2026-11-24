@@ -41,8 +41,11 @@ type CategoryColors = Record<KernelCategory, string>;
 
 const OTHER = 'var(--muted-foreground)';
 
-/** A full kernel symbol in a tooltip: monospace, wrapped anywhere since symbols have no spaces. */
-const SYMBOL_TOOLTIP = 'break-all font-mono text-xs';
+/**
+ * A full kernel symbol in a tooltip: monospace, wrapped anywhere since symbols have no spaces.
+ * Uncapped height, so a tooltip without room above flips below instead of clipping the symbol.
+ */
+const SYMBOL_TOOLTIP = 'max-h-none break-all font-mono text-xs';
 
 const CATEGORY_COLORS: Record<'light' | 'dark', CategoryColors> = {
   light: {
