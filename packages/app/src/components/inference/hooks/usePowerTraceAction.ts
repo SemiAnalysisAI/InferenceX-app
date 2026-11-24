@@ -12,7 +12,11 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import type { D3ChartHandle } from '@/lib/d3-chart/D3Chart/types';
 
-export function usePowerTraceAction(chartRef: RefObject<D3ChartHandle | null>) {
+/** `eventName` names the analytics event; PowerX passes its own `powerx_` event. */
+export function usePowerTraceAction(
+  chartRef: RefObject<D3ChartHandle | null>,
+  eventName = 'inference_power_trace_opened',
+) {
   const { setSelectedYAxisMetric } = useInferenceActions();
   return useCallback(
     (event: MouseEvent<HTMLElement>, d: InferenceData, overlay: boolean) => {
@@ -25,12 +29,12 @@ export function usePowerTraceAction(chartRef: RefObject<D3ChartHandle | null>) {
       requestPowerTraceFocus(traceKey);
       chartRef.current?.dismissTooltip();
       setSelectedYAxisMetric(POWER_TIMELINE_METRIC_KEY);
-      track('inference_power_trace_opened', {
+      track(eventName, {
         gpu: String(d.hwKey),
         conc: d.conc,
         overlay,
       });
     },
-    [chartRef, setSelectedYAxisMetric],
+    [chartRef, setSelectedYAxisMetric, eventName],
   );
 }

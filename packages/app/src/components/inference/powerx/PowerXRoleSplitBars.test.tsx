@@ -1,8 +1,8 @@
 // @test-environment jsdom
 
 import React, { act } from 'react';
-import { createRoot } from 'react-dom/client';
-import { describe, expect, it, mock } from 'bun:test';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
 
@@ -14,19 +14,31 @@ mock.module('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ runIndexByUrl: { 'https://github.com/o/r/actions/runs/9': 3 } }),
 }));
 
-import PowerXRoleSplitBars from './PowerXRoleSplitBars';
+// Runs the chart's D3 layers on fixed scales.
+mock.module('@/lib/d3-chart/D3Chart', () => import('../ui/d3-chart-test-stub'));
+
+import PowerXRoleSplitBars, { wrapRoleLabel } from './PowerXRoleSplitBars';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const point = (overrides: Partial<InferenceData>) =>
-  ({
+function point(overrides: Partial<InferenceData>): InferenceData {
+  return {
     x: 220,
     y: 1,
     hwKey: 'gb300_dynamo-trt',
+    date: '2026-04-07',
+    tp: 8,
     conc: 16,
     precision: 'fp4',
+    tpPerGpu: { y: 1, roof: false },
+    tpPerMw: { y: 1, roof: false },
+    costh: { y: 1, roof: false },
+    costr: { y: 1, roof: false },
+    costhi: { y: 1, roof: false },
+    costri: { y: 1, roof: false },
     ...overrides,
-  }) as InferenceData;
+  } as InferenceData;
+}
 
 const split = (extra: Partial<InferenceData> = {}) =>
   point({
@@ -39,11 +51,27 @@ const split = (extra: Partial<InferenceData> = {}) =>
     ...extra,
   });
 
+const segment = (group: Element, role: string) =>
+  group.querySelector<SVGRectElement>(
+    `[data-testid="powerx-role-split-segment"][data-role="${role}"]`,
+  )!;
+
+let container: HTMLDivElement;
+let root: Root;
+beforeEach(() => {
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+});
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+});
+
 describe('PowerXRoleSplitBars', () => {
   it('draws prefill + decode per point and lists aggregated chips, dimmed, without a bar', () => {
-    const container = document.createElement('div');
     act(() =>
-      createRoot(container).render(
+      root.render(
         <PowerXRoleSplitBars
           points={[split(), point({ hwKey: 'mi355x_sglang', disagg: false, num_decode_gpu: 0 })]}
           overlayPoints={[split({ run_url: 'https://github.com/o/r/actions/runs/9' })]}
@@ -62,12 +90,23 @@ describe('PowerXRoleSplitBars', () => {
     expect(text).toContain('82% decode');
 
     const groups = container.querySelectorAll('[data-testid="powerx-role-split-group"]');
-    const overlayPrefill = groups[1].querySelector<HTMLElement>('[data-role="prefill"]')!;
-    expect(overlayPrefill.style.borderColor).toBe('var(--overlay-run-3)');
-    expect(overlayPrefill.style.borderStyle).toBe('dashed');
-    expect(groups[1].querySelector<HTMLElement>('[data-role="decode"]')!.style.borderStyle).toBe(
-      'dotted',
+    // The overlay run draws in its own colour; prefill dashed, decode dotted.
+    expect(segment(groups[1], 'prefill').getAttribute('stroke')).toBe('var(--overlay-run-3)');
+    expect(segment(groups[1], 'prefill').getAttribute('stroke-dasharray')).toBe('4 2');
+    expect(segment(groups[1], 'decode').getAttribute('stroke-dasharray')).toBe('1.5 1.5');
+
+    // Each share label starts under its own segment.
+    const decodeShare = rows[0].querySelector('[data-share-role="decode"]')!;
+    expect(Number(decodeShare.getAttribute('x'))).toBeCloseTo(
+      Number(segment(groups[0], 'decode').getAttribute('x')),
     );
+    // The key draws the bars' fills: prefill hatched, decode tinted.
+    const keySwatch = (role: string) =>
+      container
+        .querySelector(`[data-testid="powerx-role-split-key"] svg[data-role="${role}"] rect`)
+        ?.getAttribute('fill');
+    expect(keySwatch('prefill')).toMatch(/^url\(#.+\)$/u);
+    expect(keySwatch('decode')).toContain('color-mix');
 
     const unsplit = container.querySelector('[data-testid="powerx-role-split-unsplit"]')!;
     expect(unsplit.className).toContain('opacity-60');
@@ -75,5 +114,44 @@ describe('PowerXRoleSplitBars', () => {
       'MI355X (SGLang) is listed but not split: it runs aggregated, so every GPU does both prefill and decode.',
     );
     expect(container.textContent).not.toMatch(/\b0 (?:prefill|decode)\b/u);
+  });
+
+  it('fills each bar to its own split, so one 31 J outlier does not shrink the rest', () => {
+    act(() =>
+      root.render(
+        <PowerXRoleSplitBars
+          points={[
+            split(),
+            split({
+              hwKey: 'gb300_dynamo-tilert',
+              reconstructedPrefillJPerOutputToken: { y: 1.68, roof: false },
+              measuredDecodeJPerOutputToken: { y: 30, roof: false },
+              measuredJPerOutputToken: { y: 31.68, roof: false },
+            }),
+          ]}
+        />,
+      ),
+    );
+    const prefill = [
+      ...container.querySelectorAll<SVGRectElement>(
+        '[data-testid="powerx-role-split-segment"][data-role="prefill"]',
+      ),
+    ];
+    expect(prefill).toHaveLength(2);
+    expect(prefill.map((bar) => Math.round(Number(bar.dataset.share)))).toEqual(
+      expect.arrayContaining([18, 5]),
+    );
+  });
+});
+
+describe('wrapRoleLabel', () => {
+  it('wraps a long run label at its " · " instead of cutting it off', () => {
+    const label = '132 tok/s/user / c32 · 16 prefill + 48 decode GPUs';
+    expect(wrapRoleLabel(label, 30, 50, 2)).toEqual([
+      '132 tok/s/user / c32',
+      '16 prefill + 48 decode GPUs',
+    ]);
+    expect(wrapRoleLabel(label, 60, 60, 2)).toEqual([label]);
+    expect(wrapRoleLabel(label, 30, 50, 1)).toEqual(['132 tok/s/user / c32 · 16 pre…']);
   });
 });

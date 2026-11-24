@@ -5,12 +5,18 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { InferenceData } from '@/components/inference/types';
-import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface-provider';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { getDisplayLabel } from '@/lib/shared/utils';
+import {
+  CompareAtProbe,
+  compareAt,
+  resetCompareAt,
+  setCompareAt,
+} from '@/test/powerx-compare-at-probe';
 
 const urlState = {
   params: {} as Record<string, string | undefined>,
@@ -45,10 +51,8 @@ mock.module('@/hooks/useMediaQuery', () => ({
   useIsCoarsePointer: () => media.coarsePointer,
   useIsMobileViewport: () => media.mobile,
 }));
-// The breakdown plot is D3 against a measured layout; jsdom has none, so the chart is a stub.
-mock.module('@/lib/d3-chart/D3Chart', () => ({
-  D3Chart: () => <div data-testid="d3-chart-stub" />,
-}));
+// jsdom has no measured layout; the stub runs the charts' D3 layers on fixed scales.
+mock.module('@/lib/d3-chart/D3Chart', () => import('./d3-chart-test-stub'));
 mock.module('@/components/ui/chart-buttons', () => ({
   ChartButtons: () => <div data-testid="chart-buttons" />,
 }));
@@ -136,8 +140,8 @@ function point(
   } as unknown as InferenceData;
 }
 
-// Two chips whose sweeps overlap: the slider lands at sqrt(30 × 120) = 60, exactly on a
-// vLLM point, and its lowest stop (20 tok/s/user) is exactly an SGLang point.
+// Two chips whose sweeps overlap: Compare at 60 is exactly a vLLM point, and 20 and the
+// default 80 tok/s/user are exactly SGLang points.
 const sglang = [
   point(1, 'b200_sglang', 64, 20, 640),
   point(2, 'b200_sglang', 16, 45, 520),
@@ -170,6 +174,7 @@ const mount = (
   act(() => {
     root.render(
       <PowerXSurfaceProvider>
+        <CompareAtProbe />
         <PowerAnalysisPanels
           data={data}
           overlayData={overlayData}
@@ -196,6 +201,7 @@ beforeEach(() => {
   media.mobile = false;
   unofficial.runIndexByUrl = {};
   unofficial.unofficialRunInfos = [];
+  resetCompareAt();
   mount([...sglang, ...vllm]);
 });
 
@@ -205,35 +211,29 @@ const drilldowns = () => container.querySelectorAll('[data-testid="power-chip-co
 const drilldownTitle = () =>
   container.querySelector('[data-testid="power-chip-compare-drilldown"] h3')?.textContent;
 const expandedRow = () =>
-  container.querySelector<HTMLButtonElement>(
+  container.querySelector<SVGGElement>(
     '[data-testid="power-chip-compare-row"][aria-expanded="true"]',
   );
+// Chip rows are SVG groups (role=button): the full name is on the name text's data-label.
+const cardName = (row: Element) =>
+  row.querySelector<SVGTextElement>('[data-testid="power-chip-compare-name"]')?.dataset.label;
 const rowFor = (title: string) =>
-  [...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]')].find(
-    (row) => title.startsWith(row.querySelector('span span span.truncate')?.textContent ?? '\0'),
+  [...container.querySelectorAll<SVGGElement>('[data-testid="power-chip-compare-row"]')].find(
+    (row) => title.startsWith(cardName(row) ?? '\0'),
   );
-const moveSlider = (step: number) => {
-  const slider = container.querySelector<HTMLInputElement>(
-    '[data-testid="power-chip-compare-target"]',
-  )!;
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
-      slider,
-      String(step),
-    );
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-};
-
+const clickRow = (row: Element) =>
+  act(() => row.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 describe('PowerAnalysisPanels inline drill-down', () => {
-  it('follows the slider to the chip nearest the new interactivity, parts list included', () => {
+  it('follows Compare at to the chip nearest the new interactivity, parts list included', () => {
     const heading = () =>
       container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
+    // The default Compare at, 80 tok/s/user, is SGLang c4; 60 is vLLM c16.
+    expect(heading()).toBe(`${label('b200_sglang')} FP8 · c4 · 80 tok/s/user`);
+    setCompareAt(60);
+    expect(drilldownTitle()).toBe(VLLM_TITLE);
     expect(heading()).toBe(`${label('b200_vllm')} FP8 · c16 · 60 tok/s/user`);
-    moveSlider(0);
-    expect(container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent).toBe(
-      '20 tok/s/user',
-    );
+    setCompareAt(20);
+    expect(compareAt.value).toBe(20);
     expect(drilldowns()).toHaveLength(1);
     expect(drilldownTitle()).toBe(SGLANG_TITLE);
     // The list re-reads the new chip at its c64 point: GPU 640 W, the heaviest row first.
@@ -249,7 +249,7 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('stays collapsed after Collapse until a bar is clicked, even when the slider moves, and a second click closes it', () => {
+  it('stays collapsed after Collapse until a bar is clicked, even when Compare at moves, and a second click closes it', () => {
     act(() =>
       container
         .querySelector<HTMLButtonElement>('[data-testid="power-breakdown-collapse"]')!
@@ -257,29 +257,30 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     );
     expect(drilldowns()).toHaveLength(0);
     expect(expandedRow()).toBeNull();
-    moveSlider(0);
+    setCompareAt(20);
     expect(drilldowns()).toHaveLength(0);
-    act(() => rowFor(VLLM_TITLE)!.click());
+    clickRow(rowFor(VLLM_TITLE)!);
     expect(drilldowns()).toHaveLength(1);
     expect(drilldownTitle()).toBe(VLLM_TITLE);
     // Clicking the open bar closes it again.
-    act(() => rowFor(VLLM_TITLE)!.click());
+    clickRow(rowFor(VLLM_TITLE)!);
     expect(drilldowns()).toHaveLength(0);
   });
 });
 
 const rows = () => [
-  ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
+  ...container.querySelectorAll<SVGGElement>('[data-testid="power-chip-compare-row"]'),
 ];
 const partRows = () => [
   ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-part-row"]'),
 ];
 const partsToggle = () =>
   container.querySelector<HTMLButtonElement>('[data-testid="power-parts-toggle"]');
-const cardName = (row: HTMLElement) => row.querySelector('.truncate')?.textContent;
-const segmentsOf = (row: HTMLElement) => [
-  ...row.querySelectorAll<HTMLElement>('[data-testid="power-chip-compare-segment"]'),
-];
+// Segments sit in the chart's bar layer; data-row names their row's data-key.
+const segmentsOf = (row: SVGElement) =>
+  [
+    ...container.querySelectorAll<SVGRectElement>('[data-testid="power-chip-compare-segment"]'),
+  ].filter((segment) => segment.dataset.row === row.dataset.key);
 
 const phone = (data = [...sglang, ...vllm], overlayData: InferenceData[] = []) => {
   unmount();
@@ -304,16 +305,24 @@ describe('PowerAnalysisPanels on a PowerX phone (compact chip cards, folded part
     expect(cards).toHaveLength(3);
     const card = cards[2];
     expect(card.dataset.layout).toBe('compact');
-    expect(cardName(card)).toContain('phone-rows');
-    expect(card.querySelector('span[aria-hidden]')?.getAttribute('style')).toContain(
-      overlayRunColor(0),
+    // On a phone the label lines sit above a bar that starts at the plot's left edge.
+    const [firstSegment] = segmentsOf(card);
+    const nameY = Number(
+      card.querySelector('[data-testid="power-chip-compare-name"]')?.getAttribute('y'),
     );
+    expect(nameY).toBeLessThan(Number(firstSegment.getAttribute('y')));
+    expect(Number(firstSegment.getAttribute('x'))).toBe(0);
+    expect(cardName(card)).toContain('phone-rows');
+    expect(
+      card.querySelector('[data-testid="power-chip-compare-swatch"]')?.getAttribute('fill'),
+    ).toBe(overlayRunColor(0));
+    expect(segmentsOf(card).length).toBeGreaterThan(0);
     for (const segment of segmentsOf(card)) {
-      expect(segment.getAttribute('style')).toContain('--overlay-run-0');
+      expect(segment.getAttribute('stroke')).toContain('--overlay-run-0');
       expect(segment.textContent).toBe('');
     }
     // Its drill-down lists the run's parts in the run colour, folded like an official chip's.
-    if (card.getAttribute('aria-expanded') !== 'true') act(() => card.click());
+    if (card.getAttribute('aria-expanded') !== 'true') clickRow(card);
     expect(cardName(expandedRow()!)).toContain('phone-rows');
     expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toContain(
       'phone-rows',
@@ -338,7 +347,7 @@ const disaggregated = (p: InferenceData): InferenceData =>
     measuredPrefillAvgPower: metric(971),
     measuredDecodeAvgPower: metric(914),
   }) as InferenceData;
-const poolSegments = (row: HTMLElement) =>
+const poolSegments = (row: SVGElement) =>
   segmentsOf(row).filter((segment) => segment.dataset.pool !== undefined);
 const runRow = (branch: string) => rows().find((row) => cardName(row)?.includes(branch))!;
 
@@ -359,6 +368,8 @@ describe('PowerAnalysisPanels under a GPU role', () => {
     ];
     unmount();
     mount([...sglang.map(disaggregated), ...vllm, ...overlay], overlay, 'decode');
+    // Both overlay runs stop at 50 tok/s/user: compare there, where each has a point.
+    setCompareAt(50);
     const [official, pdRun] = [rowFor(SGLANG_TITLE)!, runRow('pd-run')];
     // Decode keeps the prefill pool on the bar, dimmed; the modeled layers stay whole.
     for (const row of [official, pdRun]) {
@@ -367,7 +378,7 @@ describe('PowerAnalysisPanels under a GPU role', () => {
     }
     expect(segmentsOf(official).filter((s) => s.dataset.band === 'server')).toHaveLength(1);
     for (const segment of poolSegments(pdRun))
-      expect(segment.getAttribute('style')).toContain('--overlay-run-0');
+      expect(segment.getAttribute('stroke')).toContain('--overlay-run-0');
     // Aggregated chips and runs stay listed, never split into 0 W pools.
     for (const row of [rowFor(VLLM_TITLE)!, runRow('agg-run')]) {
       expect(row.dataset.roleSplit).toBe('whole');

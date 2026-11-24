@@ -2,9 +2,10 @@
 
 import * as d3 from 'd3';
 import { useQueries, type UseQueryResult } from '@tanstack/react-query';
-import { ChartNoAxesCombined, ChevronDown, Loader2, TriangleAlert } from 'lucide-react';
+import { ChartNoAxesCombined, Loader2, TriangleAlert } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { getParetoLabel } from '@/components/inference/utils/paretoLabels';
 
 import {
   bucketTimeMs,
@@ -20,8 +21,10 @@ import {
   comparisonEntryLabel,
 } from '@/components/inference/utils/comparisonEntry';
 import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
+import { Button } from '@/components/ui/button';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
-import { CONTROL_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
+import { EmptyState } from '@/components/ui/empty-state';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
@@ -29,6 +32,7 @@ import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
+import { NVL72_GPUS_PER_RACK } from '@/lib/power/load-swing-stats';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { ApiRequestError } from '@/lib/api/api-request-error';
 import { computeToggle } from '@/lib/shared/toggle-set';
@@ -69,6 +73,7 @@ import {
   spreadLabelYs,
   runIdFromUrl,
   traceConfigLabel,
+  traceDistinctions,
   traceKeyRunId,
   traceLanes,
   tracePools,
@@ -165,12 +170,17 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
-    traceKey: 'Trace colours',
+    traceKey: 'Traces',
     laneName: { prefill: 'Prefill workers', decode: 'Decode workers' } satisfies Record<
       'prefill' | 'decode',
       string
     >,
+    laneShort: { prefill: 'Prefill', decode: 'Decode' } satisfies Record<
+      'prefill' | 'decode',
+      string
+    >,
     laneAll: (count: number) => `All ${count} GPU${count === 1 ? '' : 's'}`,
+    gpuTotal: (count: number) => `${count} GPU${count === 1 ? '' : 's'}`,
     aggregated: 'aggregated',
     aggregatedNote: 'Aggregated runs stay dimmed: every GPU does both prefill and decode.',
     lane: 'Lane',
@@ -187,6 +197,11 @@ const STRINGS = {
     precision: 'Precision',
     runDate: 'Run date',
     viewWorkflow: 'View workflow run',
+    rack: `×${NVL72_GPUS_PER_RACK} per NVL72 rack`,
+    rackHelp: `Multiplies the per-GPU figures by ${NVL72_GPUS_PER_RACK} and shows kW per NVL72 rack. Assumes all ${NVL72_GPUS_PER_RACK} GPUs swing together, so it is an upper bound on rack-level swings.`,
+    rackPoolNote: 'Pool lines stay in W: a pool is not a per-GPU figure.',
+    yMeanRack: `Mean power per NVL72 rack (kW, ×${NVL72_GPUS_PER_RACK})`,
+    yGpuRack: `Power per GPU × ${NVL72_GPUS_PER_RACK} (kW)`,
   },
   zh: {
     timeAxis: '时间轴',
@@ -246,12 +261,14 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
-    traceKey: '曲线颜色',
+    traceKey: '曲线',
     laneName: { prefill: '预填充 worker', decode: '解码 worker' } satisfies Record<
       'prefill' | 'decode',
       string
     >,
+    laneShort: { prefill: '预填充', decode: '解码' } satisfies Record<'prefill' | 'decode', string>,
     laneAll: (count: number) => `全部 ${count} 个 GPU`,
+    gpuTotal: (count: number) => `${count} 个 GPU`,
     aggregated: '聚合',
     aggregatedNote: '聚合运行以淡色显示：每个 GPU 同时承担预填充和解码。',
     lane: '分组',
@@ -268,6 +285,11 @@ const STRINGS = {
     precision: '精度',
     runDate: '运行日期',
     viewWorkflow: '查看工作流运行',
+    rack: `×${NVL72_GPUS_PER_RACK}（每 NVL72 机架）`,
+    rackHelp: `将每 GPU 数值乘以 ${NVL72_GPUS_PER_RACK}，以每 NVL72 机架 kW 显示。假设全部 ${NVL72_GPUS_PER_RACK} 颗 GPU 同步波动，因此是机架级波动的上限。`,
+    rackPoolNote: 'GPU 池曲线仍以 W 显示：池功耗不是每 GPU 数值。',
+    yMeanRack: `每 NVL72 机架平均功耗（kW，×${NVL72_GPUS_PER_RACK}）`,
+    yGpuRack: `单 GPU 功耗 × ${NVL72_GPUS_PER_RACK}（kW）`,
   },
 } as const;
 
@@ -365,11 +387,8 @@ export interface PowerTimelineProps {
   runNumbering?: Map<string, number>;
   /** PowerX GPU role: per-GPU mean lanes per worker pool instead of the all-GPU mean. */
   role?: PowerXRole;
-  /**
-   * PowerX insight card, rendered under the caption from the traces the load-swings table
-   * reads (empty while runs are still loading), so its 5 s swing matches the table.
-   */
-  insight?: (traces: readonly PowerTimelineTrace[]) => React.ReactNode;
+  /** Chart height in px (the PowerX plot heights); 600 by default. */
+  height?: number;
 }
 
 type TimelineStrings = (typeof STRINGS)[keyof typeof STRINGS];
@@ -395,45 +414,6 @@ function ToolbarField({
         <span className={labelClass}>{label}</span>
       )}
       {children}
-    </div>
-  );
-}
-
-/** Native select styled like the segmented toggle's phone variant, so all toolbar controls match. */
-function ToolbarSelect({
-  id,
-  testId,
-  value,
-  onChange,
-  className,
-  children,
-}: {
-  id: string;
-  testId: string;
-  value: string;
-  onChange: (value: string) => void;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn('relative min-w-0', className)}>
-      <select
-        id={id}
-        data-testid={testId}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          SELECT_TRIGGER_STYLE,
-          CONTROL_HEIGHT.sm,
-          'w-full appearance-none truncate pr-9 text-foreground',
-        )}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
-      />
     </div>
   );
 }
@@ -499,11 +479,18 @@ function PowerTimelineStatusPanel({
       aria-live="polite"
       aria-busy={status.kind === 'loading'}
     >
-      <div className="flex max-w-xs flex-col items-center gap-2 text-center">
-        {icon}
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-        <p className="text-sm text-muted-foreground">{detail}</p>
-      </div>
+      <EmptyState
+        bare
+        className="max-w-xs"
+        title={
+          <span className="flex flex-col items-center gap-2">
+            {icon}
+            {title}
+          </span>
+        }
+      >
+        {detail}
+      </EmptyState>
     </div>
   );
 }
@@ -578,6 +565,17 @@ function laneLabel(
 ): string {
   if (kind === 'aggregated') return t.aggregated;
   return role === 'all' ? t.laneAll(gpuCount) : t.laneName[role];
+}
+
+/** The lane as a direct label: the GPU and concurrency already lead it, so the pool name is enough. */
+function laneDirectLabel(
+  role: PowerPoolRole,
+  kind: PowerLaneKind,
+  gpuCount: number,
+  t: TimelineStrings,
+): string {
+  if (kind === 'aggregated' || role === 'all') return laneLabel(role, kind, gpuCount, t);
+  return t.laneShort[role];
 }
 
 interface TraceRow {
@@ -903,6 +901,7 @@ function drawLabels(
   plotHeight: number,
   highlight: string | null,
   inGutter: boolean,
+  gutterWidth: number,
 ): void {
   plotGroup.selectAll('text.power-trace-label').remove();
   if (!inGutter) {
@@ -954,7 +953,7 @@ function drawLabels(
           : `M${plotWidth + 2},${y}L${labelX - 3},${y}`,
       );
     item
-      .select('text.power-trace-label')
+      .select<SVGTextElement>('text.power-trace-label')
       .attr('data-hw', label.hwKey)
       .attr('data-pool', label.pool ?? null)
       .attr('data-lane', label.lane ?? null)
@@ -963,8 +962,27 @@ function drawLabels(
       .attr('text-anchor', 'start')
       .attr('x', labelX)
       .attr('y', y)
-      .text(label.text);
+      .attr('data-full-text', label.text)
+      .text(label.text)
+      .each(function () {
+        fitLabelToGutter(this, label.text, gutterWidth - GUTTER_GAP - 2);
+      });
   });
+}
+
+/** The gutter is capped, so a name longer than it ends in an ellipsis instead of leaving the SVG. */
+function fitLabelToGutter(node: SVGTextElement, text: string, room: number): void {
+  if (typeof node.getComputedTextLength !== 'function' || room <= 0) return;
+  if (node.getComputedTextLength() <= room) return;
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    node.textContent = `${text.slice(0, mid).trimEnd()}…`;
+    if (node.getComputedTextLength() <= room) low = mid;
+    else high = mid - 1;
+  }
+  node.textContent = `${text.slice(0, low).trimEnd()}…`;
 }
 
 function drawReferenceLines(
@@ -1015,6 +1033,11 @@ function drawReferenceLines(
   });
 }
 
+/** W per GPU → kW per NVL72 rack (the ×72 per NVL72 rack option). */
+function toRackKw(watts: number): number {
+  return (watts * NVL72_GPUS_PER_RACK) / 1000;
+}
+
 export default function PowerTimeline({
   chartId,
   data,
@@ -1024,7 +1047,7 @@ export default function PowerTimeline({
   comparison = false,
   runNumbering: providedRunNumbering,
   role = 'all',
-  insight,
+  height = CHART_HEIGHT,
 }: PowerTimelineProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -1064,6 +1087,7 @@ export default function PowerTimeline({
   const [windowOnly, setWindowOnly] = useState(initialView.windowOnly);
   const [showUtility, setShowUtility] = useState(initialView.utility);
   const [raw, setRaw] = useState(initialView.raw);
+  const [rack, setRack] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
   const requestedFocusRef = useRequestedPowerTraceFocus();
@@ -1159,8 +1183,10 @@ export default function PowerTimeline({
     (results: UseQueryResult<GpuPowerSeriesResponse, Error>[]) => ({
       loadingRuns: results.filter((query) => query.isPending).length,
       errors: fetchedRequests.flatMap((request, index) => {
-        const error = results[index]?.error;
-        return error instanceof Error ? [{ request, error }] : [];
+        const result = results[index];
+        return result?.error instanceof Error
+          ? [{ request, error: result.error, refetch: result.refetch }]
+          : [];
       }),
       resolved: fetchedRequests.flatMap((request, index) => {
         const response = results[index]?.data;
@@ -1297,14 +1323,19 @@ export default function PowerTimeline({
       ? visibleTraces.filter((trace) => !hasPowerTimelineWindow(trace)).length
       : 0;
 
+  const configOf = useCallback(
+    (point: InferenceData) =>
+      overlayPointSet.has(point)
+        ? overlayData?.hardwareConfig[point.hwKey]
+        : hardwareConfig[point.hwKey],
+    [overlayPointSet, overlayData, hardwareConfig],
+  );
   const hardwareLabel = useCallback(
     (point: InferenceData): string => {
-      const config = overlayPointSet.has(point)
-        ? overlayData?.hardwareConfig[point.hwKey]
-        : hardwareConfig[point.hwKey];
+      const config = configOf(point);
       return config ? getDisplayLabel(config) : point.hwKey;
     },
-    [overlayPointSet, overlayData, hardwareConfig],
+    [configOf],
   );
   const entryLabel = useCallback(
     (point: InferenceData) => comparisonEntryLabel(String(point.date), runNumbering),
@@ -1316,6 +1347,51 @@ export default function PowerTimeline({
         ? `${hardwareLabel(point)} · ${entryLabel(point)}`
         : hardwareLabel(point),
     [comparisonSeriesOf, hardwareLabel, entryLabel],
+  );
+  // The framework the legend shows after the GPU, e.g. "Dynamo SGLang" from "(Dynamo SGLang)".
+  const frameworkOf = useCallback(
+    (point: InferenceData) => configOf(point)?.suffix.replaceAll(/^\(|\)$/gu, ''),
+    [configOf],
+  );
+  // Two drawn traces can share a GPU and concurrency (H200 vLLM at TP8 and TP4), so their labels
+  // add the framework, then the parallelism, then the GPU count, only where those differ.
+  const distinctions = useMemo(
+    () =>
+      traceDistinctions(
+        visibleTraces.map(({ key, point }) => {
+          const base = baseHardware(point.hwKey);
+          const gpus = point.disagg
+            ? (point.num_prefill_gpu ?? 0) + (point.num_decode_gpu ?? 0) || null
+            : (point.num_decode_gpu ?? point.num_prefill_gpu ?? null);
+          return {
+            key,
+            gpu: HW_REGISTRY[base]?.label ?? base,
+            group: `${point.conc}|${comparisonSeriesOf(point) ? point.date : ''}`,
+            framework: frameworkOf(point) ?? point.hwKey,
+            parallelism: getParetoLabel(point),
+            gpus,
+          };
+        }),
+      ),
+    [visibleTraces, comparisonSeriesOf, frameworkOf],
+  );
+  const distinctionParts = useCallback(
+    (trace: PowerTimelineTrace, framework: boolean): string[] => {
+      const parts = distinctions.get(trace.key);
+      if (!parts) return [];
+      return [
+        framework && parts.framework ? (frameworkOf(trace.point) ?? '') : '',
+        parts.parallelism ?? '',
+        parts.gpus === null ? '' : t.gpuTotal(parts.gpus),
+      ].filter(Boolean);
+    },
+    [distinctions, frameworkOf, t],
+  );
+  // Load swings rows name the GPU with its framework already, so they add the rest.
+  const swingLabel = useCallback(
+    (trace: PowerTimelineTrace): string =>
+      [seriesLabel(trace.point), ...distinctionParts(trace, false)].join(' '),
+    [seriesLabel, distinctionParts],
   );
 
   const model = useMemo<DrawModel>(() => {
@@ -1381,7 +1457,7 @@ export default function PowerTimeline({
         const last = anchor?.points.filter((point) => point.y !== null).at(-1);
         if (!last || last.y === null) continue;
         const suffix = group.lane
-          ? ` · ${laneLabel(group.lane.role, group.lane.kind, group.lane.rows.length, t)}`
+          ? ` · ${laneDirectLabel(group.lane.role, group.lane.kind, group.lane.rows.length, t)}`
           : group.pool
             ? ` · ${t.poolShort[group.pool]}`
             : '';
@@ -1393,7 +1469,9 @@ export default function PowerTimeline({
           pool: group.pool,
           lane: group.lane?.kind,
           color,
-          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}c${trace.point.conc}${suffix}`,
+          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}${distinctionParts(trace, true)
+            .map((part) => `${part} `)
+            .join('')}c${trace.point.conc}${suffix}`,
           x: last.x,
           y: last.y,
         });
@@ -1405,6 +1483,7 @@ export default function PowerTimeline({
     colorForTrace,
     comparisonSeriesOf,
     entryLabel,
+    distinctionParts,
     xMode,
     drawMode,
     role,
@@ -1415,8 +1494,8 @@ export default function PowerTimeline({
 
   const margin = useMemo(
     () =>
-      // A phone cannot spare a label gutter: the plot takes the card width and the colour key
-      // above it names the traces.
+      // A phone cannot spare a label gutter: the plot takes the card width and the legend's
+      // trace section names the traces.
       isPhone
         ? { ...MARGIN, right: PHONE_MARGIN_RIGHT }
         : { ...MARGIN, right: powerTimelineGutter(model.labels) },
@@ -1584,6 +1663,7 @@ export default function PowerTimeline({
             ctx.height,
             highlightRef.current,
             !isPhone,
+            margin.right,
           );
         },
         onZoom: (group, ctx: ZoomContext) => {
@@ -1597,11 +1677,12 @@ export default function PowerTimeline({
             ctx.height,
             highlightRef.current,
             !isPhone,
+            margin.right,
           );
         },
       },
     ],
-    [referenceLines, model, samples, isPhone],
+    [referenceLines, model, samples, isPhone, margin.right],
   );
 
   const onDisplayUpdate = useCallback(
@@ -1887,6 +1968,19 @@ export default function PowerTimeline({
       infoTooltip: t.utilityHelp,
     },
   );
+  // PowerX: the ×72 per NVL72 rack scale for the y axis and the load-swings table.
+  if (powerXSurface) {
+    switches.push({
+      id: 'power-timeline-rack',
+      label: t.rack,
+      checked: rack,
+      onCheckedChange: (checked) => {
+        setRack(checked);
+        track('powerx_timeline_rack_toggled', { enabled: checked });
+      },
+      infoTooltip: lineMode === 'pool' ? `${t.rackHelp} ${t.rackPoolNote}` : t.rackHelp,
+    });
+  }
 
   const overlayHwInScope = new Set(overlayPoints.map((point) => String(point.hwKey)));
   const hwFiltered =
@@ -1906,19 +2000,46 @@ export default function PowerTimeline({
     track('inference_power_timeline_filter_reset');
   };
 
+  // A phone has no label gutter, so the legend names each drawn trace in its own section.
+  // Tapping one focuses it; tapping it again shows all.
+  const phoneTraceItems = isPhone
+    ? model.labels.map((label) => ({
+        // One shared first word keeps these in a single group in the grouped (comparison) legend.
+        name: `power-trace-key ${label.id}`,
+        hw: `power-trace-key:${label.id}`,
+        label: label.text,
+        title: t.traceKey,
+        section: t.traceKey,
+        color: label.color,
+        lineDasharray: (label.pool && poolDash(label.pool)) || 'none',
+        forceLineSwatch: true,
+        isActive: !focusedTrace || focusedTrace.key === label.traceKey,
+        isRemovable: false,
+        onClick: () => {
+          const next = focusedTrace?.key === label.traceKey ? null : label.traceKey;
+          setFocusKey(next);
+          track('powerx_timeline_key_focus_toggled', { focused: next !== null });
+        },
+        tooltip: null,
+      }))
+    : [];
+  const traceKeyOf = new Map(
+    model.labels.map((label) => [`power-trace-key:${label.id}`, label.traceKey]),
+  );
+
   const legendElement = (
     <ChartLegend
       variant="sidebar"
       grouped={comparison}
       disableActiveSort={comparison}
-      legendItems={legendItems}
+      legendItems={phoneTraceItems.length > 0 ? [...legendItems, ...phoneTraceItems] : legendItems}
       onItemRemove={(hw) => legendItems.find((item) => item.hw === hw)?.onClick()}
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
         track('latency_legend_expanded', { enabled: expanded });
       }}
-      onItemHover={(id) => setHighlight(id)}
+      onItemHover={(id) => setHighlight(traceKeyOf.get(id) ?? id)}
       onItemHoverEnd={() => setHighlight(null)}
       hideAtomFootnote
       switches={switches}
@@ -1940,45 +2061,50 @@ export default function PowerTimeline({
       data-testid="power-timeline-toolbar"
     >
       <ToolbarField label={t.concurrency} htmlFor={`${chartId}-power-timeline-concurrency`}>
-        <ToolbarSelect
+        <SegmentedToggle<string>
+          variant="select"
           id={`${chartId}-power-timeline-concurrency`}
+          ariaLabel={t.concurrency}
           testId="power-timeline-concurrency"
           value={concurrency === null ? '' : String(concurrency)}
-          onChange={(selected) => {
+          options={[
+            { value: '', label: t.allConcurrencies },
+            ...[
+              ...(concurrency !== null && !concurrencyOptions.includes(concurrency)
+                ? [concurrency]
+                : []),
+              ...concurrencyOptions,
+            ].map((conc) => ({ value: String(conc), label: `c${conc}` })),
+          ]}
+          onValueChange={(selected) => {
             const value = selected === '' ? null : Number(selected);
             setConcurrency(value);
             track('inference_power_timeline_concurrency_changed', { concurrency: value });
           }}
-        >
-          <option value="">{t.allConcurrencies}</option>
-          {concurrency !== null && !concurrencyOptions.includes(concurrency) && (
-            <option value={concurrency}>{`c${concurrency}`}</option>
-          )}
-          {concurrencyOptions.map((conc) => (
-            <option key={conc} value={conc}>{`c${conc}`}</option>
-          ))}
-        </ToolbarSelect>
+        />
       </ToolbarField>
       {visibleTraces.length > 1 && (
         <ToolbarField label={t.highlight} htmlFor={`${chartId}-power-timeline-highlight`}>
-          <ToolbarSelect
+          <SegmentedToggle<string>
+            variant="select"
             id={`${chartId}-power-timeline-highlight`}
+            ariaLabel={t.highlight}
             testId="power-timeline-highlight"
             className="md:max-w-56"
             value={focusedTrace?.key ?? ''}
-            onChange={(selected) => {
+            options={[
+              { value: '', label: t.highlightNone },
+              ...visibleTraces.map((trace) => ({
+                value: trace.key,
+                label: `${seriesLabel(trace.point)} · ${traceConfigLabel(trace.point)}`,
+              })),
+            ]}
+            onValueChange={(selected) => {
               const key = selected === '' ? null : selected;
               setFocusKey(key);
               track('inference_power_timeline_highlight_changed', { highlighted: key !== null });
             }}
-          >
-            <option value="">{t.highlightNone}</option>
-            {visibleTraces.map((trace) => (
-              <option key={trace.key} value={trace.key}>
-                {`${seriesLabel(trace.point)} · ${traceConfigLabel(trace.point)}`}
-              </option>
-            ))}
-          </ToolbarSelect>
+          />
         </ToolbarField>
       )}
       <ToolbarField label={t.timeAxis}>
@@ -2005,7 +2131,7 @@ export default function PowerTimeline({
     </div>
   );
 
-  // The load-swings table and the insight card read the same traces: the focused one, or all.
+  // The load-swings table reads the focused trace, or every drawn one.
   const swingTraces = useMemo(
     () => (loadingRuns > 0 ? [] : focusedTrace ? [focusedTrace] : visibleTraces),
     [loadingRuns, focusedTrace, visibleTraces],
@@ -2014,10 +2140,12 @@ export default function PowerTimeline({
     <PowerLoadSwings
       traces={swingTraces}
       colorOf={(trace) => colorForTrace(trace).color}
-      labelOf={seriesLabel}
+      labelOf={swingLabel}
       role={role}
+      rack={rack}
     />
   );
+  const rackAxis = powerXSurface && rack && drawMode !== 'pool';
 
   const status = powerTimelineStatus({
     loadingRuns,
@@ -2042,10 +2170,10 @@ export default function PowerTimeline({
       data-status={status?.kind ?? 'ready'}
     >
       <D3Chart<TimelineSample>
-        key={`${chartId}-${xMode}-${drawMode}-${role}-${windowOnly}`}
+        key={`${chartId}-${xMode}-${drawMode}-${role}-${windowOnly}-${rackAxis}`}
         chartId={chartId}
         data={samples}
-        height={CHART_HEIGHT}
+        height={height}
         margin={margin}
         watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
         testId="power-timeline-chart-svg"
@@ -2070,8 +2198,26 @@ export default function PowerTimeline({
           tickFormat: xTickFormat,
         }}
         yAxis={{
-          label: drawMode === 'pool' ? t.yPool : drawMode === 'gpu' ? t.yGpu : t.yMean,
+          label: rackAxis
+            ? drawMode === 'gpu'
+              ? t.yGpuRack
+              : t.yMeanRack
+            : drawMode === 'pool'
+              ? t.yPool
+              : drawMode === 'gpu'
+                ? t.yGpu
+                : t.yMean,
           tickCount: 8,
+          // ×72 per NVL72 rack: the data stays in W per GPU; ticks fall on round kW.
+          ...(rackAxis && {
+            tickValues: (scale) => {
+              const [low, high] = (scale as AnyContinuousScale).domain();
+              return d3
+                .ticks(toRackKw(low), toRackKw(high), 8)
+                .map((kw) => (kw * 1000) / NVL72_GPUS_PER_RACK);
+            },
+            tickFormat: (value) => d3.format('~g')(Number(toRackKw(Number(value)).toPrecision(6))),
+          }),
         }}
         layers={layers}
         displayIdentity={activeHighlight ?? ''}
@@ -2105,45 +2251,14 @@ export default function PowerTimeline({
         caption={
           <>
             {caption}
-            {insight?.(swingTraces)}
             {toolbar}
-            {!isPhone && loadSwings}
-            {isPhone && model.labels.length > 0 && (
-              <ul
-                className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs"
-                aria-label={t.traceKey}
-                data-testid="power-timeline-key"
-              >
-                {model.labels.map((label) => (
-                  <li
-                    key={label.id}
-                    className="flex items-center gap-1.5 font-medium whitespace-nowrap"
-                    style={{ opacity: labelOpacity(label, activeHighlight) }}
-                    data-hw={label.hwKey}
-                  >
-                    <svg aria-hidden="true" width="14" height="6" className="shrink-0">
-                      <line
-                        x1="0"
-                        x2="14"
-                        y1="3"
-                        y2="3"
-                        stroke={label.color}
-                        strokeWidth="3"
-                        strokeDasharray={(label.pool && poolDash(label.pool)) || undefined}
-                      />
-                    </svg>
-                    {label.text}
-                  </li>
-                ))}
-              </ul>
-            )}
           </>
         }
         noDataOverlay={status ? <PowerTimelineStatusPanel status={status} t={t} /> : undefined}
       />
+      {/* The load swings follow the chart on every screen so the plot stays near the top. */}
+      {loadSwings}
       {powerXSurface && <PowerLoadSwingsCaveat />}
-      {/* On phones the per-trace stat cards follow the chart so the plot stays near the top. */}
-      {isPhone && loadSwings}
       <div
         className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
         data-testid="power-timeline-status"
@@ -2158,9 +2273,11 @@ export default function PowerTimeline({
                 `${seriesLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
               )}
             </span>
-            <button
+            <Button
               type="button"
-              className="underline decoration-dotted hover:text-foreground"
+              variant="link"
+              size="2xs"
+              className="h-auto px-0"
               data-testid="power-timeline-focus-clear"
               onClick={() => {
                 setFocusKey(null);
@@ -2168,16 +2285,20 @@ export default function PowerTimeline({
               }}
             >
               {t.showAll}
-            </button>
+            </Button>
           </p>
         )}
         {focusKey && !focusedTrace && loadingRuns === 0 && (
           <p data-testid="power-timeline-focus-missing">{t.missingFocus}</p>
         )}
-        {errors.map(({ request, error }) => (
-          <p key={request.runId} className="text-destructive" role="alert">
-            {t.loadError(request.runId, error.message)}
-          </p>
+        {errors.map(({ request, error, refetch }) => (
+          <RetryableQueryError
+            key={request.runId}
+            message={t.loadError(request.runId, error.message)}
+            analyticsEvent="powerx_timeline_run_retry_clicked"
+            onRetry={refetch}
+            testId="power-timeline-load-error"
+          />
         ))}
         {droppedRuns > 0 && <p>{t.droppedRuns(droppedRuns)}</p>}
         {hasAggregatedLane && <p data-testid="power-timeline-aggregated">{t.aggregatedNote}</p>}

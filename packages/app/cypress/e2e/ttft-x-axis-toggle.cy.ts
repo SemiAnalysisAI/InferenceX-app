@@ -613,11 +613,12 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
     expectInteractivity();
     cy.get('[data-testid="powerx-tab-energy"]').click();
     cy.contains('[data-testid="powerx-energy-per"] button', 'Input').click();
-    // The legacy prefill metric opened on the Prefill GPU role, which Energy keeps.
+    // The legacy prefill metric opened on the Prefill GPU role, which Energy keeps, and the
+    // title names the pool the chart draws.
     cy.get('[data-testid="powerx-role-prefill"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
-      'Measured Joules per Input Token',
+      'Measured Prefill Joules per Input Token',
     );
     expectInteractivity();
 

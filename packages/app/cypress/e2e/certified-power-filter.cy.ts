@@ -99,7 +99,7 @@ function visitCertifiedPowerChart(
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
-const MEASURED_POWER_TITLE = 'Measured Average Power per Chip';
+const MEASURED_POWER_TITLE = 'Measured Average Power per GPU';
 const TOKENS_PER_DOLLAR_TITLE = 'Total Tokens per $1 TCO';
 
 const assertChartTitle = (title: string) => {

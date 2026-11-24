@@ -10,11 +10,13 @@ import {
   useSetPowerXCompareTarget,
 } from './powerx-surface';
 import { usePowerLayerHighlight } from './power-layer-highlight';
-import { LAYER_STROKE_OPACITY, layerStyle } from './power-layer-style';
+import { joinHatchPatterns, LAYER_STROKE_OPACITY, layerStyle } from './power-layer-style';
 import PowerBreakdownReadout, { type PowerBreakdownReadoutSource } from './PowerBreakdownReadout';
 import PowerPartsList from './PowerPartsList';
 
+import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import {
   Select,
@@ -41,6 +43,7 @@ import {
   SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_MODEL_REVISION,
 } from '@/lib/power/system-power-categories';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
@@ -57,12 +60,10 @@ import {
   GPU_POOL_DASH,
   GPU_POOL_DIMMED_OPACITY,
   gpuPoolSegments,
-  HATCH_ANGLE,
   isHatchedBand,
   MEASURED_POWER_BANDS,
   nearestBreakdownPoint,
   POWER_BAND_OPACITY,
-  powerBandFillOpacity,
   powerBandsOf,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
@@ -81,7 +82,7 @@ import {
 } from '../utils/power-breakdown';
 import { powerXRolePools, type PowerXRole } from '../powerx/powerx-role';
 
-type PowerBreakdownView = 'bars' | 'area';
+export type PowerBreakdownView = 'bars' | 'area';
 
 const STRINGS = {
   en: {
@@ -105,10 +106,10 @@ const STRINGS = {
     graceModeled: 'Grace sockets are modeled (no validated socket telemetry).',
     clickToCompare: (label: string) => `Click to compare at ${label}`,
     comparedHere: 'Compared here',
-    compareAt: (x: string) => `Compare chips at ${x} tok/s/user`,
-    sliderAt: (x: string) => `Slider ${x} tok/s/user`,
-    sliderAbove: (x: string) => `Slider ${x} tok/s/user →`,
-    sliderBelow: (x: string) => `← Slider ${x} tok/s/user`,
+    compareAt: (x: string) => `Compare GPUs at ${x} tok/s/user`,
+    sliderAt: (x: string) => `Compare at ${x} tok/s/user`,
+    sliderAbove: (x: string) => `Compare at ${x} tok/s/user →`,
+    sliderBelow: (x: string) => `← Compare at ${x} tok/s/user`,
     note: (revision: string) =>
       `Power model revision ${revision}. Every part is the deployment's share divided by its allocated GPUs, so the stack equals the chart's All in Measured W/GPU. TDP and All in Provisioned are rated references, not measurements.`,
     empty:
@@ -159,10 +160,10 @@ const STRINGS = {
     graceModeled: 'Grace 插槽功耗为建模值（无有效插槽遥测）。',
     clickToCompare: (label: string) => `点击以在 ${label} 处对比`,
     comparedHere: '当前对比点',
-    compareAt: (x: string) => `在 ${x} tok/s/user 处对比各芯片`,
-    sliderAt: (x: string) => `滑块 ${x} tok/s/user`,
-    sliderAbove: (x: string) => `滑块 ${x} tok/s/user →`,
-    sliderBelow: (x: string) => `← 滑块 ${x} tok/s/user`,
+    compareAt: (x: string) => `在 ${x} tok/s/user 处对比各 GPU`,
+    sliderAt: (x: string) => `对比点 ${x} tok/s/user`,
+    sliderAbove: (x: string) => `对比点 ${x} tok/s/user →`,
+    sliderBelow: (x: string) => `← 对比点 ${x} tok/s/user`,
     note: (revision: string) =>
       `功耗模型版本 ${revision}。各部分均为部署分摊值除以已分配 GPU 数，因此堆叠总和等于图表中的 All in Measured W/GPU。TDP 和 All in Provisioned 为额定参考值，并非实测。`,
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点',
@@ -530,8 +531,11 @@ function BreakdownChart({
   scrub,
   plotHeight = PLOT_HEIGHT,
   pools = [],
+  unofficial = false,
 }: {
   sectionId: string;
+  /** An overlay (unofficial) run's series: stamped with the unofficial watermark. */
+  unofficial?: boolean;
   series: PowerBreakdownSeries;
   color: string;
   view: PowerBreakdownView;
@@ -767,35 +771,11 @@ function BreakdownChart({
   };
 
   const drawDefs: NonNullable<CustomLayerConfig['render']> = (group) => {
-    const pattern = group
-      .selectAll<SVGPatternElement, PowerBand>('pattern.breakdown-hatch')
-      .data(hatchedBands)
-      .join((enter) => {
-        const created = enter
-          .append('pattern')
-          .attr('class', 'breakdown-hatch')
-          .attr('patternUnits', 'userSpaceOnUse')
-          .attr('width', 6)
-          .attr('height', 6);
-        created.append('rect').attr('class', 'hatch-bg').attr('width', 6).attr('height', 6);
-        created
-          .append('line')
-          .attr('class', 'hatch-line')
-          .attr('x1', 0)
-          .attr('y1', 0)
-          .attr('x2', 0)
-          .attr('y2', 6)
-          .attr('stroke-width', 2);
-        return created;
-      })
-      .attr('id', (band) => hatchId(sectionId, band))
-      .attr('data-band', (band) => band)
-      .attr('patternTransform', (band) => `rotate(${HATCH_ANGLE[band]})`);
-    pattern
-      .select('.hatch-bg')
-      .attr('fill', color)
-      .attr('fill-opacity', (band) => powerBandFillOpacity(band));
-    pattern.select('.hatch-line').attr('stroke', color);
+    joinHatchPatterns(group, 'breakdown-hatch', hatchedBands, {
+      id: (band) => hatchId(sectionId, band),
+      band: (band) => band,
+      color: () => color,
+    }).attr('data-band', (band) => band);
   };
 
   /** Concurrency + total labels for a column, unless they would sit under a reference label. */
@@ -1527,7 +1507,7 @@ function BreakdownChart({
       data={columns}
       height={plotHeight}
       testId={`${sectionId}-plot`}
-      watermark="logo"
+      watermark={getChartWatermark(unofficial)}
       zoom={{ enabled: false }}
       grabCursor={false}
       instructions=""
@@ -1593,6 +1573,7 @@ export default function PowerBreakdownPanel({
   onPinComparedPoint,
   onUnpinComparedPoint,
   role = 'all',
+  view: controlledView,
 }: {
   chartId: string;
   data: InferenceData[];
@@ -1613,7 +1594,7 @@ export default function PowerBreakdownPanel({
   /** The main chart's x field; the breakdown uses it when it is an interactivity axis. */
   xField?: keyof AggDataEntry;
   xLabel?: string;
-  /** Shared with the chip comparison's legend on the Where view. */
+  /** Shared with the chip comparison's legend on the Breakdown view. */
   layerHighlight: PowerLayerHighlight | null;
   onLayerHighlight: (next: PowerLayerHighlight | null) => void;
   /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
@@ -1624,6 +1605,11 @@ export default function PowerBreakdownPanel({
   onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
   /** The PowerX GPU role: off All GPUs each column's GPU segment splits by pool. */
   role?: PowerXRole;
+  /**
+   * PowerX layout: the chart style comes from the Breakdown toolbar's More, so the
+   * drill-down drops its own Stacked bars | Stacked area toggle.
+   */
+  view?: PowerBreakdownView;
 }) {
   const pools = powerXRolePools(role);
   const locale = useLocale();
@@ -1633,12 +1619,13 @@ export default function PowerBreakdownPanel({
   const interactivityLabel = interactivity.fromChart && xLabel ? xLabel : t.xAxis;
   const { getUrlParam, setUrlParams } = useUrlState();
   // Stacked area by default: one chip's layers read as bands across load.
-  const [view, setView] = useState<PowerBreakdownView>(() =>
+  const [ownView, setView] = useState<PowerBreakdownView>(() =>
     getUrlParam('i_pbview') === 'bars' ? 'bars' : 'area',
   );
+  const view = controlledView ?? ownView;
   useEffect(() => {
-    setUrlParams({ i_pbview: view });
-  }, [view, setUrlParams]);
+    if (controlledView === undefined) setUrlParams({ i_pbview: ownView });
+  }, [controlledView, ownView, setUrlParams]);
   // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
   const includeFacility = usePowerXIncludeFacility();
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
@@ -1788,21 +1775,25 @@ export default function PowerBreakdownPanel({
           </Heading>
           <p className="text-xs text-muted-foreground">{heading?.subtitle ?? t.subtitle}</p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
           onClick={onCollapse}
           data-testid="power-breakdown-collapse"
           aria-label={t.collapse}
           title={t.collapse}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-border/60 text-xs font-medium text-muted-foreground hover:text-foreground md:h-8 md:w-auto md:px-3"
+          className="max-md:w-11 max-md:px-0"
         >
           <ChevronUp className="size-4 md:hidden" aria-hidden />
           <span className="hidden md:inline">{t.collapse}</span>
-        </button>
+        </Button>
       </div>
       <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
       {series === null ? (
-        <p className="py-6 text-sm text-muted-foreground">{t.empty}</p>
+        <EmptyState bare className="py-6">
+          {t.empty}
+        </EmptyState>
       ) : (
         <>
           <div className="no-export flex min-w-0 flex-wrap items-end gap-3">
@@ -1845,28 +1836,30 @@ export default function PowerBreakdownPanel({
                 </SelectContent>
               </Select>
             </div>
-            <SegmentedToggle<PowerBreakdownView>
-              value={view}
-              ariaLabel={t.view}
-              testId="power-breakdown-view"
-              role="group"
-              onValueChange={(next) => {
-                setView(next);
-                track('inference_power_breakdown_view_changed', { view: next });
-              }}
-              options={[
-                {
-                  value: 'bars',
-                  label: t.bars,
-                  testId: 'power-breakdown-view-bars',
-                },
-                {
-                  value: 'area',
-                  label: t.area,
-                  testId: 'power-breakdown-view-area',
-                },
-              ]}
-            />
+            {controlledView === undefined && (
+              <SegmentedToggle<PowerBreakdownView>
+                value={view}
+                ariaLabel={t.view}
+                testId="power-breakdown-view"
+                role="group"
+                onValueChange={(next) => {
+                  setView(next);
+                  track('inference_power_breakdown_view_changed', { view: next });
+                }}
+                options={[
+                  {
+                    value: 'bars',
+                    label: t.bars,
+                    testId: 'power-breakdown-view-bars',
+                  },
+                  {
+                    value: 'area',
+                    label: t.area,
+                    testId: 'power-breakdown-view-area',
+                  },
+                ]}
+              />
+            )}
           </div>
           {/* Overview left, detail right from `lg`; the list stacks under the plot below. */}
           <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
@@ -1889,6 +1882,7 @@ export default function PowerBreakdownPanel({
                 key={`${series.key}-${view}-${role}`}
                 sectionId={sectionId}
                 series={series}
+                unofficial={series.overlayRunIndex !== undefined}
                 color={color}
                 view={view}
                 xLabel={interactivityLabel}
@@ -1911,15 +1905,17 @@ export default function PowerBreakdownPanel({
                 pools={pools}
               />
               {touchScrub && readoutEntry && setCompareTarget && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   data-testid="power-breakdown-compare-at"
                   disabled={comparedAt !== null && readoutEntry.interactivity === comparedAt}
                   onClick={compareAtScrub}
-                  className="no-export mt-2 flex min-h-11 w-full items-center justify-center rounded-md border border-border bg-muted/30 px-3 text-sm font-medium text-foreground disabled:opacity-50"
+                  // Touch-only, so it keeps a 44px target from md up too.
+                  className="no-export mt-2 w-full md:h-11"
                 >
                   {t.compareAt(formatInteractivity(readoutEntry.interactivity))}
-                </button>
+                </Button>
               )}
             </div>
             {listEntry && (

@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test'
 mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 mock.module('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
-import { PowerXSurfaceProvider, usePowerXIncludeFacility } from '../ui/powerx-surface';
+import { usePowerXIncludeFacility } from '../ui/powerx-surface';
+import { PowerXSurfaceProvider } from '../ui/powerx-surface-provider';
 import { PowerXFacilitySwitch } from './PowerXLayout';
 
 declare global {

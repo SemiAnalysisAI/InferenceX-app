@@ -3,7 +3,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import type { InferenceData } from '@/components/inference/types';
 import { PowerXFacilitySwitch } from '@/components/inference/powerx/PowerXLayout';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
-import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface-provider';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 
@@ -116,7 +116,8 @@ describe('PowerX Include facility switch (mobile)', () => {
       </PathnameContext.Provider>,
       { inference: {}, unofficial: {} },
     );
-    cy.get('[data-testid="power-chip-compare-value"]').should('exist');
+    // Compare at lives in Chart Config now; the bars are the readiness signal.
+    cy.get('[data-testid="power-chip-compare-segment"]').should('have.length.greaterThan', 0);
     cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').should(
       'have.attr',
       'aria-checked',

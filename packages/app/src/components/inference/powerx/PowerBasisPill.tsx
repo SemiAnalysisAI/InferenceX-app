@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
@@ -7,7 +8,7 @@ import {
   POWER_BASIS_TAG_TITLES,
   type PowerBasisTag,
 } from '@/lib/power/power-basis';
-import { escapeHtml } from '@/lib/shared/utils';
+import { cn, escapeHtml } from '@/lib/shared/utils';
 
 /**
  * Neutral in both themes and in the tutorial's provenance grammar. The measured GPU tag is a
@@ -19,14 +20,19 @@ const POWER_BASIS_TAG_STYLE: Record<PowerBasisTag, { bg: string; fg: string; bor
   facility: { bg: 'transparent', fg: 'var(--muted-foreground)', border: 'var(--border)' },
 };
 
-// No font-size: the tag inherits its line's size (the tooltip keeps every line at 11px).
-const PILL_STYLE =
-  'display:inline-block;margin-left:0.3em;padding:0 0.4em;border-radius:calc(var(--radius) - 4px);border:1px solid;font-weight:500;line-height:1.35;vertical-align:baseline;white-space:nowrap;';
+// One class string for the React pill and the tooltip HTML, so both look the same. The
+// tooltip pill inherits its line's font size; the React pill sets text-2xs.
+const PILL_BOX = 'ml-1 px-1.5 py-0 align-baseline';
+const PILL_CLASS = cn(
+  badgeVariants({ variant: 'outline' }),
+  PILL_BOX,
+  'text-[length:inherit] leading-snug',
+);
 
 /** The tag as an HTML string, for the D3 tooltips that build markup by hand. */
 export function powerBasisPillHtml(tag: PowerBasisTag, locale: Locale): string {
   const { bg, fg, border } = POWER_BASIS_TAG_STYLE[tag];
-  return `<span data-testid="power-basis-pill" data-basis="${tag}" title="${escapeHtml(POWER_BASIS_TAG_TITLES[tag][locale])}" style="${PILL_STYLE}background:${bg};color:${fg};border-color:${border}">${escapeHtml(POWER_BASIS_TAG_LABELS[tag][locale])}</span>`;
+  return `<span data-testid="power-basis-pill" data-basis="${tag}" title="${escapeHtml(POWER_BASIS_TAG_TITLES[tag][locale])}" class="${escapeHtml(PILL_CLASS)}" style="background:${bg};color:${fg};border-color:${border}">${escapeHtml(POWER_BASIS_TAG_LABELS[tag][locale])}</span>`;
 }
 
 /**
@@ -38,14 +44,15 @@ export function PowerBasisPill({ tag, className }: { tag: PowerBasisTag; classNa
   const locale = useLocale();
   const { bg, fg, border } = POWER_BASIS_TAG_STYLE[tag];
   return (
-    <span
+    <Badge
+      variant="outline"
       data-testid="power-basis-pill"
       data-basis={tag}
       title={POWER_BASIS_TAG_TITLES[tag][locale]}
-      className={`ml-1 inline-block rounded-sm border px-1.5 align-baseline text-2xs leading-snug font-medium whitespace-nowrap ${className ?? ''}`}
+      className={cn(PILL_BOX, 'text-2xs leading-snug', className)}
       style={{ background: bg, color: fg, borderColor: border }}
     >
       {POWER_BASIS_TAG_LABELS[tag][locale]}
-    </span>
+    </Badge>
   );
 }

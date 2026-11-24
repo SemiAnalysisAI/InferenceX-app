@@ -231,3 +231,37 @@ describe('updateHorizontalBarsOnZoom', () => {
     updateHorizontalBarsOnZoom(group as any, xScale, (d: TestDatum) => d.value);
   });
 });
+
+describe('stacked segments', () => {
+  interface Segment {
+    row: string;
+    start: number;
+    value: number;
+  }
+  const segments: Segment[] = [
+    { row: 'GPU-A', start: 0, value: 100 },
+    { row: 'GPU-A', start: 100, value: 50 },
+  ];
+
+  it('moves each segment from its stack start on zoom', () => {
+    const group = createMockGroup();
+    const { yScale, xScale } = makeScales();
+    renderHorizontalBars(group as any, segments, yScale, xScale, {
+      getY: (d) => d.row,
+      getX: (d) => d.value,
+      getX0: (d) => d.start,
+      getColor: () => '#f00',
+      keyFn: (d) => `${d.row}-${d.start}`,
+    });
+    const newXScale = d3.scaleLinear().domain([0, 150]).range([0, 600]);
+    updateHorizontalBarsOnZoom(
+      group as any,
+      newXScale,
+      (d: Segment) => d.value,
+      (d: Segment) => d.start,
+    );
+    const bars = group.selectAll('.bar');
+    expect(bars.elements[1].attrs['x']).toBe(400);
+    expect(bars.elements[1].attrs['width']).toBe(200);
+  });
+});

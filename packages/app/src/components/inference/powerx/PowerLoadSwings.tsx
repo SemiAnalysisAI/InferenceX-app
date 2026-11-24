@@ -1,15 +1,15 @@
 'use client';
 
-import { Download, Info } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import type { InferenceData } from '@/components/inference/types';
+import { Download } from 'lucide-react';
+import { useMemo } from 'react';
 import type { PowerPoolRole, PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
-import { Switch } from '@/components/ui/switch';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { NVL72_GPUS_PER_RACK } from '@/lib/power/load-swing-stats';
+import { cn } from '@/lib/shared/utils';
 
 import {
   formatLoadSwingWatts,
@@ -23,8 +23,6 @@ import type { PowerXRole } from './powerx-role';
 const STRINGS = {
   en: {
     title: 'Load Swings',
-    rack: `× ${NVL72_GPUS_PER_RACK} per NVL72 rack`,
-    rackHelp: `Multiplies the per-GPU trace by ${NVL72_GPUS_PER_RACK} and shows kW per rack. Assumes all ${NVL72_GPUS_PER_RACK} GPUs swing together, so it is an upper bound on rack-level swings.`,
     trace: 'Trace',
     peak: 'Peak',
     min: 'Min',
@@ -39,6 +37,8 @@ const STRINGS = {
     downloads: 'Download',
     csv: 'CSV (1 s trace)',
     json: 'stats (JSON)',
+    csvShort: 'CSV',
+    jsonShort: 'JSON',
     perGpu: 'W per GPU: the mean of each 1 s sample across the config’s GPUs.',
     perRack: `kW per NVL72 rack: the per-GPU trace × ${NVL72_GPUS_PER_RACK}, assuming every GPU swings together (an upper bound).`,
     definitions:
@@ -56,8 +56,6 @@ const STRINGS = {
   },
   zh: {
     title: '负载波动',
-    rack: `× ${NVL72_GPUS_PER_RACK}（每 NVL72 机架）`,
-    rackHelp: `将每 GPU 曲线乘以 ${NVL72_GPUS_PER_RACK}，以每机架 kW 显示。假设全部 ${NVL72_GPUS_PER_RACK} 颗 GPU 同步波动，因此是机架级波动的上限。`,
     trace: '曲线',
     peak: '峰值',
     min: '最小值',
@@ -72,6 +70,8 @@ const STRINGS = {
     downloads: '下载',
     csv: 'CSV（1 秒曲线）',
     json: '统计（JSON）',
+    csvShort: 'CSV',
+    jsonShort: 'JSON',
     perGpu: '每 GPU 瓦数：该配置所有 GPU 每个 1 秒采样的均值。',
     perRack: `每 NVL72 机架 kW：每 GPU 曲线 × ${NVL72_GPUS_PER_RACK}，假设全部 GPU 同步波动（上限）。`,
     definitions:
@@ -106,29 +106,34 @@ function statsDownloadUrl(
   return `/api/v1/gpu-metrics-point/stats?${params.toString()}`;
 }
 
-/** The load-swing statistics row above the Over time chart on PowerX. */
+/**
+ * The load-swing statistics of the Over time traces on PowerX, under the chart; the ×72 per
+ * NVL72 rack switch that scales them lives in the chart legend.
+ */
 export function PowerLoadSwings({
   traces,
   colorOf,
   labelOf,
   role = 'all',
+  rack,
 }: {
   traces: readonly PowerTimelineTrace[];
   colorOf: (trace: PowerTimelineTrace) => string;
-  labelOf: (point: InferenceData) => string;
+  labelOf: (trace: PowerTimelineTrace) => string;
   /** PowerX GPU role: one row per lane (prefill, decode, and all GPUs for split). */
   role?: PowerXRole;
+  /** kW per NVL72 rack, set by the chart legend's switch. */
+  rack: boolean;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const [rack, setRack] = useState(false);
   const isPhone = useIsMobileViewport();
   const rows = useMemo<LoadSwingTraceRow[]>(
     () =>
       loadSwingRows(traces, role).map((row) => ({
         ...row,
         color: colorOf(row.trace),
-        label: labelOf(row.trace.point),
+        label: labelOf(row.trace),
       })),
     [traces, colorOf, labelOf, role],
   );
@@ -171,16 +176,23 @@ export function PowerLoadSwings({
         : t.lane[lane.role];
   const traceName = ({ trace, color, label, stats, lane }: LoadSwingTraceRow) => (
     <>
-      <span
-        aria-hidden
-        className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
-        style={{ backgroundColor: color }}
-      />
-      <span className="font-medium">{label}</span>{' '}
-      <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
+      {/* The pinned cell wraps by default; the dot, name and concurrency stay on one line. */}
+      <span className="whitespace-nowrap">
+        <span
+          aria-hidden
+          className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
+          style={{ backgroundColor: color }}
+        />
+        <span className="font-medium">{label}</span>{' '}
+        <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
+      </span>
       {lane && (
         <span
-          className={lane.kind === 'lane' ? 'ml-1' : 'ml-1 text-muted-foreground'}
+          // The lane goes on its own line so the table fits the page width.
+          className={cn(
+            lane.kind === 'lane' ? 'ml-1' : 'ml-1 text-muted-foreground',
+            'block pl-4 max-md:inline max-md:pl-0',
+          )}
           data-testid="powerx-load-swings-lane"
           data-lane={lane.kind}
           data-pool={lane.role}
@@ -188,10 +200,17 @@ export function PowerLoadSwings({
           · {laneName(lane)}
         </span>
       )}
+      {/* Notes go on their own line in the table, inline on phone cards. */}
       {stats.gapCount > 0 && (
-        <span className="ml-1 text-muted-foreground">· {t.gaps(stats.gapCount)}</span>
+        <span className="ml-1 block pl-4 text-muted-foreground max-md:inline max-md:pl-0">
+          · {t.gaps(stats.gapCount)}
+        </span>
       )}
-      {stats.mean === null && <span className="ml-1 text-muted-foreground">· {t.noWindow}</span>}
+      {stats.mean === null && (
+        <span className="ml-1 block pl-4 text-muted-foreground max-md:inline max-md:pl-0">
+          · {t.noWindow}
+        </span>
+      )}
     </>
   );
   const downloads = ({ trace, lane }: LoadSwingTraceRow) => {
@@ -204,54 +223,78 @@ export function PowerLoadSwings({
           href={statsDownloadUrl(id, 'csv', rack, pool)}
           download
           data-testid="powerx-swings-csv"
+          title={t.csv}
           className="inline-flex items-center gap-1 underline decoration-dotted hover:text-foreground"
           onClick={() =>
             track('inference_powerx_swings_exported', { format: 'csv', role: pool ?? 'all' })
           }
         >
           <Download className="size-3" aria-hidden />
-          {t.csv}
+          {t.csvShort}
         </a>
         {' · '}
         <a
           href={statsDownloadUrl(id, 'json', rack, pool)}
           download
           data-testid="powerx-swings-json"
+          title={t.json}
           className="underline decoration-dotted hover:text-foreground"
           onClick={() =>
             track('inference_powerx_swings_exported', { format: 'json', role: pool ?? 'all' })
           }
         >
-          {t.json}
+          {t.jsonShort}
         </a>
       </>
     ) : (
       '—'
     );
   };
+  const statSort: Record<string, (stats: LoadSwingTraceRow['stats']) => number | null> = {
+    peak: (stats) => stats.peak,
+    min: (stats) => stats.min,
+    idle: (stats) => stats.idleFloor,
+    mean: (stats) => stats.mean,
+    p5p95: (stats) => stats.p95,
+    d1: (stats) => stats.maxDelta1s,
+    d5: (stats) => stats.maxDelta5s,
+    up: (stats) => stats.rampUpPerSecond,
+    down: (stats) => stats.rampDownPerSecond,
+    volatility: (stats) => stats.volatility,
+  };
+  // Headers come from the same stat list as the cells, so their order cannot drift.
+  const statColumns = statCells(rows[0]).map((head, index): DataTableColumn<LoadSwingTraceRow> => ({
+    header: head.label,
+    headerContent:
+      head.key === 'peak' ? (
+        <>
+          {head.label}
+          <PowerBasisPill tag="gpu" />
+        </>
+      ) : undefined,
+    align: 'right',
+    className: 'align-top whitespace-nowrap',
+    cell: (row) => statCells(row)[index].value,
+    sortValue: (row) => statSort[head.key](row.stats) ?? Number.NEGATIVE_INFINITY,
+  }));
+  const columns: DataTableColumn<LoadSwingTraceRow>[] = [
+    {
+      header: t.trace,
+      pinned: true,
+      className: 'align-top whitespace-nowrap',
+      cell: (row) => traceName(row),
+      sortValue: (row) => row.label,
+    },
+    ...statColumns,
+    {
+      header: t.downloads,
+      className: 'no-export align-top whitespace-nowrap',
+      cell: (row) => downloads(row),
+    },
+  ];
   return (
     <section className="min-w-0 space-y-2 px-1 pb-2" data-testid="powerx-load-swings">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h3 className="text-sm font-medium">{t.title}</h3>
-        <label className="flex min-h-11 items-center gap-2 text-xs md:min-h-8">
-          <Switch
-            checked={rack}
-            onCheckedChange={(checked) => {
-              setRack(checked);
-              track('inference_powerx_swings_rack_toggled', { enabled: checked });
-            }}
-            data-testid="powerx-swings-rack"
-          />
-          <span>{t.rack}</span>
-          <span
-            title={t.rackHelp}
-            className="text-muted-foreground"
-            data-testid="powerx-swings-rack-help"
-          >
-            <Info className="size-3.5" aria-label={t.rackHelp} />
-          </span>
-        </label>
-      </div>
+      <h3 className="text-sm font-medium">{t.title}</h3>
       {isPhone ? (
         // Eleven columns cannot fit a phone, so each trace gets its own row with a two-column stat grid.
         <ul className="divide-y divide-border/30" data-testid="powerx-load-swings-cards">
@@ -275,45 +318,19 @@ export function PowerLoadSwings({
           ))}
         </ul>
       ) : (
-        <div className="max-h-96 min-w-0 overflow-auto">
-          <table
-            className="w-full min-w-[64rem] text-left text-xs tabular-nums"
-            data-testid="powerx-load-swings-table"
-          >
-            <thead className="sticky top-0 bg-card">
-              <tr>
-                <th className="p-2">{t.trace}</th>
-                <th className="p-2 text-right">
-                  {t.peak}
-                  <PowerBasisPill tag="gpu" />
-                </th>
-                <th className="p-2 text-right">{t.min}</th>
-                <th className="p-2 text-right">{t.idle}</th>
-                <th className="p-2 text-right">{t.mean}</th>
-                <th className="p-2 text-right">{t.p5p95}</th>
-                <th className="p-2 text-right">{t.d1}</th>
-                <th className="p-2 text-right">{t.d5}</th>
-                <th className="p-2 text-right">{t.up}</th>
-                <th className="p-2 text-right">{t.down}</th>
-                <th className="p-2 text-right">{t.volatility}</th>
-                <th className="p-2 no-export">{t.downloads}</th>
-              </tr>
-            </thead>
-            <tbody className="border-t">
-              {rows.map((row) => (
-                <tr key={row.key} data-testid="powerx-load-swings-row">
-                  <th className="p-2 align-top font-normal whitespace-nowrap">{traceName(row)}</th>
-                  {statCells(row).map((cell) => (
-                    <td key={cell.key} className="p-2 text-right align-top whitespace-nowrap">
-                      {cell.value}
-                    </td>
-                  ))}
-                  <td className="no-export p-2 align-top whitespace-nowrap">{downloads(row)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={rows}
+          columns={columns}
+          testId="powerx-load-swings-table"
+          analyticsPrefix="powerx_load_swings"
+          searchable={false}
+          columnPresets={false}
+          paginated={false}
+          rowAttributes={() => ({ 'data-testid': 'powerx-load-swings-row' })}
+          scrollClassName="max-h-96"
+          // Twelve columns: tighter cells and wrapping headers keep the table inside the card.
+          tableClassName="min-w-[64rem] text-xs [&_td]:px-2 [&_th]:px-2 [&_th]:whitespace-normal"
+        />
       )}
       <p className="text-xs text-muted-foreground">
         {rack ? t.perRack : t.perGpu} {role !== 'all' && `${t.perLane} `}

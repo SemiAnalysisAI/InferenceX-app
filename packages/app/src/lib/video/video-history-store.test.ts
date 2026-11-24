@@ -378,9 +378,10 @@ describe('history projection version', () => {
       // dashboard-routes gained the default Inference model slug, inference topology labels
       // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey),
       // the inference setSelectedGPUs action type now returns whether picks applied, and the
-      // unofficial run provider gained a requested-overlay flag, and the PowerX GPU role touched
-      // shared inference types and URL keys; none of these feed recorded entries.
-      sources: '658908f985a93ce76736a0a1e8c9c577ddf13a529dc100e43f9b3344684de9cc',
+      // unofficial run provider gained a requested-overlay flag, and the PowerX GPU role and layout
+      // touched shared inference types, URL keys (i_role, i_at), the live address bar and the shared
+      // scatter props. None of these feed recorded entries, so they are unchanged.
+      sources: '8cad62f1b2d53ad4ef8155d1de6494f1287c9f1f0d2600c16de0026511aea13d',
     });
   });
 });

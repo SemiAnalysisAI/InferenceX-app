@@ -68,6 +68,7 @@ const URL_STATE_KEYS = [
   'i_rulers',
   'i_pcompare',
   'i_role',
+  'i_at',
   'i_overview_current',
   'i_overview_baseline',
   'e_rundate',
@@ -162,6 +163,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_rulers: '',
   i_pcompare: '',
   i_role: '',
+  i_at: '',
   i_overview_current: '',
   i_overview_baseline: '',
   e_rundate: '',
@@ -291,6 +293,16 @@ export function hasAnyUrlParams(): boolean {
 
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingParams: UrlStateParams = {};
+let liveAddressBar = false;
+
+/**
+ * Opt a page into a live address bar: every URL-state write also lands in the location
+ * (replaceState, no history entry), so the active tab and options survive a reload or a
+ * copied address. Pages that never call this keep the address bar until Share.
+ */
+export function setLiveAddressBar(enabled: boolean): void {
+  liveAddressBar = enabled;
+}
 
 export function writeUrlParams(params: UrlStateParams): void {
   Object.assign(pendingParams, params);
@@ -301,7 +313,8 @@ export function writeUrlParams(params: UrlStateParams): void {
 
   writeTimer = setTimeout(() => {
     flushPendingParams();
-    syncProfitRoute();
+    if (liveAddressBar) rememberChartStateInUrl();
+    else syncProfitRoute();
   }, 150);
 }
 

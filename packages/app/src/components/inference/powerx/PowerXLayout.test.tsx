@@ -1,96 +1,10 @@
-// @test-environment jsdom
+import { describe, expect, it, mock } from 'bun:test';
 
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi, mock } from 'bun:test';
-
-import { TooltipProvider } from '@/components/ui/tooltip';
 import type { InferenceData } from '@/components/inference/types';
-import { POWER_PERCENT_TDP_METRIC, type PowerXSelection } from './powerx-views';
 
-const mocks = {
-  locale: 'en' as 'en' | 'zh',
-  track: vi.fn(),
-};
-mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
-mock.module('@/lib/analytics/analytics', () => ({ track: mocks.track }));
-// jsdom has no matchMedia: render the desktop layout.
-mock.module('@/hooks/useMediaQuery', () => ({
-  useIsMobileViewport: () => false,
-  useIsCoarsePointer: () => false,
-  useMediaQuery: () => false,
-}));
+mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
-declare global {
-  var IS_REACT_ACT_ENVIRONMENT: boolean;
-}
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-import { defaultReadoutPoint, PowerXCountControls, PowerXReadout } from './PowerXLayout';
-import type { PowerXRole } from './powerx-role';
-
-const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
-  mocks.locale = locale;
-  const container = document.createElement('div');
-  container.innerHTML = renderToStaticMarkup(<TooltipProvider>{node}</TooltipProvider>);
-  return container;
-};
-const noop = () => {};
-
-describe('PowerXCountControls', () => {
-  it('disables the IT and facility Counts unless energy is per output token', () => {
-    const container = render(
-      <PowerXCountControls
-        selection={{ metric: 'y_measuredJPerInputToken', compare: 'none' }}
-        onSelectionChange={noop}
-      />,
-    );
-    const buttons = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-boundary"] button'),
-    ];
-    expect(buttons.map((button) => button.disabled)).toEqual([false, true, true, true]);
-  });
-
-  it('disables % of TDP on the IT and facility Power draw boundaries', () => {
-    const container = render(
-      <PowerXCountControls
-        selection={{ metric: 'y_itModeledWatts', compare: 'none' }}
-        onSelectionChange={noop}
-      />,
-    );
-    const count = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-boundary"] button'),
-    ];
-    expect(count.map((button) => button.getAttribute('aria-pressed'))).toEqual([
-      'false',
-      'true',
-      'false',
-      'false',
-    ]);
-    const showAs = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-unit"] button'),
-    ];
-    expect(showAs.map((button) => button.disabled)).toEqual([false, true]);
-  });
-});
-
-const pinned = (selection: PowerXSelection, role: PowerXRole) =>
-  [
-    ...render(
-      <PowerXCountControls selection={selection} onSelectionChange={noop} role={role} />,
-    ).querySelectorAll<HTMLElement>('[data-testid$="-pinned"]'),
-  ].map((node) => node.dataset.testid);
-
-describe('pinned controls under a GPU role', () => {
-  it('pins the controls a role fixes and says why, leaving All untouched', () => {
-    const energy = { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' } as const;
-    expect(pinned(energy, 'decode')).toEqual(['powerx-count-pinned', 'powerx-per-pinned']);
-    expect(pinned(energy, 'all')).toEqual([]);
-    // % of TDP is read per pool under a role.
-    const tdp = { metric: POWER_PERCENT_TDP_METRIC, compare: 'none' } as const;
-    expect(pinned(tdp, 'split')).toEqual(['powerx-count-pinned', 'powerx-headroom-pinned']);
-  });
-});
+import { defaultReadoutPoint } from './PowerXLayout';
 
 const metric = (y: number) => ({ y, roof: false });
 function readoutPoint(x: number, overrides: Partial<InferenceData> = {}): InferenceData {
@@ -110,37 +24,13 @@ function readoutPoint(x: number, overrides: Partial<InferenceData> = {}): Infere
   } as InferenceData;
 }
 
-describe('PowerXReadout', () => {
-  it('reads IT W/GPU, GPUs per MW and the facility figure of the point nearest 80 tok/s/user', () => {
+describe('defaultReadoutPoint', () => {
+  it('picks the point nearest 80 tok/s/user', () => {
     const points = [readoutPoint(20), readoutPoint(75), readoutPoint(300)];
     expect(defaultReadoutPoint(points)).toBe(points[1]);
-    const container = render(<PowerXReadout points={points} />);
-    const readout = container.querySelector('[data-testid="powerx-readout"]');
-    expect(readout?.querySelector('[data-testid="powerx-readout-it"]')?.textContent).toBe(
-      'IT: 1,000 W/GPUIT',
-    );
-    expect(readout?.querySelector('[data-testid="powerx-readout-gpus-per-mw"]')?.textContent).toBe(
-      '1,000 GPUs/MWIT',
-    );
-    expect(readout?.querySelector('[data-testid="powerx-readout-facility"]')?.textContent).toBe(
-      'Facility: 1,300 W/GPU at PUE 1.3Facility',
-    );
-    expect(readout?.querySelector('[data-testid="powerx-readout-gpu"]')?.textContent).toBe(
-      'GPU: 700 WGPU',
-    );
-    // The same outline badges the TCO $/chip/hr row uses.
-    expect(readout?.querySelectorAll('[data-slot="badge"]')).toHaveLength(4);
-    expect(readout?.querySelector('[data-testid="powerx-readout-source"]')?.textContent).toBe(
-      'Near 80 tok/s/user · hover a point to change',
-    );
-    expect(
-      [...readout!.querySelectorAll<HTMLElement>('[data-testid="power-basis-pill"]')].map(
-        (pill) => pill.dataset.basis,
-      ),
-    ).toEqual(['it', 'it', 'facility', 'gpu']);
   });
 
-  it('prefers a modeled point, says when none has an IT model, and is bilingual', () => {
+  it('prefers a point with an IT model over a nearer one without', () => {
     const unmodeled = readoutPoint(80, {
       itModeledWatts: undefined,
       utilityModeledWatts: undefined,
@@ -148,15 +38,6 @@ describe('PowerXReadout', () => {
     });
     const modeled = readoutPoint(10);
     expect(defaultReadoutPoint([unmodeled, modeled])).toBe(modeled);
-    const container = render(<PowerXReadout points={[unmodeled]} />, 'zh');
-    expect(container.querySelector('[data-testid="powerx-readout-no-model"]')?.textContent).toBe(
-      '该配置暂无 IT 功耗模型',
-    );
-    expect(container.querySelector('[data-testid="powerx-readout-gpu"]')?.textContent).toBe(
-      'GPU: 700 WGPU',
-    );
-    expect(render(<PowerXReadout points={[]} />).innerHTML).toBe('');
+    expect(defaultReadoutPoint([])).toBeNull();
   });
 });
-
-/** Client render for the phone paths, whose More row and selects need real events. */

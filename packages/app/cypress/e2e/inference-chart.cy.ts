@@ -647,7 +647,7 @@ it('replots measured settings for official and unofficial data and preserves ove
     if ($toggle.attr('data-state') === 'checked') cy.wrap($toggle).click();
   });
   cy.get('[data-testid="measured-power-statistic-p75"]').click();
-  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per Chip');
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per GPU');
   assertMeasuredValues('scatter', [500, 510, 520, 530]);
   assertMeasuredValues('.unofficial-overlay-pt', [550, 560, 570, 580]);
   cy.get('[data-testid="powerx-tab-energy"]').click();
@@ -659,7 +659,7 @@ it('replots measured settings for official and unofficial data and preserves ove
   assertMeasuredValues('scatter', [2, 3, 4, 5]);
 });
 
-it('says when chosen chip configs report no measured power, and plots them on other metrics', () => {
+it('says when chosen GPU configs report no measured power, and plots them on other metrics', () => {
   interceptMeasuredComparison(singleTurnRows(null), []);
   cy.viewport(1440, 900);
   cy.visit(

@@ -28,7 +28,6 @@ export interface LoadSwingRow {
 /**
  * Statistics of every visible trace, one row per lane under a GPU role (the pool subset via
  * `poolSubsetSeries`, the same function the stats API uses); rows without samples are left out.
- * The Over time load-swings table and its insight card both read these rows.
  */
 export function loadSwingRows(
   traces: readonly PowerTimelineTrace[],

@@ -1,9 +1,9 @@
 'use client';
 
 import * as d3 from 'd3';
-import { ChevronDown } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 
+import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -29,6 +29,7 @@ import {
 } from '../utils/power-breakdown';
 import { formatInteractivity } from '../utils/interactivity-format';
 import { usePowerXSurface } from './powerx-surface';
+import { surfaceMetricText } from '../powerx/powerx-gpu-wording';
 
 const STRINGS = {
   en: {
@@ -150,6 +151,7 @@ export default function PowerPartsList({
   const powerX = usePowerXSurface();
   const mobile = useIsMobileViewport();
   const phone = powerX && mobile;
+  const acrossLoad = surfaceMetricText(t.acrossLoad, powerX, locale);
   const folded = phone && rows.length > PHONE_VISIBLE_PARTS;
   const [expanded, setExpanded] = useState(false);
   const restId = useId();
@@ -221,9 +223,9 @@ export default function PowerPartsList({
         data-testid="power-part-sparkline"
         data-max={row.max}
         role="img"
-        aria-label={t.acrossLoad}
+        aria-label={acrossLoad}
       >
-        <title>{t.acrossLoad}</title>
+        <title>{acrossLoad}</title>
         <path d={spark.area} fill={color} fillOpacity={emphasis === 'highlighted' ? 0.45 : 0.2} />
         <path
           d={spark.line}
@@ -302,10 +304,9 @@ export default function PowerPartsList({
       </ul>
       {folded && rest.length > 0 && (
         <>
-          <button
-            type="button"
+          <DisclosureToggle
+            open={expanded}
             data-testid="power-parts-toggle"
-            aria-expanded={expanded}
             aria-controls={restId}
             onClick={() => {
               setExpanded(!expanded);
@@ -314,14 +315,10 @@ export default function PowerPartsList({
                 gpu: series.hwKey,
               });
             }}
-            className="mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground"
+            className="mt-2 text-xs"
           >
-            <span>{t.allParts(rows.length)}</span>
-            <ChevronDown
-              aria-hidden="true"
-              className={cn('size-4 shrink-0 transition-transform', expanded && 'rotate-180')}
-            />
-          </button>
+            {t.allParts(rows.length)}
+          </DisclosureToggle>
           <ul id={restId} className="mt-1 space-y-px" data-testid="power-parts-rest">
             {expanded && rest.map(renderRow)}
           </ul>

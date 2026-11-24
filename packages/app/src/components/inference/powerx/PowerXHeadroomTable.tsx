@@ -3,6 +3,8 @@
 import { Download } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
 
 import type { InferenceData } from '@/components/inference/types';
 import { track } from '@/lib/analytics/analytics';
@@ -23,17 +25,16 @@ import { PowerBasisPill } from './PowerBasisPill';
 const STRINGS = {
   en: {
     title: 'Headroom by Interactivity',
-    chip: 'Chip',
+    chip: 'GPU',
     perUser: (x: number) => `${x} tok/s/user`,
     avg: 'Avg W',
     p90: 'P90 W',
     pct: '% TDP (P90)',
     headroom: 'Headroom',
     download: 'Download CSV',
-    note: 'Interpolated along each chip’s optimal points (monotone, in log interactivity). "—" means outside the measured range; nothing is extrapolated. Headroom = 1 − P90 / TDP.',
-    key: 'Shaded band on the chart: headroom from each chip’s P90 draw (dotted) up to its TDP.',
-    empty:
-      'No chip in this view has measured average and P90 power at two or more interactivities.',
+    note: 'Interpolated along each GPU’s optimal points (monotone, in log interactivity). "—" means outside the measured range; nothing is extrapolated. Headroom = 1 − P90 / TDP.',
+    key: 'Shaded band on the chart: headroom from each GPU’s P90 draw (dotted) up to its TDP.',
+    empty: 'No GPU in this view has measured average and P90 power at two or more interactivities.',
     example: (
       chip: string,
       hi: string,
@@ -48,16 +49,16 @@ const STRINGS = {
   },
   zh: {
     title: '按交互性划分的功耗余量',
-    chip: '芯片',
+    chip: 'GPU',
     perUser: (x: number) => `${x} tok/s/user`,
     avg: '平均 W',
     p90: 'P90 W',
     pct: 'TDP 占比（P90）',
     headroom: '余量',
     download: '下载 CSV',
-    note: '沿各芯片的最优点插值（单调样条，按对数交互性）。“—”表示超出实测范围，不做外推。余量 = 1 − P90 / TDP。',
-    key: '图中阴影：各芯片从 P90 功耗（虚线）到其 TDP 之间的余量。',
-    empty: '当前视图中没有芯片在两个及以上交互性下同时具备实测平均功耗与 P90 功耗。',
+    note: '沿各 GPU 的最优点插值（单调样条，按对数交互性）。“—”表示超出实测范围，不做外推。余量 = 1 − P90 / TDP。',
+    key: '图中阴影：各 GPU 从 P90 功耗（虚线）到其 TDP 之间的余量。',
+    empty: '当前视图中没有 GPU 在两个及以上交互性下同时具备实测平均功耗与 P90 功耗。',
     example: (
       name: string,
       hi: string,
@@ -68,7 +69,7 @@ const STRINGS = {
       loHead: string,
     ) =>
       `示例：${name} 从 ${hi} 降到 ${lo} tok/s/user 时，P90 功耗占 TDP 的比例从 ${hiPct}% 升至 ${loPct}%，余量从 ${hiHead}% 缩小到 ${loHead}%。`,
-    clipped: (hi: string) => ` ${hi} 是该芯片最快的实测点；300 不做外推。`,
+    clipped: (hi: string) => ` ${hi} 是该 GPU 最快的实测点；300 不做外推。`,
   },
 } as const;
 
@@ -77,8 +78,8 @@ const int = (value: number) => Math.round(value).toLocaleString('en-US');
 const pct = (value: number) => `${Math.round(value)}%`;
 
 /**
- * The per-chip summary under the Power draw chart shown as % of TDP: average
- * and P90 W per chip, % of TDP and headroom at 25 / 50 / 100 / 300 tok/s/user,
+ * The per-GPU summary under the Power draw chart shown as % of TDP: average
+ * and P90 W per GPU, % of TDP and headroom at 25 / 50 / 100 / 300 tok/s/user,
  * read along each chip's frontier with the chart's own interpolation.
  */
 export function PowerXHeadroomTable({
@@ -149,63 +150,33 @@ export function PowerXHeadroomTable({
         </p>
       )}
       {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground" data-testid="powerx-headroom-empty">
+        <EmptyState bare className="py-4 text-xs" data-testid="powerx-headroom-empty">
           {t.empty}
-        </p>
+        </EmptyState>
       ) : (
-        <div className="max-h-96 min-w-0 overflow-auto">
-          <table
-            className="w-full min-w-[52rem] text-left text-xs tabular-nums"
-            data-testid="powerx-headroom-table"
-          >
-            <thead className="sticky top-0 bg-card">
-              <tr>
-                <th rowSpan={2} className="p-2 align-bottom">
-                  {t.chip}
-                </th>
-                {HEADROOM_INTERACTIVITIES.map((x) => (
-                  <th key={x} colSpan={4} className="border-l border-border/60 p-2 text-center">
-                    {t.perUser(x)}
-                  </th>
-                ))}
-              </tr>
-              <tr className="text-muted-foreground">
-                {HEADROOM_INTERACTIVITIES.map((x) => (
-                  <HeadroomGroupHeaders key={x} t={t} />
-                ))}
-              </tr>
-            </thead>
-            <tbody className="border-t">
-              {rows.map((row) => (
-                <tr key={row.key} data-testid="powerx-headroom-row" data-run-index={row.runIndex}>
-                  <th className="p-2 align-top font-normal whitespace-nowrap">
-                    {row.runIndex !== undefined && (
-                      <span
-                        aria-hidden
-                        className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
-                        style={{ backgroundColor: overlayRunColor(row.runIndex) }}
-                      />
-                    )}
-                    {row.label}
-                  </th>
-                  {row.cells.map((cell, index) =>
-                    cell ? (
-                      <HeadroomCells
-                        key={index}
-                        avg={int(cell.avgWatts)}
-                        p90={int(cell.p90Watts)}
-                        percent={pct(cell.percentTdpP90)}
-                        headroom={pct(cell.headroomPercent)}
-                      />
-                    ) : (
-                      <HeadroomCells key={index} avg="—" p90="—" percent="—" headroom="—" muted />
-                    ),
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={rows}
+          columns={headroomColumns(t)}
+          headerGroups={[
+            { header: '', colSpan: 1 },
+            ...HEADROOM_INTERACTIVITIES.map((x) => ({
+              header: t.perUser(x),
+              colSpan: METRICS.length,
+              className: 'border-l border-border/60',
+            })),
+          ]}
+          testId="powerx-headroom-table"
+          analyticsPrefix="powerx_headroom"
+          searchable={false}
+          columnPresets={false}
+          paginated={false}
+          rowAttributes={(row) => ({
+            'data-testid': 'powerx-headroom-row',
+            'data-run-index': row.runIndex,
+          })}
+          scrollClassName="max-h-96"
+          tableClassName="min-w-[52rem] text-xs"
+        />
       )}
       <p className="text-xs text-muted-foreground">
         <span data-testid="powerx-headroom-key">{t.key}</span> {t.note}
@@ -214,43 +185,81 @@ export function PowerXHeadroomTable({
   );
 }
 
-function HeadroomGroupHeaders({ t }: { t: Strings }) {
-  return (
-    <>
-      <th className="border-l border-border/60 p-2 text-right font-normal whitespace-nowrap">
-        {t.avg}
-        <PowerBasisPill tag="gpu" />
-      </th>
-      <th className="p-2 text-right font-normal whitespace-nowrap">
-        {t.p90}
-        <PowerBasisPill tag="gpu" />
-      </th>
-      <th className="p-2 text-right font-normal whitespace-nowrap">{t.pct}</th>
-      <th className="p-2 text-right font-normal whitespace-nowrap">{t.headroom}</th>
-    </>
-  );
-}
+type HeadroomRow = ReturnType<typeof buildHeadroomRows>[number];
+type HeadroomCell = NonNullable<HeadroomRow['cells'][number]>;
 
-function HeadroomCells({
-  avg,
-  p90,
-  percent,
-  headroom,
-  muted = false,
-}: {
-  avg: string;
-  p90: string;
-  percent: string;
-  headroom: string;
-  muted?: boolean;
-}) {
-  const cls = `p-2 text-right align-top ${muted ? 'text-muted-foreground/60' : ''}`;
-  return (
-    <>
-      <td className={`border-l border-border/60 ${cls}`}>{avg}</td>
-      <td className={cls}>{p90}</td>
-      <td className={cls}>{percent}</td>
-      <td className={cls}>{headroom}</td>
-    </>
-  );
+const METRICS = [
+  {
+    label: (t: Strings) => t.avg,
+    pill: true,
+    value: (cell: HeadroomCell) => cell.avgWatts,
+    format: int,
+  },
+  {
+    label: (t: Strings) => t.p90,
+    pill: true,
+    value: (cell: HeadroomCell) => cell.p90Watts,
+    format: int,
+  },
+  {
+    label: (t: Strings) => t.pct,
+    pill: false,
+    value: (cell: HeadroomCell) => cell.percentTdpP90,
+    format: pct,
+  },
+  {
+    label: (t: Strings) => t.headroom,
+    pill: false,
+    value: (cell: HeadroomCell) => cell.headroomPercent,
+    format: pct,
+  },
+] as const;
+
+/** The GPU column, then avg / P90 / % TDP / headroom under each interactivity group. */
+function headroomColumns(t: Strings): DataTableColumn<HeadroomRow>[] {
+  return [
+    {
+      header: t.chip,
+      pinned: true,
+      className: 'align-top whitespace-nowrap',
+      sortValue: (row) => row.label,
+      cell: (row) => (
+        <>
+          {row.runIndex !== undefined && (
+            <span
+              aria-hidden
+              className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
+              style={{ backgroundColor: overlayRunColor(row.runIndex) }}
+            />
+          )}
+          {row.label}
+        </>
+      ),
+    },
+    ...HEADROOM_INTERACTIVITIES.flatMap((x, group) =>
+      METRICS.map((metric, index): DataTableColumn<HeadroomRow> => ({
+        header: `${t.perUser(x)} ${metric.label(t)}`,
+        headerContent: (
+          <>
+            {metric.label(t)}
+            {metric.pill && <PowerBasisPill tag="gpu" />}
+          </>
+        ),
+        align: 'right',
+        className: `align-top whitespace-nowrap ${index === 0 ? 'border-l border-border/60' : ''}`,
+        sortValue: (row) => {
+          const cell = row.cells[group];
+          return cell ? metric.value(cell) : Number.NEGATIVE_INFINITY;
+        },
+        cell: (row) => {
+          const cell = row.cells[group];
+          return cell ? (
+            metric.format(metric.value(cell))
+          ) : (
+            <span className="text-muted-foreground/60">—</span>
+          );
+        },
+      })),
+    ),
+  ];
 }

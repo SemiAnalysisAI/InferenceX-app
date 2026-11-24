@@ -431,6 +431,7 @@ export function D3ChartWrapper({
             </div>
           )}
           <div
+            data-slot="chart-legend-frame"
             className={
               hasDetails
                 ? 'hidden'
