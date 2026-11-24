@@ -516,6 +516,27 @@ export default function PowerChipCompare({
                 )}
               </span>
             );
+            // Every segment, pool or band, opens the same hover card and follows the pointer.
+            const segmentHoverProps = (band: PowerBand, pool?: GpuPoolSegment) => ({
+              onMouseEnter: (event: React.MouseEvent) => {
+                layers.hover(bandTarget(band));
+                setSegmentHover({
+                  x: event.clientX,
+                  y: event.clientY,
+                  label: entry.label,
+                  color,
+                  band,
+                  point,
+                  pool,
+                });
+              },
+              onMouseMove: (event: React.MouseEvent) =>
+                setSegmentHover((prev) => prev && { ...prev, x: event.clientX, y: event.clientY }),
+              onMouseLeave: () => {
+                layers.hover(null);
+                setSegmentHover(null);
+              },
+            });
             // The stacked bar's segments: the layer steps and hatches; the watt labels only
             // in the 28 px desktop bar, never in the 8 px phone bar.
             const poolSpans = (labels: boolean) =>
@@ -529,32 +550,7 @@ export default function PowerChipCompare({
                     data-pool={segment.pool}
                     data-pool-emphasis={dimmed ? 'dimmed' : 'shown'}
                     data-emphasis={powerLayerEmphasis('gpu', layers.highlight)}
-                    onMouseEnter={(event) => {
-                      layers.hover(bandTarget('gpu'));
-                      setSegmentHover({
-                        x: event.clientX,
-                        y: event.clientY,
-                        label: entry.label,
-                        color,
-                        band: 'gpu',
-                        point,
-                        pool: segment,
-                      });
-                    }}
-                    onMouseMove={(event) =>
-                      setSegmentHover(
-                        (prev) =>
-                          prev && {
-                            ...prev,
-                            x: event.clientX,
-                            y: event.clientY,
-                          },
-                      )
-                    }
-                    onMouseLeave={() => {
-                      layers.hover(null);
-                      setSegmentHover(null);
-                    }}
+                    {...segmentHoverProps('gpu', segment)}
                     className="flex h-full items-center justify-center text-2xs font-medium tabular-nums text-foreground"
                     style={{
                       width: `${(segment.layerWatts / point.totalWattsPerGpu) * 100}%`,
@@ -578,31 +574,7 @@ export default function PowerChipCompare({
                     data-testid="power-chip-compare-segment"
                     data-band={band}
                     data-emphasis={powerLayerEmphasis(band, layers.highlight)}
-                    onMouseEnter={(event) => {
-                      layers.hover(bandTarget(band));
-                      setSegmentHover({
-                        x: event.clientX,
-                        y: event.clientY,
-                        label: entry.label,
-                        color,
-                        band,
-                        point,
-                      });
-                    }}
-                    onMouseMove={(event) =>
-                      setSegmentHover(
-                        (prev) =>
-                          prev && {
-                            ...prev,
-                            x: event.clientX,
-                            y: event.clientY,
-                          },
-                      )
-                    }
-                    onMouseLeave={() => {
-                      layers.hover(null);
-                      setSegmentHover(null);
-                    }}
+                    {...segmentHoverProps(band)}
                     className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                     style={{
                       width: `${(w / point.totalWattsPerGpu) * 100}%`,
