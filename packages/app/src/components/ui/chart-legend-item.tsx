@@ -45,6 +45,8 @@ export interface CommonLegendItemProps {
   blockedReason?: string;
   /** Prefixes the checkbox id so several legends for the same items on one page do not share ids. */
   idScope?: string;
+  /** Always draw the line swatch, for keys whose dash is the meaning (e.g. GPU role). */
+  forceLineSwatch?: boolean;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
@@ -68,9 +70,12 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   showPointsAriaLabel,
   blockedReason,
   idScope,
+  forceLineSwatch = false,
 }) => {
   const locale = useLocale();
-  const lineDasharray = legendSwatchDasharray(requestedDasharray);
+  const lineDasharray = forceLineSwatch
+    ? requestedDasharray
+    : legendSwatchDasharray(requestedDasharray);
   const t = STRINGS[locale];
   const id = `checkbox-${idScope ? `${idScope}-` : ''}${hw || name}`;
   const isLongText = (label ?? '').length > 8;

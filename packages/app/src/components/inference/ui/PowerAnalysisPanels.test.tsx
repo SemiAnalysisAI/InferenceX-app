@@ -54,6 +54,7 @@ mock.module('@/components/ui/chart-buttons', () => ({
 }));
 
 import PowerAnalysisPanels from './PowerAnalysisPanels';
+import type { PowerXRole } from '../powerx/powerx-role';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -158,7 +159,11 @@ const VLLM_TITLE = `${label('b200_vllm')} FP8 across load`;
 let container: HTMLDivElement;
 let root: Root;
 
-const mount = (data: InferenceData[], overlayData: InferenceData[] = []) => {
+const mount = (
+  data: InferenceData[],
+  overlayData: InferenceData[] = [],
+  role: PowerXRole = 'all',
+) => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -172,6 +177,7 @@ const mount = (data: InferenceData[], overlayData: InferenceData[] = []) => {
           xLabel="Interactivity (output tok/s/user)"
           chartId="chart-0"
           placement="before"
+          role={role}
         />
       </PowerXSurfaceProvider>,
     );
@@ -319,5 +325,57 @@ describe('PowerAnalysisPanels on a PowerX phone (compact chip cards, folded part
       ).toContain('--overlay-run-0');
     }
     expect(partsToggle()!.textContent).toMatch(/^All \d+ parts · across load$/u);
+  });
+});
+
+// A disaggregated run: 16 prefill GPUs at 971 W and 16 decode GPUs at 914 W.
+const disaggregated = (p: InferenceData): InferenceData =>
+  ({
+    ...p,
+    disagg: true,
+    num_prefill_gpu: 16,
+    num_decode_gpu: 16,
+    measuredPrefillAvgPower: metric(971),
+    measuredDecodeAvgPower: metric(914),
+  }) as InferenceData;
+const poolSegments = (row: HTMLElement) =>
+  segmentsOf(row).filter((segment) => segment.dataset.pool !== undefined);
+const runRow = (branch: string) => rows().find((row) => cardName(row)?.includes(branch))!;
+
+describe('PowerAnalysisPanels under a GPU role', () => {
+  it('splits official and overlay disaggregated GPU layers by pool, keeping aggregated ones whole', () => {
+    const PD_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/778/attempts/1';
+    const AGG_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/779/attempts/1';
+    const overlay = [
+      disaggregated(point(41, 'h200_sglang', 64, 25, 300, PD_URL)),
+      disaggregated(point(42, 'h200_sglang', 16, 50, 250, PD_URL)),
+      point(51, 'b200_vllm', 64, 25, 600, AGG_URL),
+      point(52, 'b200_vllm', 16, 50, 500, AGG_URL),
+    ];
+    unofficial.runIndexByUrl = { [PD_URL]: 0, [AGG_URL]: 1 };
+    unofficial.unofficialRunInfos = [
+      { id: 778, branch: 'pd-run' },
+      { id: 779, branch: 'agg-run' },
+    ];
+    unmount();
+    mount([...sglang.map(disaggregated), ...vllm, ...overlay], overlay, 'decode');
+    const [official, pdRun] = [rowFor(SGLANG_TITLE)!, runRow('pd-run')];
+    // Decode keeps the prefill pool on the bar, dimmed; the modeled layers stay whole.
+    for (const row of [official, pdRun]) {
+      const pools = poolSegments(row).map((s) => `${s.dataset.pool}:${s.dataset.poolEmphasis}`);
+      expect(pools).toEqual(['prefill:dimmed', 'decode:shown']);
+    }
+    expect(segmentsOf(official).filter((s) => s.dataset.band === 'server')).toHaveLength(1);
+    for (const segment of poolSegments(pdRun))
+      expect(segment.getAttribute('style')).toContain('--overlay-run-0');
+    // Aggregated chips and runs stay listed, never split into 0 W pools.
+    for (const row of [rowFor(VLLM_TITLE)!, runRow('agg-run')]) {
+      expect(row.dataset.roleSplit).toBe('whole');
+      expect(poolSegments(row)).toHaveLength(0);
+    }
+    expect(
+      container.querySelector('[data-testid="power-chip-compare-unsplit-note"]')?.textContent,
+    ).toContain('every GPU does both prefill and decode');
+    expect(container.querySelector('[data-testid="power-chip-compare-role-note"]')).not.toBeNull();
   });
 });

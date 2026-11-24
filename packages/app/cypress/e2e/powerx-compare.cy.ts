@@ -202,6 +202,7 @@ describe('AgentX All in Measured chart and table', () => {
       }
       cy.get('[data-testid="export-button"]').first().click();
       cy.get('[data-testid="export-csv-button"]').click();
+      cy.wrap(null).should(() => expect(csvBlob, 'CSV Blob').to.exist);
       cy.then(() => csvBlob!.text()).then((csv) => {
         const [header, ...data] = csv.split('\n').filter((line) => !line.startsWith('#'));
         const columns = header.split(',');

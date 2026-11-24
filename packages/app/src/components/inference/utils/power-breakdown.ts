@@ -158,7 +158,10 @@ export interface PowerLayerHighlight {
 
 export type PowerLayerTarget = Pick<PowerLayerHighlight, 'band' | 'category'>;
 
-export const bandTarget = (band: PowerBand): PowerLayerTarget => ({ band, category: null });
+export const bandTarget = (band: PowerBand): PowerLayerTarget => ({
+  band,
+  category: null,
+});
 
 export const partTarget = (category: SystemPowerCategory): PowerLayerTarget => ({
   band: powerBandOf(category),
@@ -259,7 +262,11 @@ export function powerBreakdownInteractivity(
       value: (point) => point[field as keyof InferenceData] as number | undefined,
     };
   }
-  return { field: 'median_intvty', fromChart: false, value: (point) => point.median_intvty };
+  return {
+    field: 'median_intvty',
+    fromChart: false,
+    value: (point) => point.median_intvty,
+  };
 }
 
 function powerBreakdownForPoint(
@@ -310,7 +317,10 @@ export function buildPowerBreakdowns(
   for (const point of observedPoints(points)) {
     const breakdown = powerBreakdownForPoint(
       point,
-      configs.get(equalServiceSourceKey(point)) ?? { key: equalServiceSourceKey(point), label: '' },
+      configs.get(equalServiceSourceKey(point)) ?? {
+        key: equalServiceSourceKey(point),
+        label: '',
+      },
       interactivity,
     );
     if (!breakdown) continue;
@@ -520,6 +530,8 @@ export interface PowerPartRow {
   max: number;
   /** Index of the selected point within `history`. */
   selectedIndex: number;
+  /** Set on the GPU row's per-pool rows under a GPU role: the pool and its measured draw. */
+  pool?: GpuPoolShare & { pool: GpuPool };
 }
 
 /**
@@ -776,4 +788,144 @@ export function bandAtWatts<K extends string>(
 ): StackedSegment<K> | null {
   if (!(watts >= 0)) return null;
   return bands.find((band) => band.watts > 0 && watts >= band.y0 && watts <= band.y1) ?? null;
+}
+
+/** One measured GPU pool of a disaggregated deployment. */
+export interface GpuPoolShare {
+  /** GPUs in the pool. */
+  gpus: number;
+  /** The pool's measured average board power per GPU. */
+  watts: number;
+  /** The pool's share of the deployment's measured GPU watts (the two pools sum to 1). */
+  share: number;
+}
+
+export type GpuPool = 'prefill' | 'decode';
+export const GPU_POOLS = ['prefill', 'decode'] as const satisfies readonly GpuPool[];
+
+export type GpuPoolSplit = Record<GpuPool, GpuPoolShare>;
+
+/**
+ * How a disaggregated point's measured GPU layer splits between its prefill and
+ * decode pools: each pool weighted by its GPU count × its measured W/GPU, so
+ * prefill share = Np·Wp / (Np·Wp + Nd·Wd). Null when the point cannot split: an
+ * aggregated run (every GPU does both) or a disaggregated one missing either
+ * pool's GPU count or measured watts. Only the GPU layer splits; the modeled
+ * layers describe the whole deployment.
+ */
+export function gpuPoolSplit(
+  point: Pick<
+    InferenceData,
+    | 'disagg'
+    | 'num_prefill_gpu'
+    | 'num_decode_gpu'
+    | 'measuredPrefillAvgPower'
+    | 'measuredDecodeAvgPower'
+  >,
+): GpuPoolSplit | null {
+  if (!point.disagg) return null;
+  const prefillGpus = point.num_prefill_gpu;
+  const decodeGpus = point.num_decode_gpu;
+  const prefillWatts = point.measuredPrefillAvgPower?.y;
+  const decodeWatts = point.measuredDecodeAvgPower?.y;
+  if (
+    !isPositive(prefillGpus) ||
+    !isPositive(decodeGpus) ||
+    !isPositive(prefillWatts) ||
+    !isPositive(decodeWatts)
+  ) {
+    return null;
+  }
+  const prefill = prefillGpus * prefillWatts;
+  const decode = decodeGpus * decodeWatts;
+  const total = prefill + decode;
+  return {
+    prefill: { gpus: prefillGpus, watts: prefillWatts, share: prefill / total },
+    decode: { gpus: decodeGpus, watts: decodeWatts, share: decode / total },
+  };
+}
+
+/** One pool's slice of a breakdown point's GPU layer, in the stack's W/GPU. */
+export interface GpuPoolSegment extends GpuPoolShare {
+  pool: GpuPool;
+  /** The pool's slice of the GPU layer (W per allocated GPU): layer × share. */
+  layerWatts: number;
+  /** Bottom and top of the slice in the stack (prefill sits under decode). */
+  y0: number;
+  y1: number;
+}
+
+/** The GPU layer of a breakdown point cut into its pools, bottom up; null when it cannot split. */
+export function gpuPoolSegments(
+  entry: Pick<PowerBreakdownPoint, 'point' | 'wattsPerGpu'>,
+): GpuPoolSegment[] | null {
+  const split = gpuPoolSplit(entry.point);
+  if (!split) return null;
+  const layer = bandWattsPerGpu(entry, 'gpu');
+  let y = 0;
+  return GPU_POOLS.map((pool) => {
+    const layerWatts = layer * split[pool].share;
+    const segment = {
+      pool,
+      ...split[pool],
+      layerWatts,
+      y0: y,
+      y1: y + layerWatts,
+    };
+    y += layerWatts;
+    return segment;
+  });
+}
+
+/** How a role other than All draws a pool: its own pool shown, the other dimmed. */
+export type GpuPoolEmphasis = 'shown' | 'dimmed';
+
+export function gpuPoolEmphasis(pools: readonly GpuPool[], pool: GpuPool): GpuPoolEmphasis {
+  return pools.includes(pool) ? 'shown' : 'dimmed';
+}
+
+/** A dimmed pool keeps this share of its layer's fill. */
+export const GPU_POOL_DIMMED_OPACITY = 0.3;
+
+/** Pool outlines match the chart's role dashes: prefill dashed, decode dotted. */
+export const GPU_POOL_DASH: Record<GpuPool, string> = {
+  prefill: '7 3',
+  decode: '2 3',
+};
+
+/**
+ * The parts list under a GPU role: the GPU row becomes one row per pool (prefill, then
+ * decode), each the pool's slice of the GPU layer with its GPU count and measured W/GPU;
+ * every other row is unchanged. A point that cannot split keeps its whole GPU row.
+ */
+export function powerPartRowsByPool(
+  series: Pick<PowerBreakdownSeries, 'points'>,
+  entry: PowerBreakdownPoint,
+): PowerPartRow[] {
+  const rows = powerPartRows(series, entry);
+  const segments = gpuPoolSegments(entry);
+  if (!segments) return rows;
+  const itWatts = breakdownItWattsPerGpu(entry);
+  return rows.flatMap((row) => {
+    if (row.category !== 'gpu') return [row];
+    return segments.map((segment): PowerPartRow => {
+      const history = series.points.map(
+        (point) =>
+          gpuPoolSegments(point)?.find((other) => other.pool === segment.pool)?.layerWatts ?? 0,
+      );
+      return {
+        ...row,
+        watts: segment.layerWatts,
+        share: itWatts > 0 ? segment.layerWatts / itWatts : 0,
+        history,
+        max: Math.max(0, ...history),
+        pool: {
+          pool: segment.pool,
+          gpus: segment.gpus,
+          watts: segment.watts,
+          share: segment.share,
+        },
+      };
+    });
+  });
 }

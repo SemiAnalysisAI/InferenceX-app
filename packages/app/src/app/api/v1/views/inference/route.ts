@@ -69,6 +69,7 @@ import {
   parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
+import { resolvePowerRoleParams, type PowerRoleSelection } from '@/lib/views-api/power-role';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import {
   comparisonSelections,
@@ -119,7 +120,9 @@ export const dynamic = 'force-dynamic';
  * e2e-normalized-interactivity mode falls back to interactivity, as the
  * dashboard does for fixed-seq), xmetric (default p90_ttft), percentile
  * (default p90), date, runId (exact workflow-run snapshot), gpus, vendors,
- * frameworks, deployment, spec, optimal, best, format (json|csv).
+ * frameworks, deployment, spec, optimal, best, format (json|csv), role
+ * (all|prefill|decode|split: the PowerX GPU role control, resolved by the same pure
+ * transforms the page runs; old role-specific metric keys are rewritten onto it).
  */
 
 const XMETRIC_VALUES = ['median_ttft', 'p75_ttft', 'p90_ttft', 'p95_ttft', 'p99_ttft'] as const;
@@ -153,6 +156,7 @@ interface InferenceViewParams {
   readonly userCosts: Record<string, number>;
   readonly userPowers: Record<string, number>;
   readonly pricing?: TokenRevenuePricing;
+  readonly powerRole: PowerRoleSelection;
 }
 
 interface InferenceViewData {
@@ -212,6 +216,7 @@ function buildView(
     userPowers: params.userPowers,
     pricing: params.pricing,
     derivedMetrics,
+    powerRole: params.powerRole,
   });
 
   return { resolvedPrecisions, result };
@@ -235,6 +240,7 @@ function csvRows(data: { result: Pick<InferenceSeriesResult, 'series' | 'tableRo
       vendor: entry.vendor ?? '',
       deployment: entry.deployment,
       kvOffload: entry.kvOffload,
+      ...(entry.powerRole ? { powerRole: entry.powerRole } : {}),
       x: point.x,
       y: point.y,
       concurrency: point.concurrency,
@@ -317,7 +323,12 @@ export function GET(request: NextRequest) {
     const { displayName, dbModelKeys } = resolveModelParam(search.get('model'));
     const sequence = parseSequenceParam(search.get('sequence'), Sequence.EightK_OneK);
     const precisions = parsePrecisionsParam(search.get('precisions'));
-    const metric = parseMetricParam(search.get('metric'));
+    // The GPU role pins the metric the page pins and rewrites old role-specific metric keys.
+    const powerRole = resolvePowerRoleParams(
+      parseMetricParam(search.get('metric')),
+      search.get('role'),
+    );
+    const metric = parseMetricParam(powerRole.metric);
     const requestedXMode = parseEnumParam<XAxisMode>(
       search.get('xmode'),
       'xmode',
@@ -429,6 +440,7 @@ export function GET(request: NextRequest) {
       userCosts,
       userPowers,
       pricing,
+      powerRole,
     };
 
     async function project(rows: BenchmarkRow[], scope: InferenceViewParams) {
@@ -592,6 +604,7 @@ export function GET(request: NextRequest) {
       sequence: sequence as string,
       precisions: data.resolvedPrecisions,
       metric,
+      role: powerRole.role,
       xmode,
       xstat: sequence === Sequence.AgenticTraces ? null : xstat,
       xmetric,
@@ -647,6 +660,9 @@ export function GET(request: NextRequest) {
       frontier: data.result.frontier,
       hardware: data.result.hardware,
       series: data.result.series,
+      ...(data.result.roleAggregated === undefined
+        ? {}
+        : { roleAggregated: data.result.roleAggregated }),
       ...(data.result.tableRows === undefined ? {} : { tableRows: data.result.tableRows }),
       count: data.result.count,
       comparisons,

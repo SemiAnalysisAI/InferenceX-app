@@ -181,6 +181,10 @@ import {
   powerVariantLabel,
   powerVariantsInData,
 } from '@/components/inference/utils/power-compare';
+import {
+  powerRoleHiddenVariants,
+  powerXRolePools,
+} from '@/components/inference/powerx/powerx-role';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   isAllInMeasuredConfigKey,
@@ -515,6 +519,9 @@ const SCATTER_STRINGS = {
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    lineStyleRole: 'Line style = GPU role',
+    aggregatedTag: 'aggregated',
+    aggregatedRoleReason: 'Not split: every GPU does both prefill and decode.',
     noRoleEnergyDataHint:
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
@@ -551,6 +558,9 @@ const SCATTER_STRINGS = {
     overflowLatency: (count: number, limit: number) => `${count} 个点 > ${limit}s TTFT`,
     noData: '暂无数据',
     noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    lineStyleRole: '线型 = GPU 角色',
+    aggregatedTag: '聚合',
+    aggregatedRoleReason: '未拆分：每块 GPU 同时承担预填充与解码。',
     noRoleEnergyDataHint:
       '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
     noMeasuredDataHint:
@@ -616,6 +626,7 @@ const ScatterGraph = React.memo(
       showFrameworkLabel,
       showParetoFrontier,
       paretoFrontierPlayful,
+      powerRole,
     } = useInferenceDisplay();
     const {
       setBestPerSku,
@@ -677,8 +688,21 @@ const ScatterGraph = React.memo(
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
     const legendT = SCATTER_STRINGS[locale];
-    const [hiddenPowerVariants, setHiddenPowerVariants] = useState<ReadonlySet<string>>(
+    const [hiddenSeriesChoice, setHiddenPowerVariants] = useState<ReadonlySet<string>>(
       () => new Set(),
+    );
+    // PowerX GPU role: the role decides which per-pool lines draw (the legend no longer
+    // toggles roles); the boundary legend keeps its own toggles.
+    const roleHiddenVariants = useMemo<ReadonlySet<string>>(
+      () => (powerXSurface ? powerRoleHiddenVariants(powerRole) : new Set<string>()),
+      [powerRole, powerXSurface],
+    );
+    const hiddenPowerVariants = useMemo<ReadonlySet<string>>(
+      () =>
+        roleHiddenVariants.size === 0
+          ? hiddenSeriesChoice
+          : new Set([...hiddenSeriesChoice, ...roleHiddenVariants]),
+      [hiddenSeriesChoice, roleHiddenVariants],
     );
     const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
@@ -924,7 +948,17 @@ const ScatterGraph = React.memo(
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
 
-    const displayedRooflines = showPowerEnvelope ? groupedData : rooflines;
+    // Series the GPU role leaves out are never drawn: no curve, point or label, not even a
+    // transparent one. The rows stay in `pointsData` for the legend's points table.
+    const displayedRooflines = useMemo(() => {
+      const curves = showPowerEnvelope ? groupedData : rooflines;
+      if (roleHiddenVariants.size === 0) return curves;
+      return Object.fromEntries(
+        Object.entries(curves).filter(
+          ([key]) => !roleHiddenVariants.has(parseScatterSeriesKey(key).variant ?? ''),
+        ),
+      );
+    }, [showPowerEnvelope, groupedData, rooflines, roleHiddenVariants]);
 
     const powerEnvelopePointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -998,6 +1032,15 @@ const ScatterGraph = React.memo(
           activeOverlayHwTypes.has(String(point.hwKey)),
       );
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
+    const drawnOverlayData = useMemo(
+      () =>
+        roleHiddenVariants.size === 0
+          ? processedOverlayData
+          : processedOverlayData.filter(
+              (point) => !roleHiddenVariants.has(powerVariantId(point.powerVariant)),
+            ),
+      [processedOverlayData, roleHiddenVariants],
+    );
 
     const processedOverlayClippedData = useMemo(() => {
       if (!overlayData?.clippedData) return EMPTY_CLIPPED_DATA;
@@ -1171,8 +1214,8 @@ const ScatterGraph = React.memo(
         variant: string | null;
         points: InferenceData[];
       }
-      if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
-      const grouped = processedOverlayData.reduce(
+      if (drawnOverlayData.length === 0) return {} as Record<string, Entry>;
+      const grouped = drawnOverlayData.reduce(
         (acc, p) => {
           const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
           const key = `${scatterSeriesKey(p)}_run${runIndex}`;
@@ -1190,7 +1233,7 @@ const ScatterGraph = React.memo(
         {} as Record<string, Entry>,
       );
       return grouped;
-    }, [processedOverlayData, runIndexByUrl]);
+    }, [drawnOverlayData, runIndexByUrl]);
 
     const overlayRooflines = useMemo(
       () =>
@@ -1253,6 +1296,13 @@ const ScatterGraph = React.memo(
     );
 
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
+    const drawnPointsData = useMemo(
+      () =>
+        roleHiddenVariants.size === 0
+          ? pointsData
+          : pointsData.filter((d) => !roleHiddenVariants.has(powerVariantId(d.powerVariant))),
+      [pointsData, roleHiddenVariants],
+    );
     const hasPersistedPoint = useMemo(
       () => pointsData.some((point) => isPersistedBenchmarkId(point.id)),
       [pointsData],
@@ -1378,21 +1428,27 @@ const ScatterGraph = React.memo(
     );
 
     const visiblePoints = useMemo(() => {
-      let pts = filteredData;
+      // Series the GPU role leaves out also leave the axes, so an undrawn all-GPU line cannot
+      // stretch the range the drawn pools read against. Legend toggles keep the axes still.
+      let pts =
+        roleHiddenVariants.size === 0
+          ? filteredData
+          : filteredData.filter((d) => !roleHiddenVariants.has(powerVariantId(d.powerVariant)));
       if (hideNonOptimal && !showPowerEnvelope) {
         pts = pts.filter((d) => optimalPointKeys.has(optimalPointKey(d)));
       }
-      const overlayPts = processedOverlayData.filter(
+      const overlayPts = drawnOverlayData.filter(
         (point) => !hideNonOptimal || showPowerEnvelope || overlayOptimalPoints.has(point),
       );
       return overlayPts.length > 0 ? [...pts, ...overlayPts] : pts;
     }, [
       filteredData,
-      processedOverlayData,
+      drawnOverlayData,
       hideNonOptimal,
       optimalPointKeys,
       overlayOptimalPoints,
       showPowerEnvelope,
+      roleHiddenVariants,
     ]);
 
     const isInputTputMetric = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -1479,12 +1535,12 @@ const ScatterGraph = React.memo(
     const dataIdentity = useMemo(
       () =>
         [
-          ...pointsData.map((point) => `official:${buildPointId(point)}`),
-          ...processedOverlayData.map((point) => `overlay:${scatterPointConfigId(point)}`),
+          ...drawnPointsData.map((point) => `official:${buildPointId(point)}`),
+          ...drawnOverlayData.map((point) => `overlay:${scatterPointConfigId(point)}`),
         ]
           .toSorted()
           .join('|'),
-      [pointsData, processedOverlayData, buildPointId],
+      [drawnPointsData, drawnOverlayData, buildPointId],
     );
     const metricIdentity = useMemo(
       () =>
@@ -1495,11 +1551,11 @@ const ScatterGraph = React.memo(
           selectedYAxisMetric,
           `${xScaleConfig.type}:${xScaleConfig.domain.join(',')}`,
           `${yScaleConfig.type}:${yScaleConfig.domain.join(',')}`,
-          ...pointsData.map(
+          ...drawnPointsData.map(
             (point) =>
               `${buildPointId(point)}:${point.date ?? ''}:${point.id ?? ''}:${point.run_url ?? ''}:${point.x}:${point.y}`,
           ),
-          ...processedOverlayData.map(
+          ...drawnOverlayData.map(
             (point) =>
               `overlay:${scatterPointConfigId(point)}:${point.date ?? ''}:${point.id ?? ''}:${point.run_url ?? ''}:${point.x}:${point.y}`,
           ),
@@ -1513,8 +1569,8 @@ const ScatterGraph = React.memo(
         showConcurrencyLabels,
         xScaleConfig,
         yScaleConfig,
-        pointsData,
-        processedOverlayData,
+        drawnPointsData,
+        drawnOverlayData,
         buildPointId,
       ],
     );
@@ -1778,9 +1834,29 @@ const ScatterGraph = React.memo(
 
     const powerVariantLegendItems = useMemo(() => {
       const allPoints = [...pointsData, ...processedOverlayData];
-      const variants = powerVariantsInData(allPoints, selectedYAxisMetric);
+      const roleShown = new Set<string>(powerXRolePools(powerRole));
+      const variants = powerVariantsInData(allPoints, selectedYAxisMetric).filter(
+        (variant) => variant.kind !== 'role' || !powerXSurface || roleShown.has(variant.id),
+      );
       const baseId = powerCompareBaseId;
       return variants.map((variant) => {
+        if (variant.kind === 'role' && powerXSurface) {
+          // A key, not a filter: the GPU role control above the chart picks the pools.
+          const id = powerVariantId(variant);
+          const legendId = `${POWER_VARIANT_LEGEND_PREFIX}${id}`;
+          return {
+            name: legendId,
+            hw: legendId,
+            label: powerVariantLabel(variant, locale, powerLabelStyle),
+            section: legendT.lineStyleRole,
+            color: 'var(--foreground)',
+            lineDasharray: powerVariantDash(variant) || '1 0',
+            forceLineSwatch: true,
+            isActive: true,
+            isRemovable: false,
+            onClick: () => {},
+          };
+        }
         const id = powerVariantId(variant);
         const legendId = `${POWER_VARIANT_LEGEND_PREFIX}${id}`;
         const isBase = id === baseId;
@@ -1823,7 +1899,24 @@ const ScatterGraph = React.memo(
       locale,
       powerLabelStyle,
       hiddenPowerVariants,
+      powerRole,
+      powerXSurface,
+      legendT,
     ]);
+
+    // Under a GPU role, chips with no per-pool line are aggregated: listed, dimmed, never
+    // dropped and never a reason to leave the role.
+    const roleSplitHwKeys = useMemo(() => {
+      if (!powerXSurface || powerRole === 'all') return null;
+      const shown = new Set<string>(powerXRolePools(powerRole));
+      return new Set(
+        [...pointsData, ...processedOverlayData]
+          .filter(
+            (point) => point.powerVariant?.kind === 'role' && shown.has(point.powerVariant.id),
+          )
+          .map((point) => String(point.hwKey)),
+      );
+    }, [powerXSurface, powerRole, pointsData, processedOverlayData]);
 
     const isRooflineVisible = useCallback(
       (el: SVGElement) => {
@@ -3131,7 +3224,7 @@ const ScatterGraph = React.memo(
       const scatterLayer: LayerConfig<InferenceData> = {
         type: 'scatter',
         key: 'points',
-        data: pointsData,
+        data: drawnPointsData,
         config: {
           getColor: (d) =>
             (showGradientLabels && gradientColorByPoint.get(d)) ||
@@ -3282,7 +3375,7 @@ const ScatterGraph = React.memo(
 
               const overlayPoints = zoomGroup
                 .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
-                .data(processedOverlayData, (_d, i) => String(i))
+                .data(drawnOverlayData, (_d, i) => String(i))
                 .join((enter) => {
                   const g = enter.append('g').attr('class', 'unofficial-overlay-pt');
                   g.append('circle')
@@ -3893,6 +3986,7 @@ const ScatterGraph = React.memo(
       overlayGradientLabelPoints,
       chartId,
       pointsData,
+      drawnPointsData,
       showPointLabels,
       pointLabelsVisible,
       useAdvancedLabels,
@@ -3902,6 +3996,7 @@ const ScatterGraph = React.memo(
       buildPointId,
       overlayData,
       processedOverlayData,
+      drawnOverlayData,
       displayedOverlayRooflines,
       officialOverflowContinuations,
       overlayOverflowContinuations,
@@ -4344,7 +4439,7 @@ const ScatterGraph = React.memo(
           instructions={minimalChrome || powerXSurface ? '' : undefined}
           chartId={chartId}
           height={plotHeight}
-          data={pointsData}
+          data={drawnPointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
           margin={chartMargin}
@@ -4462,13 +4557,16 @@ const ScatterGraph = React.memo(
                         getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                     )
                     .map(([key, hwConfig]: [string, any]) => {
-                      const isActive = showAllHardwareTypes
-                        ? true
-                        : effectiveOfficialHwTypes.has(key);
+                      const aggregated = roleSplitHwKeys !== null && !roleSplitHwKeys.has(key);
+                      const isActive =
+                        !aggregated &&
+                        (showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key));
                       const blocked = isActive ? undefined : blockedHwToggles.get(key);
                       return {
                         name: hwConfig.name,
-                        label: getDisplayLabel(hwConfig),
+                        label: aggregated
+                          ? `${getDisplayLabel(hwConfig)} · ${legendT.aggregatedTag}`
+                          : getDisplayLabel(hwConfig),
                         color: resolveColor(key),
                         lineDasharray:
                           powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
@@ -4476,18 +4574,21 @@ const ScatterGraph = React.memo(
                         isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
                         hw: key,
                         isActive,
-                        blockedReason: blocked
-                          ? describeEngineComparisonConflict(
-                              { kind: 'blocked', ...blocked },
-                              locale,
-                            )
-                          : undefined,
-                        onClick: showAllHardwareTypes
-                          ? () => {}
-                          : () => {
-                              handleToggleHwType(key);
-                              track('latency_hw_type_toggled', { gpu: key });
-                            },
+                        blockedReason: aggregated
+                          ? legendT.aggregatedRoleReason
+                          : blocked
+                            ? describeEngineComparisonConflict(
+                                { kind: 'blocked', ...blocked },
+                                locale,
+                              )
+                            : undefined,
+                        onClick:
+                          showAllHardwareTypes || aggregated
+                            ? () => {}
+                            : () => {
+                                handleToggleHwType(key);
+                                track('latency_hw_type_toggled', { gpu: key });
+                              },
                         onShowPoints: () => {
                           setPointsTableTarget({ kind: 'official', hwKey: key });
                           track('inference_legend_points_table_opened', {

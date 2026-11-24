@@ -693,3 +693,21 @@ describe('inferenceChartToCsv power comparison', () => {
     expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);
   });
 });
+
+describe('inferenceChartToCsv GPU role columns', () => {
+  it('writes pool sizes under a GPU role, "aggregated" never 0, and leaves All GPUs unchanged', () => {
+    const disagg = makePoint({ disagg: true, num_prefill_gpu: 8, num_decode_gpu: 32 });
+    const aggregated = makePoint({ hwKey: 'mi355x_sglang', num_prefill_gpu: 8, num_decode_gpu: 0 });
+    const csv = (role: 'prefill' | 'all') =>
+      inferenceChartToCsv([disagg, aggregated], 'dsr1', '1k/1k', [], undefined, { role });
+    const { headers, rows } = csv('prefill');
+    const prefill = headers.indexOf('Prefill GPUs');
+    const decode = headers.indexOf('Decode GPUs');
+    expect(rows.map((row) => [row[prefill], row[decode]])).toEqual([
+      [8, 32],
+      ['aggregated', 'aggregated'],
+    ]);
+    expect(rows[1][headers.indexOf('Num Decode Chips')]).toBe('aggregated');
+    expect(csv('all').headers).not.toContain('Prefill GPUs');
+  });
+});

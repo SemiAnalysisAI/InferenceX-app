@@ -87,10 +87,10 @@ export function energyPerFor(metric: string): EnergyPer {
 export function powerXViewFor(metric: string, compare: PowerCompare): PowerXView | null {
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
-  // The breakdown stacks and the prefill/decode split are the Where view; a boundary
-  // overlay (Count: All, the rated pair, or a share link's five lines) stays on the
-  // metric's own view.
-  if (compare === 'breakdown' || compare === 'roles') return 'where';
+  // The breakdown stacks are the Where view; a boundary overlay (Count: All, the rated
+  // pair, or a share link's five lines) and the per-role lines a GPU role draws stay on
+  // the metric's own view. Old `i_pcompare=roles` links are rewritten onto `i_role`.
+  if (compare === 'breakdown') return 'where';
   if (config.family === 'energy') return 'energy';
   return config.display === 'timeline' ? 'time' : 'draw';
 }
@@ -246,11 +246,10 @@ export function powerXSecondaryChangedCount(selection: PowerXSelection): number 
 }
 
 /**
- * Which of the measured-metric controls still mean something on a view:
- * Scope (All / Prefill / Decode GPUs) for GPU-only power and for per-token
- * energy, plus the Power statistic (Average / P75 / P90) for power. Timelines,
- * comparisons and the modeled IT and facility boundaries are defined for the
- * all-GPU average only.
+ * Which of the measured-metric controls still mean something on a view: the Power
+ * statistic (Average / P75 / P90) for GPU-only power. The GPU role control replaced
+ * Scope, so role-specific metric keys are never selected here; timelines, comparisons
+ * and the modeled IT and facility boundaries are defined for the all-GPU average only.
  */
 export function powerXMetricFields(
   metric: string,
@@ -259,12 +258,6 @@ export function powerXMetricFields(
   const config = getMeasuredMetricConfig(metric);
   const view = powerXViewFor(metric, compare);
   if (!config || !view || compare !== 'none' || config.basis !== 'gpu-measured') return [];
-  if (view === 'draw') return ['scope', 'statistic'];
-  if (
-    config.family === 'energy' &&
-    view === 'energy' &&
-    (config.denominator === 'input' || config.denominator === 'output')
-  )
-    return ['scope'];
+  if (view === 'draw') return ['statistic'];
   return [];
 }

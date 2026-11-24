@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 
 import { MeasuredMetricControls } from '@/components/inference/ui/MeasuredMetricControls';
-import { powerCompareAvailable } from '@/components/inference/utils/power-compare';
+import { powerVariantDash } from '@/components/inference/utils/power-compare';
 import { Badge } from '@/components/ui/badge';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -47,14 +47,19 @@ import {
   selectPowerXRated,
   selectPowerXShowAs,
   selectPowerXView,
-  VIEW_METRICS,
-  WHERE_COMPARE,
   type EnergyPer,
   type PowerXCount,
   type PowerXSelection,
   type PowerXShowAs,
   type PowerXView,
 } from './powerx-views';
+import {
+  POWERX_ROLES,
+  powerXPinnedControls,
+  powerXRoleEnergyPers,
+  resolvePowerXRole,
+  type PowerXRole,
+} from './powerx-role';
 
 const STRINGS = {
   en: {
@@ -91,6 +96,10 @@ const STRINGS = {
       gpu: 'GPU',
       measured: 'W',
       noModel: 'No IT model for this setup yet',
+      wholeDeployment: 'whole deployment',
+      prefill: 'Prefill',
+      decode: 'Decode',
+      poolGpus: (count: number, role: 'prefill' | 'decode') => `${count} ${role} GPUs`,
       pinned: 'Pinned point',
       hovered: 'Hovered point',
       scrubbed: 'Point under your finger · tap it for details',
@@ -121,13 +130,34 @@ const STRINGS = {
     compareAll: 'All-in provisioned',
     compareAllHelp:
       'Draws two lines per chip: measured GPU power (solid) and the all-in provisioned bound (dashed), nothing else.',
-    splitBy: 'Split by',
-    splitByHelp:
-      'Stack the GPU, IT and facility boundaries, or split measured GPU power between prefill and decode GPUs on disaggregated deployments.',
-    boundaries: 'Boundary',
-    roles: 'Prefill vs decode',
-    rolesUnavailable: 'Needs disaggregated prefill/decode results',
-    rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
+    role: 'GPU role',
+    roleNew: 'New',
+    roleHelp:
+      'Which GPUs of a disaggregated deployment the charts read: all of them, only the prefill pool, only the decode pool, or both pools side by side. Aggregated runs cannot split: every GPU does both.',
+    roles: {
+      all: 'All GPUs',
+      prefill: 'Prefill',
+      decode: 'Decode',
+      split: 'Prefill vs decode',
+    } satisfies Record<PowerXRole, string>,
+    roleHints: {
+      all: 'Every GPU of the deployment',
+      prefill: 'Only the GPUs that run prefill',
+      decode: 'Only the GPUs that run decode',
+      split: 'Prefill and decode pools side by side',
+    } satisfies Record<PowerXRole, string>,
+    countPinned:
+      'Pinned to GPU only: IT and facility are modeled for the whole deployment, not per GPU pool.',
+    perPinned: 'Pinned to Output: it is the one denominator prefill and decode share.',
+    perPrefill:
+      'Prefill GPUs: Output is reconstructed so it adds up with decode; Input is role-local.',
+    perComesBack: (choice: string) => `Your ${choice} choice comes back with All GPUs.`,
+    ratedPinned: 'Off under a GPU role: the all-in provisioned bound is per deployment.',
+    statisticPinned:
+      'P75 and P90 are time-weighted percentiles of the whole fleet, so they need All GPUs.',
+    headroomPinned:
+      'Headroom shading is off under a GPU role: it needs a P90 per GPU pool, which runs do not publish yet.',
+    tdpPerPool: '% of TDP per pool is the pool’s average draw over its rated TDP.',
     more: 'More',
     moreChanged: (count: number) => `More · ${count} changed`,
   },
@@ -165,6 +195,11 @@ const STRINGS = {
       gpu: 'GPU',
       measured: 'W',
       noModel: '该配置暂无 IT 功耗模型',
+      wholeDeployment: '整个部署',
+      prefill: '预填充',
+      decode: '解码',
+      poolGpus: (count: number, role: 'prefill' | 'decode') =>
+        `${count} 块${role === 'prefill' ? '预填充' : '解码'} GPU`,
       pinned: '已固定的数据点',
       hovered: '悬停的数据点',
       scrubbed: '手指所在的数据点 · 点按可查看详情',
@@ -192,13 +227,31 @@ const STRINGS = {
     compareOff: '关闭',
     compareAll: '整体预配',
     compareAllHelp: '每芯片仅绘制两条线：GPU 实测功耗（实线）与整体预配功耗（虚线）。',
-    splitBy: '拆分方式',
-    splitByHelp:
-      '按 GPU、IT 与数据中心边界堆叠，或在预填充/解码分离部署中将实测 GPU 功耗拆分为预填充与解码两部分。',
-    boundaries: '功耗边界',
-    roles: '预填充 vs 解码',
-    rolesUnavailable: '需要预填充/解码分离部署的结果',
-    rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
+    role: 'GPU 角色',
+    roleNew: '新',
+    roleHelp:
+      '图表读取分离式部署中的哪些 GPU：全部 GPU、仅预填充池、仅解码池，或并排对比两个池。聚合式部署无法拆分：每块 GPU 同时承担两者。',
+    roles: {
+      all: '全部 GPU',
+      prefill: '预填充',
+      decode: '解码',
+      split: '预填充 vs 解码',
+    } satisfies Record<PowerXRole, string>,
+    roleHints: {
+      all: '部署中的每块 GPU',
+      prefill: '仅承担预填充的 GPU',
+      decode: '仅承担解码的 GPU',
+      split: '并排对比预填充池与解码池',
+    } satisfies Record<PowerXRole, string>,
+    countPinned: '已固定为仅 GPU：IT 与数据中心功耗按整个部署建模，无法按 GPU 池拆分。',
+    perPinned: '已固定为输出：这是预填充与解码共用的唯一分母。',
+    perPrefill: '预填充 GPU：输出按重构值计算，可与解码相加；输入仅统计本角色。',
+    perComesBack: (choice: string) => `切回“全部 GPU”后恢复你选择的“${choice}”。`,
+    ratedPinned: '选择 GPU 角色时关闭：整体预配上限按整个部署计算。',
+    statisticPinned: 'P75 与 P90 是整个集群按时间加权的百分位，需选择“全部 GPU”。',
+    headroomPinned:
+      '选择 GPU 角色时不显示余量阴影：它需要按 GPU 池统计的 P90，目前运行结果尚未提供。',
+    tdpPerPool: '按池计算的 TDP 占比为该池平均功耗相对额定 TDP 的比例。',
     more: '更多',
     moreChanged: (count: number) => `更多 · 已更改 ${count} 项`,
   },
@@ -286,13 +339,28 @@ function Field({
 const CELL_TOGGLE_CLASS = 'self-start';
 const CELL_SEGMENT_CLASS = 'whitespace-nowrap';
 
-/** Count, Per and Show as for the Energy and Power draw views. */
+/** The line on screen that says why a GPU role pins a control. */
+function PinnedHint({ children, testId }: { children: ReactNode; testId: string }) {
+  return (
+    <span className="text-xs text-muted-foreground" data-testid={testId}>
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Count, Per and Show as for the Energy and Power draw views. `selection` is the user's
+ * stored choice; under a GPU role the pinned values show instead and the hint says why.
+ * Choosing an option a role allows still writes through to the stored choice.
+ */
 export function PowerXCountControls({
   selection,
   onSelectionChange,
+  role = 'all',
 }: {
   selection: PowerXSelection;
   onSelectionChange: (next: PowerXSelection) => void;
+  role?: PowerXRole;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -301,10 +369,22 @@ export function PowerXCountControls({
   const variant = useIsMobileViewport() ? 'select' : 'segments';
   const view = powerXViewFor(selection.metric, selection.compare);
   if (view !== 'energy' && view !== 'draw') return null;
-  const energyPer = energyPerFor(selection.metric);
-  const count = powerXCountFor(selection.metric, selection.compare);
+  const pinned = powerXPinnedControls(view, role);
+  const effective = resolvePowerXRole(selection, role);
+  const storedPer = energyPerFor(selection.metric);
+  const energyPer = energyPerFor(effective.metric);
+  const count = pinned.includes('count')
+    ? 'gpu'
+    : powerXCountFor(selection.metric, selection.compare);
+  const rolePers = powerXRoleEnergyPers(role);
   // Input-token and per-query energy are GPU-only; W per chip has every boundary.
   const modeledDisabled = view === 'energy' && !energyPerHasBoundaries(energyPer);
+  const countReason = pinned.includes('count') ? t.countPinned : null;
+  const modeledTitle = (help: string) =>
+    countReason ?? (modeledDisabled ? t.systemTokensOnly : help);
+  const perComesBack = rolePers.includes(storedPer as 'output' | 'input')
+    ? null
+    : t.perComesBack(t.perOptions[storedPer]);
   return (
     <>
       {/* Four segments: two cells wide from the sm grid up; one per row on phones. */}
@@ -327,23 +407,24 @@ export function PowerXCountControls({
             {
               value: 'it',
               label: POWER_COUNT_LABELS['it-modeled'][locale],
-              title: modeledDisabled ? t.systemTokensOnly : t.itHelp,
-              disabled: modeledDisabled,
+              title: modeledTitle(t.itHelp),
+              disabled: Boolean(countReason) || modeledDisabled,
             },
             {
               value: 'system',
               label: POWER_COUNT_LABELS['utility-modeled'][locale],
-              title: modeledDisabled ? t.systemTokensOnly : t.systemHelp,
-              disabled: modeledDisabled,
+              title: modeledTitle(t.systemHelp),
+              disabled: Boolean(countReason) || modeledDisabled,
             },
             {
               value: 'both',
               label: t.both,
-              title: modeledDisabled ? t.systemTokensOnly : t.bothHelp,
-              disabled: modeledDisabled,
+              title: modeledTitle(t.bothHelp),
+              disabled: Boolean(countReason) || modeledDisabled,
             },
           ]}
         />
+        {countReason && <PinnedHint testId="powerx-count-pinned">{countReason}</PinnedHint>}
       </Field>
       {view === 'energy' && (
         <Field label={t.per} tooltip={t.perHelp}>
@@ -358,19 +439,32 @@ export function PowerXCountControls({
             buttonClassName={CELL_SEGMENT_CLASS}
             onValueChange={(next) => {
               track('inference_powerx_energy_per_selected', { ...analyticsContext, per: next });
+              // Under a role Output is already drawn unless the stored unit is Input.
+              if (role !== 'all' && next === energyPer) return;
               onSelectionChange(selectPowerXPer(next, selection));
             }}
-            options={(['total', 'output', 'input', 'query'] as const).map((value) => ({
-              value,
-              label: t.perOptions[value],
-            }))}
+            options={(['total', 'output', 'input', 'query'] as const).map((value) => {
+              const off = role !== 'all' && !rolePers.includes(value as 'output' | 'input');
+              return {
+                value,
+                label: t.perOptions[value],
+                disabled: off,
+                title: off ? (role === 'prefill' ? t.perPrefill : t.perPinned) : undefined,
+              };
+            })}
           />
+          {role !== 'all' && (
+            <PinnedHint testId="powerx-per-pinned">
+              {role === 'prefill' ? t.perPrefill : t.perPinned}
+              {perComesBack && ` ${perComesBack}`}
+            </PinnedHint>
+          )}
         </Field>
       )}
       {view === 'draw' && (
         <Field label={t.showAs} tooltip={t.showAsHelp}>
           <SegmentedToggle<PowerXShowAs>
-            value={powerXShowAsFor(selection.metric)}
+            value={powerXShowAsFor(effective.metric)}
             ariaLabel={t.showAs}
             role="group"
             testId="powerx-unit"
@@ -392,9 +486,97 @@ export function PowerXCountControls({
               },
             ]}
           />
+          {role !== 'all' && powerXShowAsFor(effective.metric) === 'tdp' && (
+            <PinnedHint testId="powerx-headroom-pinned">
+              {t.tdpPerPool} {t.headroomPinned}
+            </PinnedHint>
+          )}
         </Field>
       )}
     </>
+  );
+}
+
+/** A line-style swatch for each GPU role, matching the chart: solid, dashed, dotted, both. */
+function swatchLine(dash: string, y: number) {
+  return (
+    <line
+      x1="1"
+      x2="17"
+      y1={y}
+      y2={y}
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeDasharray={dash || undefined}
+    />
+  );
+}
+
+function RoleSwatch({ role }: { role: PowerXRole }) {
+  const line = swatchLine;
+  return (
+    <svg width="18" height="10" viewBox="0 0 18 10" aria-hidden="true" className="shrink-0">
+      {role === 'all' && line('', 5)}
+      {role === 'prefill' && line(powerVariantDash({ kind: 'role', id: 'prefill' }), 5)}
+      {role === 'decode' && line(powerVariantDash({ kind: 'role', id: 'decode' }), 5)}
+      {role === 'split' && (
+        <>
+          {line(powerVariantDash({ kind: 'role', id: 'prefill' }), 2.5)}
+          {line(powerVariantDash({ kind: 'role', id: 'decode' }), 7.5)}
+        </>
+      )}
+    </svg>
+  );
+}
+
+/**
+ * The GPU role control: one choice for every view. It replaces Where's Split by, the
+ * Scope select and the legend's role filter, and lives in the URL as `i_role`.
+ */
+export function PowerXRoleControl({
+  role,
+  onRoleChange,
+}: {
+  role: PowerXRole;
+  onRoleChange: (role: PowerXRole) => void;
+}) {
+  const t = usePowerXStrings();
+  const analyticsContext = useInferenceAnalyticsContext();
+  const variant = useIsMobileViewport() ? 'select' : 'segments';
+  return (
+    <div
+      className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
+      data-testid="powerx-role"
+    >
+      <div className="flex items-center gap-1.5">
+        <LabelWithTooltip label={t.role} tooltip={t.roleHelp} />
+        <Badge variant="outline" className="py-0 text-2xs text-brand">
+          {t.roleNew}
+        </Badge>
+      </div>
+      <SegmentedToggle<PowerXRole>
+        value={role}
+        ariaLabel={t.role}
+        role="group"
+        testId="powerx-role-toggle"
+        size="default"
+        variant={variant}
+        className={CELL_TOGGLE_CLASS}
+        buttonClassName={CELL_SEGMENT_CLASS}
+        onValueChange={(next) => {
+          if (next === role) return;
+          track('powerx_role_changed', { ...analyticsContext, role: next, previous_role: role });
+          onRoleChange(next);
+        }}
+        options={POWERX_ROLES.map((value) => ({
+          value,
+          label: t.roles[value],
+          title: t.roleHints[value],
+          icon: <RoleSwatch role={value} />,
+          testId: `powerx-role-${value}`,
+        }))}
+      />
+    </div>
   );
 }
 
@@ -420,24 +602,29 @@ export function PowerXChartConfig({
   selection,
   onSelectionChange,
   slots,
+  role = 'all',
 }: {
   selection: PowerXSelection;
   onSelectionChange: (next: PowerXSelection) => void;
   slots?: PowerXChartConfigSlots;
+  role?: PowerXRole;
 }) {
   const t = usePowerXStrings();
   const analyticsContext = useInferenceAnalyticsContext();
   const phone = useIsMobileViewport();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
+  const view = powerXViewFor(selection.metric, selection.compare);
+  const pinned = powerXPinnedControls(view, role);
   const fields = powerXMetricFields(selection.metric, selection.compare);
-  const ratedAvailable = powerXRatedAvailable(selection.metric);
+  const ratedPinned = pinned.includes('rated');
+  const ratedAvailable = powerXRatedAvailable(selection.metric) || ratedPinned;
   // On: measured GPU power against the all-in provisioned bound, two lines per chip.
-  const ratedMode: 'none' | 'provisioned' = powerXRatedOn(selection.compare)
-    ? 'provisioned'
-    : 'none';
+  const ratedMode: 'none' | 'provisioned' =
+    !ratedPinned && powerXRatedOn(selection.compare) ? 'provisioned' : 'none';
   const measuredControls = fields.length > 0 && (
     <MeasuredMetricControls
+      statisticPinnedReason={pinned.includes('statistic') ? t.statisticPinned : undefined}
       metric={selection.metric}
       onChange={(metric) => {
         track('inference_powerx_measured_metric_selected', {
@@ -467,26 +654,42 @@ export function PowerXChartConfig({
         }}
         options={[
           { value: 'none', label: t.compareOff },
-          { value: 'provisioned', label: t.compareAll, title: t.compareAllHelp },
+          {
+            value: 'provisioned',
+            label: t.compareAll,
+            title: ratedPinned ? t.ratedPinned : t.compareAllHelp,
+            disabled: ratedPinned,
+          },
         ]}
       />
+      {ratedPinned && <PinnedHint testId="powerx-rated-pinned">{t.ratedPinned}</PinnedHint>}
     </Field>
   );
   if (!phone) {
     return (
       <div className="contents" data-testid="powerx-chart-config">
         {slots?.xAxisSelector}
-        <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
+        <PowerXCountControls
+          selection={selection}
+          onSelectionChange={onSelectionChange}
+          role={role}
+        />
         {measuredControls}
         {ratedControl}
       </div>
     );
   }
   const secondary = Boolean(slots?.xAxisSelector) || fields.length > 0 || ratedAvailable;
-  const changed = powerXSecondaryChangedCount(selection) + (slots?.xAxisChanged ? 1 : 0);
+  const changed =
+    powerXSecondaryChangedCount(ratedPinned ? { ...selection, compare: 'none' } : selection) +
+    (slots?.xAxisChanged ? 1 : 0);
   return (
     <div className="contents" data-testid="powerx-chart-config">
-      <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
+      <PowerXCountControls
+        selection={selection}
+        onSelectionChange={onSelectionChange}
+        role={role}
+      />
       {secondary && (
         <button
           type="button"
@@ -514,56 +717,6 @@ export function PowerXChartConfig({
         </div>
       )}
     </div>
-  );
-}
-
-/** Split by (Boundary | Prefill vs decode) with the reason when roles are unavailable. */
-export function PowerXSplitBy({
-  selection,
-  onSelectionChange,
-  rolesHaveData,
-}: {
-  selection: PowerXSelection;
-  onSelectionChange: (next: PowerXSelection) => void;
-  /** False when the loaded results carry no prefill/decode telemetry; undefined while unknown. */
-  rolesHaveData?: boolean;
-}) {
-  const t = usePowerXStrings();
-  const rolesSupported = powerCompareAvailable(VIEW_METRICS.where.gpu, 'roles');
-  const rolesAvailable = rolesSupported && rolesHaveData !== false;
-  const rolesReason = rolesSupported ? t.rolesNoData : t.rolesUnavailable;
-  return (
-    <Field label={t.splitBy} tooltip={t.splitByHelp}>
-      <SegmentedToggle<'boundaries' | 'roles'>
-        value={selection.compare === 'roles' ? 'roles' : 'boundaries'}
-        ariaLabel={t.splitBy}
-        role="group"
-        testId="powerx-split"
-        size="default"
-        className={CELL_TOGGLE_CLASS}
-        buttonClassName={CELL_SEGMENT_CLASS}
-        onValueChange={(value) =>
-          onSelectionChange({
-            metric: VIEW_METRICS.where.gpu,
-            compare: value === 'roles' ? 'roles' : WHERE_COMPARE,
-          })
-        }
-        options={[
-          { value: 'boundaries', label: t.boundaries },
-          {
-            value: 'roles',
-            label: t.roles,
-            disabled: !rolesAvailable,
-            title: rolesAvailable ? undefined : rolesReason,
-          },
-        ]}
-      />
-      {!rolesAvailable && (
-        <span className="text-xs text-muted-foreground" data-testid="powerx-roles-unavailable">
-          {t.roles}: {rolesReason}
-        </span>
-      )}
-    </Field>
   );
 }
 
@@ -617,9 +770,12 @@ export interface PowerXReadoutMetric {
 export function PowerXReadout({
   points,
   yMetric,
+  role = 'all',
 }: {
   points: readonly InferenceData[];
   yMetric?: PowerXReadoutMetric;
+  /** Under a GPU role the row adds each pool's W per GPU and tags IT / facility as whole-deployment. */
+  role?: PowerXRole;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale].readout;
@@ -644,6 +800,18 @@ export function PowerXReadout({
             ? t.nearestTouch(String(READOUT_INTERACTIVITY))
             : t.nearest(String(READOUT_INTERACTIVITY));
   const label = getDisplayLabel(getHardwareConfig(point.hwKey, point.model));
+  const pools =
+    role === 'all'
+      ? []
+      : (['prefill', 'decode'] as const).flatMap((pool) => {
+          const value =
+            pool === 'prefill' ? point.measuredPrefillAvgPower?.y : point.measuredDecodeAvgPower?.y;
+          const gpus = pool === 'prefill' ? point.num_prefill_gpu : point.num_decode_gpu;
+          return point.disagg && typeof value === 'number' && Number.isFinite(value)
+            ? [{ pool, watts: value, gpus: gpus ?? null }]
+            : [];
+        });
+  const whole = pools.length > 0 ? ` · ${t.wholeDeployment}` : '';
   return (
     <p
       className="mb-2 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground"
@@ -668,6 +836,7 @@ export function PowerXReadout({
           <ReadoutBadge testId="powerx-readout-it">
             {t.it}: <span className="font-medium text-foreground tabular-nums">{watts(it)}</span>{' '}
             {t.wPerGpu}
+            {whole}
             <PowerBasisPill tag="it" className="ml-0" />
           </ReadoutBadge>
           {perMw !== null && (
@@ -682,6 +851,7 @@ export function PowerXReadout({
               {t.facility}:{' '}
               <span className="font-medium text-foreground tabular-nums">{watts(facility)}</span>{' '}
               {t.atPue(String(pue))}
+              {whole}
               <PowerBasisPill tag="facility" className="ml-0" />
             </ReadoutBadge>
           )}
@@ -694,6 +864,15 @@ export function PowerXReadout({
           <PowerBasisPill tag="gpu" className="ml-0" />
         </ReadoutBadge>
       )}
+      {pools.map(({ pool, watts: poolWatts, gpus }) => (
+        <ReadoutBadge key={pool} testId={`powerx-readout-${pool}`}>
+          {t[pool]}:{' '}
+          <span className="font-medium text-foreground tabular-nums">{watts(poolWatts)}</span>{' '}
+          {t.measured}
+          {gpus !== null && ` · ${t.poolGpus(gpus, pool)}`}
+          <PowerBasisPill tag="gpu" className="ml-0" />
+        </ReadoutBadge>
+      ))}
       <span className="no-export text-2xs" data-testid="powerx-readout-source">
         {source}
       </span>

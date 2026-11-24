@@ -54,6 +54,9 @@ import {
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
+  GPU_POOL_DASH,
+  GPU_POOL_DIMMED_OPACITY,
+  gpuPoolSegments,
   HATCH_ANGLE,
   isHatchedBand,
   MEASURED_POWER_BANDS,
@@ -65,6 +68,8 @@ import {
   powerBreakdownPointLabels,
   stackedBandsAt,
   stackPowerBands,
+  type GpuPool,
+  type GpuPoolSegment,
   type PowerBand,
   type PowerBreakdownDisplaySeries,
   type PowerBreakdownPoint,
@@ -74,6 +79,7 @@ import {
   type PowerLayerTarget,
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
+import { powerXRolePools, type PowerXRole } from '../powerx/powerx-role';
 
 type PowerBreakdownView = 'bars' | 'area';
 
@@ -115,6 +121,8 @@ const STRINGS = {
       network: 'Network share',
       facility: 'Facility overhead',
     } satisfies Record<PowerBand, string>,
+    pools: { prefill: 'Prefill GPUs', decode: 'Decode GPUs' } satisfies Record<GpuPool, string>,
+    poolCount: (gpus: number, w: string) => `${gpus} × ${w} W`,
     categories: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -166,6 +174,8 @@ const STRINGS = {
       network: '网络分摊',
       facility: '机房开销',
     } satisfies Record<PowerBand, string>,
+    pools: { prefill: '预填充 GPU', decode: '解码 GPU' } satisfies Record<GpuPool, string>,
+    poolCount: (gpus: number, w: string) => `${gpus} × ${w} W`,
     categories: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -267,7 +277,13 @@ function interactivityColumnLayout(positions: readonly number[], plotWidth: numb
       MIN_BAR_PX,
       Math.min(MAX_BAR_PX, edge, (Number.isFinite(room) ? room : plotWidth) * BAR_GAP_FRACTION),
     );
-    return { center, barWidth, hitX: left, hitWidth: Math.max(1, right - left), room };
+    return {
+      center,
+      barWidth,
+      hitX: left,
+      hitWidth: Math.max(1, right - left),
+      room,
+    };
   });
 }
 
@@ -306,8 +322,10 @@ function tooltipHtml(
   t: (typeof STRINGS)['en'],
   totalLabel: string = t.total,
   highlight: PowerLayerHighlight | null = null,
+  pools: readonly GpuPool[] = [],
 ) {
   const { entry } = column;
+  const poolSegments = pools.length > 0 ? gpuPoolSegments(entry) : null;
   const bands = powerBandsOf(series.categories);
   const cell = (value: number) =>
     `<td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td>`;
@@ -321,8 +339,19 @@ function tooltipHtml(
       const bold = highlight?.band === band.key && highlight.category === null;
       const parts = bandPartsAt(entry, band.key);
       const suffix = band.key === 'facility' ? ` (${t.pue} ${entry.pue})` : '';
+      const poolRows =
+        band.key === 'gpu' && poolSegments
+          ? poolSegments
+              .toReversed()
+              .map(
+                (segment) =>
+                  `<tr data-pool="${segment.pool}" class="${pools.includes(segment.pool) ? '' : 'text-muted-foreground'}"><td class="pr-2 pl-4">${escapeHtml(`${t.pools[segment.pool]} · ${t.poolCount(segment.gpus, watts(segment.watts))}`)}</td><td></td>${cell(segment.layerWatts)}</tr>`,
+              )
+              .join('')
+          : '';
       const partRows =
-        parts.length > 1
+        poolRows ||
+        (parts.length > 1
           ? parts
               .toReversed()
               .map(
@@ -330,7 +359,7 @@ function tooltipHtml(
                   `<tr data-category="${part.category}" class="${highlight?.category === part.category ? 'font-semibold' : 'text-muted-foreground'}"><td class="pr-2 pl-4">${escapeHtml(t.categories[part.category])}</td><td></td>${cell(part.watts)}</tr>`,
               )
               .join('')
-          : '';
+          : '');
       return `<tr data-band="${band.key}" class="font-semibold${bold ? ' bg-muted/60' : ''}"><td class="pr-2">${tooltipSwatch(band.key, color)}${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 font-normal text-muted-foreground">${basis}</td>${cell(band.watts)}</tr>${partRows}`;
     })
     .join('');
@@ -357,7 +386,10 @@ function tooltipHtml(
           value: watts(entry.totalWattsPerGpu),
           label: `${totalLabel} · ${axisLabelUnit(t.yAxis)}`,
         },
-        { value: interactivityFormat(entry.interactivity), label: axisLabelUnit(xLabel) },
+        {
+          value: interactivityFormat(entry.interactivity),
+          label: axisLabelUnit(xLabel),
+        },
       ],
       body: `<table class="text-xs"><tbody>${rows}</tbody></table>${notes}`,
       summary: entry.configLabel || undefined,
@@ -368,6 +400,8 @@ function tooltipHtml(
 
 interface CursorLabel {
   band: PowerBand;
+  /** The GPU pool under the cursor when the GPU role splits the GPU layer. */
+  pool?: GpuPool;
   x: number;
   y: number;
   watts: number;
@@ -428,6 +462,53 @@ export interface ScrubControls {
   onScrub: (index: number | null, phase: ScrubPhase) => void;
 }
 
+/** One stacked area: a band, or under a GPU role one GPU pool (or the unsplit GPU layer). */
+interface AreaValue {
+  x: number;
+  y0: number;
+  y1: number;
+  defined: boolean;
+}
+
+interface AreaPiece {
+  key: PowerBand;
+  pool: GpuPool | null;
+  whole: boolean;
+  values: AreaValue[];
+}
+
+/**
+ * CSV columns a GPU role adds: each pool's GPUs, measured W/GPU and slice of the GPU
+ * layer. A point that cannot split reads "aggregated" (or "no pool telemetry"), never 0.
+ */
+const ROLE_CSV_COLUMNS = [
+  'prefill_gpus',
+  'prefill_measured_w_per_gpu',
+  'prefill_gpu_layer_w_per_gpu',
+  'decode_gpus',
+  'decode_measured_w_per_gpu',
+  'decode_gpu_layer_w_per_gpu',
+];
+
+function roleCsvCells(entry: PowerBreakdownPoint): (string | number)[] {
+  const segments = gpuPoolSegments(entry);
+  if (!segments) {
+    const reason = entry.point.disagg ? 'no pool telemetry' : 'aggregated';
+    return ROLE_CSV_COLUMNS.map(() => reason);
+  }
+  return segments.flatMap((segment) => [segment.gpus, segment.watts, segment.layerWatts]);
+}
+
+/** A stacked bar segment; GPU segments carry their pool when the GPU role splits them. */
+interface PoolStackSegment {
+  key: PowerBand;
+  y0: number;
+  y1: number;
+  watts: number;
+  column: Column;
+  pool: GpuPool | null;
+}
+
 function BreakdownChart({
   sectionId,
   series,
@@ -448,6 +529,7 @@ function BreakdownChart({
   coarsePointer,
   scrub,
   plotHeight = PLOT_HEIGHT,
+  pools = [],
 }: {
   sectionId: string;
   series: PowerBreakdownSeries;
@@ -481,8 +563,20 @@ function BreakdownChart({
    * the chart instead of the hover label and the tooltip; a tap still clicks.
    */
   scrub?: ScrubControls;
+  /**
+   * The GPU pools the PowerX GPU role draws: each column's GPU segment splits into its
+   * prefill and decode pools (outlined dashed / dotted), the pool left out dimmed. A
+   * column that cannot split keeps its GPU segment whole, dimmed.
+   */
+  pools?: readonly GpuPool[];
 }) {
   const labels = powerBreakdownPointLabels(series.points);
+  const splitByRole = pools.length > 0;
+  const poolsAt = (entry: PowerBreakdownPoint): GpuPoolSegment[] | null =>
+    splitByRole ? gpuPoolSegments(entry) : null;
+  /** GPU fill under a role: the pool the role leaves out, and an unsplit GPU layer, dim. */
+  const gpuFillScale = (pool: GpuPool | null) =>
+    splitByRole && (pool === null || !pools.includes(pool)) ? GPU_POOL_DIMMED_OPACITY : 1;
   const columns: Column[] = series.points.map((entry, index) => ({
     key: `${index}`,
     label: labels[index],
@@ -618,7 +712,9 @@ function BreakdownChart({
     height: number,
   ) => {
     const label = cursor.current;
-    const text = label ? `${nameOf(label.band)} · ${watts(label.watts)} W` : '';
+    const text = label
+      ? `${label.pool ? t.pools[label.pool] : nameOf(label.band)} · ${watts(label.watts)} W`
+      : '';
     const hint = label?.hint ?? '';
     const textWidth = Math.max(
       measureLabel(text, CURSOR_LABEL_FONT),
@@ -736,69 +832,130 @@ function BreakdownChart({
     const barWidth = (key: string) => layout[Number(key)].barWidth;
     const center = (key: string) => layout[Number(key)].center;
     const labelledColumns = labelledColumnsFor(ctx);
-    const segments = columns.flatMap((column) =>
-      stackPowerBands(column.entry, bands)
+    const segments = columns.flatMap((column) => {
+      const columnPools = poolsAt(column.entry);
+      return stackPowerBands(column.entry, bands)
         .filter((segment) => segment.watts > 0)
-        .map((segment) => ({ ...segment, column })),
-    );
+        .flatMap((segment): PoolStackSegment[] =>
+          segment.key === 'gpu' && columnPools
+            ? columnPools.map((pool) => ({
+                key: segment.key,
+                y0: pool.y0,
+                y1: pool.y1,
+                watts: pool.layerWatts,
+                column,
+                pool: pool.pool,
+              }))
+            : [{ ...segment, column, pool: null }],
+        );
+    });
 
     group
       .selectAll<SVGRectElement, (typeof segments)[number]>('rect.breakdown-bar')
-      .data(view === 'bars' ? segments : [], (d) => `${d.column.key}-${d.key}`)
+      .data(view === 'bars' ? segments : [], (d) => `${d.column.key}-${d.key}-${d.pool ?? ''}`)
       .join('rect')
       .attr('class', 'breakdown-bar')
       .attr('data-testid', 'power-breakdown-bar')
       .attr('data-band', (d) => d.key)
+      .attr('data-pool', (d) => d.pool)
       .attr('x', (d) => center(d.column.key) - barWidth(d.column.key) / 2)
       .attr('width', (d) => barWidth(d.column.key))
       .attr('y', (d) => y(d.y1))
       .attr('height', (d) => Math.max(0, y(d.y0) - y(d.y1)))
       .attr('rx', 1)
       .attr('fill', (d) => fill(d.key))
-      .attr('fill-opacity', (d) => layerStyle(d.key, null).fillOpacity)
-      .attr('stroke', color);
+      .attr(
+        'fill-opacity',
+        (d) => layerStyle(d.key, null).fillOpacity * (d.key === 'gpu' ? gpuFillScale(d.pool) : 1),
+      )
+      .attr('stroke', color)
+      .attr('stroke-dasharray', (d) => (d.pool ? GPU_POOL_DASH[d.pool] : null));
 
-    const areas = bands.map((key) => ({
-      key,
-      values: columns.map((column) => {
-        const segment = stackPowerBands(column.entry, bands).find(
-          (candidate) => candidate.key === key,
-        )!;
-        return { x: center(column.key), y0: segment.y0, y1: segment.y1 };
-      }),
-    }));
+    // Under a GPU role the GPU band is drawn as its pools where a column splits, and
+    // whole (dimmed) where it cannot; each piece is undefined on the other columns.
+    const areas = bands.flatMap((key): AreaPiece[] => {
+      const valuesFor = (pool: GpuPool | null, whole: boolean) =>
+        columns.map((column): AreaValue => {
+          const segment = stackPowerBands(column.entry, bands).find(
+            (candidate) => candidate.key === key,
+          )!;
+          const columnPools = key === 'gpu' ? poolsAt(column.entry) : null;
+          if (pool === null) {
+            return {
+              x: center(column.key),
+              y0: segment.y0,
+              y1: segment.y1,
+              defined: !whole || columnPools === null,
+            };
+          }
+          const piece = columnPools?.find((candidate) => candidate.pool === pool);
+          return {
+            x: center(column.key),
+            y0: piece?.y0 ?? segment.y0,
+            y1: piece?.y1 ?? segment.y1,
+            defined: piece !== undefined,
+          };
+        });
+      if (key !== 'gpu' || !splitByRole) {
+        return [{ key, pool: null, whole: false, values: valuesFor(null, false) }];
+      }
+      const pieces: AreaPiece[] = [
+        { key, pool: null, whole: true, values: valuesFor(null, true) },
+        {
+          key,
+          pool: 'prefill',
+          whole: false,
+          values: valuesFor('prefill', false),
+        },
+        {
+          key,
+          pool: 'decode',
+          whole: false,
+          values: valuesFor('decode', false),
+        },
+      ];
+      return pieces.filter((piece) => piece.values.some((value) => value.defined));
+    });
     const area = d3
-      .area<{ x: number; y0: number; y1: number }>()
+      .area<AreaValue>()
+      .defined((d) => d.defined)
       .x((d) => d.x)
       .y0((d) => y(d.y0))
       .y1((d) => y(d.y1))
       .curve(d3.curveMonotoneX);
     const edge = d3
-      .line<{ x: number; y1: number }>()
+      .line<AreaValue>()
+      .defined((d) => d.defined)
       .x((d) => d.x)
       .y((d) => y(d.y1))
       .curve(d3.curveMonotoneX);
     group
       .selectAll<SVGPathElement, (typeof areas)[number]>('path.breakdown-area')
-      .data(view === 'area' ? areas : [], (d) => d.key)
+      .data(view === 'area' ? areas : [], (d) => `${d.key}-${d.pool ?? (d.whole ? 'whole' : '')}`)
       .join('path')
       .attr('class', 'breakdown-area')
       .attr('data-testid', 'power-breakdown-area')
       .attr('data-band', (d) => d.key)
+      .attr('data-pool', (d) => d.pool)
       .attr('d', (d) => area(d.values))
       .attr('fill', (d) => fill(d.key))
-      .attr('fill-opacity', (d) => layerStyle(d.key, null).fillOpacity)
+      .attr(
+        'fill-opacity',
+        (d) => layerStyle(d.key, null).fillOpacity * (d.key === 'gpu' ? gpuFillScale(d.pool) : 1),
+      )
       .attr('stroke', 'none');
     // Each layer's top edge, 1 px in the chip colour; the stack's top edge is the chip's total.
     group
       .selectAll<SVGPathElement, (typeof areas)[number]>('path.breakdown-edge')
-      .data(view === 'area' ? areas : [], (d) => d.key)
+      .data(view === 'area' ? areas : [], (d) => `${d.key}-${d.pool ?? (d.whole ? 'whole' : '')}`)
       .join('path')
       .attr('class', 'breakdown-edge')
       .attr('data-band', (d) => d.key)
+      .attr('data-pool', (d) => d.pool)
       .attr('d', (d) => edge(d.values))
       .attr('fill', 'none')
       .attr('stroke', color)
+      .attr('stroke-dasharray', (d) => (d.pool ? GPU_POOL_DASH[d.pool] : null))
       .attr('pointer-events', 'none');
     group
       .selectAll<SVGCircleElement, Column>('circle.breakdown-total-dot')
@@ -820,7 +977,10 @@ function BreakdownChart({
         : [];
     group
       .selectAll<SVGTextElement, (typeof segments)[number]>('text.breakdown-segment-label')
-      .data(segmentLabels, (d) => `${d.column.key}-${d.key}`)
+      .data(
+        segmentLabels.filter((d) => d.key !== 'gpu' || gpuFillScale(d.pool) === 1),
+        (d) => `${d.column.key}-${d.key}-${d.pool ?? ''}`,
+      )
       .join('text')
       .attr('class', 'breakdown-segment-label')
       .attr('x', (d) => center(d.column.key))
@@ -929,7 +1089,11 @@ function BreakdownChart({
         const top = y(reference.value) - 4 - 12;
         return [
           reference.key,
-          { x, anchor, box: { left, right: left + width, top, bottom: top + 14 } },
+          {
+            x,
+            anchor,
+            box: { left, right: left + width, top, bottom: top + 14 },
+          },
         ];
       }),
     );
@@ -986,24 +1150,38 @@ function BreakdownChart({
     if (view === 'bars') {
       const { center, barWidth } = layout[Number(column.key)];
       const band = bandAtWatts(stackPowerBands(column.entry, bands), value);
+      const pool =
+        band?.key === 'gpu'
+          ? poolsAt(column.entry)?.find((piece) => value >= piece.y0 && value <= piece.y1)
+          : undefined;
       return band
         ? {
             band: band.key,
+            pool: pool?.pool,
             x: center + barWidth / 2 + 6,
-            y: (y(band.y0) + y(band.y1)) / 2,
-            watts: band.watts,
+            y: pool ? (y(pool.y0) + y(pool.y1)) / 2 : (y(band.y0) + y(band.y1)) / 2,
+            watts: pool?.layerWatts ?? band.watts,
             hint: hintFor(column),
           }
         : null;
     }
     const stack = stackedBandsAt(
-      columns.map((entry) => ({ x: layout[Number(entry.key)].center, entry: entry.entry })),
+      columns.map((entry) => ({
+        x: layout[Number(entry.key)].center,
+        entry: entry.entry,
+      })),
       mx,
       bands,
     );
     const band = bandAtWatts(stack, value);
     return band
-      ? { band: band.key, x: mx + 12, y: my - 10, watts: band.watts, hint: hintFor(column) }
+      ? {
+          band: band.key,
+          x: mx + 12,
+          y: my - 10,
+          watts: band.watts,
+          hint: hintFor(column),
+        }
       : null;
   };
 
@@ -1379,7 +1557,16 @@ function BreakdownChart({
           : {
               rulerType: 'none',
               content: (column) =>
-                tooltipHtml(series, column, color, xLabel, t, totalLabel, liveHighlight.current),
+                tooltipHtml(
+                  series,
+                  column,
+                  color,
+                  xLabel,
+                  t,
+                  totalLabel,
+                  liveHighlight.current,
+                  pools,
+                ),
               attachToLayer: 4,
               onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
               onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
@@ -1405,6 +1592,7 @@ export default function PowerBreakdownPanel({
   comparedPoints,
   onPinComparedPoint,
   onUnpinComparedPoint,
+  role = 'all',
 }: {
   chartId: string;
   data: InferenceData[];
@@ -1434,7 +1622,10 @@ export default function PowerBreakdownPanel({
   onPinComparedPoint?: (series: PowerBreakdownDisplaySeries, entry: PowerBreakdownPoint) => void;
   /** The slider's guide (or the column under it) was clicked: this chip follows the slider again. */
   onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
+  /** The PowerX GPU role: off All GPUs each column's GPU segment splits by pool. */
+  role?: PowerXRole;
 }) {
+  const pools = powerXRolePools(role);
   const locale = useLocale();
   const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
@@ -1456,7 +1647,11 @@ export default function PowerBreakdownPanel({
       buildPowerBreakdownsWithOverlays(
         data,
         overlayData.length > 0
-          ? { points: overlayData, runIndexByUrl, runInfos: unofficialRunInfos ?? [] }
+          ? {
+              points: overlayData,
+              runIndexByUrl,
+              runInfos: unofficialRunInfos ?? [],
+            }
           : undefined,
         locale,
         interactivity,
@@ -1562,6 +1757,7 @@ export default function PowerBreakdownPanel({
         'chassis_basis',
         'cpu_basis',
         'power_model_revision',
+        ...(pools.length > 0 ? ROLE_CSV_COLUMNS : []),
       ],
       breakdowns.flatMap((entry) =>
         entry.points.map((point) => [
@@ -1575,6 +1771,7 @@ export default function PowerBreakdownPanel({
           point.chassisBasis,
           point.cpuBasis,
           SYSTEM_POWER_MODEL_REVISION,
+          ...(pools.length > 0 ? roleCsvCells(point) : []),
         ]),
       ),
       contextLabel ? [contextLabel] : [],
@@ -1620,7 +1817,9 @@ export default function PowerBreakdownPanel({
                 value={series.key}
                 onValueChange={(value) => {
                   onSelectKey(value);
-                  track('inference_power_breakdown_source_selected', { ...analyticsContext });
+                  track('inference_power_breakdown_source_selected', {
+                    ...analyticsContext,
+                  });
                 }}
               >
                 <SelectTrigger
@@ -1656,8 +1855,16 @@ export default function PowerBreakdownPanel({
                 track('inference_power_breakdown_view_changed', { view: next });
               }}
               options={[
-                { value: 'bars', label: t.bars, testId: 'power-breakdown-view-bars' },
-                { value: 'area', label: t.area, testId: 'power-breakdown-view-area' },
+                {
+                  value: 'bars',
+                  label: t.bars,
+                  testId: 'power-breakdown-view-bars',
+                },
+                {
+                  value: 'area',
+                  label: t.area,
+                  testId: 'power-breakdown-view-area',
+                },
               ]}
             />
           </div>
@@ -1679,7 +1886,7 @@ export default function PowerBreakdownPanel({
                 />
               )}
               <BreakdownChart
-                key={`${series.key}-${view}`}
+                key={`${series.key}-${view}-${role}`}
                 sectionId={sectionId}
                 series={series}
                 color={color}
@@ -1701,6 +1908,7 @@ export default function PowerBreakdownPanel({
                 coarsePointer={coarsePointer}
                 scrub={touchScrub ? { index: scrubIndex, onScrub } : undefined}
                 plotHeight={touchScrub && phone ? PHONE_PLOT_HEIGHT : PLOT_HEIGHT}
+                pools={pools}
               />
               {touchScrub && readoutEntry && setCompareTarget && (
                 <button
@@ -1722,6 +1930,7 @@ export default function PowerBreakdownPanel({
                 highlight={layers.highlight}
                 onHover={layers.hover}
                 onTogglePin={layers.togglePin}
+                pools={pools}
               />
             )}
           </div>

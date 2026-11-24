@@ -60,6 +60,7 @@ import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import { usePowerXSurface } from './powerx-surface';
+import { usePowerXModelBadges } from '../powerx/PowerXModelBadges';
 import { powerXChangedCount } from '../powerx/powerx-views';
 import type { PowerXChartConfigSlots } from '../powerx/PowerXLayout';
 import {
@@ -272,6 +273,7 @@ export default function ChartControls({
         : availableModels,
     [availableModels, powerXSurface, tcoSource, featureGateUnlocked],
   );
+  const powerXModelBadges = usePowerXModelBadges(Boolean(powerXSurface), selectableModels);
   const analyticsContext = useInferenceAnalyticsContext();
 
   const visibleGroups = useMemo(
@@ -579,6 +581,7 @@ export default function ChartControls({
                 trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
                 modelDetails={modelDetails}
+                modelBadges={powerXModelBadges}
               />
             </div>
             {!isMobile && <div className="hidden md:contents">{scenarioSelector}</div>}

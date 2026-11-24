@@ -117,6 +117,7 @@ export function MeasuredMetricControls({
   onCompareChange,
   fields,
   className,
+  statisticPinnedReason,
 }: {
   metric: string;
   onChange: (metric: string) => void;
@@ -125,6 +126,8 @@ export function MeasuredMetricControls({
   /** Controls to render; all of them when omitted. */
   fields?: readonly MeasuredMetricField[];
   className?: string;
+  /** PowerX GPU role: the statistic reads Average and says why P75 / P90 are off. */
+  statisticPinnedReason?: string;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -277,7 +280,7 @@ export function MeasuredMetricControls({
                 className="self-start"
                 buttonClassName="whitespace-nowrap"
                 ariaLabel={t.statistic}
-                value={config.statistic}
+                value={statisticPinnedReason ? 'average' : config.statistic}
                 onValueChange={(statistic) => change({ statistic })}
                 options={(
                   [
@@ -288,9 +291,23 @@ export function MeasuredMetricControls({
                 ).map((option) => ({
                   ...option,
                   testId: `measured-power-statistic-${option.value}`,
-                  disabled: config.scope !== 'all' && option.value !== 'average',
+                  disabled:
+                    (Boolean(statisticPinnedReason) || config.scope !== 'all') &&
+                    option.value !== 'average',
+                  title:
+                    statisticPinnedReason && option.value !== 'average'
+                      ? statisticPinnedReason
+                      : undefined,
                 }))}
               />
+              {statisticPinnedReason && (
+                <span
+                  className="text-xs text-muted-foreground"
+                  data-testid="measured-power-statistic-pinned"
+                >
+                  {statisticPinnedReason}
+                </span>
+              )}
             </div>
           )}
           {show('display') && (
