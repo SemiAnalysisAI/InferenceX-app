@@ -612,6 +612,35 @@ it('reopens the model token selection and sweep mode from a share link', () => {
   cy.get('#operatorx-model-tokens').should('have.attr', 'aria-valuetext', 'All token counts');
 });
 
+it('filters the charts of an op opened from the model graph by their legend', () => {
+  const model = gemm.models[0];
+  const empty = (op: string) => ({ ...moe, op, model, modelOptions: [model] });
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', {
+    ...gemm,
+    model,
+    modelOptions: [model],
+  }).as('modelGemm');
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', empty('moe'));
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=attention*', empty('attention'));
+  cy.visit(`/opx/model?model=${encodeURIComponent(model)}`);
+  cy.wait('@modelGemm');
+  cy.get('button[data-testid^="operatorx-model-slot-"]:enabled').first().click();
+  cy.get('[data-testid="operatorx-model-slot-detail"]').within(() => {
+    // The roofline and metric vs size each list both GPUs.
+    cy.get('[data-testid="chart-legend"]').should('have.length', 2);
+    cy.get('[data-testid="chart-legend"] li input:checked').should('have.length', 4);
+    cy.get('[data-testid="chart-legend"] li label').first().click();
+    // Clicking a shown GPU isolates it in both charts, and the op stays open.
+    cy.get('[data-testid="chart-legend"] li input:checked').should('have.length', 2);
+    cy.get('[data-testid="chart-legend"]').each(($legend) => {
+      expect($legend.find('li input:checked')).to.have.length(1);
+    });
+  });
+  cy.location('search').should((search) =>
+    expect(new URLSearchParams(search).get('hardware')).to.be.oneOf(['h200', 'b200']),
+  );
+});
+
 const noModelResults = (op: string) => ({ ...moe, op, modelOptions: [] });
 
 it('lists the inference models and opens an OperatorX family link on its listed model', () => {
