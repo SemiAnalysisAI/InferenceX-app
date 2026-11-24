@@ -652,11 +652,22 @@ connections at 16 and above. Each connection holds up to about 1 GB while it com
 #### Log sanitization
 
 Ingest and `sync-public-db` sanitize server-log text with `etl/log-redaction.ts`, and
-`sync-public-db` also sanitizes runs from repositories that are not public.
+`sync-public-db` also sanitizes runs from repositories that are not public. The rules replace
+access tokens (`hf_`, GitHub, AWS access key IDs, Slack, `sk-` API keys and JWTs), URL passwords,
+public IPv4 and IPv6 addresses and `*.oraclevcn.com` host suffixes with `***REDACTED***`. Private,
+loopback, link-local and CGNAT addresses, internal node names, package versions such as
+`==9.19.0.56` and pip's `(9.19.0.56)` stay. The InferenceX uploader applies the same rules, and
+both sides test against `etl/log-redaction.vectors.json`, so change the two together.
+
+The log routes serve stored text as is and do not sanitize at read time. Rows stored before
+this change stay exposed until the backfill runs.
 `bun run admin:db:backfill-log-redaction` applies it to rows stored earlier in the public database
-(point `DATABASE_WRITE_URL` at it): dry run by default,
-`--write` to apply, `--run-id` to scope it, safe to rerun. Purge the log cache afterwards with
-`bun run admin:cache:invalidate -- <app-url> --immediate`.
+(point `DATABASE_WRITE_URL` at it). It is a dry run by default. `--write` applies it, `--run-id`
+scopes it to one run, and `--concurrency N` sanitizes N files at once. Each file is its own
+transaction, and its blocks are rebuilt from the sanitized text. Rerunning is safe because
+sanitized text is a fixed point. Besides log text, it sets `workflow_runs.html_url` to null for
+runs from repositories that are not public, once every file succeeded. Purge the log cache
+afterwards with `bun run admin:cache:invalidate -- <app-url> --immediate`.
 
 ### Agentic Dataset Provenance
 

@@ -1,16 +1,26 @@
 import type { PGlite } from '@electric-sql/pglite';
-import type { TransactionSql } from 'postgres';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from 'bun:test';
 
 import { writeTextAsBlocks } from '../etl/server-log-block-writer';
 import { readServerLogBlocks } from '../server-log-blocks';
 import {
+  backfillLogRedaction,
   listStoredServerLogFiles,
   redactStoredServerLogFile,
   sanitizeRunUrls,
   type StoredServerLogFile,
 } from './stored-redaction';
-import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
+import { migratedPglite, pgliteDriverSql, type PgliteSql } from './test-pglite';
 
 const RAW =
   'peer 198.51.100.7:9100 ready\nremote=[node-a.subnet1.vcn1.oraclevcn.com]:29501 via 10.0.0.21\n';
@@ -22,23 +32,48 @@ let sql: PgliteSql;
 
 beforeAll(async () => {
   db = await migratedPglite();
-  sql = pgliteSql(db);
-}, 30_000);
+  sql = await pgliteDriverSql(db);
+}, 20_000);
 
 afterAll(async () => {
+  await sql?.end();
   await db?.close();
 });
 
 beforeEach(async () => {
-  await db.exec('TRUNCATE server_logs RESTART IDENTITY CASCADE');
+  await db.exec('TRUNCATE workflow_runs, configs, server_logs RESTART IDENTITY CASCADE');
 });
 
 function redactStored(file: StoredServerLogFile, write: boolean) {
-  return sql.begin((tx) => redactStoredServerLogFile(tx as unknown as TransactionSql, file, write));
+  return sql.begin((tx) => redactStoredServerLogFile(tx, file, write));
 }
 
 function redactFile(fileName: string, primary: boolean, write: boolean) {
   return redactStored({ logId: '1', fileName, primary, shadowed: false, repositories: [] }, write);
+}
+
+function writeBlocks(logId: number, fileName: string, text: string) {
+  return sql.begin((tx) => writeTextAsBlocks(tx, logId, fileName, text));
+}
+
+async function decodedBlocks(logId: number, fileName: string, length: number) {
+  const blocks = await sql<
+    { char_offset: number; char_count: number; ascii: boolean; data: Uint8Array }[]
+  >`
+    select char_offset, char_count, ascii, data from server_log_blocks
+    where server_log_id = ${logId} and file_name = ${fileName}
+    order by block_index
+  `;
+  return readServerLogBlocks(
+    blocks.map((block) => ({
+      charOffset: block.char_offset,
+      charCount: block.char_count,
+      ascii: block.ascii,
+      data: block.data,
+    })),
+    0,
+    length,
+  );
 }
 
 async function storedLogs() {
@@ -57,9 +92,7 @@ describe('redactStoredServerLogFile', () => {
       insert into server_log_files (server_log_id, file_name, log_text)
       values (1, 'results/router.log', ${RAW})
     `;
-    await sql.begin((tx) =>
-      writeTextAsBlocks(tx as unknown as TransactionSql, 1, 'results/router.log', RAW),
-    );
+    await writeBlocks(1, 'results/router.log', RAW);
   });
 
   it('reports a block-backed file in a dry run without writing', async () => {
@@ -81,25 +114,8 @@ describe('redactStoredServerLogFile', () => {
     });
 
     expect(await storedLogs()).toEqual({ primary: REDACTED, child: REDACTED });
-    const blocks = await sql<
-      { char_offset: number; char_count: number; ascii: boolean; data: Uint8Array }[]
-    >`
-      select char_offset, char_count, ascii, data from server_log_blocks
-      where server_log_id = 1 and file_name = 'results/router.log'
-      order by block_index
-    `;
-    const decoded = readServerLogBlocks(
-      blocks.map((block) => ({
-        charOffset: block.char_offset,
-        charCount: block.char_count,
-        ascii: block.ascii,
-        data: block.data,
-      })),
-      0,
-      REDACTED.length,
-    );
-    expect(decoded).toBe(REDACTED);
-    expect(await sql`select char_count, block_count from server_log_block_files`).toEqual([
+    expect(await decodedBlocks(1, 'results/router.log', REDACTED.length)).toBe(REDACTED);
+    expect(await sql`select char_count::int, block_count from server_log_block_files`).toEqual([
       { char_count: REDACTED.length, block_count: 1 },
     ]);
     expect(await sql`select count(*)::int as n from server_log_blocks`).toEqual([{ n: 1 }]);
@@ -120,9 +136,7 @@ describe('redactStoredServerLogFile', () => {
       insert into server_log_files (server_log_id, file_name, log_text)
       values (1, 'results/server.log', ${child})
     `;
-    await sql.begin((tx) =>
-      writeTextAsBlocks(tx as unknown as TransactionSql, 1, 'results/server.log', RAW),
-    );
+    await writeBlocks(1, 'results/server.log', RAW);
 
     const files = await listStoredServerLogFiles(sql, undefined);
     expect(files.map(({ fileName, primary, shadowed }) => [fileName, primary, shadowed])).toEqual([
@@ -132,24 +146,7 @@ describe('redactStoredServerLogFile', () => {
     ]);
     for (const file of files) await redactStored(file, true);
 
-    const blocks = await sql<
-      { char_offset: number; char_count: number; ascii: boolean; data: Uint8Array }[]
-    >`
-      select char_offset, char_count, ascii, data from server_log_blocks
-      where server_log_id = 1 and file_name = 'results/server.log'
-      order by block_index
-    `;
-    const decoded = readServerLogBlocks(
-      blocks.map((block) => ({
-        charOffset: block.char_offset,
-        charCount: block.char_count,
-        ascii: block.ascii,
-        data: block.data,
-      })),
-      0,
-      REDACTED.length,
-    );
-    expect(decoded).toBe(REDACTED);
+    expect(await decodedBlocks(1, 'results/server.log', REDACTED.length)).toBe(REDACTED);
     expect(
       await sql`select log_text from server_log_files where file_name = 'results/server.log'`,
     ).toEqual([{ log_text: 'child ***REDACTED***\n' }]);
@@ -163,28 +160,29 @@ const PRIVATE_LOG =
 const PRIVATE_CHILD =
   'pip install private-repo-tools\n/_work/private-repo/private-repo/router.py\n';
 const PUBLIC_LOG = 'cd /_work/public-repo/public-repo\n';
+/** GitHub's API as an unauthenticated caller sees it: only `public-repo` is public. */
+const githubVisibility = ((url: string) =>
+  Promise.resolve(
+    url === 'https://api.github.com/repos/example-org/public-repo'
+      ? Response.json({ private: false })
+      : new Response(null, { status: 404 }),
+  )) as typeof fetch;
+
+afterEach(() => {
+  mock.restore();
+});
 
 async function stored() {
   return {
     runs: await sql`select github_run_id::int, html_url from workflow_runs order by id`,
     logs: await sql`select server_log from server_logs order by id`,
-    files: await sql`select log_text from server_log_files`,
+    files: await sql`select log_text from server_log_files order by server_log_id, file_name`,
   };
 }
 
-describe('backfill of runs from repositories that are not public', () => {
+describe('runs from repositories that are not public', () => {
   beforeEach(async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        Promise.resolve(
-          url === 'https://api.github.com/repos/example-org/public-repo'
-            ? Response.json({ private: false })
-            : new Response(null, { status: 404 }),
-        ),
-      ),
-    );
-    await db.exec('TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE');
+    spyOn(globalThis, 'fetch').mockImplementation(githubVisibility);
     await sql`
       insert into workflow_runs (id, github_run_id, run_attempt, name, created_at, date, html_url)
       values (1, 101, 1, 'Run Sweep', '2026-11-01T00:00:00Z', '2026-11-01', ${PRIVATE_URL}),
@@ -209,10 +207,6 @@ describe('backfill of runs from repositories that are not public', () => {
       values (1, 1, 'single_turn', '2026-11-01', 1024, 1024, 1, '{}', 1),
         (2, 1, 'single_turn', '2026-11-01', 1024, 1024, 1, '{}', 2)
     `);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it('sanitizes the logs and run URL of a private run and leaves a public run untouched', async () => {
@@ -288,5 +282,137 @@ describe('backfill of runs from repositories that are not public', () => {
       { github_run_id: 101, html_url: PRIVATE_URL },
       { github_run_id: 102, html_url: PUBLIC_URL },
     ]);
+  });
+});
+
+/** Every row of the tables the backfill reads, as JSON, in a stable order. */
+async function snapshot() {
+  const tables = [
+    'workflow_runs',
+    'configs',
+    'benchmark_results',
+    'server_logs',
+    'server_log_files',
+    'server_log_block_files',
+    'server_log_blocks',
+  ];
+  const rows: Record<string, Record<string, unknown>[]> = {};
+  for (const table of tables) {
+    const result = await db.query<{ row: Record<string, unknown> }>(
+      `select to_jsonb(t) as row from ${table} t order by to_jsonb(t)::text`,
+    );
+    rows[table] = result.rows.map((r) => r.row);
+  }
+  return rows;
+}
+
+describe('backfillLogRedaction', () => {
+  const PUBLIC_ROUTER = 'router up on 198.51.100.20:8000\n';
+  const PRIVATE_SERVER =
+    'clone https://github.com/example-org/private-repo\n' +
+    'token hf_abcdefghijklmnopqrstuvwxyzABCDEF12 from 203.0.113.5\n';
+  const quiet = { log: () => {}, error: () => {} };
+
+  beforeEach(async () => {
+    spyOn(globalThis, 'fetch').mockImplementation(githubVisibility);
+    await sql`
+      insert into workflow_runs (id, github_run_id, run_attempt, name, created_at, date, html_url)
+      values (1, 101, 1, 'Run Sweep', '2026-11-01T00:00:00Z', '2026-11-01', ${PRIVATE_URL}),
+        (2, 102, 1, 'Run Sweep', '2026-11-01T00:00:00Z', '2026-11-01', ${PUBLIC_URL}),
+        (3, 103, 1, 'Run Sweep', '2026-11-01T00:00:00Z', '2026-11-01', null)
+    `;
+    await db.exec(`
+      insert into configs (id, model, hardware, framework, precision, spec_method, disagg,
+        is_multinode, prefill_tp, decode_tp, num_prefill_gpu, num_decode_gpu)
+      values (1, 'dsv4', 'gb200', 'dynamo-vllm', 'fp4', 'none', true, true, 4, 8, 8, 16)
+    `);
+    await sql`
+      insert into server_logs (server_log, file_name, files_complete)
+      values (${PRIVATE_SERVER}, 'results/server.log', true),
+        (${RAW}, 'results/server.log', true),
+        ('nothing to hide on 10.0.0.4\n', 'results/server.log', true)
+    `;
+    await sql`
+      insert into server_log_files (server_log_id, file_name, log_text)
+      values (1, 'results/router.log', ${PRIVATE_CHILD}), (2, 'results/router.log', ${PUBLIC_ROUTER})
+    `;
+    await writeBlocks(2, 'results/server.log', RAW);
+    await writeBlocks(2, 'results/router.log', PUBLIC_ROUTER);
+    await db.exec(`
+      insert into benchmark_results
+        (workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, metrics, server_log_id)
+      values
+        (1, 1, 'single_turn', '2026-11-01', 1024, 1024, 1, '{"throughput": 198.51}', 1),
+        (2, 1, 'single_turn', '2026-11-01', 1024, 1024, 1, '{"host": "198.51.100.7"}', 2),
+        (3, 1, 'single_turn', '2026-11-01', 1024, 1024, 1, '{}', 3)
+    `);
+  });
+
+  it('writes nothing in a dry run', async () => {
+    const before = await snapshot();
+
+    expect(
+      await backfillLogRedaction(sql, { runId: undefined, write: false, concurrency: 2, ...quiet }),
+    ).toEqual({ files: 5, changed: 4, blockBacked: 2, failed: 0, runUrls: 1 });
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('sanitizes only log text and private run URLs, and a second run changes nothing', async () => {
+    const before = await snapshot();
+
+    expect(
+      await backfillLogRedaction(sql, { runId: undefined, write: true, concurrency: 2, ...quiet }),
+    ).toEqual({ files: 5, changed: 4, blockBacked: 2, failed: 0, runUrls: 1 });
+    const once = await snapshot();
+    expect(
+      await backfillLogRedaction(sql, { runId: undefined, write: true, concurrency: 2, ...quiet }),
+    ).toEqual({ files: 5, changed: 0, blockBacked: 0, failed: 0, runUrls: 0 });
+    expect(await snapshot()).toEqual(once);
+
+    // Rows other than log text are untouched; run URLs change only for the private run.
+    expect(once.configs).toEqual(before.configs);
+    expect(once.benchmark_results).toEqual(before.benchmark_results);
+    expect(once.workflow_runs!.map((run) => ({ ...run, html_url: null }))).toEqual(
+      before.workflow_runs!.map((run) => ({ ...run, html_url: null })),
+    );
+    expect(await stored()).toEqual({
+      runs: [
+        { github_run_id: 101, html_url: null },
+        { github_run_id: 102, html_url: PUBLIC_URL },
+        { github_run_id: 103, html_url: null },
+      ],
+      logs: [
+        {
+          server_log:
+            'clone https://github.com/***REDACTED***\n' +
+            'token ***REDACTED*** from ***REDACTED***\n',
+        },
+        { server_log: REDACTED },
+        { server_log: 'nothing to hide on 10.0.0.4\n' },
+      ],
+      files: [
+        {
+          log_text:
+            'pip install private-repo-tools\n/_work/***REDACTED***/***REDACTED***/router.py\n',
+        },
+        { log_text: 'router up on ***REDACTED***:8000\n' },
+      ],
+    });
+    const router = 'router up on ***REDACTED***:8000\n';
+    expect(await decodedBlocks(2, 'results/server.log', REDACTED.length)).toBe(REDACTED);
+    expect(await decodedBlocks(2, 'results/router.log', router.length)).toBe(router);
+  });
+
+  it('scopes to --run-id and leaves other runs alone', async () => {
+    const before = await snapshot();
+
+    expect(
+      await backfillLogRedaction(sql, { runId: 102, write: true, concurrency: 1, ...quiet }),
+    ).toEqual({ files: 2, changed: 2, blockBacked: 2, failed: 0, runUrls: 0 });
+    const after = await snapshot();
+    expect(after.workflow_runs).toEqual(before.workflow_runs);
+    expect(after.server_logs!.filter((log) => log.id !== 2)).toEqual(
+      before.server_logs!.filter((log) => log.id !== 2),
+    );
   });
 });

@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { isPublicRepository, sanitizeLogText } from './repo-visibility';
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  mock.restore();
 });
 
 describe('sanitizeLogText', () => {
@@ -27,8 +27,7 @@ describe('isPublicRepository', () => {
     ['private-a', false, () => Promise.resolve(Response.json({ private: true }))],
     ['missing-a', false, () => Promise.resolve(new Response(null, { status: 404 }))],
   ])('%s is public: %s', async (name, expected, respond) => {
-    const fetchMock = vi.fn(respond);
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = spyOn(globalThis, 'fetch').mockImplementation(respond as typeof fetch);
 
     expect(await isPublicRepository(`example-org/${name}`)).toBe(expected);
     expect(await isPublicRepository(`example-org/${name}`)).toBe(expected);
@@ -39,7 +38,7 @@ describe('isPublicRepository', () => {
     ['limited-a', () => Promise.resolve(new Response(null, { status: 403 }))],
     ['offline-a', () => Promise.reject(new TypeError('fetch failed'))],
   ])('%s fails instead of guessing', async (name, respond) => {
-    vi.stubGlobal('fetch', vi.fn(respond));
+    spyOn(globalThis, 'fetch').mockImplementation(respond as typeof fetch);
     await expect(isPublicRepository(`example-org/${name}`)).rejects.toThrow();
   });
 });

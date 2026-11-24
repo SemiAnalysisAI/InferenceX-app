@@ -139,6 +139,31 @@
       "name": "compact json url next to an email kept",
       "input": "{\"url\":\"http://10.0.0.5:8000\",\"owner\":\"a@example.com\"}",
       "output": "{\"url\":\"http://10.0.0.5:8000\",\"owner\":\"a@example.com\"}"
+    },
+    {
+      "name": "jwt access token",
+      "input": "(b'X-Xet-Access-Token', b'eyJhbGciOiJIUzI1NiJ9.eyJyZXBvSWQiOiIxMjMiLCJhY2Nlc3MiOiJSRUFEIn0.c2lnbmF0dXJlLWJ5dGVz')",
+      "output": "(b'X-Xet-Access-Token', b'***REDACTED***')"
+    },
+    {
+      "name": "lone base64 json segment kept",
+      "input": "payload eyJyZXBvSWQiOiIxMjMiLCJhY2Nlc3MiOiJSRUFEIn0",
+      "output": "payload eyJyZXBvSWQiOiIxMjMiLCJhY2Nlc3MiOiJSRUFEIn0"
+    },
+    {
+      "name": "pip installed version kept",
+      "input": "Requirement already satisfied: nvidia-cudnn-cu13==9.19.0.56 in /opt/conda/lib/python3.12/site-packages (from torch==2.11.0) (9.19.0.56)",
+      "output": "Requirement already satisfied: nvidia-cudnn-cu13==9.19.0.56 in /opt/conda/lib/python3.12/site-packages (from torch==2.11.0) (9.19.0.56)"
+    },
+    {
+      "name": "public ipv4 in parentheses",
+      "input": "connected (198.51.100.10)",
+      "output": "connected (***REDACTED***)"
+    },
+    {
+      "name": "public mq_connect_ip",
+      "input": "master_addr=127.0.0.1, mq_connect_ip=203.0.113.20 (local), world_size=8",
+      "output": "master_addr=127.0.0.1, mq_connect_ip=***REDACTED*** (local), world_size=8"
     }
   ]
 }

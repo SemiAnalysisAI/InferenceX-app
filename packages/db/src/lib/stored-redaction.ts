@@ -134,3 +134,64 @@ export async function redactStoredServerLogFile(
   }
   return { changed: true, blockBacked: Boolean(marker) };
 }
+
+export interface LogRedactionBackfillOptions {
+  /** GitHub run ID to scope the backfill to; every run when undefined. */
+  runId: number | undefined;
+  write: boolean;
+  /** Files sanitized at once, each in its own transaction. */
+  concurrency: number;
+  log?: (line: string) => void;
+  error?: (line: string) => void;
+}
+
+export interface LogRedactionBackfillResult {
+  files: number;
+  changed: number;
+  blockBacked: number;
+  failed: number;
+  /** Run URLs from repositories that are not public; null when a failed file left them alone. */
+  runUrls: number | null;
+}
+
+/**
+ * Sanitize every stored server-log file in scope, one transaction per file, then the run URLs of
+ * repositories that are not public. Logs are sanitized against those URLs, so the URLs change only
+ * after every file succeeded and a rerun still knows which repositories to remove.
+ */
+export async function backfillLogRedaction(
+  sql: Sql,
+  {
+    runId,
+    write,
+    concurrency,
+    log = console.log,
+    error = console.error,
+  }: LogRedactionBackfillOptions,
+): Promise<LogRedactionBackfillResult> {
+  const files = await listStoredServerLogFiles(sql, runId);
+  log(`Scanning ${files.length} server-log file(s)`);
+  let changed = 0;
+  let blockBacked = 0;
+  let failed = 0;
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (next < files.length) {
+        const file = files[next++]!;
+        try {
+          const result = await sql.begin((tx) => redactStoredServerLogFile(tx, file, write));
+          if (!result.changed) continue;
+          changed++;
+          if (result.blockBacked) blockBacked++;
+          log(`  ${file.logId} ${file.fileName}: ${write ? 'sanitized' : 'would change'}`);
+        } catch (error_) {
+          failed++;
+          error(`  ✗ ${file.logId} ${file.fileName}: ${String(error_)}`);
+        }
+      }
+    }),
+  );
+  const runUrls = failed > 0 ? null : await sanitizeRunUrls(sql, runId, write);
+  return { files: files.length, changed, blockBacked, failed, runUrls };
+}

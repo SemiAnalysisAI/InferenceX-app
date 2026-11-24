@@ -14,6 +14,8 @@ const SECRET_PATTERNS = [
   /\bAKIA[0-9A-Z]{16}\b/gu,
   /\bxox[abprs]-[A-Za-z0-9-]{10,}/gu,
   /\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{32,}/gu,
+  // A JWT: base64url `{"…` header and payload, then a signature (e.g. HF Xet access tokens).
+  /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/gu,
 ];
 const URL_PASSWORD = /(?<userinfo>\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@"',;<>]*:)[^\s@/"',;<>]+@/gu;
 const ORACLE_VCN =
@@ -24,6 +26,8 @@ const OCTET = String.raw`(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)`;
 const IPV4 = new RegExp(String.raw`(?<![\w.])(?:${OCTET}\.){3}${OCTET}(?![\w]|\.\d)`, 'gu');
 const VERSION_OPERATORS = ['==', '!=', '>=', '<=', '~='];
 const PACKAGE_NAME_SUFFIX = /[A-Za-z0-9]-$/u;
+/** pip ends this line with the installed version in parentheses, `… (9.19.0.56)`. */
+const PIP_SATISFIED = 'Requirement already satisfied:';
 const ADDRESS_KEY = /host|addr|ip|url|uri|endpoint|server|peer|remote|bind|master|node|target/iu;
 const WHITESPACE = /\s/u;
 
@@ -46,9 +50,16 @@ function jsonValueKey(text: string, start: number): string | null {
   return text.slice(open + 1, at);
 }
 
+function isPipInstalledVersion(text: string, start: number, end: number): boolean {
+  if (text[start - 1] !== '(' || text[end] !== ')') return false;
+  const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+  return text.slice(lineStart, start).includes(PIP_SATISFIED);
+}
+
 function isVersionContext(text: string, start: number, end: number): boolean {
   const before = text.slice(Math.max(0, start - 2), start);
   if (VERSION_OPERATORS.includes(before) || PACKAGE_NAME_SUFFIX.test(before)) return true;
+  if (isPipInstalledVersion(text, start, end)) return true;
   if (text[end] !== '"') return false;
   const key = jsonValueKey(text, start);
   return key !== null && !ADDRESS_KEY.test(key);

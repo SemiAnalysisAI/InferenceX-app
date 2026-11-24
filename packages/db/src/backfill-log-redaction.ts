@@ -19,11 +19,7 @@
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { parseRunIdFlag, runBackfillMain } from './lib/backfill-runner.js';
-import {
-  listStoredServerLogFiles,
-  redactStoredServerLogFile,
-  sanitizeRunUrls,
-} from './lib/stored-redaction.js';
+import { backfillLogRedaction } from './lib/stored-redaction.js';
 
 const runId = parseRunIdFlag();
 const write = process.argv.includes('--write');
@@ -40,39 +36,17 @@ async function main(): Promise<void> {
     `=== backfill-log-redaction (${write ? 'write' : 'dry run, pass --write to apply'}) ===`,
   );
   console.log(`  run_id = ${runId ?? 'all'}, concurrency = ${concurrency}`);
-  const files = await listStoredServerLogFiles(sql, runId);
-  console.log(`Scanning ${files.length} server-log file(s)`);
-  let changed = 0;
-  let blockBacked = 0;
-  let failed = 0;
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: concurrency }, async () => {
-      while (next < files.length) {
-        const file = files[next++]!;
-        try {
-          const result = await sql.begin((tx) => redactStoredServerLogFile(tx, file, write));
-          if (!result.changed) continue;
-          changed++;
-          if (result.blockBacked) blockBacked++;
-          console.log(`  ${file.logId} ${file.fileName}: ${write ? 'sanitized' : 'would change'}`);
-        } catch (error) {
-          failed++;
-          console.error(`  ✗ ${file.logId} ${file.fileName}: ${String(error)}`);
-        }
-      }
-    }),
-  );
+  const result = await backfillLogRedaction(sql, { runId, write, concurrency });
   console.log(
-    `${changed} of ${files.length} file(s) ${write ? 'sanitized' : 'would change'}, ` +
-      `${blockBacked} of them block-backed${write ? ' (blocks rebuilt)' : ''}, ${failed} failed`,
+    `${result.changed} of ${result.files} file(s) ${write ? 'sanitized' : 'would change'}, ` +
+      `${result.blockBacked} of them block-backed${write ? ' (blocks rebuilt)' : ''}, ` +
+      `${result.failed} failed`,
   );
-  // Logs are sanitized against the run URLs, so the URLs change only after every file succeeded.
-  if (failed > 0) {
+  if (result.runUrls === null) {
+    console.error('Run URLs left unchanged because a file failed; rerun after fixing it');
     process.exitCode = 1;
   } else {
-    const runs = await sanitizeRunUrls(sql, runId, write);
-    console.log(`${runs} run URL(s) ${write ? 'sanitized' : 'would change'}`);
+    console.log(`${result.runUrls} run URL(s) ${write ? 'sanitized' : 'would change'}`);
   }
   if (write) {
     console.log(
