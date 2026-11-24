@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { hasNoSslFlag } from './cli-utils.js';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
@@ -43,6 +43,7 @@ import {
   collectMissingTelemetryExpectations,
   type GpuMetricsArtifactPair,
 } from './lib/gpu-metrics-backfill.js';
+import { loadRedactedRunUrls } from './lib/redacted-run-urls.js';
 import { storedRunRepository } from './lib/runtime-metadata-artifacts.js';
 import {
   gpuMetricsRunCoverage,
@@ -329,6 +330,7 @@ async function processPair(
 }
 
 async function main(): Promise<void> {
+  const redactedUrls = loadRedactedRunUrls();
   const flags = parseFlags(process.argv.slice(2));
   if (!flags.all && flags.run === null) {
     throw new Error('Pass --run <github run id> or --all');
@@ -355,11 +357,7 @@ async function main(): Promise<void> {
     let failedRuns = 0;
     for (const run of runs) {
       try {
-        const repository = storedRunRepository(run);
-        if (repository === null) {
-          failedRuns++;
-          continue;
-        }
+        const repository = storedRunRepository(run, redactedUrls) ?? requireIngestRepo();
         const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
         if (artifacts === null) {
           goneRuns++;
@@ -411,11 +409,7 @@ async function main(): Promise<void> {
 
   for (const [runIndex, run] of runs.entries()) {
     const runId = run.github_run_id;
-    const repository = storedRunRepository(run);
-    if (repository === null) {
-      runFailures++;
-      continue;
-    }
+    const repository = storedRunRepository(run, redactedUrls) ?? requireIngestRepo();
     const runStart = Date.now();
     const manifest = flags.receipt === null ? null : readReceipt(flags.receipt, run);
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));

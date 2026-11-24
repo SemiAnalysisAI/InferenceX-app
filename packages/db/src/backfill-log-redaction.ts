@@ -29,7 +29,7 @@ import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { parseRunIdFlag, runBackfillMain } from './lib/backfill-runner.js';
 import { redactedRunUrlsPath } from './lib/redacted-run-urls.js';
-import { backfillLogRedaction } from './lib/stored-redaction.js';
+import { backfillLogRedaction, reportLogRedaction } from './lib/stored-redaction.js';
 
 const runId = parseRunIdFlag();
 const write = process.argv.includes('--write');
@@ -50,34 +50,9 @@ async function main(): Promise<void> {
   );
   const scope = downstream ? ', downstream (repository names and run URLs kept)' : '';
   console.log(`  run_id = ${runId ?? 'all'}, concurrency = ${concurrency}${scope}`);
-  const result = await backfillLogRedaction(sql, {
-    runId,
-    write,
-    concurrency,
-    urlMapFile,
-    downstream,
-  });
-  console.log(
-    `${result.changed} of ${result.files} file(s) ${write ? 'sanitized' : 'would change'}, ` +
-      `${result.blockBacked} of them block-backed${write ? ' (blocks rebuilt)' : ''}, ` +
-      `${result.failed} failed`,
-  );
-  if (downstream) {
-    console.log('Run URLs kept (--downstream)');
-  } else if (result.runUrls === null) {
-    console.error('Run URLs left unchanged because a file failed; rerun after fixing it');
-    process.exitCode = 1;
-  } else {
-    console.log(`${result.runUrls} run URL(s) ${write ? 'sanitized' : 'would change'}`);
-    if (write && result.runUrls > 0) {
-      console.log(`Their previous URLs are in ${urlMapFile} (operator-only; do not share)`);
-    }
-  }
-  if (write) {
-    console.log(
-      'Purge cached log responses now: bun run admin:cache:invalidate -- <app-url> --immediate',
-    );
-  }
+  const options = { runId, write, concurrency, urlMapFile, downstream };
+  const result = await backfillLogRedaction(sql, options);
+  process.exitCode = reportLogRedaction(result, options);
 }
 
 runBackfillMain('backfill-log-redaction', sql, main);

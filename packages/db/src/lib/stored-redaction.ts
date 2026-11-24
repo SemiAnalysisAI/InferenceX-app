@@ -1,8 +1,10 @@
 import type postgres from 'postgres';
 
 import type { Sql } from '../etl/db-utils';
+import { REDACTED } from '../etl/log-redaction';
 import { nonPublicRepository, sanitizeLogText } from '../etl/repo-visibility';
 import { lockServerLogFile, writeTextAsBlocks } from '../etl/server-log-block-writer';
+import { readServerLogBlocks } from '../server-log-blocks';
 import { recordRedactedRunUrls, type RedactedRunUrl } from './redacted-run-urls';
 
 export interface StoredServerLogFile {
@@ -108,12 +110,45 @@ export interface ServerLogRedaction {
 }
 
 /**
+ * Whether a file's blocks decode to exactly `text`. Only text that already holds a redaction is
+ * checked this way: a compaction that raced an earlier backfill could have built its blocks from
+ * the raw text, with the same length when every replacement kept it.
+ */
+async function blocksMatchText(
+  tx: postgres.TransactionSql,
+  logId: string,
+  fileName: string,
+  text: string,
+  chars: number,
+): Promise<boolean> {
+  const blocks = await tx<
+    { char_offset: number; char_count: number; ascii: boolean; data: Uint8Array }[]
+  >`
+    select char_offset, char_count, ascii, data from server_log_blocks
+    where server_log_id = ${logId} and file_name = ${fileName}
+    order by block_index
+  `;
+  const decoded = readServerLogBlocks(
+    blocks.map((block) => ({
+      charOffset: block.char_offset,
+      charCount: block.char_count,
+      ascii: block.ascii,
+      data: block.data,
+    })),
+    0,
+    chars,
+  );
+  return decoded === text;
+}
+
+/**
  * Sanitize one stored server-log file. With `write`, the text column is replaced
  * and any blocks are rebuilt from the sanitized text in the same transaction, so
  * block offsets, sizes and bloom filters keep describing the stored text. Blocks
- * whose character count differs from already-sanitized text (built from the raw
- * text by a compaction that raced an earlier run) are rebuilt too. The file's
- * advisory lock keeps `compact-server-logs` from building blocks meanwhile.
+ * that no longer describe already-sanitized text (built from the raw text by a
+ * compaction that raced an earlier run) are rebuilt too: a different character
+ * count gives them away, and for text holding a redaction so does decoding them.
+ * The file's advisory lock keeps `compact-server-logs` from building blocks meanwhile.
  */
 export async function redactStoredServerLogFile(
   tx: postgres.TransactionSql,
@@ -139,9 +174,12 @@ export async function redactStoredServerLogFile(
         where server_log_id = ${logId} and file_name = ${fileName}
       `;
   const textChanged = redacted !== row.text;
-  if (!textChanged && (!marker || marker.char_count === row.chars)) {
-    return { changed: false, blockBacked: false };
-  }
+  const staleBlocks =
+    marker !== undefined &&
+    (marker.char_count !== row.chars ||
+      (row.text.includes(REDACTED) &&
+        !(await blocksMatchText(tx, logId, fileName, row.text, Number(row.chars)))));
+  if (!textChanged && !staleBlocks) return { changed: false, blockBacked: false };
   if (!write) return { changed: true, blockBacked: Boolean(marker) };
   if (textChanged) {
     await (primary
@@ -237,4 +275,40 @@ export async function backfillLogRedaction(
   const runUrls =
     failed > 0 || downstream ? null : await sanitizeRunUrls(sql, runId, write, urlMapFile);
   return { files: files.length, changed, blockBacked, failed, runUrls };
+}
+
+/**
+ * Print the summary of a backfill and return its exit code: 1 whenever a file failed, in every
+ * mode, so a partial run never looks complete.
+ */
+export function reportLogRedaction(
+  result: LogRedactionBackfillResult,
+  {
+    write,
+    downstream = false,
+    urlMapFile,
+    log = console.log,
+    error = console.error,
+  }: Pick<LogRedactionBackfillOptions, 'write' | 'downstream' | 'urlMapFile' | 'log' | 'error'>,
+): number {
+  log(
+    `${result.changed} of ${result.files} file(s) ${write ? 'sanitized' : 'would change'}, ` +
+      `${result.blockBacked} of them block-backed${write ? ' (blocks rebuilt)' : ''}, ` +
+      `${result.failed} failed`,
+  );
+  if (downstream) {
+    log('Run URLs kept (--downstream)');
+  } else if (result.runUrls === null) {
+    error('Run URLs left unchanged because a file failed; rerun after fixing it');
+  } else {
+    log(`${result.runUrls} run URL(s) ${write ? 'sanitized' : 'would change'}`);
+    if (write && result.runUrls > 0) {
+      log(`Their previous URLs are in ${urlMapFile} (operator-only; do not share)`);
+    }
+  }
+  if (result.failed > 0) error(`${result.failed} file(s) failed; rerun after fixing them`);
+  if (write) {
+    log('Purge cached log responses now: bun run admin:cache:invalidate -- <app-url> --immediate');
+  }
+  return result.failed > 0 ? 1 : 0;
 }

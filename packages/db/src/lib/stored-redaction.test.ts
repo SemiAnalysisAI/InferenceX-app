@@ -26,6 +26,7 @@ import {
   backfillLogRedaction,
   listStoredServerLogFiles,
   redactStoredServerLogFile,
+  reportLogRedaction,
   sanitizeRunUrls,
   type StoredServerLogFile,
 } from './stored-redaction';
@@ -185,6 +186,25 @@ describe('redactStoredServerLogFile', () => {
       blockBacked: true,
     });
     expect(await decodedBlocks(1, 'results/router.log', REDACTED.length)).toBe(REDACTED);
+    expect(await redactFile('results/router.log', false, true)).toEqual({
+      changed: false,
+      blockBacked: false,
+    });
+  });
+
+  it('rebuilds raw blocks under redacted text of the same length', async () => {
+    // `100.200.100.20` and `***REDACTED***` are both 14 characters.
+    const raw = 'peer 100.200.100.20 up\n';
+    const sanitized = 'peer ***REDACTED*** up\n';
+    await db.exec('DELETE FROM server_log_block_files; DELETE FROM server_log_blocks;');
+    await sql`update server_log_files set log_text = ${sanitized}`;
+    await writeBlocks(1, 'results/router.log', raw);
+
+    expect(await redactFile('results/router.log', false, true)).toEqual({
+      changed: true,
+      blockBacked: true,
+    });
+    expect(await decodedBlocks(1, 'results/router.log', sanitized.length)).toBe(sanitized);
     expect(await redactFile('results/router.log', false, true)).toEqual({
       changed: false,
       blockBacked: false,
@@ -524,5 +544,35 @@ describe('backfillLogRedaction', () => {
       ],
       files: [{ log_text: PRIVATE_CHILD }, { log_text: 'router up on ***REDACTED***:8000\n' }],
     });
+  });
+
+  it('exits 1 when a file fails, also on a downstream database', async () => {
+    await db.exec(`
+      CREATE FUNCTION refuse_log_update() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'refused'; END $$;
+      CREATE TRIGGER refuse_log_update BEFORE UPDATE ON server_log_files
+        FOR EACH ROW EXECUTE FUNCTION refuse_log_update();
+    `);
+    try {
+      const errors: string[] = [];
+      const options = {
+        runId: undefined,
+        write: true,
+        concurrency: 1,
+        downstream: true,
+        ...quiet,
+        error: (line: string) => errors.push(line),
+      };
+      const result = await backfillLogRedaction(sql, options);
+      expect(result).toMatchObject({ failed: 1, runUrls: null });
+      expect(reportLogRedaction(result, options)).toBe(1);
+      expect(errors.at(-1)).toBe('1 file(s) failed; rerun after fixing them');
+      expect(reportLogRedaction({ ...result, failed: 0 }, options)).toBe(0);
+    } finally {
+      await db.exec(`
+        DROP TRIGGER refuse_log_update ON server_log_files;
+        DROP FUNCTION refuse_log_update();
+      `);
+    }
   });
 });
