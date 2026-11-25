@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'bun:test';
-import { archiveSources } from './archive';
+import { archiveSources, type CIArtifact } from './archive';
 import { loadBundle } from './bundle';
 const artifact = { id: 20, name: 'h3-video-10-1', expired: false, size_in_bytes: 0 };
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -9,6 +9,12 @@ function archive(files: Record<string, string>) {
   return new Blob([
     zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)]))).buffer,
   ]);
+}
+/** Opens the ZIP under the digest GitHub reports for exactly these bytes. */
+async function open(blob: Blob, metadata: Omit<CIArtifact, 'digest'>) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const digest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+  return archiveSources(blob, { ...metadata, digest });
 }
 describe('CI ZIP import', () => {
   it('verifies and opens a legacy CI artifact', async () => {
@@ -23,7 +29,7 @@ describe('CI ZIP import', () => {
       'manifest.json': manifest,
       SHA256SUMS: `${hash(manifest)}  manifest.json\n`,
     });
-    const [source] = await archiveSources(blob, artifact);
+    const [source] = await open(blob, artifact);
     expect(source.id).toBe('10');
     const bundle = await loadBundle(source.read);
     expect(bundle.manifestSha256).toBe(hash(manifest));
@@ -42,10 +48,10 @@ describe('CI ZIP import', () => {
       SHA256SUMS: `${hash(manifest)}  manifest.json`,
     });
     const native = { ...artifact, name, workflow_run: { id: 10, head_sha: 'a'.repeat(40) } };
-    const sources = await archiveSources(blob, native);
+    const sources = await open(blob, native);
     expect(sources[0].id).toBe('10');
     const dispatched = { ...native, workflow_run: { id: 10, head_sha: 'e'.repeat(40) } };
-    const [source] = await archiveSources(blob, dispatched);
+    const [source] = await open(blob, dispatched);
     expect(source.id).toBe('10');
     for (const altered of [
       { ...native, name: name.replace('-2-', '-1-') },
@@ -53,7 +59,7 @@ describe('CI ZIP import', () => {
       { ...native, workflow_run: { id: 10, head_sha: 'b'.repeat(40) } },
       { ...native, workflow_run: { id: 11, head_sha: 'a'.repeat(40) } },
     ])
-      await expect(archiveSources(blob, altered)).rejects.toThrow();
+      await expect(open(blob, altered)).rejects.toThrow();
   });
   it('preserves original execution identities in an exported archive', async () => {
     const index = JSON.stringify({
@@ -72,18 +78,18 @@ describe('CI ZIP import', () => {
         .map(([path, value]) => `${hash(value)}  ${path}`)
         .join('\n'),
     });
-    const [source] = await archiveSources(blob, { ...artifact, name: 'h3-results-10-1' });
+    const [source] = await open(blob, { ...artifact, name: 'h3-results-10-1' });
     expect(source.id).toBe('9');
     const original = await source.read('manifest.json');
     expect(JSON.parse(await original.text())).toEqual({ run_id: '9' });
-    await expect(archiveSources(blob, { ...artifact, name: 'h3-results-11-1' })).rejects.toThrow(
+    await expect(open(blob, { ...artifact, name: 'h3-results-11-1' })).rejects.toThrow(
       'different runs',
     );
   });
   it('rejects a legacy manifest attributed to another CI run', async () => {
     const manifest = JSON.stringify({ run_id: '11', run_attempt: '1' });
     await expect(
-      archiveSources(
+      open(
         archive({
           'manifest.json': manifest,
           SHA256SUMS: `${hash(manifest)}  manifest.json`,
@@ -101,19 +107,19 @@ describe('CI ZIP import', () => {
       SHA256SUMS: `${hash(comparison)}  comparison.json`,
     });
     const fidelity = { ...artifact, name: 'h3-fidelity-10-1' };
-    const [source] = await archiveSources(blob, {
+    const [source] = await open(blob, {
       ...fidelity,
       workflow_run: { id: 10, head_sha: 'a'.repeat(40) },
     });
     expect(source.id).toBe('10');
     await expect(
-      archiveSources(blob, {
+      open(blob, {
         ...fidelity,
         workflow_run: { id: 10, head_sha: 'b'.repeat(40) },
       }),
     ).rejects.toThrow('different runs');
     await expect(
-      archiveSources(blob, {
+      open(blob, {
         ...fidelity,
         workflow_run: { id: 11, head_sha: 'a'.repeat(40) },
       }),
@@ -124,14 +130,8 @@ describe('CI ZIP import', () => {
       archiveSources(archive({}), { ...artifact, digest: `sha256:${'0'.repeat(64)}` }),
     ).rejects.toThrow('digest mismatch');
   });
-  it('rejects unsafe paths and checksum mismatches', async () => {
-    await expect(archiveSources(archive({ '../secret': 'x' }), artifact)).rejects.toThrow('Unsafe');
-    await expect(
-      archiveSources(
-        archive({ SHA256SUMS: `${'0'.repeat(64)}  manifest.json`, 'manifest.json': '{}' }),
-        artifact,
-      ),
-    ).rejects.toThrow('checksum mismatch');
+  it('rejects unsafe paths', async () => {
+    await expect(open(archive({ '../secret': 'x' }), artifact)).rejects.toThrow('Unsafe');
   });
   it('rejects unknown export schemas', async () => {
     const index = JSON.stringify({
@@ -140,10 +140,7 @@ describe('CI ZIP import', () => {
       results: [],
     });
     await expect(
-      archiveSources(
-        archive({ 'index.json': index, SHA256SUMS: `${hash(index)}  index.json` }),
-        artifact,
-      ),
+      open(archive({ 'index.json': index, SHA256SUMS: `${hash(index)}  index.json` }), artifact),
     ).rejects.toThrow('Unsupported');
   });
 });

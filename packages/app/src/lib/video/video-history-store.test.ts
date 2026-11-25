@@ -57,18 +57,23 @@ const artifactReads = () =>
     ([url]) => /\/runs\/\d+\//u.test(String(url)) && !String(url).includes('/approvals/'),
   ).length;
 
-const SEAL = { path: 'seal/SHA256SUMS', body: 'synthetic SHA256SUMS' };
-/** Approves as a merge run does: its selection names the stored manifest and SHA256SUMS. */
+/** Approves as a merge run does, under the digests its selection names. */
 const approve = (saved: StoredArtifact) =>
-  approveVideoPublication(saved.runId, ref(saved), saved, '9', new AbortController().signal, {
-    manifestSha256: new Map(saved.sources[0].checksums).get('manifest.json')!,
-    sha256sumsSha256: createHash('sha256').update(SEAL.body).digest('hex'),
-  });
+  approveVideoPublication(
+    saved,
+    '9',
+    {
+      manifestSha256: new Map(saved.sources[0].checksums).get('manifest.json')!,
+      sha256sumsSha256: 'e'.repeat(64),
+    },
+    new AbortController().signal,
+  );
+/** Records a publication as the endpoint does, with the receipt it holds. */
+const record = (saved: StoredArtifact) =>
+  recordVideoHistory(saved, JSON.parse(blobs.get(approvalPath(saved.runId, ref(saved)))!.body));
 
 async function publish(i: number, approved = true, hardware?: string, takes?: number) {
   const saved = servingArtifact(100 + i, 1000 + i, hardware, takes);
-  const url = `https://blob.test/${SEAL.path}`;
-  saved.sources[0].assets.push(['SHA256SUMS', { url, downloadUrl: url }]);
   save(indexPath(saved), JSON.stringify(saved));
   if (approved) await approve(saved);
   return saved;
@@ -101,7 +106,6 @@ function meta(pathname: string): HeadBlobResult {
 beforeEach(() => {
   stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
   blobs.clear();
-  blobs.set(SEAL.path, { url: '', uploadedAt: new Date(0), body: SEAL.body });
   mocked(list).mockImplementation((options) => {
     const all = [...blobs.keys()]
       .filter((path) => path.startsWith(options?.prefix ?? ''))
@@ -256,7 +260,7 @@ describe('recorded video history', () => {
   it('serves backfilled entries from one snapshot read and no artifact reads, byte-identical', async () => {
     for (let i = 0; i < 14; i++) await publish(i, i % 4 !== 1);
     const expected = [await direct(1, 5), await direct(2)];
-    expect(await recordVideoHistory(null)).toEqual({ entries: 14, built: 14, skipped: 0 });
+    expect(await recordVideoHistory(null, null)).toEqual({ entries: 14, built: 14, skipped: 0 });
     mocked(fetch).mockClear();
     mocked(head).mockClear();
     expect(JSON.stringify(await publishedVideoHistory(1, 5))).toBe(expected[0]);
@@ -268,7 +272,7 @@ describe('recorded video history', () => {
 
   it('projects only drifted indexes directly and repairs them on the next record', async () => {
     const saved = await Promise.all([0, 1, 2, 3, 4].map((i) => publish(i, i !== 3)));
-    await recordVideoHistory(null);
+    await recordVideoHistory(null, null);
     save(indexPath(saved[2]), blobs.get(indexPath(saved[2]))!.body);
     blobs.delete(approvalPath(saved[0].runId, ref(saved[0])));
     await approve(saved[3]);
@@ -277,8 +281,8 @@ describe('recorded video history', () => {
     mocked(fetch).mockClear();
     expect(JSON.stringify(await publishedVideoHistory(1))).toBe(expected);
     expect(artifactReads()).toBe(4);
-    expect(await recordVideoHistory(added)).toEqual({ entries: 3, built: 1, skipped: 0 });
-    expect(await recordVideoHistory(null)).toEqual({ entries: 6, built: 3, skipped: 0 });
+    expect(await record(added)).toEqual({ entries: 3, built: 1, skipped: 0 });
+    expect(await recordVideoHistory(null, null)).toEqual({ entries: 6, built: 3, skipped: 0 });
     mocked(fetch).mockClear();
     expect(JSON.stringify(await publishedVideoHistory(1))).toBe(expected);
     expect(artifactReads()).toBe(0);
@@ -286,20 +290,20 @@ describe('recorded video history', () => {
 
   it('records only the published artifact, prunes deleted indexes and skips unchanged writes', async () => {
     const first = await publish(0);
-    await recordVideoHistory(null);
+    await recordVideoHistory(null, null);
     const added = await publish(1);
     const sibling = servingArtifact(Number(added.runId), added.artifact.id + 1);
     save(indexPath(sibling), JSON.stringify(sibling));
     mocked(fetch).mockClear();
-    expect(await recordVideoHistory(added)).toEqual({ entries: 2, built: 1, skipped: 0 });
+    expect(await record(added)).toEqual({ entries: 2, built: 1, skipped: 0 });
     expect(artifactReads()).toBe(0);
-    expect(await recordVideoHistory(null)).toEqual({ entries: 3, built: 1, skipped: 0 });
+    expect(await recordVideoHistory(null, null)).toEqual({ entries: 3, built: 1, skipped: 0 });
     const before = mocked(put).mock.calls.length;
-    expect(await recordVideoHistory(added)).toEqual({ entries: 3, built: 0, skipped: 0 });
-    expect(await recordVideoHistory(null)).toEqual({ entries: 3, built: 0, skipped: 0 });
+    expect(await record(added)).toEqual({ entries: 3, built: 0, skipped: 0 });
+    expect(await recordVideoHistory(null, null)).toEqual({ entries: 3, built: 0, skipped: 0 });
     expect(put).toHaveBeenCalledTimes(before);
     blobs.delete(indexPath(sibling));
-    expect(await recordVideoHistory(null)).toEqual({ entries: 2, built: 0, skipped: 0 });
+    expect(await recordVideoHistory(null, null)).toEqual({ entries: 2, built: 0, skipped: 0 });
     const written = Object.keys(JSON.parse(String(mocked(put).mock.calls.at(-1)![1])));
     expect(written.toSorted()).toEqual([indexPath(added), indexPath(first)].toSorted());
   });
@@ -312,11 +316,11 @@ describe('recorded video history', () => {
     );
     const expected = await direct(1);
     expect(JSON.stringify(await publishedVideoHistory(1))).toBe(expected);
-    await recordVideoHistory(null);
+    await recordVideoHistory(null, null);
     await publish(1);
-    await recordVideoHistory(null);
+    await recordVideoHistory(null, null);
     await publish(2);
-    await recordVideoHistory(null);
+    await recordVideoHistory(null, null);
     const kept = snapshots();
     expect(kept).toHaveLength(2);
     expect(kept.every((path) => path.includes(`/v${VIDEO_HISTORY_PROJECTION}/`))).toBe(true);
@@ -335,13 +339,13 @@ describe('recorded video history', () => {
         ? Promise.resolve(new Response('', { status: 503 }))
         : read(url, init),
     );
-    expect(await recordVideoHistory(null)).toEqual({ entries: 0, built: 0, skipped: 1 });
+    expect(await recordVideoHistory(null, null)).toEqual({ entries: 0, built: 0, skipped: 1 });
     mocked(fetch).mockImplementation(read);
     mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
-    expect(await recordVideoHistory(null)).toEqual({ entries: 0, built: 0, skipped: 1 });
+    expect(await recordVideoHistory(null, null)).toEqual({ entries: 0, built: 0, skipped: 1 });
     const healed = await publishedVideoHistory(1);
     expect(healed.entries[0].approved).toBe(true);
-    await recordVideoHistory(null);
+    await recordVideoHistory(null, null);
     const [snapshot] = snapshots();
     const added = await publish(1);
     mocked(fetch).mockImplementation((url, init) =>
@@ -350,7 +354,7 @@ describe('recorded video history', () => {
         : read(url, init),
     );
     const writes = mocked(put).mock.calls.length;
-    await expect(recordVideoHistory(added)).rejects.toThrow('snapshot unavailable');
+    await expect(record(added)).rejects.toThrow('snapshot unavailable');
     expect(put).toHaveBeenCalledTimes(writes);
     expect(snapshots()).toEqual([snapshot]);
     expect(JSON.stringify(await publishedVideoHistory(1))).toBe(await direct(1));
@@ -392,9 +396,10 @@ describe('history projection version', () => {
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
       // approved under a receipt without one must be projected again. The walk skips type-only
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
-      // Trn3/TPU7x all-in power changed in gpu-keys; video entries
-      // read no power, so entries are unchanged.
-      sources: 'ce2885df3c8304adff4e614bb2f4c72b86c12fea504f0fab9d627e2b27fb3dc7',
+      // the publish endpoint took over merge provenance and reads stopped recomputing receipts (a
+      // recorded entry was approved by a receipt that still approves it), and after Trn3/TPU7x
+      // all-in power changed in gpu-keys (video entries read no power), so entries are unchanged.
+      sources: 'bc5f36cc4214c7400596773f489113162e51770a802ea8e80930da8d25ccf9d1',
     });
   });
 });

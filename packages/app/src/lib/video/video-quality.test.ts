@@ -22,7 +22,7 @@ const trusted = {
   event: 'workflow_run',
   head_branch: 'main',
   head_sha: 'f'.repeat(40),
-  repository: { full_name: 'SemiAnalysisAI/InferenceX' },
+  repository: { full_name: 'SemiAnalysisAI/InferenceX', private: false },
   head_repository: { full_name: 'SemiAnalysisAI/InferenceX' },
 };
 const qualityArtifact = (id: number, run: number, attempt = 1) => ({

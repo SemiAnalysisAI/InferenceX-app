@@ -23,8 +23,7 @@ export interface CIRun {
 }
 
 export async function archiveSources(blob: Blob, artifact: CIArtifact) {
-  if (blob.size > 256 * 1024 ** 2) throw new Error('Archive exceeds 256 MiB');
-  if (artifact.digest && artifact.digest !== `sha256:${await sha256(blob)}`)
+  if (artifact.digest !== `sha256:${await sha256(blob)}`)
     throw new Error('GitHub artifact digest mismatch');
   const { unzipSync } = await import('fflate');
   let total = 0;
@@ -46,25 +45,7 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
     if (!bytes) throw new Error(`Missing artifact file: ${path}`);
     return new Blob([new Uint8Array(bytes).buffer]);
   };
-  const sums = await read('SHA256SUMS').text();
-  const verified = new Set<string>();
-  for (const line of sums.trim().split('\n')) {
-    const match = /^(?<hash>[a-f0-9]{64})  (?<path>.+)$/u.exec(line);
-    if (
-      !match ||
-      verified.has(match.groups!.path) ||
-      (await sha256(read(match.groups!.path))) !== match.groups!.hash
-    )
-      throw new Error('Archive checksum mismatch');
-    verified.add(match.groups!.path);
-  }
   const fidelity = artifact.name.startsWith('h3-fidelity-');
-  if (
-    !verified.has(
-      fidelity ? 'comparison.json' : files['index.json'] ? 'index.json' : 'manifest.json',
-    )
-  )
-    throw new Error('Missing verified archive entry point');
   const index: Json = files['index.json'] ? JSON.parse(await read('index.json').text()) : null;
   const identity = videoArtifactIdentity(artifact.name);
   if (!identity) throw new Error('Invalid H3 artifact identity');
@@ -78,13 +59,7 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
           artifact.workflow_run.head_sha !== at(comparison, 'producer', 'git_commit')))
     )
       throw new Error('Comparison and GitHub artifact identify different runs');
-    return [
-      {
-        id: identity.run,
-        kind: 'fidelity' as const,
-        read: (path: string) => Promise.resolve(read(path)),
-      },
-    ];
+    return [{ id: identity.run, read: (path: string) => Promise.resolve(read(path)) }];
   }
   if (
     index &&
@@ -99,11 +74,7 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
       const manifest = safePath(text(at(result, 'manifest')));
       if (!manifest.endsWith('/result.json')) throw new Error('Invalid export result path');
       const source = text(at(result, 'source_run_id'));
-      if (
-        !/^[1-9]\d*$/u.test(source) ||
-        manifest !== `source-${source}/result.json` ||
-        !verified.has(manifest)
-      )
+      if (!/^[1-9]\d*$/u.test(source) || manifest !== `source-${source}/result.json`)
         throw new Error('Invalid export source identity');
       const prefix = manifest.slice(0, -'result.json'.length);
       const original: Json = JSON.parse(new TextDecoder().decode(files[`${prefix}manifest.json`]));

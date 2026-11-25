@@ -1,19 +1,9 @@
 import { videoArtifactIdentity } from '@/components/video-benchmark/artifact-identity';
 import { head, list, put, BlobNotFoundError } from '@vercel/blob';
 import { archiveSources, type CIArtifact } from '@/components/video-benchmark/archive';
-import {
-  at,
-  loadBundle,
-  number,
-  ROLES,
-  rows,
-  sha256,
-  text,
-} from '@/components/video-benchmark/bundle';
-import { loadFidelityBundle, type FidelityBundle } from '@/components/video-benchmark/fidelity';
+import { at, loadBundle, sha256, text } from '@/components/video-benchmark/bundle';
 import {
   storedBundle,
-  storedFidelityBundle,
   withQuality,
   type StoredArtifact,
   type StoredQuality,
@@ -71,74 +61,6 @@ export async function storedArtifacts(runId: string): Promise<CIArtifact[]> {
   return result;
 }
 
-async function verifyPublishedSources(bundle: FidelityBundle, signal: AbortSignal) {
-  const comparison = bundle.comparison;
-  const roles = new Set<string>();
-  const media = new Map<string, StoredSource['assets'][number][1]>();
-  for (const reference of rows(at(comparison, 'source_artifacts'))) {
-    const id = number(at(reference, 'ci', 'databaseId'));
-    const artifactId = number(at(reference, 'artifact', 'id'));
-    const name = text(at(reference, 'artifact', 'name'));
-    const identity = videoArtifactIdentity(name);
-    if (
-      !Number.isSafeInteger(id) ||
-      !id ||
-      !Number.isSafeInteger(artifactId) ||
-      !artifactId ||
-      identity?.run !== String(id) ||
-      identity?.attempt !== String(number(at(reference, 'ci', 'runAttempt'))) ||
-      name.startsWith('h3-fidelity-')
-    )
-      throw new Error('Invalid original fidelity artifact');
-    const saved = await readStoredArtifact(String(id), {
-      id: artifactId,
-      name,
-      expired: false,
-      size_in_bytes: 0,
-    });
-    const source = saved?.sources.find((item) => item.id === String(id) && !item.kind);
-    if (!source || saved?.artifact.digest !== at(reference, 'artifact', 'digest'))
-      throw new Error('Fidelity media requires an already published original source');
-    const original = storedBundle(source);
-    servingCells(original);
-    const revision = at(original.manifest, 'ci', 'head_sha') ?? at(original.manifest, 'git_commit');
-    if (
-      revision !== at(reference, 'ci', 'headSha') ||
-      revision !== at(reference, 'artifact', 'workflow_run', 'head_sha') ||
-      at(reference, 'artifact', 'workflow_run', 'id') !== id
-    )
-      throw new Error('Fidelity original source revision mismatch');
-    const sealUrl = source.assets.find(([path]) => path === 'SHA256SUMS')?.[1].url;
-    if (!sealUrl) throw new Error('Original source seal unavailable');
-    const seal = await fetch(sealUrl, { signal });
-    if (!seal.ok || (await sha256(await seal.blob())) !== at(reference, 'source_seal_sha256'))
-      throw new Error('Fidelity original source seal mismatch');
-    const role = ROLES.find(
-      (candidateRole) =>
-        at(comparison, candidateRole, 'run_bundle_sha256') ===
-        original.checksums.get('gpu/c1/baseline/run.json'),
-    );
-    if (!role || roles.has(role))
-      throw new Error('Fidelity roles do not match the original C1 runs');
-    roles.add(role);
-    const hashes = new Set<string>();
-    for (const [path, hash] of original.checksums) {
-      if (!/^gpu\/c1\/baseline\/artifacts\/[^/]+\.mp4$/u.test(path)) continue;
-      const asset = source.assets.find(([assetPath]) => assetPath === path)?.[1];
-      if (asset) {
-        hashes.add(hash);
-        media.set(hash, asset);
-      }
-    }
-    for (const slot of rows(at(comparison, 'slots'))) {
-      const hash = at(slot, role, 'sha256');
-      if (text(at(slot, role, 'artifact_path')) && !hashes.has(text(hash)))
-        throw new Error('Fidelity media was not published in the original C1 source');
-    }
-  }
-  if (roles.size !== 2) throw new Error('Both original fidelity sources are required');
-  return media;
-}
 export async function readStoredArtifact(
   runId: string,
   artifact: CIArtifact,
@@ -278,7 +200,8 @@ export interface VideoPublicationSelection {
 
 /**
  * Version 2 carries the merge run and the selection it was verified against. Version 1 was
- * written before merge selections existed; nothing writes it any more.
+ * written before merge selections existed. Nothing writes it any more, and reading it is the one
+ * permanent compatibility path: the entries it approves are never migrated.
  */
 export interface VideoPublicationReceipt {
   version: 1 | 2;
@@ -291,81 +214,8 @@ export interface VideoPublicationReceipt {
   sources: PublicationSource[];
 }
 
-function publicationSources(saved: StoredArtifact): PublicationSource[] {
-  if (saved.sources.length === 0) throw new Error('Video publication has no source');
-  return saved.sources
-    .map((source) => {
-      let sha: string;
-      let checkout: string;
-      if (source.kind === 'fidelity') {
-        const bundle = storedFidelityBundle(source);
-        sha = bundle.comparisonSha256;
-        checkout = text(at(bundle.comparison, 'producer', 'git_commit'));
-      } else {
-        const bundle = storedBundle(source);
-        servingCells(bundle);
-        sha = bundle.manifestSha256;
-        checkout = text(at(bundle.manifest, 'git_commit'));
-      }
-      if (!/^[a-f0-9]{64}$/u.test(sha) || !/^[a-f0-9]{40}$/u.test(checkout))
-        throw new Error('Video publication source seal is invalid');
-      return {
-        id: source.id,
-        kind: source.kind === 'fidelity' ? ('fidelity' as const) : ('observation' as const),
-        sha256: sha,
-        checkoutSha: checkout,
-      };
-    })
-    .toSorted((a, b) => a.id.localeCompare(b.id) || a.kind.localeCompare(b.kind));
-}
-
-function expectedReceipt(
-  runId: string,
-  artifact: CIArtifact,
-  saved: StoredArtifact,
-  mergeRunId: string,
-  selected?: VideoPublicationSelection,
-): VideoPublicationReceipt {
-  if (
-    saved.runId !== runId ||
-    saved.artifact.id !== artifact.id ||
-    saved.artifact.name !== artifact.name ||
-    (artifact.digest !== undefined && saved.artifact.digest !== artifact.digest)
-  )
-    throw new Error('Stored video source does not match the GitHub artifact');
-  const identity = {
-    runId,
-    artifactId: artifact.id,
-    artifactName: artifact.name,
-    artifactDigest: saved.artifact.digest ?? null,
-    mergeRunId,
-  };
-  const sources = publicationSources(saved);
-  if (!selected) return { version: 1, ...identity, sources };
-  const { manifestSha256, sha256sumsSha256 } = selected;
-  if (
-    sources.length !== 1 ||
-    sources[0].id !== runId ||
-    sources[0].kind !== 'observation' ||
-    sources[0].sha256 !== manifestSha256 ||
-    !/^[a-f0-9]{64}$/u.test(String(sha256sumsSha256))
-  )
-    throw new Error('Stored source differs from the selected manifest');
-  return { version: 2, ...identity, selected: { manifestSha256, sha256sumsSha256 }, sources };
-}
-
-export async function readVideoPublication(
-  runId: string,
-  artifact: CIArtifact,
-  saved: StoredArtifact,
-): Promise<VideoPublicationReceipt | null> {
-  if (!videoStorageEnabled()) return null;
-  if (
-    videoArtifactIdentity(artifact.name)?.run !== runId ||
-    !Number.isSafeInteger(artifact.id) ||
-    artifact.id <= 0
-  )
-    throw new Error('Invalid video publication identity');
+/** The stored receipt as written, or null when the artifact has none. */
+async function receiptText(runId: string, artifact: CIArtifact): Promise<string | null> {
   let url: string;
   try {
     const metadata = await head(approvalPath(runId, artifact));
@@ -376,7 +226,23 @@ export async function readVideoPublication(
   }
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error('Video publication receipt unavailable');
-  const receipt: VideoPublicationReceipt = await response.json();
+  return response.text();
+}
+
+/**
+ * The receipt that approves `saved`, or null without one. The index and the receipt are both
+ * immutable, so a read only binds them by the manifest SHA256; the receipt was verified in full
+ * when it was written.
+ */
+export async function readVideoPublication(
+  runId: string,
+  artifact: CIArtifact,
+  saved: StoredArtifact,
+): Promise<VideoPublicationReceipt | null> {
+  if (!videoStorageEnabled()) return null;
+  const stored = await receiptText(runId, artifact);
+  if (stored === null) return null;
+  const receipt: VideoPublicationReceipt = JSON.parse(stored);
   // A receipt approves only when it names a merge run.
   if (
     typeof receipt.mergeRunId !== 'string' ||
@@ -384,135 +250,135 @@ export async function readVideoPublication(
     !Number.isSafeInteger(Number(receipt.mergeRunId))
   )
     return null;
-  const expected = expectedReceipt(
-    runId,
-    artifact,
-    saved,
-    receipt.mergeRunId,
-    receipt.version === 2 ? receipt.selected : undefined,
-  );
-  if (JSON.stringify(receipt) !== JSON.stringify(expected))
+  if (
+    (receipt.version !== 1 && receipt.version !== 2) ||
+    receipt.sources[0]?.sha256 !== storedBundle(saved.sources[0]).manifestSha256
+  )
     throw new Error('Video publication receipt does not match its stored source');
   return receipt;
 }
 
 /**
- * The only writer of an approval: a merge run approves the bundle its selection names. The stored
- * manifest and SHA256SUMS must be the selected ones before the receipt is written or reused.
+ * The one check of an already stored copy against a merge selection: its manifest, and its
+ * SHA256SUMS by the content address it is stored under.
  */
-export async function approveVideoPublication(
-  runId: string,
-  artifact: CIArtifact,
-  saved: StoredArtifact,
-  mergeRunId: string,
-  signal: AbortSignal,
-  selected: VideoPublicationSelection,
-): Promise<VideoPublicationReceipt> {
-  const expected = expectedReceipt(runId, artifact, saved, mergeRunId, selected);
-  const sealUrl = saved.sources[0].assets.find(([path]) => path === 'SHA256SUMS')?.[1].url;
-  const seal = sealUrl ? await fetch(sealUrl, { signal }) : null;
-  if (!seal?.ok || (await sha256(await seal.blob())) !== selected.sha256sumsSha256)
-    throw new Error('Stored source differs from the selected SHA256SUMS');
-  const existing = await readVideoPublication(runId, artifact, saved);
-  if (existing) {
-    if (JSON.stringify(existing) !== JSON.stringify(expected))
-      throw new Error('Video publication already has a different merge identity');
-    return existing;
-  }
-  await immutable(
-    approvalPath(runId, artifact),
-    JSON.stringify(expected),
-    'application/json',
-    signal,
-  );
-  const written = await readVideoPublication(runId, artifact, saved);
-  if (!written || JSON.stringify(written) !== JSON.stringify(expected))
-    throw new Error('Video publication receipt readback mismatch');
-  return written;
+export function requireSelectedSource(saved: StoredArtifact, selected: VideoPublicationSelection) {
+  const seal = `/${PREFIX}/objects/${selected.sha256sumsSha256}/SHA256SUMS`;
+  if (
+    saved.sources.length !== 1 ||
+    storedBundle(saved.sources[0]).manifestSha256 !== selected.manifestSha256 ||
+    !saved.sources[0].assets.some(([path, { url }]) => path === 'SHA256SUMS' && url.endsWith(seal))
+  )
+    throw new Error('Stored source differs from the merge selection');
 }
 
+/**
+ * The only writer of an approval: a merge run approves the stored bundle that its selection
+ * names, which the caller has checked against that selection. Serving evidence is validated here,
+ * once. The first receipt wins: a repeat with the same merge run and selection reuses it, and any
+ * other stored receipt refuses the approval.
+ */
+export async function approveVideoPublication(
+  saved: StoredArtifact,
+  mergeRunId: string,
+  { manifestSha256, sha256sumsSha256 }: VideoPublicationSelection,
+  signal: AbortSignal,
+): Promise<VideoPublicationReceipt> {
+  const { runId, artifact } = saved;
+  const bundle = storedBundle(saved.sources[0]);
+  servingCells(bundle);
+  const receipt: VideoPublicationReceipt = {
+    version: 2,
+    runId,
+    artifactId: artifact.id,
+    artifactName: artifact.name,
+    artifactDigest: artifact.digest ?? null,
+    mergeRunId,
+    selected: { manifestSha256, sha256sumsSha256 },
+    sources: [
+      {
+        id: saved.sources[0].id,
+        kind: 'observation',
+        sha256: bundle.manifestSha256,
+        checkoutSha: text(at(bundle.manifest, 'git_commit')),
+      },
+    ],
+  };
+  const body = JSON.stringify(receipt);
+  const existing = await receiptText(runId, artifact);
+  if (existing === null) {
+    await immutable(approvalPath(runId, artifact), body, 'application/json', signal);
+    // A concurrent approval may have written first, so the stored bytes must be these.
+    if ((await receiptText(runId, artifact)) !== body)
+      throw new Error('Video publication receipt readback mismatch');
+  } else if (existing !== body)
+    throw new Error('Video publication already has a different merge identity');
+  return receipt;
+}
+
+/**
+ * Stores the one observation bundle a merge selection names. The ZIP is checked against the
+ * selection here, before the first write.
+ */
 export async function storeVideoArtifact(
   runId: string,
   artifact: CIArtifact,
   zip: Blob,
   signal: AbortSignal,
-  selected?: VideoPublicationSelection,
+  selected: VideoPublicationSelection,
 ): Promise<StoredArtifact> {
-  const sources: StoredSource[] = [];
+  const sources = await archiveSources(zip, artifact);
+  if (sources.length !== 1) throw new Error('A merge selection names one observation bundle');
+  const [source] = sources;
+  const bundle = await loadBundle(source.read);
+  if (
+    bundle.checksums.get('manifest.json') !== selected.manifestSha256 ||
+    (await sha256(bundle.files.get('SHA256SUMS')!)) !== selected.sha256sumsSha256
+  )
+    throw new Error('Bundle differs from the merge selection');
   const uploads = new Map<string, Promise<{ url: string; downloadUrl: string }>>();
-  const archived = await archiveSources(zip, artifact);
-  for (const source of archived) {
-    const fidelity = 'kind' in source && source.kind === 'fidelity';
-    const fidelityBundle = fidelity ? await loadFidelityBundle(source.read, source.id) : null;
-    const bundle = fidelityBundle ?? (await loadBundle(source.read));
-    // A merge selection names one observation bundle. Any other is refused before the first write.
-    if (selected) {
-      if (
-        archived.length !== 1 ||
-        fidelity ||
-        source.id !== runId ||
-        bundle.checksums.get('manifest.json') !== selected.manifestSha256
-      )
-        throw new Error('Bundle differs from the selected manifest');
-      const seal = bundle.files.get('SHA256SUMS');
-      if (!seal || (await sha256(seal)) !== selected.sha256sumsSha256)
-        throw new Error('Bundle differs from the selected SHA256SUMS');
-    }
-    const publishedMedia = fidelityBundle
-      ? await verifyPublishedSources(fidelityBundle, signal)
-      : null;
-    const assets: StoredSource['assets'] = [];
-    const files = [...bundle.files];
-    for (let start = 0; start < files.length; start += 8) {
-      const batch = await Promise.allSettled(
-        files.slice(start, start + 8).map(async ([path, body]) => {
-          const hash = bundle.checksums.get(path) ?? (await sha256(body));
-          const original = path.endsWith('.mp4') ? publishedMedia?.get(hash) : undefined;
-          if (original) {
-            assets.push([path, original]);
-            return;
-          }
-          const key = `${PREFIX}/objects/${hash}/${path.split('/').at(-1)}`;
-          let upload = uploads.get(key);
-          if (!upload) {
-            upload = immutable(
-              key,
-              body,
-              path.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream',
-              signal,
-            );
-            uploads.set(key, upload);
-          }
-          const saved = await upload;
-          assets.push([path, { url: saved.url, downloadUrl: saved.downloadUrl }]);
-        }),
-      );
-      const failed = batch.find((result) => result.status === 'rejected');
-      if (failed) throw failed.reason;
-    }
-    const texts: StoredSource['texts'] = [];
-    for (const [path, body] of bundle.files) {
-      if (
-        path === 'report/index.html' ||
-        (fidelity && sourceSeal(path)) ||
-        (!('result' in bundle && bundle.result) && legacyTelemetry(path))
-      )
-        texts.push([path, await body.text()]);
-    }
-    sources.push({
-      id: source.id,
-      ...(fidelity ? { kind: 'fidelity' as const } : {}),
-      documents: [...bundle.documents],
-      checksums: [...bundle.checksums],
-      assets,
-      texts,
-    });
+  const assets: StoredSource['assets'] = [];
+  const files = [...bundle.files];
+  for (let start = 0; start < files.length; start += 8) {
+    const batch = await Promise.allSettled(
+      files.slice(start, start + 8).map(async ([path, body]) => {
+        const hash = bundle.checksums.get(path) ?? (await sha256(body));
+        const key = `${PREFIX}/objects/${hash}/${path.split('/').at(-1)}`;
+        let upload = uploads.get(key);
+        if (!upload) {
+          upload = immutable(
+            key,
+            body,
+            path.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream',
+            signal,
+          );
+          uploads.set(key, upload);
+        }
+        const saved = await upload;
+        assets.push([path, { url: saved.url, downloadUrl: saved.downloadUrl }]);
+      }),
+    );
+    const failed = batch.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
+  }
+  const texts: StoredSource['texts'] = [];
+  for (const [path, body] of bundle.files) {
+    if (path === 'report/index.html' || (!bundle.result && legacyTelemetry(path)))
+      texts.push([path, await body.text()]);
   }
   const result: StoredArtifact = {
     storageVersion: 1,
     runId,
     artifact: { ...artifact, stored: true },
-    sources,
+    sources: [
+      {
+        id: source.id,
+        documents: [...bundle.documents],
+        checksums: [...bundle.checksums],
+        assets,
+        texts,
+      },
+    ],
   };
   await immutable(
     `${runPrefix(runId)}${artifact.name}_${artifact.id}.json`,

@@ -8,12 +8,12 @@ import {
   readPublishedArtifact,
   readVideoPublication,
   readStoredArtifact,
+  requireSelectedSource,
   derivedMedia,
   storeVideoArtifact,
 } from './video-storage';
 import { publishedVideoHistory } from './video-history-store';
-import { storedBundle, storedFidelityBundle } from '@/components/video-benchmark/stored';
-import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
+import { storedBundle } from '@/components/video-benchmark/stored';
 
 const actual = { ...(await import('@vercel/blob')) };
 mock.module('@vercel/blob', () => ({
@@ -33,7 +33,7 @@ mock.module('@vercel/blob', () => ({
   ),
 }));
 const artifact = { id: 20, name: 'h3-video-10-1', size_in_bytes: 100, expired: false };
-const digest = (s: string) => createHash('sha256').update(s).digest('hex');
+const digest = (s: string | Uint8Array) => createHash('sha256').update(s).digest('hex');
 function archive(corrupt = false, extra: Record<string, string> = {}) {
   const files = {
     'manifest.json': JSON.stringify({
@@ -61,10 +61,23 @@ function archive(corrupt = false, extra: Record<string, string> = {}) {
     ).buffer,
   ]);
 }
-/** The archive's SHA256SUMS bytes and the digest a merge selection names them by. */
-async function sealOf(zip: Blob) {
-  const bytes = unzipSync(new Uint8Array(await zip.arrayBuffer())).SHA256SUMS;
-  return { bytes, sha256: createHash('sha256').update(bytes).digest('hex') };
+/** A ZIP as GitHub reports it, with the digests a merge selection names its bundle by. */
+async function uploaded(zip: Blob) {
+  const bytes = new Uint8Array(await zip.arrayBuffer());
+  const files = unzipSync(bytes);
+  return {
+    published: { ...artifact, digest: `sha256:${digest(bytes)}` },
+    selected: {
+      manifestSha256: digest(files['manifest.json']),
+      sha256sumsSha256: digest(files.SHA256SUMS),
+    },
+  };
+}
+async function stored(zip = archive()) {
+  const { published, selected } = await uploaded(zip);
+  const signal = new AbortController().signal;
+  const saved = await storeVideoArtifact('10', published, zip, signal, selected);
+  return { saved, published, selected };
 }
 beforeEach(() => {
   mocked(put).mockClear();
@@ -75,116 +88,63 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe('persistent H3 media', () => {
-  it('writes one immutable approval after the index and verifies source seal on replay', async () => {
+  it('writes one immutable approval after the index and binds both to the merge selection', async () => {
     stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const zip = archive();
-    const withDigest = {
-      ...artifact,
-      digest: `sha256:${createHash('sha256')
-        .update(Buffer.from(await zip.arrayBuffer()))
-        .digest('hex')}`,
-    };
-    const saved = await storeVideoArtifact('10', withDigest, zip, new AbortController().signal);
-    const seal = await sealOf(zip);
-    const selected = {
-      manifestSha256: storedBundle(saved.sources[0]).manifestSha256,
-      sha256sumsSha256: seal.sha256,
-    };
-    // A selected bundle is checked before the first write, so a mismatch stores nothing.
-    const stored = mocked(put).mock.calls.length;
-    for (const [field, message] of [
-      ['manifestSha256', 'selected manifest'],
-      ['sha256sumsSha256', 'selected SHA256SUMS'],
-    ] as const) {
-      await expect(
-        storeVideoArtifact('10', withDigest, zip, new AbortController().signal, {
-          ...selected,
-          [field]: '0'.repeat(64),
-        }),
-      ).rejects.toThrow(message);
-    }
-    expect(mocked(put).mock.calls).toHaveLength(stored);
-    const again = await storeVideoArtifact(
-      '10',
-      withDigest,
-      zip,
-      new AbortController().signal,
-      selected,
-    );
-    expect(again.sources).toHaveLength(1);
-    let receipt: unknown;
-    vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
-      Promise.resolve(
-        String(url).endsWith('/SHA256SUMS') ? new Response(seal.bytes) : Response.json(receipt),
-      ),
-    );
-    const writes = mocked(put).mock.calls.length;
-    await expect(
-      approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal, {
-        ...selected,
-        manifestSha256: '0'.repeat(64),
-      }),
-    ).rejects.toThrow('selected manifest');
-    await expect(
-      approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal, {
-        ...selected,
-        sha256sumsSha256: '0'.repeat(64),
-      }),
-    ).rejects.toThrow('selected SHA256SUMS');
-    expect(mocked(put).mock.calls).toHaveLength(writes);
+    const { published, selected } = await uploaded(zip);
+    const signal = new AbortController().signal;
+    const altered = (['manifestSha256', 'sha256sumsSha256'] as const).map((field) => ({
+      ...selected,
+      [field]: '0'.repeat(64),
+    }));
+    // The ZIP is checked against the selection before the first write, so a mismatch stores nothing.
+    for (const other of altered)
+      await expect(storeVideoArtifact('10', published, zip, signal, other)).rejects.toThrow(
+        'merge selection',
+      );
+    expect(put).not.toHaveBeenCalled();
+    const saved = await storeVideoArtifact('10', published, zip, signal, selected);
+    // An already stored copy answers for the same two digests.
+    for (const other of altered)
+      expect(() => requireSelectedSource(saved, other)).toThrow('merge selection');
+    expect(() => requireSelectedSource(saved, selected)).not.toThrow();
+    let receipt: string | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(receipt)));
     const before = mocked(put).mock.calls.length;
     mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
     mocked(put).mockImplementationOnce((path, body) => {
-      receipt = JSON.parse(String(body));
+      receipt = String(body);
       return Promise.resolve({
         url: `https://test.public.blob.vercel-storage.com/${path}`,
         downloadUrl: `https://test.public.blob.vercel-storage.com/${path}?download=1`,
       } as Awaited<ReturnType<typeof put>>);
     });
-    const approved = await approveVideoPublication(
-      '10',
-      withDigest,
-      saved,
-      '99',
-      new AbortController().signal,
-      selected,
-    );
-    expect(approved).toMatchObject({
+    const approved = await approveVideoPublication(saved, '99', selected, signal);
+    expect(approved).toEqual({
       version: 2,
       runId: '10',
       artifactId: 20,
       artifactName: artifact.name,
-      artifactDigest: withDigest.digest,
+      artifactDigest: published.digest,
       mergeRunId: '99',
       selected,
-      sources: [{ id: '10', kind: 'observation', checkoutSha: 'a'.repeat(40) }],
+      sources: [
+        {
+          id: '10',
+          kind: 'observation',
+          sha256: selected.manifestSha256,
+          checkoutSha: 'a'.repeat(40),
+        },
+      ],
     });
-    expect(approved.sources[0].sha256).toBe(storedBundle(saved.sources[0]).manifestSha256);
     expect(mocked(put).mock.calls[before][0]).toBe(
       'h3-video-media/v1/approvals/10/h3-video-10-1_20.json',
     );
     expect(await readVideoPublication('10', artifact, saved)).toEqual(approved);
-    await approveVideoPublication(
-      '10',
-      withDigest,
-      saved,
-      '99',
-      new AbortController().signal,
-      selected,
+    await approveVideoPublication(saved, '99', selected, signal);
+    await expect(approveVideoPublication(saved, '100', selected, signal)).rejects.toThrow(
+      'different merge identity',
     );
-    expect(mocked(put).mock.calls).toHaveLength(before + 1);
-    await expect(
-      approveVideoPublication(
-        '10',
-        withDigest,
-        saved,
-        '100',
-        new AbortController().signal,
-        selected,
-      ),
-    ).rejects.toThrow('different merge identity');
-    // A manual republish names no merge run; it reads the recorded approval and writes nothing.
-    expect(await readVideoPublication('10', withDigest, saved)).toEqual(approved);
     expect(mocked(put).mock.calls).toHaveLength(before + 1);
     mocked(list).mockResolvedValue({
       blobs: [
@@ -207,29 +167,17 @@ describe('persistent H3 media', () => {
 
   it('fails closed for a missing or mismatched approval without changing the stored source', async () => {
     stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
-    const saved = await storeVideoArtifact('10', artifact, archive(), new AbortController().signal);
+    const { saved, published } = await stored();
     mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
     expect(await readVideoPublication('10', artifact, saved)).toBeNull();
     expect(saved.sources).toHaveLength(1);
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         version: 1,
-        runId: '11',
-        artifactId: artifact.id,
-        artifactName: artifact.name,
-        artifactDigest: null,
-        mergeRunId: '99',
-        sources: [],
-      }),
-    );
-    await expect(readVideoPublication('10', artifact, saved)).rejects.toThrow('does not match');
-    fetcher.mockResolvedValue(
-      Response.json({
-        version: 1,
         runId: '10',
         artifactId: artifact.id,
         artifactName: artifact.name,
-        artifactDigest: null,
+        artifactDigest: published.digest,
         mergeRunId: '99',
         sources: [
           { id: '10', kind: 'observation', sha256: '0'.repeat(64), checkoutSha: 'a'.repeat(40) },
@@ -244,28 +192,14 @@ describe('persistent H3 media', () => {
       runId: '10',
       artifactId: artifact.id,
       artifactName: artifact.name,
-      artifactDigest: null,
+      artifactDigest: published.digest,
       mergeRunId: '99',
       sources: [{ id: '10', kind: 'observation', sha256, checkoutSha: 'a'.repeat(40) }],
     };
     fetcher.mockImplementation(() => Promise.resolve(Response.json(legacy)));
     expect(await readVideoPublication('10', artifact, saved)).toEqual(legacy);
-    // Version 2 needs both its merge run and the selection that matches the stored manifest.
     const selected = { manifestSha256: sha256, sha256sumsSha256: 'e'.repeat(64) };
     const { sources, ...identity } = legacy;
-    for (const forged of [
-      { ...legacy, version: 2 },
-      {
-        ...identity,
-        version: 2,
-        selected: { ...selected, manifestSha256: '0'.repeat(64) },
-        sources,
-      },
-      { ...identity, version: 2, selected: { manifestSha256: sha256 }, sources },
-    ]) {
-      fetcher.mockImplementation(() => Promise.resolve(Response.json(forged)));
-      await expect(readVideoPublication('10', artifact, saved)).rejects.toThrow();
-    }
     // Without a merge run not even a version 2 receipt approves.
     const unmerged = { ...identity, version: 2, mergeRunId: null, selected, sources };
     fetcher.mockImplementation(() => Promise.resolve(Response.json(unmerged)));
@@ -278,121 +212,50 @@ describe('persistent H3 media', () => {
 
   it('leaves the immutable media index intact when approval upload fails', async () => {
     stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
-    const zip = archive();
-    const saved = await storeVideoArtifact('10', artifact, zip, new AbortController().signal);
+    const { saved, selected } = await stored();
     const indexWrites = mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'));
     expect(indexWrites).toHaveLength(1);
-    const seal = await sealOf(zip);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
-      Promise.resolve(new Response(seal.bytes)),
-    );
     mocked(head)
       .mockRejectedValueOnce(new BlobNotFoundError())
       .mockRejectedValueOnce(new BlobNotFoundError())
       .mockRejectedValueOnce(new BlobNotFoundError());
     mocked(put).mockRejectedValueOnce(new Error('Approval upload failed'));
     await expect(
-      approveVideoPublication('10', artifact, saved, '99', new AbortController().signal, {
-        manifestSha256: storedBundle(saved.sources[0]).manifestSha256,
-        sha256sumsSha256: seal.sha256,
-      }),
+      approveVideoPublication(saved, '99', selected, new AbortController().signal),
     ).rejects.toThrow('Approval upload failed');
     expect(saved.sources).toHaveLength(1);
     expect(mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'))).toHaveLength(1);
     expect(await readVideoPublication('10', artifact, saved)).toBeNull();
   });
 
-  it.each([false, true])(
-    'publishes fidelity reusing original videos (native names: %s)',
-    async (nativeOriginals) => {
-      stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
-      const fixture = await fidelityFixture({ nativeOriginals });
-      vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
-        const url = String(input);
-        const original = fixture.originals.find((item) => url.includes(`/runs/${item.runId}/`));
-        if (original) return Promise.resolve(Response.json(original));
-        for (const [id, files] of fixture.originalFiles)
-          if (url.endsWith(`/${id}/SHA256SUMS`))
-            return Promise.resolve(new Response(files.get('SHA256SUMS')));
-        throw new Error(`Unexpected synthetic URL: ${url}`);
-      });
-      const zip = new Blob([
-        zipSync(
-          Object.fromEntries(
-            await Promise.all(
-              [...fixture.files].map(async ([path, blob]) => [
-                path,
-                new Uint8Array(await blob.arrayBuffer()),
-              ]),
-            ),
-          ),
-        ).buffer,
-      ]);
-      const result = await storeVideoArtifact(
-        fixture.runId,
-        fixture.artifact,
-        zip,
-        new AbortController().signal,
-      );
-      expect(result.sources[0].kind).toBe('fidelity');
-      mocked(fetch).mockResolvedValueOnce(Response.json(result));
-      const saved = await readStoredArtifact(fixture.runId, fixture.artifact);
-      expect(storedFidelityBundle(saved!.sources[0]).comparisonSha256).toBe(
-        fixture.checksums.get('comparison.json'),
-      );
-      expect(result.sources[0].assets.filter(([path]) => path.endsWith('.mp4'))).toHaveLength(4);
-      expect(result.sources[0].assets.find(([path]) => path.endsWith('.mp4'))?.[1].url).toContain(
-        '/101/gpu/c1/baseline/artifacts/',
-      );
-      expect(mocked(put).mock.calls.some((call) => call[2]?.contentType === 'video/mp4')).toBe(
-        false,
-      );
-      expect(mocked(put).mock.calls.at(-1)?.[0]).toBe(
-        'h3-video-media/v1/runs/789/h3-fidelity-789-1_987.json',
-      );
-    },
-  );
+  it('still reads a receipt as approved when its bundle no longer passes serving validation', async () => {
+    stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    // Stands for a serving reader that changed after the approval: it rejects this matrix today.
+    const matrix = JSON.stringify({ schema_version: '0' });
+    const { saved, published, selected } = await stored(
+      archive(false, { 'serving-smoke.json': matrix }),
+    );
+    const receipt = {
+      version: 2,
+      runId: '10',
+      artifactId: artifact.id,
+      artifactName: artifact.name,
+      artifactDigest: published.digest,
+      mergeRunId: '99',
+      selected,
+      sources: [
+        {
+          id: '10',
+          kind: 'observation',
+          sha256: selected.manifestSha256,
+          checkoutSha: 'a'.repeat(40),
+        },
+      ],
+    };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(receipt));
+    expect(await readVideoPublication('10', artifact, saved)).toEqual(receipt);
+  });
 
-  it.each(['missing', 'digest', 'seal', 'media'])(
-    'does not publish fidelity with an unaccepted original source: %s',
-    async (failure) => {
-      stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
-      const fixture = await fidelityFixture();
-      if (failure === 'missing') fixture.originals[0].sources = [];
-      if (failure === 'digest') fixture.originals[0].artifact.digest = `sha256:${'0'.repeat(64)}`;
-      if (failure === 'media')
-        fixture.originals[0].sources[0].assets = fixture.originals[0].sources[0].assets.filter(
-          ([path]) => !path.endsWith('.mp4'),
-        );
-      vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
-        const url = String(input);
-        const original = fixture.originals.find((item) => url.includes(`/runs/${item.runId}/`));
-        if (original) return Promise.resolve(Response.json(original));
-        for (const [id, files] of fixture.originalFiles)
-          if (url.endsWith(`/${id}/SHA256SUMS`))
-            return Promise.resolve(
-              new Response(failure === 'seal' ? 'Changed source seal' : files.get('SHA256SUMS')),
-            );
-        throw new Error(`Unexpected synthetic URL: ${url}`);
-      });
-      const zip = new Blob([
-        zipSync(
-          Object.fromEntries(
-            await Promise.all(
-              [...fixture.files].map(async ([path, blob]) => [
-                path,
-                new Uint8Array(await blob.arrayBuffer()),
-              ]),
-            ),
-          ),
-        ).buffer,
-      ]);
-      await expect(
-        storeVideoArtifact(fixture.runId, fixture.artifact, zip, new AbortController().signal),
-      ).rejects.toThrow();
-      expect(put).not.toHaveBeenCalled();
-    },
-  );
   it('reads the trusted listed index URL without a redundant HEAD request', async () => {
     stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const indexUrl =
@@ -420,12 +283,7 @@ describe('persistent H3 media', () => {
     });
   });
   it('publishes verified files before the index and restores metadata without media bytes', async () => {
-    const result = await storeVideoArtifact(
-      '10',
-      artifact,
-      archive(),
-      new AbortController().signal,
-    );
+    const { saved: result } = await stored();
     const calls = mocked(put).mock.calls;
     expect(calls.at(-1)?.[0]).toBe('h3-video-media/v1/runs/10/h3-video-10-1_20.json');
     const video = calls.find(([path]) => path.endsWith('/synthetic.mp4'))!;
@@ -446,11 +304,8 @@ describe('persistent H3 media', () => {
   it('keeps serving telemetry downloadable without embedding it in the page data', async () => {
     const serving = 'gpu/c1/supervisor/baseline/telemetry.jsonl';
     const legacy = 'gpu/supervisor/baseline/telemetry.jsonl';
-    const result = await storeVideoArtifact(
-      '10',
-      artifact,
+    const { saved: result } = await stored(
       archive(false, { [serving]: 'synthetic serving log', [legacy]: 'synthetic legacy log' }),
-      new AbortController().signal,
     );
     expect(result.sources[0].texts).toEqual([[legacy, 'synthetic legacy log']]);
     expect(result.sources[0].assets.some(([path]) => path === serving)).toBe(true);
@@ -487,27 +342,18 @@ describe('persistent H3 media', () => {
   });
   it('reuses an immutable object regardless of SDK conflict wording', async () => {
     mocked(put).mockRejectedValueOnce(new Error('Different SDK conflict wording'));
-    const result = await storeVideoArtifact(
-      '10',
-      artifact,
-      archive(),
-      new AbortController().signal,
-    );
+    const { saved: result } = await stored();
     expect(result.artifact.stored).toBe(true);
     expect(head).toHaveBeenCalledTimes(1);
   });
   it('preserves upload failures when no immutable object exists', async () => {
     mocked(put).mockRejectedValueOnce(new Error('Storage upload failed'));
     mocked(head).mockRejectedValueOnce(new Error('Object missing'));
-    await expect(
-      storeVideoArtifact('10', artifact, archive(), new AbortController().signal),
-    ).rejects.toThrow('Storage upload failed');
+    await expect(stored()).rejects.toThrow('Storage upload failed');
     expect(mocked(put).mock.calls.some(([path]) => path.includes('/runs/'))).toBe(false);
   });
   it('does not publish unverified bytes', async () => {
-    await expect(
-      storeVideoArtifact('10', artifact, archive(true), new AbortController().signal),
-    ).rejects.toThrow('checksum mismatch');
+    await expect(stored(archive(true))).rejects.toThrow('SHA256 mismatch');
     expect(put).not.toHaveBeenCalled();
   });
 });

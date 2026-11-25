@@ -1,6 +1,5 @@
 import { at, entries, ROLES, rows, sha256, text, type Json } from './bundle';
 import { servingFixture } from './serving.fixture';
-import type { CIArtifact } from './archive';
 import type { StoredArtifact, StoredSource } from './stored';
 
 const object = (value: Json) => Object.fromEntries(entries(value));
@@ -15,15 +14,8 @@ export async function fidelityFixture({
   nativeOriginals = false,
 } = {}) {
   const runId = '789';
-  const artifact: CIArtifact = {
-    id: 987,
-    name: `h3-fidelity-${runId}-1`,
-    expired: false,
-    size_in_bytes: 1,
-  };
   const files = new Map<string, Blob>();
   const originals: StoredArtifact[] = [];
-  const originalFiles = new Map<string, Map<string, Blob>>();
   const sourceArtifacts: Json[] = [];
   const roleResults: Record<string, Json> = {};
   const observations: Record<string, Json[]> = {};
@@ -134,7 +126,6 @@ export async function fidelityFixture({
         },
       ],
     });
-    originalFiles.set(id, sourceFiles);
     roleResults[role] = {
       run_id: `synthetic-${role}`,
       configuration: at(requestRun, 'configuration'),
@@ -251,21 +242,12 @@ export async function fidelityFixture({
     assets: [...files.keys()].map((path) => [path, asset(runId, path)]),
     texts,
   };
-  const read = (path: string) => {
-    const file = files.get(path);
-    if (!file) throw new Error(`Missing synthetic fixture file: ${path}`);
-    return Promise.resolve(file);
-  };
   return {
     runId,
-    artifact,
-    files,
-    read,
     documents,
     checksums,
     published,
     originals,
-    originalFiles,
     comparison,
     portable,
   };
