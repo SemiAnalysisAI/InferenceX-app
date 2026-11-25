@@ -393,7 +393,7 @@ describe('history projection version', () => {
       // approved under a receipt without one must be projected again. The walk skips type-only
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
       // uncalled helpers left bundle.ts and metrics.ts; entries are unchanged.
-      sources: 'bbfe21ac0c8adb0cb5236bf511d3e155a53d903441c80bfc8f8572bb70e2f864',
+      sources: '983a3ebffcfe3cad4861432ce954b6365b93bbc6c5417e8dea7fa6d27ccba436',
     });
   });
 });
