@@ -226,7 +226,7 @@ describe('Trainium3 launch banner', { testIsolation: true }, () => {
         });
         cy.get('[data-testid="launch-banner"]:visible')
           .should('have.length', 1)
-          .and('have.attr', 'href', `${locale}/infx/inference/glm-5-3?i_vendor=AWS`)
+          .and('have.attr', 'href', `${locale}/infx/inference/glm-5-3`)
           .and('contain.text', locale ? 'Amazon Trainium3 结果' : 'Amazon Trainium3 Results')
           .and(
             'contain.text',
@@ -234,7 +234,7 @@ describe('Trainium3 launch banner', { testIsolation: true }, () => {
           )
           .click();
         cy.location('pathname').should('eq', `${locale}/infx/inference/glm-5-3`);
-        cy.location('search').should('eq', '?i_vendor=AWS');
+        cy.location('search').should('eq', '');
       });
     }
   }
@@ -256,7 +256,7 @@ describe('Trainium3 launch banner', { testIsolation: true }, () => {
           .should('eq', variant);
         cy.get('[data-testid="launch-banner"]:visible')
           .should('have.length', 1)
-          .and('have.attr', 'href', '/infx/inference/glm-5-3?i_vendor=AWS');
+          .and('have.attr', 'href', '/infx/inference/glm-5-3');
         cy.reload();
         cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
       });

@@ -2,7 +2,7 @@ import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const LANDING_BANNER_STORAGE_KEY = 'inferencex-trainium3-glm-5-2-banner-dismissed';
 export const LANDING_BANNER_DISMISSED_ATTRIBUTE = 'data-landing-banner-dismissed';
-export const TRAINIUM3_GLM_5_2_AGENTX_URL = `${getDashboardRoute('inference').path}/glm-5-3?i_vendor=AWS`;
+export const TRAINIUM3_GLM_5_2_AGENTX_URL = `${getDashboardRoute('inference').path}/glm-5-3`;
 
 /**
  * A/B test of the landing banner destination. Each visitor is assigned one arm with
