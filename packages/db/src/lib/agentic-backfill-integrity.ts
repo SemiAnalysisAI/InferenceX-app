@@ -1,3 +1,21 @@
+import { createHash } from 'node:crypto';
+
+/**
+ * SHA-256 of the database URL's host name and path (the database name), so a manifest identifies
+ * its database without revealing the host when the manifest is uploaded or printed.
+ */
+export function databaseFingerprint(databaseUrl: string): string {
+  const { hostname, pathname } = new URL(databaseUrl);
+  return createHash('sha256').update(`${hostname}${pathname}`).digest('hex');
+}
+
+/** Throws unless a manifest's `database` fingerprint is that of `databaseUrl`. */
+export function assertManifestDatabase(manifestDatabase: unknown, databaseUrl: string): void {
+  if (manifestDatabase !== databaseFingerprint(databaseUrl)) {
+    throw new Error('Manifest belongs to a different database');
+  }
+}
+
 export interface BackfillState {
   id: string;
   trace_id: string | null;

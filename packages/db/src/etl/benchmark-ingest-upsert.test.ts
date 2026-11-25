@@ -1,11 +1,13 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
+import { stubEnv, unstubAllEnvs } from '../lib/test-helpers';
 import { migratedPglite, pgliteDriverSql, type PgliteSql } from '../lib/test-pglite';
 import { getBenchmarkPresence } from '../queries/benchmark-presence';
 import {
   bulkIngestBenchmarkRows,
   insertServerLog,
+  insertServerLogFiles,
   type BenchmarkPersistenceInput,
 } from './benchmark-ingest';
 
@@ -93,5 +95,32 @@ describe('insertServerLog', () => {
     expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [] });
     await insertServerLog(sql, insertedIds, 'log');
     expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [1, 3] });
+  });
+});
+
+describe('insertServerLogFiles sanitization', () => {
+  afterEach(() => {
+    unstubAllEnvs();
+  });
+
+  it('stores sanitized text in the primary, child rows and their blocks', async () => {
+    await db.exec('TRUNCATE server_logs RESTART IDENTITY CASCADE');
+    stubEnv('SERVER_LOG_BLOCKS', '1');
+    const { insertedIds } = await bulkIngestBenchmarkRows(sql, [row()], 1, '2026-09-11');
+    await insertServerLogFiles(sql, insertedIds, [
+      { fileName: 'server.log', logText: 'listening on 198.51.100.7:8000 and 10.0.0.2:8000\n' },
+      { fileName: 'router.log', logText: 'HF_TOKEN=hf_abcdefghijklmnopqrstuvwxyzABCDEF12\n' },
+    ]);
+
+    const server = 'listening on ***REDACTED***:8000 and 10.0.0.2:8000\n';
+    const router = 'HF_TOKEN=***REDACTED***\n';
+    expect(await sql`select server_log from server_logs`).toEqual([{ server_log: server }]);
+    expect(await sql`select log_text from server_log_files`).toEqual([{ log_text: router }]);
+    expect(
+      await sql`select file_name, char_count::int from server_log_block_files order by file_name`,
+    ).toEqual([
+      { file_name: 'router.log', char_count: router.length },
+      { file_name: 'server.log', char_count: server.length },
+    ]);
   });
 });

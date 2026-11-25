@@ -761,6 +761,53 @@ describe('computeChartSeries', () => {
     expect(result?.metricSources[1]?.generationTps).toEqual([{ t: 0, value: 50 }]);
   });
 
+  it('serves public endpoint addresses sanitized and keeps private ones', async () => {
+    const publicA = 'http://198.51.100.7:7500/metrics';
+    const publicB = 'http://198.51.100.8:7500/metrics';
+    const privateUrl = 'http://10.3.10.21:7501/metrics';
+    const json = JSON.stringify({
+      metrics: {
+        trtllm_kv_cache_utilization: {
+          series: [
+            buildTrtllmSeries(publicA, 'prefill', 0.3, 'avg'),
+            buildTrtllmSeries(publicB, 'prefill', 0.5, 'avg'),
+            buildTrtllmSeries(privateUrl, 'backend', 0.7, 'avg'),
+          ],
+        },
+      },
+    });
+
+    const result = await computeChartSeries(gzipSync(Buffer.from(json)), {
+      framework: 'trtllm',
+      disagg: true,
+    });
+
+    expect(
+      result?.metricSources.map(({ source, kvCacheUsage }) => [
+        source.id,
+        source.endpointUrl,
+        kvCacheUsage,
+      ]),
+    ).toEqual([
+      [
+        'trtllm|prefill|http://***REDACTED***:7500/metrics',
+        'http://***REDACTED***:7500/metrics',
+        [{ t: 0, value: 0.3 }],
+      ],
+      [
+        'trtllm|prefill|http://***REDACTED***:7500/metrics#2',
+        'http://***REDACTED***:7500/metrics',
+        [{ t: 0, value: 0.5 }],
+      ],
+      [
+        'trtllm|decode|http://10.3.10.21:7501/metrics',
+        'http://10.3.10.21:7501/metrics',
+        [{ t: 0, value: 0.7 }],
+      ],
+    ]);
+    expect(JSON.stringify(result)).not.toContain('198.51.100');
+  });
+
   it('keeps Dynamo TRT ranks within each worker and falls back to native-only endpoints', async () => {
     const prefillUrls = ['http://prefill-a:7500/metrics', 'http://prefill-b:7500/metrics'];
     const decodeUrl = 'http://decode:7500/metrics';

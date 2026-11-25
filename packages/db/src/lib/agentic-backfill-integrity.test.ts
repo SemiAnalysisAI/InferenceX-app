@@ -1,5 +1,34 @@
 import { describe, expect, it } from 'bun:test';
-import { verifyBackfillState, type BackfillState } from './agentic-backfill-integrity.js';
+import {
+  assertManifestDatabase,
+  databaseFingerprint,
+  verifyBackfillState,
+  type BackfillState,
+} from './agentic-backfill-integrity.js';
+
+describe('manifest database', () => {
+  const url = 'postgres://user:pass@ep-example-123.us-east-2.aws.neon.tech/db';
+
+  it('names the database by a hash that omits the host', () => {
+    const fingerprint = databaseFingerprint(url);
+    expect(fingerprint).toMatch(/^[0-9a-f]{64}$/u);
+    expect(fingerprint).not.toContain('neon');
+    expect(() => assertManifestDatabase(fingerprint, `${url}?sslmode=require`)).not.toThrow();
+  });
+
+  it('rejects a manifest from another database or without one', () => {
+    const other = databaseFingerprint('postgres://user:pass@ep-other-456.neon.tech/db');
+    expect(() => assertManifestDatabase(other, url)).toThrow('different database');
+    expect(() => assertManifestDatabase(undefined, url)).toThrow('different database');
+  });
+
+  it('tells apart two databases on one host', () => {
+    const sameHost = 'postgres://user:pass@ep-example-123.us-east-2.aws.neon.tech/other_db';
+    expect(() => assertManifestDatabase(databaseFingerprint(sameHost), url)).toThrow(
+      'different database',
+    );
+  });
+});
 
 const before: BackfillState = {
   id: '439892',

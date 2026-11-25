@@ -20,7 +20,8 @@ import {
 } from './lib/backfill-runner.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
 import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
-import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
+import { loadRedactedRunUrls } from './lib/redacted-run-urls.js';
+import { storedRunRepository } from './lib/runtime-metadata-artifacts.js';
 import { pairServerLogArtifacts } from './lib/server-log-backfill.js';
 
 const RETENTION_DAYS = 90;
@@ -101,6 +102,7 @@ function isWithinGithubRetention(date: string, now = new Date()): boolean {
 }
 
 async function main(): Promise<void> {
+  const redactedUrls = loadRedactedRunUrls();
   console.log('=== backfill-server-log-files ===');
   const runFilter = parseRunFilter();
   const fromRunFilter = parseFromRunFilter();
@@ -172,7 +174,7 @@ async function main(): Promise<void> {
   let githubRuns = 0;
   for (const [runIndex, run] of runs.entries()) {
     const runId = Number(run.github_run_id);
-    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
+    const repository = storedRunRepository(run, redactedUrls) ?? requireIngestRepo();
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `server-log-backfill-${runId}-`));
     try {
       let source: Exclude<ArtifactSource, 'auto'> | null = null;

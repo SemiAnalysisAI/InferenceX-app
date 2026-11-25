@@ -1,6 +1,6 @@
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql } from './etl/db-utils.js';
-import { writeServerLogBlocks } from './etl/server-log-block-writer.js';
+import { compactStoredServerLogFile } from './etl/server-log-block-writer.js';
 
 function flagValue(name: string): string | null {
   const index = process.argv.indexOf(name);
@@ -49,33 +49,23 @@ let done = 0;
 let next = 0;
 async function compact({ log_id: logId, file_name: fileName, primary }: Candidate): Promise<void> {
   const t0 = performance.now();
-  const [{ chars }] = primary
-    ? await sql<{ chars: string }[]>`
-        select char_length(server_log)::text as chars from server_logs
-        where id = ${logId} and file_name = ${fileName}`
-    : await sql<{ chars: string }[]>`
-        select char_length(log_text)::text as chars from server_log_files
-        where server_log_id = ${logId} and file_name = ${fileName}`;
-  const charCount = Number(chars);
   if (dryRun) {
-    console.log(`  ${logId} ${fileName}: ${charCount} chars`);
+    const [{ chars }] = primary
+      ? await sql<{ chars: string }[]>`
+          select char_length(server_log)::text as chars from server_logs
+          where id = ${logId} and file_name = ${fileName}`
+      : await sql<{ chars: string }[]>`
+          select char_length(log_text)::text as chars from server_log_files
+          where server_log_id = ${logId} and file_name = ${fileName}`;
+    console.log(`  ${logId} ${fileName}: ${chars} chars`);
     return;
   }
-  const written = await sql.begin((tx) =>
-    writeServerLogBlocks(tx, logId, fileName, charCount, async (start, length) => {
-      const [{ text }] = primary
-        ? await tx<{ text: string }[]>`
-            select substring(server_log from ${start + 1}::integer for ${length}::integer) as text
-            from server_logs where id = ${logId}`
-        : await tx<{ text: string }[]>`
-            select substring(log_text from ${start + 1}::integer for ${length}::integer) as text
-            from server_log_files where server_log_id = ${logId} and file_name = ${fileName}`;
-      return text;
-    }),
+  const { chars, written } = await sql.begin((tx) =>
+    compactStoredServerLogFile(tx, logId, fileName, primary),
   );
   done += written ? 1 : 0;
   console.log(
-    `  ${logId} ${fileName}: ${charCount} chars ${written ? 'compacted' : 'already block-backed'} ` +
+    `  ${logId} ${fileName}: ${chars} chars ${written ? 'compacted' : 'already block-backed'} ` +
       `in ${Math.round(performance.now() - t0)} ms`,
   );
 }
