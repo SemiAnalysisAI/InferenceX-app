@@ -55,6 +55,7 @@ const HIGH_CONTRAST_COLORS: Record<string, string> = {
 };
 
 let frames: FrameRequestCallback[] = [];
+let chartWidth = 1000;
 let container: HTMLDivElement;
 let root: Root;
 
@@ -80,7 +81,7 @@ beforeEach(() => {
       }
       observe(target: Element) {
         observe?.(
-          [{ target, contentRect: DOMRect.fromRect({ width: 1000, height: 500 }) } as never],
+          [{ target, contentRect: DOMRect.fromRect({ width: chartWidth, height: 500 }) } as never],
           this as never,
         );
       }
@@ -90,8 +91,8 @@ beforeEach(() => {
   );
   stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
   stubGlobal('cancelAnimationFrame', () => {});
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
-    DOMRect.fromRect({ width: 1000, height: 500 }),
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() =>
+    DOMRect.fromRect({ width: chartWidth, height: 500 }),
   );
   container = document.createElement('div');
   document.body.append(container);
@@ -103,13 +104,14 @@ afterEach(() => {
   container.remove();
   vi.restoreAllMocks();
   unstubAllGlobals();
+  chartWidth = 1000;
 });
 
-function draw(colors: Record<string, string>) {
+function draw(colors: Record<string, string>, rows: ProfitEstimatorRow[] = ROWS) {
   act(() =>
     root.render(
       createElement(ProfitEstimatorChart, {
-        rows: ROWS,
+        rows,
         hardwareConfig: {} as HardwareConfig,
         // A new resolver per palette, as the display builds one per `useThemeColors` result.
         colorResolver: (row: ProfitEstimatorRow) => colors[row.hwKey]!,
@@ -135,5 +137,45 @@ describe('ProfitEstimatorChart palette changes', () => {
 
     draw(DEFAULT_COLORS);
     expect(tcoFills()).toEqual(['#2e7d32', '#c62828']);
+  });
+});
+
+const isAws = (mark: SVGImageElement) =>
+  /#161D26|#FFFFFF/u.test(decodeURIComponent(mark.getAttribute('href') ?? ''));
+
+function expectAwsPair(marks: SVGImageElement[]) {
+  const aws = marks.filter(isAws);
+  expect(aws.map((mark) => mark.getAttribute('class'))).toEqual([
+    expect.stringContaining('dark:hidden'),
+    expect.stringContaining('hidden dark:inline'),
+  ]);
+  expect(decodeURIComponent(aws[0]!.getAttribute('href')!)).toContain('#161D26');
+  expect(decodeURIComponent(aws[1]!.getAttribute('href')!)).toContain('#FFFFFF');
+  expect(aws[0]!.getAttribute('x')).toBe(aws[1]!.getAttribute('x'));
+  expect(aws[0]!.getAttribute('y')).toBe(aws[1]!.getAttribute('y'));
+  expect(aws.some((mark) => mark.classList.contains('dark:invert'))).toBe(false);
+}
+
+describe('ProfitEstimatorChart vendor marks', () => {
+  const trn3: ProfitEstimatorRow = { ...ROWS[0]!, hwKey: 'trn3_vllm', resultKey: 'trn3_vllm' };
+  it('puts each vendor mark before the chip name on phone rows, with the AWS light/dark pair', () => {
+    chartWidth = 393;
+    draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
+    expect(container.querySelectorAll('image.bar-vendor-mark')).toHaveLength(0);
+    const marks = [...container.querySelectorAll<SVGImageElement>('image.row-vendor-mark')];
+    expect(marks).toHaveLength(4);
+    for (const mark of marks) {
+      expect(Number(mark.getAttribute('x')) + Number(mark.getAttribute('width'))).toBeLessThan(0);
+    }
+    expectAwsPair(marks);
+    expect(marks.filter((mark) => mark.classList.contains('dark:invert'))).toHaveLength(1);
+  });
+
+  it('tops every vendor bar, Trainium3 included, with the AWS light/dark pair', () => {
+    draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
+    const marks = [...container.querySelectorAll<SVGImageElement>('image.bar-vendor-mark')];
+    expect(marks).toHaveLength(4);
+    expectAwsPair(marks);
+    expect(Number(marks.find(isAws)?.getAttribute('width'))).toBeGreaterThan(0);
   });
 });
