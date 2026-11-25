@@ -400,6 +400,11 @@ export interface InferenceFiltersContextType {
   requestedHwTypes: ReadonlySet<string> | null;
   /** Inactive hardware keys whose legend toggle the engine exclusion blocks. */
   blockedHwToggles: ReadonlyMap<string, BlockedComparisonToggle>;
+  /**
+   * A model, sequence or precision pick is still rendering. The legend shows the old scope until
+   * it lands, so hardware actions do nothing and legends render busy.
+   */
+  scopePickPending: boolean;
   selectedModel: Model;
   selectedSequence: Sequence;
   selectedPrecisions: string[];

@@ -593,6 +593,7 @@ const ScatterGraph = React.memo(
       activeHwTypes,
       bestPerSku,
       blockedHwToggles,
+      scopePickPending,
       selectedPrecisions,
       selectedRunId,
       selectedSequence,
@@ -4382,6 +4383,7 @@ const ScatterGraph = React.memo(
               <EngineComparisonConflictNotice className="mb-2" />
               <ChartLegend
                 variant="sidebar"
+                busy={scopePickPending}
                 onItemHover={handleLegendHover}
                 onItemHoverEnd={handleLegendHoverEnd}
                 onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}

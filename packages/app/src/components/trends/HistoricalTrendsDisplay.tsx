@@ -212,8 +212,14 @@ export default function HistoricalTrendsDisplay() {
   const t = STRINGS[locale];
   const { graphs, loading, error, hardwareConfig, hwTypesWithData, availableDates } =
     useInferenceData();
-  const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes, selectedRunDate } =
-    useInferenceFilters();
+  const {
+    selectedModel,
+    selectedSequence,
+    selectedPrecisions,
+    activeHwTypes,
+    selectedRunDate,
+    scopePickPending,
+  } = useInferenceFilters();
   const isAgentic = selectedSequence === Sequence.AgenticTraces;
   const targetLabel = isAgentic ? t.agenticTargetLabel : t.targetLabel;
   const { selectedYAxisMetric, tokenRevenuePricing, logScale, isLegendExpanded, highContrast } =
@@ -587,6 +593,7 @@ export default function HistoricalTrendsDisplay() {
       <EngineComparisonConflictNotice className="mb-2" />
       <ChartLegend
         variant="sidebar"
+        busy={scopePickPending}
         hideAtomFootnote
         collapsible={chartView !== 'waterfall'}
         onItemRemove={removeHwType}

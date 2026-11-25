@@ -4,10 +4,12 @@ import {
   type ReactNode,
   type SetStateAction,
   createContext,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useOptimistic,
   useRef,
   useState,
 } from 'react';
@@ -708,6 +710,15 @@ export function InferenceProvider({
   const [requestedHwSelection, setRequestedHwSelection] = useState<Set<string> | null>(null);
   // The keys the page asked for, kept while that request is still the reader's selection.
   const requestedHwKeysRef = useRef<ReadonlySet<string> | null>(null);
+  // Model, sequence and precision picks render as transitions, and the hardware reset for the new
+  // scope runs only once one lands. Until then the legend shows the old scope, so hardware actions
+  // wait, since a click there would commit first and the reset would then undo it. React drops the
+  // flag when the pick's transition ends, whether or not the pick changed the scope.
+  const [scopePickPending, setScopePickPending] = useOptimistic(false);
+  const markScopePick = useCallback(
+    () => startTransition(() => setScopePickPending(true)),
+    [setScopePickPending],
+  );
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
@@ -896,6 +907,7 @@ export function InferenceProvider({
   }, [clearOverviewHistoryPair, clearPresetOnChange]);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
+      markScopePick();
       if (v !== selectedModel) {
         if (activeTab === 'inference' && v === Model.Qwen3_5) {
           setRequestedXAxisMode(null);
@@ -913,6 +925,7 @@ export function InferenceProvider({
     [
       selectedModel,
       activeTab,
+      markScopePick,
       setSelectedModel,
       clearScopedSelectionOnChange,
       initialActiveHwTypes,
@@ -921,20 +934,22 @@ export function InferenceProvider({
   );
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
+      markScopePick();
       setSelectedSequence(v);
       clearScopedSelectionOnChange();
     },
-    [setSelectedSequence, clearScopedSelectionOnChange],
+    [markScopePick, setSelectedSequence, clearScopedSelectionOnChange],
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
+      markScopePick();
       if (activeTab === 'inference' && selectedModel === Model.Qwen3_5) {
         setRequestedXAxisMode(null);
       }
       setSelectedPrecisions(v);
       clearScopedSelectionOnChange();
     },
-    [activeTab, selectedModel, setSelectedPrecisions, clearScopedSelectionOnChange],
+    [activeTab, selectedModel, markScopePick, setSelectedPrecisions, clearScopedSelectionOnChange],
   );
   const setSelectedYAxisMetricAndClear = useCallback(
     (v: string) => {
@@ -1236,6 +1251,7 @@ export function InferenceProvider({
 
   const setBestPerSkuAndApply = useCallback(
     (enabled: boolean, options?: { applySelection?: boolean }) => {
+      if (scopePickPending) return;
       if (
         !enabled &&
         options?.applySelection !== false &&
@@ -1256,7 +1272,14 @@ export function InferenceProvider({
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [bestHwTypes, selectableHwTypes, resolveHwSelection, setActiveHwTypes, requestEngineComparison],
+    [
+      scopePickPending,
+      bestHwTypes,
+      selectableHwTypes,
+      resolveHwSelection,
+      setActiveHwTypes,
+      requestEngineComparison,
+    ],
   );
 
   useEffect(() => {
@@ -1274,6 +1297,7 @@ export function InferenceProvider({
 
   const toggleHwType = useCallback(
     (hw: string) => {
+      if (scopePickPending) return;
       const proposed = computeToggle(activeHwTypes, hw, selectableHwTypes);
       if (
         !activeHwTypes.has(hw) &&
@@ -1295,6 +1319,7 @@ export function InferenceProvider({
       presetHwFilterRef.current = null;
     },
     [
+      scopePickPending,
       activeHwTypes,
       selectableHwTypes,
       setActiveHwTypes,
@@ -1305,13 +1330,14 @@ export function InferenceProvider({
 
   const removeHwType = useCallback(
     (hw: string) => {
+      if (scopePickPending) return;
       setHardwareDefaultsOverridden(true);
       removeHwRaw(hw);
       setBestPerSku(false);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [removeHwRaw],
+    [scopePickPending, removeHwRaw],
   );
 
   const allDateIds = useMemo(() => {
@@ -1329,6 +1355,7 @@ export function InferenceProvider({
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
+    if (scopePickPending) return;
     if (
       requestEngineComparison(selectableHwTypes, () => {
         setHardwareDefaultsOverridden(true);
@@ -1352,6 +1379,7 @@ export function InferenceProvider({
     }
     selectAllHwRaw(selectableHwTypes);
   }, [
+    scopePickPending,
     selectAllHwRaw,
     selectableHwTypes,
     activeHwTypes,
@@ -1805,7 +1833,7 @@ export function InferenceProvider({
   );
 
   useEffect(() => {
-    if (urlPresetAppliedRef.current) return;
+    if (urlPresetAppliedRef.current || scopePickPending) return;
     if (typeof window === 'undefined') return;
     const sp = new URLSearchParams(window.location.search);
     const presetId = sp.get('preset');
@@ -1821,7 +1849,7 @@ export function InferenceProvider({
       `${window.location.pathname}${search ? `?${search}` : ''}`,
     );
     applyPreset(preset);
-  }, [applyPreset]);
+  }, [applyPreset, scopePickPending]);
 
   const handleDateRangeDialogOk = () => {
     clearOverviewHistoryPair();
@@ -1877,6 +1905,7 @@ export function InferenceProvider({
       bestPerSku,
       requestedHwTypes,
       blockedHwToggles,
+      scopePickPending,
       selectedModel,
       selectedSequence: effectiveSequence,
       selectedPrecisions: effectivePrecisions,
@@ -1900,6 +1929,7 @@ export function InferenceProvider({
       bestPerSku,
       requestedHwTypes,
       blockedHwToggles,
+      scopePickPending,
       selectedModel,
       effectiveSequence,
       effectivePrecisions,

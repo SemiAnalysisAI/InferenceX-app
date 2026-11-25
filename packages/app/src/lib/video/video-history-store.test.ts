@@ -379,9 +379,10 @@ describe('history projection version', () => {
       // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey),
       // the inference setSelectedGPUs action type now returns whether picks applied, the
       // unofficial run provider gained a requested-overlay flag, buildShareUrl now carries
-      // the overview search params, and url-state reads those keys from an import-free
-      // overview-search-keys module. None of these feed recorded entries, so they are unchanged.
-      sources: '3c52be3fed6522f7eaa036a29ca5728077c060f425a19abc5e9c24553b77eeee',
+      // the overview search params, url-state reads those keys from an import-free
+      // overview-search-keys module, and the inference filters type gained the scopePickPending
+      // flag. None of these feed recorded entries, so they are unchanged.
+      sources: 'de1bf57885db1ac5da984cd91d03c0b74f655d538380cfdaacce8829ec6b0467',
     });
   });
 });
