@@ -13,6 +13,7 @@ mock.module('@/lib/video/video-storage', () => {
   const readIndex = vi.fn();
   return {
     approveVideoPublication: vi.fn(),
+    readVideoPublication: vi.fn(),
     videoStorageEnabled: vi.fn(() => false),
     storedArtifacts: vi.fn(() => Promise.resolve([])),
     readStoredArtifact: readIndex,
@@ -44,6 +45,7 @@ const { publishVideoQuality } = await import('@/lib/video/video-quality');
 const {
   approveVideoPublication,
   readStoredArtifact,
+  readVideoPublication,
   derivedMedia,
   storedArtifacts,
   storeVideoArtifact,
@@ -75,6 +77,7 @@ afterEach(() => {
   mocked(readStoredArtifact).mockReset();
   mocked(storeVideoArtifact).mockClear();
   mocked(approveVideoPublication).mockReset();
+  mocked(readVideoPublication).mockReset();
   mocked(derivedMedia).mockReset().mockResolvedValue(new Map());
   unstubAllEnvs();
   vi.restoreAllMocks();
@@ -496,13 +499,20 @@ describe('explicit H3 publication', () => {
     workflow_run: { id: 10, head_sha: 'c'.repeat(40) },
   };
   const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [{ id: '10' }] };
+  const selectedArtifact = {
+    id: '20',
+    manifestSha256: 'd'.repeat(64),
+    sha256sumsSha256: 'f'.repeat(64),
+  };
+  const selectedBody = { runId: '10', mergeRunId: '99', selectedArtifact };
   const receipt = {
-    version: 1,
+    version: 2,
     runId: '10',
     artifactId: 20,
     artifactName: artifact.name,
     artifactDigest: artifact.digest,
     mergeRunId: '99',
+    selected: { manifestSha256: 'd'.repeat(64), sha256sumsSha256: 'f'.repeat(64) },
     sources: [{ id: '10', sha256: 'd'.repeat(64), checkoutSha: 'e'.repeat(40) }],
   };
   it('rejects a missing secret or bearer before any external read or write', async () => {
@@ -528,6 +538,16 @@ describe('explicit H3 publication', () => {
       { runId: '10', artifactId: '9007199254740993', mergeRunId: null },
       { runId: '10', artifactId: '20' },
       { runId: '10', artifactId: '20', mergeRunId: '0' },
+      { runId: '10', artifactId: '20', mergeRunId: '99', selectedArtifact: {} },
+      {
+        runId: '10',
+        mergeRunId: '99',
+        selectedArtifact: { id: '20', manifestSha256: '0'.repeat(64) },
+      },
+      // A merge run approves only through its selection, and only a merge run carries one.
+      { runId: '10', artifactId: '20', mergeRunId: '99' },
+      { ...selectedBody, artifactId: '20' },
+      { ...selectedBody, mergeRunId: null },
     ]) {
       const result = await POST(post(body));
       expect(result.status).toBe(400);
@@ -546,7 +566,7 @@ describe('explicit H3 publication', () => {
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
-    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    const result = await POST(post(selectedBody));
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ ...receipt, quality: 2 });
     expect(readStoredArtifact).toHaveBeenCalledWith('10', artifact);
@@ -556,6 +576,7 @@ describe('explicit H3 publication', () => {
       saved,
       '99',
       expect.any(AbortSignal),
+      selectedArtifact,
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
@@ -567,6 +588,34 @@ describe('explicit H3 publication', () => {
     );
   });
 
+  it('republishes without a merge run only an artifact that already holds an approval', async () => {
+    stubEnv('INVALIDATE_SECRET', 'test-secret');
+    mocked(videoStorageEnabled).mockReturnValue(true);
+    const republish = () => {
+      fetchMock
+        .mockResolvedValueOnce(response({ private: false }))
+        .mockResolvedValueOnce(response(artifact));
+      return POST(post({ runId: '10', artifactId: '20', mergeRunId: null }));
+    };
+    // Never stored, then stored without a receipt: refused, and nothing is downloaded or written.
+    mocked(readStoredArtifact).mockResolvedValueOnce(null);
+    mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    mocked(readVideoPublication).mockResolvedValueOnce(null);
+    for (const refused of [await republish(), await republish()]) {
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toEqual({ error: 'Artifact has no approval to republish' });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(recordVideoHistory).not.toHaveBeenCalled();
+    mocked(readVideoPublication).mockResolvedValue(receipt as never);
+    const result = await republish();
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ ...receipt, quality: null });
+    expect(recordVideoHistory).toHaveBeenCalledExactlyOnceWith(saved);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+    expect(approveVideoPublication).not.toHaveBeenCalled();
+  });
+
   it('publishes a run whose quality is missing or cannot be attached', async () => {
     stubEnv('INVALIDATE_SECRET', 'test-secret');
     mocked(videoStorageEnabled).mockReturnValue(true);
@@ -576,7 +625,7 @@ describe('explicit H3 publication', () => {
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
-    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    const result = await POST(post(selectedBody));
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ ...receipt, quality: 'failed' });
     expect(recordVideoHistory).toHaveBeenCalledExactlyOnceWith(saved);
@@ -592,7 +641,7 @@ describe('explicit H3 publication', () => {
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
-    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    const result = await POST(post(selectedBody));
     expect(result.status).toBe(502);
     // The approval receipt was written, so History projected before it is stale.
     await GET(request('?format=history'));
@@ -633,13 +682,14 @@ describe('explicit H3 publication', () => {
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact))
       .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4])));
-    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    const result = await POST(post(selectedBody));
     expect(result.status).toBe(200);
     expect(storeVideoArtifact).toHaveBeenCalledWith(
       '10',
       artifact,
       expect.any(Blob),
       expect.any(AbortSignal),
+      selectedArtifact,
     );
     expect(String(fetchMock.mock.calls[2][0])).toContain('/actions/artifacts/20/zip');
   });
@@ -650,7 +700,7 @@ describe('explicit H3 publication', () => {
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response({ ...artifact, workflow_run: { id: 11 } }));
-    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    const result = await POST(post(selectedBody));
     expect(result.status).toBe(404);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
     expect(approveVideoPublication).not.toHaveBeenCalled();
@@ -667,7 +717,7 @@ describe('explicit H3 publication', () => {
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact))
       .mockResolvedValueOnce(response({ private: false }));
-    const failed = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    const failed = await POST(post(selectedBody));
     expect(failed.status).toBe(502);
     const result = await GET(request('?run=10&artifact=20&format=media'));
     expect(await result.json()).toEqual(saved);

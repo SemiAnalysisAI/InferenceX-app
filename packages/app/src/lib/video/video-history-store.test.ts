@@ -57,17 +57,20 @@ const artifactReads = () =>
     ([url]) => /\/runs\/\d+\//u.test(String(url)) && !String(url).includes('/approvals/'),
   ).length;
 
-async function publish(i: number, approve = true, hardware?: string, takes?: number) {
+const SEAL = { path: 'seal/SHA256SUMS', body: 'synthetic SHA256SUMS' };
+/** Approves as a merge run does: its selection names the stored manifest and SHA256SUMS. */
+const approve = (saved: StoredArtifact) =>
+  approveVideoPublication(saved.runId, ref(saved), saved, '9', new AbortController().signal, {
+    manifestSha256: new Map(saved.sources[0].checksums).get('manifest.json')!,
+    sha256sumsSha256: createHash('sha256').update(SEAL.body).digest('hex'),
+  });
+
+async function publish(i: number, approved = true, hardware?: string, takes?: number) {
   const saved = servingArtifact(100 + i, 1000 + i, hardware, takes);
+  const url = `https://blob.test/${SEAL.path}`;
+  saved.sources[0].assets.push(['SHA256SUMS', { url, downloadUrl: url }]);
   save(indexPath(saved), JSON.stringify(saved));
-  if (approve)
-    await approveVideoPublication(
-      saved.runId,
-      ref(saved),
-      saved,
-      null,
-      new AbortController().signal,
-    );
+  if (approved) await approve(saved);
   return saved;
 }
 
@@ -98,6 +101,7 @@ function meta(pathname: string): HeadBlobResult {
 beforeEach(() => {
   stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
   blobs.clear();
+  blobs.set(SEAL.path, { url: '', uploadedAt: new Date(0), body: SEAL.body });
   mocked(list).mockImplementation((options) => {
     const all = [...blobs.keys()]
       .filter((path) => path.startsWith(options?.prefix ?? ''))
@@ -157,6 +161,21 @@ describe('published video history', () => {
     // A legacy entry without a receipt is still an exact read, so the shared cache may keep it.
     const read = await publishedVideoHistoryRead(1);
     expect(read.complete).toBe(true);
+  });
+
+  it('does not approve an entry whose version 1 receipt names no merge run', async () => {
+    const saved = await publish(1);
+    const path = approvalPath(saved.runId, ref(saved));
+    const { selected: _selected, ...receipt } = JSON.parse(blobs.get(path)!.body);
+    // What a manual publication wrote before an approval needed a merge run.
+    save(path, JSON.stringify({ ...receipt, version: 1, mergeRunId: null }));
+    const { page, complete } = await publishedVideoHistoryRead(1);
+    expect(page.entries.map((entry) => entry.approved)).toEqual([false]);
+    expect(complete).toBe(true);
+    // The same receipt with its merge run approves.
+    save(path, JSON.stringify({ ...receipt, version: 1 }));
+    const counted = await publishedVideoHistory(1);
+    expect(counted.entries.map((entry) => entry.approved)).toEqual([true]);
   });
 
   it('marks a page with an unreadable index as incomplete so it is not retained', async () => {
@@ -252,13 +271,7 @@ describe('recorded video history', () => {
     await recordVideoHistory(null);
     save(indexPath(saved[2]), blobs.get(indexPath(saved[2]))!.body);
     blobs.delete(approvalPath(saved[0].runId, ref(saved[0])));
-    await approveVideoPublication(
-      saved[3].runId,
-      ref(saved[3]),
-      saved[3],
-      null,
-      new AbortController().signal,
-    );
+    await approve(saved[3]);
     const added = await publish(5);
     const expected = await direct(1);
     mocked(fetch).mockClear();
@@ -371,18 +384,10 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 6,
-      // Re-pinned after the lazy power model loader gained failure and retry states (reached only
-      // through type imports), fetchJson learned to take an early document-load response,
-      // data_query_failed stopped reporting failed background refetches that keep their data,
-      // dashboard-routes gained the default Inference model slug, inference topology labels
-      // moved to one pass (the graph reaches that file only for the unchanged pointTopologyKey),
-      // the inference setSelectedGPUs action type now returns whether picks applied, the
-      // unofficial run provider gained a requested-overlay flag, buildShareUrl now carries
-      // the overview search params, url-state reads those keys from an import-free
-      // overview-search-keys module, and the inference filters type gained the scopePickPending
-      // flag. None of these feed recorded entries, so they are unchanged.
-      sources: 'de1bf57885db1ac5da984cd91d03c0b74f655d538380cfdaacce8829ec6b0467',
+      projection: 7,
+      // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
+      // approved under a receipt without one must be projected again.
+      sources: '68e91a6e29acc6e59c56216e7870a0a35a24d18dc32baf7ff35244a0a8acacf6',
     });
   });
 });

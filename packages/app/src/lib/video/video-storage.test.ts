@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { strToU8, zipSync } from 'fflate';
+import { strToU8, unzipSync, zipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { mocked, stubEnv, unstubAllEnvs } from '@/test/helpers';
 import { BlobNotFoundError, head, put, list } from '@vercel/blob';
@@ -41,7 +41,7 @@ function archive(corrupt = false, extra: Record<string, string> = {}) {
       run_id: '10',
       run_attempt: '1',
       git_commit: 'a'.repeat(40),
-      ci: { repository: 'SemiAnalysisAI/InferenceX' },
+      ci: { repository: 'SemiAnalysisAI/InferenceX', head_sha: 'c'.repeat(40) },
     }),
     'synthetic.mp4': 'Synthetic test bytes, not a playable benchmark clip',
     ...extra,
@@ -60,6 +60,11 @@ function archive(corrupt = false, extra: Record<string, string> = {}) {
       ),
     ).buffer,
   ]);
+}
+/** The archive's SHA256SUMS bytes and the digest a merge selection names them by. */
+async function sealOf(zip: Blob) {
+  const bytes = unzipSync(new Uint8Array(await zip.arrayBuffer())).SHA256SUMS;
+  return { bytes, sha256: createHash('sha256').update(bytes).digest('hex') };
 }
 beforeEach(() => {
   mocked(put).mockClear();
@@ -80,8 +85,54 @@ describe('persistent H3 media', () => {
         .digest('hex')}`,
     };
     const saved = await storeVideoArtifact('10', withDigest, zip, new AbortController().signal);
-    const before = mocked(put).mock.calls.length;
+    const seal = await sealOf(zip);
+    const selected = {
+      manifestSha256: storedBundle(saved.sources[0]).manifestSha256,
+      sha256sumsSha256: seal.sha256,
+    };
+    // A selected bundle is checked before the first write, so a mismatch stores nothing.
+    const stored = mocked(put).mock.calls.length;
+    for (const [field, message] of [
+      ['manifestSha256', 'selected manifest'],
+      ['sha256sumsSha256', 'selected SHA256SUMS'],
+    ] as const) {
+      await expect(
+        storeVideoArtifact('10', withDigest, zip, new AbortController().signal, {
+          ...selected,
+          [field]: '0'.repeat(64),
+        }),
+      ).rejects.toThrow(message);
+    }
+    expect(mocked(put).mock.calls).toHaveLength(stored);
+    const again = await storeVideoArtifact(
+      '10',
+      withDigest,
+      zip,
+      new AbortController().signal,
+      selected,
+    );
+    expect(again.sources).toHaveLength(1);
     let receipt: unknown;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
+      Promise.resolve(
+        String(url).endsWith('/SHA256SUMS') ? new Response(seal.bytes) : Response.json(receipt),
+      ),
+    );
+    const writes = mocked(put).mock.calls.length;
+    await expect(
+      approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal, {
+        ...selected,
+        manifestSha256: '0'.repeat(64),
+      }),
+    ).rejects.toThrow('selected manifest');
+    await expect(
+      approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal, {
+        ...selected,
+        sha256sumsSha256: '0'.repeat(64),
+      }),
+    ).rejects.toThrow('selected SHA256SUMS');
+    expect(mocked(put).mock.calls).toHaveLength(writes);
+    const before = mocked(put).mock.calls.length;
     mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
     mocked(put).mockImplementationOnce((path, body) => {
       receipt = JSON.parse(String(body));
@@ -90,21 +141,22 @@ describe('persistent H3 media', () => {
         downloadUrl: `https://test.public.blob.vercel-storage.com/${path}?download=1`,
       } as Awaited<ReturnType<typeof put>>);
     });
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json(receipt)));
     const approved = await approveVideoPublication(
       '10',
       withDigest,
       saved,
       '99',
       new AbortController().signal,
+      selected,
     );
     expect(approved).toMatchObject({
-      version: 1,
+      version: 2,
       runId: '10',
       artifactId: 20,
       artifactName: artifact.name,
       artifactDigest: withDigest.digest,
       mergeRunId: '99',
+      selected,
       sources: [{ id: '10', kind: 'observation', checkoutSha: 'a'.repeat(40) }],
     });
     expect(approved.sources[0].sha256).toBe(storedBundle(saved.sources[0]).manifestSha256);
@@ -112,15 +164,27 @@ describe('persistent H3 media', () => {
       'h3-video-media/v1/approvals/10/h3-video-10-1_20.json',
     );
     expect(await readVideoPublication('10', artifact, saved)).toEqual(approved);
-    await approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal);
+    await approveVideoPublication(
+      '10',
+      withDigest,
+      saved,
+      '99',
+      new AbortController().signal,
+      selected,
+    );
     expect(mocked(put).mock.calls).toHaveLength(before + 1);
     await expect(
-      approveVideoPublication('10', withDigest, saved, '100', new AbortController().signal),
+      approveVideoPublication(
+        '10',
+        withDigest,
+        saved,
+        '100',
+        new AbortController().signal,
+        selected,
+      ),
     ).rejects.toThrow('different merge identity');
-    // A manual republish names no merge run and reuses the approval.
-    expect(
-      await approveVideoPublication('10', withDigest, saved, null, new AbortController().signal),
-    ).toEqual(approved);
+    // A manual republish names no merge run; it reads the recorded approval and writes nothing.
+    expect(await readVideoPublication('10', withDigest, saved)).toEqual(approved);
     expect(mocked(put).mock.calls).toHaveLength(before + 1);
     mocked(list).mockResolvedValue({
       blobs: [
@@ -154,7 +218,7 @@ describe('persistent H3 media', () => {
         artifactId: artifact.id,
         artifactName: artifact.name,
         artifactDigest: null,
-        mergeRunId: null,
+        mergeRunId: '99',
         sources: [],
       }),
     );
@@ -166,28 +230,72 @@ describe('persistent H3 media', () => {
         artifactId: artifact.id,
         artifactName: artifact.name,
         artifactDigest: null,
-        mergeRunId: null,
+        mergeRunId: '99',
         sources: [
           { id: '10', kind: 'observation', sha256: '0'.repeat(64), checkoutSha: 'a'.repeat(40) },
         ],
       }),
     );
     await expect(readVideoPublication('10', artifact, saved)).rejects.toThrow('does not match');
+    // A receipt written before merge selections (version 1) still counts when it matches.
+    const sha256 = storedBundle(saved.sources[0]).manifestSha256;
+    const legacy = {
+      version: 1,
+      runId: '10',
+      artifactId: artifact.id,
+      artifactName: artifact.name,
+      artifactDigest: null,
+      mergeRunId: '99',
+      sources: [{ id: '10', kind: 'observation', sha256, checkoutSha: 'a'.repeat(40) }],
+    };
+    fetcher.mockImplementation(() => Promise.resolve(Response.json(legacy)));
+    expect(await readVideoPublication('10', artifact, saved)).toEqual(legacy);
+    // Version 2 needs both its merge run and the selection that matches the stored manifest.
+    const selected = { manifestSha256: sha256, sha256sumsSha256: 'e'.repeat(64) };
+    const { sources, ...identity } = legacy;
+    for (const forged of [
+      { ...legacy, version: 2 },
+      {
+        ...identity,
+        version: 2,
+        selected: { ...selected, manifestSha256: '0'.repeat(64) },
+        sources,
+      },
+      { ...identity, version: 2, selected: { manifestSha256: sha256 }, sources },
+    ]) {
+      fetcher.mockImplementation(() => Promise.resolve(Response.json(forged)));
+      await expect(readVideoPublication('10', artifact, saved)).rejects.toThrow();
+    }
+    // Without a merge run not even a version 2 receipt approves.
+    const unmerged = { ...identity, version: 2, mergeRunId: null, selected, sources };
+    fetcher.mockImplementation(() => Promise.resolve(Response.json(unmerged)));
+    expect(await readVideoPublication('10', artifact, saved)).toBeNull();
+    const current = { ...identity, version: 2, selected, sources };
+    fetcher.mockImplementation(() => Promise.resolve(Response.json(current)));
+    expect(await readVideoPublication('10', artifact, saved)).toEqual(current);
     expect(mocked(put).mock.calls.some(([path]) => path.includes('/approvals/'))).toBe(false);
   });
 
   it('leaves the immutable media index intact when approval upload fails', async () => {
     stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
-    const saved = await storeVideoArtifact('10', artifact, archive(), new AbortController().signal);
+    const zip = archive();
+    const saved = await storeVideoArtifact('10', artifact, zip, new AbortController().signal);
     const indexWrites = mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'));
     expect(indexWrites).toHaveLength(1);
+    const seal = await sealOf(zip);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(new Response(seal.bytes)),
+    );
     mocked(head)
       .mockRejectedValueOnce(new BlobNotFoundError())
       .mockRejectedValueOnce(new BlobNotFoundError())
       .mockRejectedValueOnce(new BlobNotFoundError());
     mocked(put).mockRejectedValueOnce(new Error('Approval upload failed'));
     await expect(
-      approveVideoPublication('10', artifact, saved, null, new AbortController().signal),
+      approveVideoPublication('10', artifact, saved, '99', new AbortController().signal, {
+        manifestSha256: storedBundle(saved.sources[0]).manifestSha256,
+        sha256sumsSha256: seal.sha256,
+      }),
     ).rejects.toThrow('Approval upload failed');
     expect(saved.sources).toHaveLength(1);
     expect(mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'))).toHaveLength(1);
