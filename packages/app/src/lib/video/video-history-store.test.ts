@@ -389,7 +389,7 @@ describe('history projection version', () => {
       projection: 8,
       // Projection 8: a cell's energy and power need a power document whose verdict is true, and
       // entries no longer carry clipsGpuHour, so entries recorded under 7 must be projected again.
-      sources: '8a8af4e9897fa5c5cb9f2cea108bffe13d5c419f94da965ad14c86629a324e1a',
+      sources: '77b1590b14a66414188ab301ae8b2370b0f10cacc20efbfa27262b048549a043',
     });
   });
 });

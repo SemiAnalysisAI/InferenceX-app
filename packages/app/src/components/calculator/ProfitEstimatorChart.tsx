@@ -28,7 +28,7 @@ import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getDisplayLabel } from '@/lib/shared/utils';
-import { getAxisVendorIcon } from '@/lib/catalog/vendor-logos';
+import { getAxisVendorIcon, vendorMarkVariants } from '@/lib/catalog/vendor-logos';
 
 import {
   formatProfitUsd,
@@ -67,6 +67,9 @@ const ROW_VALUE_GAP = 6;
 const ROW_TICKS_PX = 22;
 const ROW_AXIS_LINE_PX = 15;
 const ROW_ORIGIN_MERGE_PX = 8;
+// Phone rows put the vendor mark before the hardware name, a little under its 14px line.
+export const ROW_MARK_HEIGHT_PX = 11;
+const ROW_MARK_GAP_PX = 4;
 
 export function chartHeightForViewport(viewportHeightPx: number | undefined): number {
   if (!Number.isFinite(viewportHeightPx) || (viewportHeightPx as number) <= 0) return CHART_HEIGHT;
@@ -137,11 +140,12 @@ export interface RowLabelLine {
   sub: boolean;
 }
 
-export function wrapRowLabel(label: string, maxPx: number): RowLabelLine[] {
+/** `markPx` is the room a vendor mark takes before the name, so the name wraps short of it. */
+export function wrapRowLabel(label: string, maxPx: number, markPx = 0): RowLabelLine[] {
   const [config, date] = splitHistoryLabel(label);
   const [name, detail] = splitAxisLabel(config);
   return [
-    ...wrapWords(name, maxPx, CHART_TYPE.axisLabel).map((text) => ({ text, sub: false })),
+    ...wrapWords(name, maxPx - markPx, CHART_TYPE.axisLabel).map((text) => ({ text, sub: false })),
     ...[detail, date]
       .filter(Boolean)
       .flatMap((part) =>
@@ -212,6 +216,11 @@ export function barMarkHeight(bandwidthPx: number): number {
     BAR_ICON_MAX_HEIGHT,
     Math.max(BAR_ICON_MIN_HEIGHT, bandwidthPx * BAR_ICON_WIDTH_SHARE),
   );
+}
+
+/** Horizontal room a phone row's vendor mark takes before the name, gap included. */
+export function rowMarkSpacePx(icon: { width: number; height: number } | undefined): number {
+  return icon ? barMarkWidth(icon, ROW_MARK_HEIGHT_PX) + ROW_MARK_GAP_PX : 0;
 }
 
 function barMarkWidth(
@@ -841,27 +850,31 @@ export default function ProfitEstimatorChart({
           basis,
           slot,
         );
+        const barMarks = horizontal
+          ? []
+          : labelData.flatMap((d) => {
+              const icon = getAxisVendorIcon(d.row.hwKey);
+              if (!icon) return [];
+              const width = barMarkWidth(icon, iconHeight);
+              return vendorMarkVariants(icon).map((variant, index) => ({
+                key: `${d.row.resultKey}:${index}`,
+                ...variant,
+                width,
+                x: bandMid(d.row) - width / 2,
+                y: revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - iconHeight,
+              }));
+            });
         group
-          .selectAll<SVGImageElement, ProfitSegment>('image.bar-vendor-mark')
-          .data(
-            horizontal ? [] : labelData.filter((d) => getAxisVendorIcon(d.row.hwKey)),
-            (d) => d.row.resultKey,
-          )
+          .selectAll<SVGImageElement, (typeof barMarks)[number]>('image.bar-vendor-mark')
+          .data(barMarks, (d) => d.key)
           .join('image')
-          .attr('class', (d) =>
-            getAxisVendorIcon(d.row.hwKey)?.monochrome
-              ? 'bar-vendor-mark dark:invert'
-              : 'bar-vendor-mark',
-          )
+          .attr('class', (d) => `bar-vendor-mark ${d.className}`.trim())
           .attr('aria-hidden', 'true')
-          .attr('href', (d) => getAxisVendorIcon(d.row.hwKey)?.href ?? '')
-          .attr('width', (d) => barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight))
+          .attr('href', (d) => d.href)
+          .attr('width', (d) => d.width)
           .attr('height', iconHeight)
-          .attr('x', (d) => {
-            const w = barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight);
-            return bandMid(d.row) - w / 2;
-          })
-          .attr('y', (d) => revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - iconHeight)
+          .attr('x', (d) => d.x)
+          .attr('y', (d) => d.y)
           .attr('pointer-events', 'none');
         const revenueText = group
           .selectAll<SVGTextElement, ProfitSegment>('.revenue-label')
@@ -1027,19 +1040,32 @@ export default function ProfitEstimatorChart({
       : horizontal
         ? t.yAxisCompact[basis]
         : t.yAxis[basis];
+  const rowMarks = useMemo(
+    () => new Map(rows.map((row) => [row.resultKey, getAxisVendorIcon(row.hwKey)])),
+    [rows],
+  );
   const rowLabels = useMemo(() => {
     if (!horizontal) return new Map<string, RowLabelLine[]>();
     const maxPx = Math.floor(dimensions.width * ROW_LABEL_SHARE) - ROW_LABEL_GAP;
-    return new Map([...labelMap].map(([key, label]) => [key, wrapRowLabel(label, maxPx)]));
-  }, [horizontal, dimensions.width, labelMap]);
+    return new Map(
+      [...labelMap].map(([key, label]) => [
+        key,
+        wrapRowLabel(label, maxPx, rowMarkSpacePx(rowMarks.get(key))),
+      ]),
+    );
+  }, [horizontal, dimensions.width, labelMap, rowMarks]);
   const rowLabelWidth = Math.ceil(
     Math.max(
       0,
-      ...[...rowLabels.values()]
-        .flat()
-        .map((line) =>
-          estimateTextWidth(line.text, line.sub ? CHART_TYPE.axisLabelSub : CHART_TYPE.axisLabel),
+      ...[...rowLabels].flatMap(([key, lines]) =>
+        lines.map(
+          (line, index) =>
+            estimateTextWidth(
+              line.text,
+              line.sub ? CHART_TYPE.axisLabelSub : CHART_TYPE.axisLabel,
+            ) + (index === 0 ? rowMarkSpacePx(rowMarks.get(key)) : 0),
         ),
+      ),
     ),
   );
   const rowPlotWidth = dimensions.width - ROW_MARGIN.right - rowLabelWidth - ROW_LABEL_GAP;
@@ -1134,10 +1160,13 @@ export default function ProfitEstimatorChart({
             .attr('text-anchor', 'end')
             .text(null);
           const x = text.attr('x');
+          const tick = d3.select(this);
+          tick.selectAll('image.row-vendor-mark').remove();
+          const mark = rowMarks.get(String(d));
           let top = -rowLabelHeightPx(lines) / 2;
-          for (const line of lines) {
+          for (const [index, line] of lines.entries()) {
             const lineHeight = line.sub ? ROW_SUB_LINE_PX : ROW_NAME_LINE_PX;
-            text
+            const tspan = text
               .append('tspan')
               .attr('x', x)
               .attr('y', top + lineHeight * 0.76)
@@ -1145,12 +1174,36 @@ export default function ProfitEstimatorChart({
               .attr('font-weight', line.sub ? null : '500')
               .style('fill', line.sub ? 'var(--muted-foreground)' : 'var(--foreground)')
               .text(line.text);
+            if (index === 0 && mark) {
+              // Measured where the browser lays text out; the layout estimate elsewhere (jsdom).
+              const measured = tspan.node()?.getComputedTextLength?.() ?? 0;
+              const textWidth =
+                measured > 0 ? measured : estimateTextWidth(line.text, CHART_TYPE.axisLabel);
+              const width = barMarkWidth(mark, ROW_MARK_HEIGHT_PX);
+              for (const variant of vendorMarkVariants(mark)) {
+                tick
+                  .append('image')
+                  .attr('class', `row-vendor-mark ${variant.className}`.trim())
+                  .attr('aria-hidden', 'true')
+                  .attr('href', variant.href)
+                  .attr('width', width)
+                  .attr('height', ROW_MARK_HEIGHT_PX)
+                  // Glyphs can run wider than the estimate the label column is sized from, so keep
+                  // the mark inside the column instead of clipping it at the SVG edge.
+                  .attr(
+                    'x',
+                    Math.max(-margin.left, Number(x) - textWidth - ROW_MARK_GAP_PX - width),
+                  )
+                  .attr('y', top + (lineHeight - ROW_MARK_HEIGHT_PX) / 2)
+                  .attr('pointer-events', 'none');
+              }
+            }
             top += lineHeight;
           }
         });
       },
     }),
-    [labelMap, rowLabels],
+    [labelMap, rowLabels, rowMarks, margin.left],
   );
 
   const columnAxisConfig = useMemo(

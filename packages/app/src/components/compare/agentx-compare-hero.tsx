@@ -20,7 +20,6 @@ const MODEL_LOGOS: Record<string, string> = {
   'deepseek-v4': '/logos/deepseek-color.svg',
   'glm-5-3': '/logos/zai-color.svg',
   'minimax-m3': '/logos/minimax-color.svg',
-  'minimax-m31-flash': '/logos/minimax-color.svg',
   'qwen-3-8-flash-next': '/logos/qwen-color.svg',
   'qwen-3-5': '/logos/qwen-color.svg',
 };
@@ -416,6 +415,25 @@ const VENDOR_MARKS: readonly {
   },
 ] as const;
 
+// Square Amazon mark for the results list; the logo row above uses the wordmark.
+// From https://cdn.jsdelivr.net/npm/simple-icons/icons/amazon.svg (Simple Icons).
+const AMAZON_RESULT_MARK = {
+  name: 'Amazon',
+  viewBox: '0 0 24 24',
+  width: 24,
+  height: 24,
+  paths: [
+    {
+      d: 'M6.61 11.802c0-1.005.247-1.863.743-2.577.495-.71 1.17-1.25 2.04-1.615.796-.335 1.756-.575 2.912-.72.39-.046 1.033-.103 1.92-.174v-.37c0-.93-.105-1.558-.3-1.875-.302-.43-.78-.65-1.44-.65h-.182c-.48.046-.896.196-1.246.46-.35.27-.575.63-.675 1.096-.06.3-.206.465-.435.51l-2.52-.315c-.248-.06-.372-.18-.372-.39 0-.046.007-.09.022-.15.247-1.29.855-2.25 1.82-2.88.976-.616 2.1-.975 3.39-1.05h.54c1.65 0 2.957.434 3.888 1.29.135.15.27.3.405.48.12.165.224.314.283.45.075.134.15.33.195.57.06.254.105.42.135.51.03.104.062.3.076.615.01.313.02.493.02.553v5.28c0 .376.06.72.165 1.036.105.313.21.54.315.674l.51.674c.09.136.136.256.136.36 0 .12-.06.226-.18.314-1.2 1.05-1.86 1.62-1.963 1.71-.165.135-.375.15-.63.045a6.062 6.062 0 01-.526-.496l-.31-.347a9.391 9.391 0 01-.317-.42l-.3-.435c-.81.886-1.603 1.44-2.4 1.665-.494.15-1.093.227-1.83.227-1.11 0-2.04-.343-2.76-1.034-.72-.69-1.08-1.665-1.08-2.94l-.05-.076zM10.363 11.364c0 .566.14 1.02.425 1.364.285.34.675.512 1.155.512.045 0 .106-.007.195-.02.09-.016.134-.023.166-.023.614-.16 1.08-.553 1.424-1.178.165-.28.285-.58.36-.91.09-.32.12-.59.135-.8.015-.195.015-.54.015-1.005v-.54c-.84 0-1.484.06-1.92.18-1.275.36-1.92 1.17-1.92 2.43l-.035-.02z',
+      fill: 'currentColor',
+    },
+    {
+      d: 'M0.045 18.02c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.166 11.87 3.166 2.852 0 5.668-.533 8.447-1.595l.315-.14c.138-.06.234-.1.293-.13.226-.088.39-.046.525.13.12.174.09.336-.12.48-.256.19-.6.41-1.006.654-1.244.743-2.64 1.316-4.185 1.726a17.617 17.617 0 01-10.951-.577 17.88 17.88 0 01-5.43-3.35c-.1-.074-.151-.15-.151-.22 0-.047.021-.09.051-.13zM19.525 18.391c.03-.06.075-.11.132-.17.362-.243.714-.41 1.05-.5a8.094 8.094 0 011.612-.24c.14-.012.28 0 .41.03.65.06 1.05.168 1.172.33.063.09.099.228.099.39v.15c0 .51-.149 1.11-.424 1.8-.278.69-.664 1.248-1.156 1.68-.073.06-.14.09-.197.09-.03 0-.06 0-.09-.012-.09-.044-.107-.12-.064-.24.54-1.26.806-2.143.806-2.64 0-.15-.03-.27-.087-.344-.145-.166-.55-.257-1.224-.257-.243 0-.533.016-.87.046-.363.045-.7.09-1 .135-.09 0-.148-.014-.18-.044-.03-.03-.036-.047-.02-.077 0-.017.006-.03.02-.063v-.06z',
+      fill: '#FF9900',
+    },
+  ],
+} as const;
+
 const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
   'muse-spark-open',
   'deepseek-v4',
@@ -427,6 +445,18 @@ const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
 ]);
 
 const LANDING_HARDWARE_RESULTS = [
+  {
+    id: 'trainium-glm-5-2',
+    vendor: 'Amazon',
+    title: 'Amazon Trainium3',
+    titleZh: 'Amazon Trainium3',
+    subtitle: 'GLM 5.2 · 744B Parameters · AgentX',
+    subtitleZh: 'GLM 5.2 · 7440 亿参数 · AgentX',
+    href: `${getDashboardRoute('inference').path}/glm-5-3?i_vendor=AWS`,
+    model: 'glm-5-3',
+    analyticsEvent: 'landing_trainium_results_clicked',
+    isNew: true,
+  },
   {
     id: 'huawei',
     vendor: 'Huawei',
@@ -471,17 +501,6 @@ const LANDING_HARDWARE_RESULTS = [
     href: `${getDashboardRoute('inference').path}/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e`,
     model: 'deepseek-r1',
     analyticsEvent: 'landing_jalapeno_results_clicked',
-  },
-  {
-    id: 'minimax-m31-flash',
-    vendor: 'MiniMax',
-    title: 'MiniMax M3.1 Flash',
-    titleZh: 'MiniMax M3.1 Flash',
-    subtitle: '428B Parameters · AgentX',
-    subtitleZh: '4280 亿参数 · AgentX',
-    href: `${getDashboardRoute('inference').path}/minimax-m31-flash`,
-    model: 'minimax-m31-flash',
-    analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
   },
 ] as const;
 
@@ -557,7 +576,7 @@ export function AgentXCompareHero({
             <div
               aria-hidden="true"
               data-testid="compare-agentx-vendor-marks"
-              className="mt-6 grid grid-cols-3 items-center gap-x-4 gap-y-3 text-foreground sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2"
+              className={`mt-6 grid items-center gap-x-4 gap-y-4 text-foreground sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2 ${surface === 'landing' ? 'grid-cols-4' : 'grid-cols-3'}`}
             >
               {VENDOR_MARKS.filter((mark) => surface === 'landing' || mark.name !== 'Huawei').map(
                 (mark) => (
@@ -567,7 +586,7 @@ export function AgentXCompareHero({
                     viewBox={mark.viewBox}
                     width={mark.width}
                     height={mark.height}
-                    className="h-auto max-w-full shrink-0"
+                    className={`h-auto max-w-full shrink-0 justify-self-center ${surface === 'landing' && mark.width > 60 ? 'col-span-2' : ''}`}
                   >
                     {mark.gradients ? (
                       <defs>
@@ -631,7 +650,10 @@ export function AgentXCompareHero({
             {surface === 'landing' && (
               <div className="divide-y divide-border/20 border-b border-border/20">
                 {LANDING_HARDWARE_RESULTS.map((result) => {
-                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor);
+                  const mark =
+                    result.vendor === AMAZON_RESULT_MARK.name
+                      ? AMAZON_RESULT_MARK
+                      : VENDOR_MARKS.find((vendor) => vendor.name === result.vendor);
                   return (
                     <CompareIndexTrackedLink
                       key={result.id}
@@ -644,32 +666,19 @@ export function AgentXCompareHero({
                       className="group flex min-h-14 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none"
                     >
                       <span className="flex min-w-0 items-center gap-3">
-                        {result.vendor === 'MiniMax' ? (
-                          <img
-                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
-                            src={MODEL_LOGOS[result.model]}
-                            alt=""
-                            aria-hidden="true"
-                            width={32}
-                            height={32}
-                            loading="lazy"
-                            className="size-8 shrink-0 object-contain"
-                          />
-                        ) : (
-                          <svg
-                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox={mark!.viewBox}
-                            width={32}
-                            height={32}
-                            aria-hidden="true"
-                            className="size-8 shrink-0 text-foreground"
-                          >
-                            {mark!.paths.map((path) => (
-                              <path key={path.d} d={path.d} fill={path.fill} />
-                            ))}
-                          </svg>
-                        )}
+                        <svg
+                          data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox={mark!.viewBox}
+                          width={32}
+                          height={32}
+                          aria-hidden="true"
+                          className="size-8 shrink-0 text-foreground"
+                        >
+                          {mark!.paths.map((path) => (
+                            <path key={path.d} d={path.d} fill={path.fill} />
+                          ))}
+                        </svg>
                         <span className="min-w-0">
                           <span className="block text-sm font-medium leading-tight text-foreground">
                             {locale === 'zh' ? result.titleZh : result.title}
