@@ -1,14 +1,20 @@
 import { readFileSync } from 'node:fs';
 
+import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
+
 import { isMonochromeLogo } from './model-logos';
 import { describe, expect, it } from 'bun:test';
 
 import {
   VENDOR_LOGO_ICONS,
+  VENDOR_MARK_HREFS,
   getAxisVendorIcon,
   getLineLabelVendorIcon,
   getHwVendorLogo,
 } from './vendor-logos';
+
+const pathsOf = (svg: string) =>
+  [...svg.matchAll(/<path d="(?<d>[^"]+)"/gu)].map((m) => m.groups?.d);
 
 describe('vendor logo icons', () => {
   it('maps NVIDIA hardware keys to the full-color NVIDIA mark', () => {
@@ -44,6 +50,34 @@ describe('vendor logo icons', () => {
       ['#000000', '#000000', '#000000', '#000000'],
     );
     expect(getAxisVendorIcon('tpuv7')?.href).toBe(`data:image/svg+xml,${encodeURIComponent(svg)}`);
+  });
+
+  it('gives Trainium3 the Amazon smile cropped from the wordmark on every surface', () => {
+    const wordmark = readFileSync('public/logos/amazon.svg', 'utf8');
+    const smile = [...wordmark.matchAll(/<path d="(?<d>[^"]+)" fill="#ff9900"/giu)].map((m) =>
+      m.groups?.d?.split(/\s+/u).join(' '),
+    );
+    const file = readFileSync('public/logos/amazon-smile.svg', 'utf8').trim();
+    expect(smile).toHaveLength(2);
+    expect(pathsOf(file)).toEqual(smile);
+    expect(getHwVendorLogo('AWS')).toBe('amazon-smile.svg');
+    expect(isMonochromeLogo('amazon-smile.svg')).toBe(false);
+
+    const axis = getAxisVendorIcon('trn3_vllm');
+    expect(axis?.monochrome).toBe(false);
+    expect(axis?.href).toBe(`data:image/svg+xml,${encodeURIComponent(file)}`);
+    expect(getLineLabelVendorIcon('trn3')).toBe(VENDOR_LOGO_ICONS.AWS);
+    expect(pathsOf(decodeURIComponent(VENDOR_MARK_HREFS.AWS ?? ''))).toEqual(smile);
+  });
+
+  it('has a mark for every vendor in the hardware registry', () => {
+    for (const vendor of new Set(Object.values(GPU_VENDORS))) {
+      // Jalapeño (OpenAI) only ever appears as a line label, never as a chip or bar.
+      if (vendor === 'OpenAI') continue;
+      expect(getHwVendorLogo(vendor), vendor).toBeDefined();
+      expect(VENDOR_MARK_HREFS[vendor], vendor).toBeDefined();
+      expect(VENDOR_LOGO_ICONS[vendor], vendor).toBeDefined();
+    }
   });
 
   it('returns no icon for unknown hardware', () => {

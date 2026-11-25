@@ -105,11 +105,11 @@ afterEach(() => {
   unstubAllGlobals();
 });
 
-function draw(colors: Record<string, string>) {
+function draw(colors: Record<string, string>, rows: ProfitEstimatorRow[] = ROWS) {
   act(() =>
     root.render(
       createElement(ProfitEstimatorChart, {
-        rows: ROWS,
+        rows,
         hardwareConfig: {} as HardwareConfig,
         // A new resolver per palette, as the display builds one per `useThemeColors` result.
         colorResolver: (row: ProfitEstimatorRow) => colors[row.hwKey]!,
@@ -135,5 +135,20 @@ describe('ProfitEstimatorChart palette changes', () => {
 
     draw(DEFAULT_COLORS);
     expect(tcoFills()).toEqual(['#2e7d32', '#c62828']);
+  });
+});
+
+describe('ProfitEstimatorChart vendor marks', () => {
+  it('tops every vendor bar, Trainium3 included, with a mark and keeps the orange smile uninverted', () => {
+    const trn3: ProfitEstimatorRow = { ...ROWS[0]!, hwKey: 'trn3_vllm', resultKey: 'trn3_vllm' };
+    draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
+    const marks = [...container.querySelectorAll<SVGImageElement>('image.bar-vendor-mark')];
+    expect(marks).toHaveLength(3);
+    const trn3Mark = marks.find((mark) =>
+      decodeURIComponent(mark.getAttribute('href') ?? '').includes('#FF9900'),
+    );
+    expect(trn3Mark).toBeDefined();
+    expect(trn3Mark?.getAttribute('class')).not.toContain('dark:invert');
+    expect(Number(trn3Mark?.getAttribute('width'))).toBeGreaterThan(0);
   });
 });
