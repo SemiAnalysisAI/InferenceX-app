@@ -404,6 +404,18 @@ export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
       appendOnly: true,
     },
   },
+  {
+    id: 'run-45490780339-restore-append-only',
+    reason:
+      'Audited exception: PR #5226 reran the five MiniMax-M3.1-Flash GB200 Dynamo-SGLang disaggregated linker points purged for pooling DRAM on the infra node. It was ingested as a full replacement, which hid the nine aggregated points from run 44263569706 (PR #4695) on the same curve; those points were not affected and carry forward.',
+    githubRunId: 45490780339,
+    runAttempt: 1,
+    baseRef: '7ee3766a19cb4a1048888c6eb1034b56038c0680',
+    headRef: 'ad39ddd246b7feb092e05a0236545609cff37915',
+    set: {
+      appendOnly: true,
+    },
+  },
 ];
 
 export type JsonValue =
