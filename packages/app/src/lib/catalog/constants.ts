@@ -26,6 +26,12 @@ export const DEFAULT_TCO_BASIS: TcoBasis = 'internal';
 
 const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 
+const INTERNAL_OWNER_COST: Record<string, number> = { tpuv7: 1.03, trn3: 0.83 };
+
+export function hasInternalOwnerCost(hwKey: string): boolean {
+  return hwKey.split('_')[0] in INTERNAL_OWNER_COST;
+}
+
 export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS): GpuSpecs {
   const dash = hwKey.indexOf('-');
   const underscore = hwKey.indexOf('_');
@@ -33,7 +39,7 @@ export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS):
   const base = end === -1 ? hwKey : hwKey.slice(0, end);
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
-  const internalCost = base === 'tpuv7' ? 1.03 : undefined;
+  const internalCost = INTERNAL_OWNER_COST[base];
   return {
     tdp: entry.tdp,
     power: entry.power,

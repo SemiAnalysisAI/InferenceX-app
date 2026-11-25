@@ -1298,7 +1298,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/quickFilters.ts',
-    sourceSha256: 'ba6e41f71f0ebbecad861b2694dbfb8a72f1e1d4e27252a1eacc154702aaf388',
+    sourceSha256: 'd5acd2c733465351d539650d0c736c19282e8da1719b39a5319f54084992bbd0',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',

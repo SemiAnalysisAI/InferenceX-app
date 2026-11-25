@@ -1,6 +1,7 @@
 import { rgb } from 'd3';
 
 import {
+  AWS_ORANGE,
   GOOGLE_BLUE,
   HUAWEI_CHART_COLORS,
   GPU_VENDORS,
@@ -8,18 +9,26 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 
-export type Vendor = 'nvidia' | 'amd' | 'openai' | 'google' | 'huawei' | 'unknown';
+export type Vendor = 'nvidia' | 'amd' | 'openai' | 'google' | 'aws' | 'huawei' | 'unknown';
 
 export function getVendor(hwKey: string): Vendor {
   const normalized = hwKey.trim().toLowerCase();
   if (/^(?:huawei|ascend)(?=\d|[\s_-]|$)/u.test(normalized)) return 'huawei';
   const base = normalized.split('_')[0];
-  if (base === 'nvidia' || base === 'amd' || base === 'openai' || base === 'google') return base;
+  if (
+    base === 'nvidia' ||
+    base === 'amd' ||
+    base === 'openai' ||
+    base === 'google' ||
+    base === 'aws'
+  )
+    return base;
   const vendor = GPU_VENDORS[base];
   if (vendor === 'NVIDIA') return 'nvidia';
   if (vendor === 'AMD') return 'amd';
   if (vendor === 'OpenAI') return 'openai';
   if (vendor === 'Google') return 'google';
+  if (vendor === 'AWS') return 'aws';
   return 'unknown';
 }
 
@@ -82,6 +91,10 @@ export function generateVendorColors(
       result[keys[0]] = GOOGLE_BLUE;
       continue;
     }
+    if (vendor === 'aws' && count === 1) {
+      result[keys[0]] = AWS_ORANGE;
+      continue;
+    }
 
     for (let i = 0; i < count; i++) {
       const hue =
@@ -102,6 +115,7 @@ export const VENDOR_LABELS: Record<Vendor, string> = {
   amd: 'AMD',
   openai: 'OpenAI',
   google: 'Google',
+  aws: 'AWS',
   huawei: 'Huawei',
   unknown: 'Unknown',
 };
@@ -145,9 +159,11 @@ export function generateGpuDateColors(
       gpuCount === 1
         ? vendor === 'google'
           ? GOOGLE_BLUE
-          : vendor === 'huawei'
-            ? HUAWEI_CHART_COLORS[theme]
-            : null
+          : vendor === 'aws'
+            ? AWS_ORANGE
+            : vendor === 'huawei'
+              ? HUAWEI_CHART_COLORS[theme]
+              : null
         : null;
     const fixedBase = fixedColor ? hexToOklch(fixedColor) : null;
 
