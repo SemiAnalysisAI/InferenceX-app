@@ -4,10 +4,12 @@ import {
   type ReactNode,
   type SetStateAction,
   createContext,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useOptimistic,
   useRef,
   useState,
 } from 'react';
@@ -708,15 +710,15 @@ export function InferenceProvider({
   const [requestedHwSelection, setRequestedHwSelection] = useState<Set<string> | null>(null);
   // The keys the page asked for, kept while that request is still the reader's selection.
   const requestedHwKeysRef = useRef<ReadonlySet<string> | null>(null);
-  // Model, sequence and precision picks render as transitions, and the hardware reset below runs
-  // only once one lands. Until then the legend still shows the old scope, and a click there commits
-  // first. Holds the pick until its reset, with the hardware the reader chose since, which wins,
-  // and the best-per-SKU choice and defaults flag the pick left, for when none of it carries over.
-  const scopePickRef = useRef<{
-    hardware: Set<string> | null;
-    bestPerSku: boolean | null;
-    defaultsOverridden: boolean | 'page';
-  } | null>(null);
+  // Model, sequence and precision picks render as transitions, and the hardware reset for the new
+  // scope runs only once one lands. Until then the legend shows the old scope, so hardware actions
+  // wait, since a click there would commit first and the reset would then undo it. React drops the
+  // flag when the pick's transition ends, whether or not the pick changed the scope.
+  const [scopePickPending, setScopePickPending] = useOptimistic(false);
+  const markScopePick = useCallback(
+    () => startTransition(() => setScopePickPending(true)),
+    [setScopePickPending],
+  );
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
@@ -905,18 +907,17 @@ export function InferenceProvider({
   }, [clearOverviewHistoryPair, clearPresetOnChange]);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
+      markScopePick();
       if (v !== selectedModel) {
-        const bestPerSkuReset = activeTab === 'inference' ? null : false;
-        const defaultsOverridden =
-          initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false;
-        scopePickRef.current = { hardware: null, bestPerSku: bestPerSkuReset, defaultsOverridden };
         if (activeTab === 'inference' && v === Model.Qwen3_5) {
           setRequestedXAxisMode(null);
         }
-        setBestPerSku(bestPerSkuReset);
+        setBestPerSku(activeTab === 'inference' ? null : false);
         setPendingActiveHwTypes(null);
         requestedHwKeysRef.current = null;
-        setHardwareDefaultsOverridden(defaultsOverridden);
+        setHardwareDefaultsOverridden(
+          initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false,
+        );
       }
       setSelectedModel(v);
       clearScopedSelectionOnChange();
@@ -924,6 +925,7 @@ export function InferenceProvider({
     [
       selectedModel,
       activeTab,
+      markScopePick,
       setSelectedModel,
       clearScopedSelectionOnChange,
       initialActiveHwTypes,
@@ -932,52 +934,22 @@ export function InferenceProvider({
   );
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
-      if (v !== effectiveSequence) {
-        // A pick still pending set the flags this render predates, so they stay.
-        scopePickRef.current = {
-          bestPerSku: bestPerSkuChoice,
-          defaultsOverridden: hardwareDefaultsOverridden,
-          ...scopePickRef.current,
-          hardware: null,
-        };
-      }
+      markScopePick();
       setSelectedSequence(v);
       clearScopedSelectionOnChange();
     },
-    [
-      effectiveSequence,
-      bestPerSkuChoice,
-      hardwareDefaultsOverridden,
-      setSelectedSequence,
-      clearScopedSelectionOnChange,
-    ],
+    [markScopePick, setSelectedSequence, clearScopedSelectionOnChange],
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
-      if (v.join(',') !== effectivePrecisions.join(',')) {
-        // A pick still pending set the flags this render predates, so they stay.
-        scopePickRef.current = {
-          bestPerSku: bestPerSkuChoice,
-          defaultsOverridden: hardwareDefaultsOverridden,
-          ...scopePickRef.current,
-          hardware: null,
-        };
-      }
+      markScopePick();
       if (activeTab === 'inference' && selectedModel === Model.Qwen3_5) {
         setRequestedXAxisMode(null);
       }
       setSelectedPrecisions(v);
       clearScopedSelectionOnChange();
     },
-    [
-      activeTab,
-      selectedModel,
-      effectivePrecisions,
-      bestPerSkuChoice,
-      hardwareDefaultsOverridden,
-      setSelectedPrecisions,
-      clearScopedSelectionOnChange,
-    ],
+    [activeTab, selectedModel, markScopePick, setSelectedPrecisions, clearScopedSelectionOnChange],
   );
   const setSelectedYAxisMetricAndClear = useCallback(
     (v: string) => {
@@ -1279,6 +1251,7 @@ export function InferenceProvider({
 
   const setBestPerSkuAndApply = useCallback(
     (enabled: boolean, options?: { applySelection?: boolean }) => {
+      if (scopePickPending) return;
       if (
         !enabled &&
         options?.applySelection !== false &&
@@ -1299,7 +1272,14 @@ export function InferenceProvider({
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [bestHwTypes, selectableHwTypes, resolveHwSelection, setActiveHwTypes, requestEngineComparison],
+    [
+      scopePickPending,
+      bestHwTypes,
+      selectableHwTypes,
+      resolveHwSelection,
+      setActiveHwTypes,
+      requestEngineComparison,
+    ],
   );
 
   useEffect(() => {
@@ -1317,6 +1297,7 @@ export function InferenceProvider({
 
   const toggleHwType = useCallback(
     (hw: string) => {
+      if (scopePickPending) return;
       const proposed = computeToggle(activeHwTypes, hw, selectableHwTypes);
       if (
         !activeHwTypes.has(hw) &&
@@ -1331,7 +1312,6 @@ export function InferenceProvider({
         return;
       const next = toggleComparisonSelection(activeHwTypes, hw, selectableHwTypes);
       if (!next) return;
-      if (scopePickRef.current) scopePickRef.current.hardware = next;
       setHardwareDefaultsOverridden(true);
       setActiveHwTypes(next);
       setBestPerSku(false);
@@ -1339,6 +1319,7 @@ export function InferenceProvider({
       presetHwFilterRef.current = null;
     },
     [
+      scopePickPending,
       activeHwTypes,
       selectableHwTypes,
       setActiveHwTypes,
@@ -1349,18 +1330,14 @@ export function InferenceProvider({
 
   const removeHwType = useCallback(
     (hw: string) => {
-      if (scopePickRef.current) {
-        const next = new Set(activeHwTypesRef.current);
-        next.delete(hw);
-        scopePickRef.current.hardware = next;
-      }
+      if (scopePickPending) return;
       setHardwareDefaultsOverridden(true);
       removeHwRaw(hw);
       setBestPerSku(false);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [removeHwRaw],
+    [scopePickPending, removeHwRaw],
   );
 
   const allDateIds = useMemo(() => {
@@ -1378,6 +1355,7 @@ export function InferenceProvider({
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
+    if (scopePickPending) return;
     if (
       requestEngineComparison(selectableHwTypes, () => {
         setHardwareDefaultsOverridden(true);
@@ -1386,8 +1364,6 @@ export function InferenceProvider({
       })
     )
       return;
-    // Every chip of the old scope means every chip of a pending one, which its reset then picks.
-    if (scopePickRef.current) scopePickRef.current.hardware = null;
     setHardwareDefaultsOverridden(true);
     setBestPerSku(false);
     if (exclusion) {
@@ -1403,6 +1379,7 @@ export function InferenceProvider({
     }
     selectAllHwRaw(selectableHwTypes);
   }, [
+    scopePickPending,
     selectAllHwRaw,
     selectableHwTypes,
     activeHwTypes,
@@ -1497,25 +1474,9 @@ export function InferenceProvider({
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
     if (modelChanged) preferredHwTypesRef.current = new Set();
-    const scopePick = scopeChanged ? scopePickRef.current : null;
-    if (scopeChanged) scopePickRef.current = null;
-    let best = bestPerSku;
-    let defaultsOverridden = hardwareDefaultsOverridden;
-    if (scopePick?.hardware && !bestPerSku) {
-      const kept = new Set([...scopePick.hardware].filter((key) => selectableHwTypes.has(key)));
-      if (kept.size > 0) {
-        setActiveHwTypes(exclusion ? resolveHwSelection(kept, previousSelection).result : kept);
-        return;
-      }
-      // None of it carries over, so the new scope starts as the pick left it, not as the click did.
-      best = scopePick.bestPerSku ?? bestPerSkuDefault;
-      defaultsOverridden = scopePick.defaultsOverridden;
-      setBestPerSku(scopePick.bestPerSku);
-      setHardwareDefaultsOverridden(scopePick.defaultsOverridden);
-    }
     // Loading an overlay changes the scope; keep the page's request instead of the defaults.
     const request = requestedHwKeysRef.current;
-    if (request && requestedHwActiveRef.current && !best) {
+    if (request && requestedHwActiveRef.current && !bestPerSku) {
       const matched = matchRequestedHw(request, selectableHwTypes);
       if (matched.size > 0) {
         const selection = exclusion
@@ -1535,13 +1496,15 @@ export function InferenceProvider({
         return;
       }
     }
-    const candidates = best ? bestHwTypes : selectableHwTypes;
+    const candidates = bestPerSku ? bestHwTypes : selectableHwTypes;
     const automaticSelection =
-      activeTab === 'inference' && !defaultsOverridden ? automaticHardware(candidates) : candidates;
+      activeTab === 'inference' && !hardwareDefaultsOverridden
+        ? automaticHardware(candidates)
+        : candidates;
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
-      if (droppedGroups.length > 0 && defaultsOverridden === true) {
+      if (droppedGroups.length > 0 && hardwareDefaultsOverridden === true) {
         setEngineConflict({
           kind: 'resolved',
           ...exclusionResolutionFamilies(automaticSelection, result, exclusion),
@@ -1558,7 +1521,6 @@ export function InferenceProvider({
     selectableHwTypes,
     bestHwTypes,
     bestPerSku,
-    bestPerSkuDefault,
     exclusion,
     pendingActiveHwTypes,
     resolveHwSelection,
@@ -1871,7 +1833,7 @@ export function InferenceProvider({
   );
 
   useEffect(() => {
-    if (urlPresetAppliedRef.current) return;
+    if (urlPresetAppliedRef.current || scopePickPending) return;
     if (typeof window === 'undefined') return;
     const sp = new URLSearchParams(window.location.search);
     const presetId = sp.get('preset');
@@ -1887,7 +1849,7 @@ export function InferenceProvider({
       `${window.location.pathname}${search ? `?${search}` : ''}`,
     );
     applyPreset(preset);
-  }, [applyPreset]);
+  }, [applyPreset, scopePickPending]);
 
   const handleDateRangeDialogOk = () => {
     clearOverviewHistoryPair();
@@ -1943,6 +1905,7 @@ export function InferenceProvider({
       bestPerSku,
       requestedHwTypes,
       blockedHwToggles,
+      scopePickPending,
       selectedModel,
       selectedSequence: effectiveSequence,
       selectedPrecisions: effectivePrecisions,
@@ -1966,6 +1929,7 @@ export function InferenceProvider({
       bestPerSku,
       requestedHwTypes,
       blockedHwToggles,
+      scopePickPending,
       selectedModel,
       effectiveSequence,
       effectivePrecisions,

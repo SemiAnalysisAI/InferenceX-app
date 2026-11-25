@@ -111,6 +111,8 @@ export interface ChartLegendProps {
   readOnly?: boolean;
   /** An enclosing panel can own expansion instead of the legend itself. */
   collapsible?: boolean;
+  /** The chart behind the legend is about to change, so the legend takes no input until it has. */
+  busy?: boolean;
 }
 
 export default function ChartLegend({
@@ -134,6 +136,7 @@ export default function ChartLegend({
   hideAtomFootnote = false,
   readOnly = false,
   collapsible = true,
+  busy = false,
 }: ChartLegendProps) {
   const isLegendExpanded = collapsible ? expandedProp : true;
   const locale = useLocale();
@@ -568,6 +571,8 @@ export default function ChartLegend({
         data-testid={!isSidebar || isLegendExpanded ? 'chart-legend' : undefined}
         className={outerClasses}
         style={outerStyle}
+        aria-busy={busy || undefined}
+        inert={busy}
       >
         {panelHeader}
         {(!isSidebar || isLegendExpanded) && scrollContent}

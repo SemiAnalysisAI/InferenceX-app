@@ -902,7 +902,8 @@ export default function PowerTimeline({
   const locale = useLocale();
   const t = STRINGS[locale];
   const { hardwareConfig, hwTypesWithData } = useInferenceData();
-  const { activeHwTypes, selectedPrecisions, quickFilters, activeDates } = useInferenceFilters();
+  const { activeHwTypes, selectedPrecisions, quickFilters, activeDates, scopePickPending } =
+    useInferenceFilters();
   const { isLegendExpanded, highContrast } = useInferenceDisplay();
   const { setBestPerSku, toggleHwType, selectAllHwTypes, setIsLegendExpanded, toggleActiveDate } =
     useInferenceActions();
@@ -1740,6 +1741,7 @@ export default function PowerTimeline({
   const legendElement = (
     <ChartLegend
       variant="sidebar"
+      busy={scopePickPending}
       grouped={comparison}
       disableActiveSort={comparison}
       legendItems={legendItems}

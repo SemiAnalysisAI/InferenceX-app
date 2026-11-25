@@ -3,7 +3,7 @@ import { DISPLAY_MODEL_TO_DB, sequenceToIslOsl } from '@semianalysisai/inference
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as NextNavigation from 'next/navigation';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { act, startTransition } from 'react';
+import { act, startTransition, useLayoutEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { stubGlobal, unstubAllGlobals } from '@/test/helpers';
@@ -38,21 +38,18 @@ mock.module('@/providers/unofficial-run-provider', () => ({
 await loadSystemPowerModeler();
 
 const DATE = '2026-06-12';
-// DeepSeek V4 Pro and Kimi K3 run vLLM on the same three chips at both precisions, so a pick
-// between them never changes which legend entries exist. Qwen 3.5 lacks B200, and its defaults
-// leave H200 off, so it starts with less hardware than it has.
-const HARDWARE = new Map<Model, string[]>([
-  [Model.DeepSeek_V4_Pro, ['b200', 'b300', 'h200']],
-  [Model.Kimi_K3, ['b200', 'b300', 'h200']],
-  [Model.Qwen3_5, ['b300', 'h200']],
-]);
+const MODELS = [Model.DeepSeek_V4_Pro, Model.Kimi_K3];
 const PRECISIONS = [Precision.FP4, Precision.FP8];
+// Both models run vLLM on the same three chips at both precisions, so a pick never changes which
+// legend entries exist, only which hardware the new scope starts with.
+const HARDWARE = ['b200', 'b300', 'h200'];
+const ALL_KEYS = HARDWARE.map((hardware) => `${hardware}_vllm`);
 const SOLO_KEY = 'b300_vllm';
 
 const AVAILABILITY = compactAvailability(
-  [...HARDWARE].flatMap(([model, hardwareKeys]) =>
+  MODELS.flatMap((model) =>
     PRECISIONS.flatMap((precision) =>
-      hardwareKeys.map((hardware): AvailabilityRow => ({
+      HARDWARE.map((hardware): AvailabilityRow => ({
         model: DISPLAY_MODEL_TO_DB[model]![0]!,
         precision,
         hardware,
@@ -70,7 +67,7 @@ const AVAILABILITY = compactAvailability(
 let nextRowId = 1;
 const benchmarkRows = (model: Model): BenchmarkRow[] =>
   PRECISIONS.flatMap((precision) =>
-    HARDWARE.get(model)!.flatMap((hardware) =>
+    HARDWARE.flatMap((hardware) =>
       [16, 64].map(
         (conc) =>
           ({
@@ -110,7 +107,7 @@ const benchmarkRows = (model: Model): BenchmarkRow[] =>
       ),
     ),
   );
-const ROWS = new Map([...HARDWARE.keys()].map((model) => [model as string, benchmarkRows(model)]));
+const ROWS = new Map(MODELS.map((model) => [model as string, benchmarkRows(model)]));
 
 const fetchMock = vi.fn((input: string) => {
   const url = new URL(input, 'http://localhost');
@@ -130,20 +127,42 @@ const fetchMock = vi.fn((input: string) => {
 
 let actions: InferenceActionsContextType | null = null;
 let activeHwTypes = new Set<string>();
+let bestPerSku = false;
+let activePresetId: string | null = null;
+let scopePickPending: boolean | undefined;
 let selectedModel: Model | null = null;
-let selectedPrecisions: string[] = [];
 let hwTypesWithData = new Set<string>();
 let loading = true;
+/** Every hardware selection the provider committed, in order. */
+let committedHardware: string[][] = [];
+/** Runs once, with the actions of the first commit that shows a scope pick as pending. */
+let whilePending: ((pendingActions: InferenceActionsContextType) => void) | null = null;
+let sawPending = false;
 
 function Probe() {
-  actions = useInferenceActions();
+  const probeActions = useInferenceActions();
   const filters = useInferenceFilters();
   const data = useInferenceData();
+  actions = probeActions;
   activeHwTypes = filters.activeHwTypes;
+  bestPerSku = filters.bestPerSku;
+  activePresetId = filters.activePresetId;
+  scopePickPending = filters.scopePickPending;
   selectedModel = filters.selectedModel;
-  selectedPrecisions = filters.selectedPrecisions;
   hwTypesWithData = data.hwTypesWithData;
   loading = data.loading;
+  // Layout effects run after the pick's urgent commit and before its transition renders, which
+  // is where a reader's click on the old legend lands.
+  useLayoutEffect(() => {
+    committedHardware.push([...filters.activeHwTypes].toSorted());
+  }, [filters.activeHwTypes]);
+  useLayoutEffect(() => {
+    if (!filters.scopePickPending) return;
+    sawPending = true;
+    const run = whilePending;
+    whilePending = null;
+    run?.(probeActions);
+  });
   return null;
 }
 
@@ -157,10 +176,7 @@ async function settle(until: () => boolean): Promise<void> {
   for (let pass = 0; pass < 5; pass++) await act(() => sleep(0));
 }
 
-const chartReady = () =>
-  !loading &&
-  selectedModel !== null &&
-  hwTypesWithData.size === HARDWARE.get(selectedModel)!.length;
+const chartReady = () => !loading && hwTypesWithData.size === HARDWARE.length;
 
 async function mount() {
   act(() =>
@@ -195,6 +211,9 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   window.history.replaceState(null, '', '/infx/inference');
+  committedHardware = [];
+  whilePending = null;
+  sawPending = false;
 });
 
 afterEach(() => {
@@ -204,80 +223,72 @@ afterEach(() => {
   unstubAllGlobals();
 });
 
-describe('a legend pick made while a scope pick is still rendering', () => {
-  it('survives the hardware reset of the model the reader picked first', async () => {
+describe('hardware actions while a scope pick is rendering', () => {
+  it('ignores a legend click on the old legend, and the new model opens on its defaults', async () => {
     await mount();
-    expect([...activeHwTypes].toSorted()).toEqual(['b200_vllm', 'b300_vllm', 'h200_vllm']);
+    expect([...activeHwTypes].toSorted()).toEqual(ALL_KEYS);
+    committedHardware = [];
 
-    // The model pick is still a pending transition when the reader solos B300 in the legend,
-    // which still shows the previous model's hardware.
-    act(() => {
-      pickModel(Model.Kimi_K3);
-      actions!.toggleHwType(SOLO_KEY);
-    });
-    await settle(() => selectedModel === Model.Kimi_K3 && chartReady());
-
-    expect(selectedModel).toBe(Model.Kimi_K3);
-    expect([...activeHwTypes]).toEqual([SOLO_KEY]);
-  });
-
-  it('survives the hardware reset of the precision the reader picked first', async () => {
-    await mount();
-
-    act(() => {
-      startTransition(() => actions!.setSelectedPrecisions([Precision.FP8]));
-      actions!.toggleHwType(SOLO_KEY);
-    });
-    await settle(() => selectedPrecisions.join(',') === Precision.FP8 && chartReady());
-
-    expect(selectedPrecisions).toEqual([Precision.FP8]);
-    expect([...activeHwTypes]).toEqual([SOLO_KEY]);
-  });
-
-  it('does not outlive a model pick made after it', async () => {
-    await mount();
-    const defaults = [...activeHwTypes].toSorted();
-
-    act(() => actions!.toggleHwType(SOLO_KEY));
-    expect([...activeHwTypes]).toEqual([SOLO_KEY]);
+    whilePending = (pendingActions) => {
+      pendingActions.toggleHwType(SOLO_KEY);
+      pendingActions.removeHwType('h200_vllm');
+      pendingActions.setBestPerSku(true);
+    };
     act(() => pickModel(Model.Kimi_K3));
     await settle(() => selectedModel === Model.Kimi_K3 && chartReady());
 
+    expect(sawPending).toBe(true);
+    expect(scopePickPending).toBe(false);
     expect(selectedModel).toBe(Model.Kimi_K3);
-    expect([...activeHwTypes].toSorted()).toEqual(defaults);
+    expect([...activeHwTypes].toSorted()).toEqual(ALL_KEYS);
+    // Main applied the click and the reset undid it. Nothing may show the click at any point.
+    expect(committedHardware.every((keys) => keys.length === ALL_KEYS.length)).toBe(true);
   });
 
-  it('gives way to the new model defaults when the new model has none of that hardware', async () => {
+  it('stops waiting once a pick lands without changing the scope', async () => {
     await mount();
 
-    act(() => {
-      pickModel(Model.Qwen3_5);
-      actions!.toggleHwType('b200_vllm');
-    });
-    await settle(() => selectedModel === Model.Qwen3_5 && chartReady());
-
-    expect(selectedModel).toBe(Model.Qwen3_5);
+    act(() => pickModel(Model.DeepSeek_V4_Pro));
+    await settle(() => true);
+    expect(sawPending).toBe(true);
+    expect(scopePickPending).toBe(false);
+    act(() => actions!.toggleHwType(SOLO_KEY));
     expect([...activeHwTypes]).toEqual([SOLO_KEY]);
+
+    sawPending = false;
+    act(() => {
+      pickModel(Model.Kimi_K3);
+      pickModel(Model.DeepSeek_V4_Pro);
+    });
+    await settle(() => true);
+    expect(sawPending).toBe(true);
+    expect(scopePickPending).toBe(false);
+    expect(selectedModel).toBe(Model.DeepSeek_V4_Pro);
+    const before = [...activeHwTypes].toSorted();
+    act(() => actions!.toggleHwType(SOLO_KEY));
+    expect([...activeHwTypes].toSorted()).not.toEqual(before);
+  });
+});
+
+describe('hardware actions with no scope pick pending', () => {
+  it('applies best per SKU', async () => {
+    await mount();
+    act(() => actions!.toggleHwType(SOLO_KEY));
+    expect([...activeHwTypes]).toEqual([SOLO_KEY]);
+
+    act(() => actions!.setBestPerSku(true));
+
+    expect(bestPerSku).toBe(true);
+    expect([...activeHwTypes].toSorted()).toEqual(ALL_KEYS);
   });
 
-  it('gives way to the model pick defaults when a precision pick follows it before it lands', async () => {
+  it('applies a preset named in the URL', async () => {
+    window.history.replaceState(null, '', '/infx/inference?preset=kimi-k3-launch');
     await mount();
-    // The reader's own best-per-SKU choice marks the hardware as theirs, which a model pick undoes.
-    act(() => actions!.setBestPerSku(false));
+    await settle(() => selectedModel === Model.Kimi_K3 && chartReady());
 
-    act(() => {
-      pickModel(Model.Qwen3_5);
-      startTransition(() => actions!.setSelectedPrecisions([Precision.FP8]));
-      actions!.toggleHwType('b200_vllm');
-    });
-    await settle(
-      () =>
-        selectedModel === Model.Qwen3_5 &&
-        selectedPrecisions.join(',') === Precision.FP8 &&
-        chartReady(),
-    );
-
-    expect(selectedModel).toBe(Model.Qwen3_5);
-    expect([...activeHwTypes]).toEqual([SOLO_KEY]);
+    expect(activePresetId).toBe('kimi-k3-launch');
+    expect(selectedModel).toBe(Model.Kimi_K3);
+    expect(window.location.search).toBe('');
   });
 });

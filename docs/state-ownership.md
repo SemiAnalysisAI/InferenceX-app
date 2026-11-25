@@ -87,13 +87,16 @@ toggle does not notify filter-only or data-only consumers.
 
 A model, sequence or precision pick gives the legend the new scope's default hardware
 once it lands. The selectors show the pick at once and render the chart for it as a
-transition, so until then the legend still shows the old scope, and a legend click there
-commits before the pick. That click is the reader's newer choice, so the reset keeps it,
-limited to hardware the new scope has, instead of the defaults. When the new scope has
-none of that hardware, the click is dropped with its best-per-SKU and defaults flags, and
-the new scope starts as the pick alone would have left it. Tests that act on the chart
-after a model pick wait for `inference-page-heading`, which renders from the committed
-model, rather than for the selector label.
+transition, so until then the legend still shows the old scope. A click there would
+commit first, and the reset would then undo it. So while a pick is pending,
+`scopePickPending` (in `useInferenceFilters`) is true. Hardware actions (legend toggle,
+remove, select all, best per SKU) do nothing, a `?preset=` link waits for the pick to
+land, and the legends render `aria-busy` and `inert` with no layout change. The flag is
+`useOptimistic` state, so React clears it when the pick's transition ends, including a
+pick that lands on the scope already shown. The trade-off is that a click in that brief
+window does nothing, instead of being applied and then undone. Tests that act on the
+chart after a model pick wait for `inference-page-heading`, which renders from the
+committed model, rather than for the selector label.
 
 GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
 annotations are independent. Agentic and fixed-sequence charts default to curve
