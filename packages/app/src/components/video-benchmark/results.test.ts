@@ -413,6 +413,33 @@ describe('VideoGenX results contract', () => {
       'vllm-omni',
     ]);
   });
+  it('keeps the workload and its engine choices when an engine is picked', () => {
+    const plan = JSON.parse(eligible.workloadKey!);
+    plan.plan.generation.height = 512;
+    const cell = (hardwareKey: string, engine: string, workloadKey = eligible.workloadKey) => ({
+      ...eligible,
+      id: `${hardwareKey}:${engine}:${workloadKey === eligible.workloadKey ? 'default' : 'other'}`,
+      hardwareKey,
+      workloadKey,
+      results: evidence({ engine }),
+    });
+    // vLLM-Omni covers more hardware on a workload SGLang never ran than on the default one.
+    const input = [
+      cell('b300', 'vllm-omni', JSON.stringify(plan)),
+      cell('b200', 'vllm-omni', JSON.stringify(plan)),
+      cell('h200', 'sglang'),
+      cell('h100', 'sglang'),
+      cell('b200', 'vllm-omni'),
+    ];
+    for (const engine of [null, 'sglang', 'vllm-omni']) {
+      const picked = resultProjection(input, { ...state(), engine });
+      expect(picked.workloadKey).toBe(eligible.workloadKey);
+      expect(picked.options.engines).toEqual(['sglang', 'vllm-omni']);
+    }
+    expect(ids(resultProjection(input, { ...state(), engine: 'vllm-omni' }).cells)).toEqual([
+      'b200:vllm-omni:default',
+    ]);
+  });
   const b200Entry = (id: string, engine: string) => ({
     ...eligible,
     id,
