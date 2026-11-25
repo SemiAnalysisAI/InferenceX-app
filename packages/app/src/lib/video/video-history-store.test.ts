@@ -363,12 +363,16 @@ describe('history projection version', () => {
   it('pins the sources that produce recorded entries', () => {
     const root = resolve(import.meta.dirname, '../..');
     const seen = new Set<string>();
+    // A statement that starts `import type` or `export type` is erased when its file is compiled,
+    // so it loads nothing and cannot change an entry: the walk does not follow it. A statement
+    // that imports any value is followed, `import { type A, b }` included.
     const visit = (file: string) => {
       if (seen.has(file)) return;
       seen.add(file);
       for (const match of readFileSync(file, 'utf8').matchAll(
-        /from '(?<spec>(?:\.{1,2}|@)\/[^']+)'/gu,
+        /(?<typeOnly>\b(?:import|export)\s+type\s+(?:\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+)\s+)?from '(?<spec>(?:\.{1,2}|@)\/[^']+)'/gu,
       )) {
+        if (match.groups!.typeOnly) continue;
         const spec = match.groups!.spec;
         const base = spec.startsWith('@/')
           ? join(root, spec.slice(2))
@@ -386,8 +390,9 @@ describe('history projection version', () => {
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 7,
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
-      // approved under a receipt without one must be projected again.
-      sources: '68e91a6e29acc6e59c56216e7870a0a35a24d18dc32baf7ff35244a0a8acacf6',
+      // approved under a receipt without one must be projected again. The walk skips type-only
+      // imports, so the pin covers only the video sources that run plus gpu-keys.
+      sources: 'bb96b40d2afd5ed5a01130d061f396c5ec12eb4f6cd5a4814b5cec7681eba082',
     });
   });
 });
