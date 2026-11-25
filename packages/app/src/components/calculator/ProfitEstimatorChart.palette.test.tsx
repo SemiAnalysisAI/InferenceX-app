@@ -140,34 +140,42 @@ describe('ProfitEstimatorChart palette changes', () => {
   });
 });
 
+const isAws = (mark: SVGImageElement) =>
+  /#161D26|#FFFFFF/u.test(decodeURIComponent(mark.getAttribute('href') ?? ''));
+
+function expectAwsPair(marks: SVGImageElement[]) {
+  const aws = marks.filter(isAws);
+  expect(aws.map((mark) => mark.getAttribute('class'))).toEqual([
+    expect.stringContaining('dark:hidden'),
+    expect.stringContaining('hidden dark:inline'),
+  ]);
+  expect(decodeURIComponent(aws[0]!.getAttribute('href')!)).toContain('#161D26');
+  expect(decodeURIComponent(aws[1]!.getAttribute('href')!)).toContain('#FFFFFF');
+  expect(aws[0]!.getAttribute('x')).toBe(aws[1]!.getAttribute('x'));
+  expect(aws[0]!.getAttribute('y')).toBe(aws[1]!.getAttribute('y'));
+  expect(aws.some((mark) => mark.classList.contains('dark:invert'))).toBe(false);
+}
+
 describe('ProfitEstimatorChart vendor marks', () => {
   const trn3: ProfitEstimatorRow = { ...ROWS[0]!, hwKey: 'trn3_vllm', resultKey: 'trn3_vllm' };
-
-  it('puts each vendor mark before the chip name on phone rows, keeping the smile uninverted', () => {
+  it('puts each vendor mark before the chip name on phone rows, with the AWS light/dark pair', () => {
     chartWidth = 393;
     draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
     expect(container.querySelectorAll('image.bar-vendor-mark')).toHaveLength(0);
     const marks = [...container.querySelectorAll<SVGImageElement>('image.row-vendor-mark')];
-    expect(marks).toHaveLength(3);
+    expect(marks).toHaveLength(4);
     for (const mark of marks) {
       expect(Number(mark.getAttribute('x')) + Number(mark.getAttribute('width'))).toBeLessThan(0);
     }
-    const smile = marks.find((mark) =>
-      decodeURIComponent(mark.getAttribute('href') ?? '').includes('#FF9900'),
-    );
-    expect(smile?.getAttribute('class')).not.toContain('dark:invert');
+    expectAwsPair(marks);
     expect(marks.filter((mark) => mark.classList.contains('dark:invert'))).toHaveLength(1);
   });
 
-  it('tops every vendor bar, Trainium3 included, with a mark and keeps the orange smile uninverted', () => {
+  it('tops every vendor bar, Trainium3 included, with the AWS light/dark pair', () => {
     draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
     const marks = [...container.querySelectorAll<SVGImageElement>('image.bar-vendor-mark')];
-    expect(marks).toHaveLength(3);
-    const trn3Mark = marks.find((mark) =>
-      decodeURIComponent(mark.getAttribute('href') ?? '').includes('#FF9900'),
-    );
-    expect(trn3Mark).toBeDefined();
-    expect(trn3Mark?.getAttribute('class')).not.toContain('dark:invert');
-    expect(Number(trn3Mark?.getAttribute('width'))).toBeGreaterThan(0);
+    expect(marks).toHaveLength(4);
+    expectAwsPair(marks);
+    expect(Number(marks.find(isAws)?.getAttribute('width'))).toBeGreaterThan(0);
   });
 });

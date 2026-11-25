@@ -10,11 +10,12 @@ import {
   VENDOR_MARK_HREFS,
   getAxisVendorIcon,
   getLineLabelVendorIcon,
+  getHwVendorDarkLogo,
   getHwVendorLogo,
+  vendorMarkVariants,
 } from './vendor-logos';
 
-const pathsOf = (svg: string) =>
-  [...svg.matchAll(/<path d="(?<d>[^"]+)"/gu)].map((m) => m.groups?.d);
+const pathsOf = (svg: string) => [...svg.matchAll(/ d="(?<d>[^"]+)"/gu)].map((m) => m.groups?.d);
 
 describe('vendor logo icons', () => {
   it('maps NVIDIA hardware keys to the full-color NVIDIA mark', () => {
@@ -52,22 +53,31 @@ describe('vendor logo icons', () => {
     expect(getAxisVendorIcon('tpuv7')?.href).toBe(`data:image/svg+xml,${encodeURIComponent(svg)}`);
   });
 
-  it('gives Trainium3 the Amazon smile cropped from the wordmark on every surface', () => {
-    const wordmark = readFileSync('public/logos/amazon.svg', 'utf8');
-    const smile = [...wordmark.matchAll(/<path d="(?<d>[^"]+)" fill="#ff9900"/giu)].map((m) =>
-      m.groups?.d?.split(/\s+/u).join(' '),
-    );
-    const file = readFileSync('public/logos/amazon-smile.svg', 'utf8').trim();
-    expect(smile).toHaveLength(2);
-    expect(pathsOf(file)).toEqual(smile);
-    expect(getHwVendorLogo('AWS')).toBe('amazon-smile.svg');
-    expect(isMonochromeLogo('amazon-smile.svg')).toBe(false);
+  it('gives Trainium3 the official AWS logo, Squid Ink in light mode and white in dark', () => {
+    const light = readFileSync('public/logos/aws.svg', 'utf8').trim();
+    const dark = readFileSync('public/logos/aws-dark.svg', 'utf8').trim();
+    expect(light).toContain('fill="#161D26"');
+    expect(dark).toBe(light.replace('#161D26', '#FFFFFF'));
+    expect(getHwVendorLogo('AWS')).toBe('aws.svg');
+    expect(getHwVendorDarkLogo('AWS')).toBe('aws-dark.svg');
+    expect(getHwVendorDarkLogo('NVIDIA')).toBeUndefined();
 
     const axis = getAxisVendorIcon('trn3_vllm');
-    expect(axis?.monochrome).toBe(false);
-    expect(axis?.href).toBe(`data:image/svg+xml,${encodeURIComponent(file)}`);
+    expect(axis?.href).toBe(`data:image/svg+xml,${encodeURIComponent(light)}`);
+    expect(axis?.darkHref).toBe(`data:image/svg+xml,${encodeURIComponent(dark)}`);
+    expect(vendorMarkVariants(axis!)).toEqual([
+      { href: axis!.href, className: 'dark:hidden' },
+      { href: axis!.darkHref!, className: 'hidden dark:inline' },
+    ]);
     expect(getLineLabelVendorIcon('trn3')).toBe(VENDOR_LOGO_ICONS.AWS);
-    expect(pathsOf(decodeURIComponent(VENDOR_MARK_HREFS.AWS ?? ''))).toEqual(smile);
+    expect(pathsOf(decodeURIComponent(VENDOR_MARK_HREFS.AWS ?? ''))).toEqual(pathsOf(light));
+  });
+
+  it('keeps one image per mark for vendors without a dark variant', () => {
+    expect(vendorMarkVariants(getAxisVendorIcon('mi355x')!)).toEqual([
+      { href: getAxisVendorIcon('mi355x')!.href, className: 'dark:invert' },
+    ]);
+    expect(vendorMarkVariants(getAxisVendorIcon('b200')!)[0]?.className).toBe('');
   });
 
   it('has a mark for every vendor in the hardware registry', () => {

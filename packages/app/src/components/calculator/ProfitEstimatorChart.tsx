@@ -28,7 +28,7 @@ import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getDisplayLabel } from '@/lib/shared/utils';
-import { getAxisVendorIcon } from '@/lib/catalog/vendor-logos';
+import { getAxisVendorIcon, vendorMarkVariants } from '@/lib/catalog/vendor-logos';
 
 import {
   formatProfitUsd,
@@ -850,27 +850,31 @@ export default function ProfitEstimatorChart({
           basis,
           slot,
         );
+        const barMarks = horizontal
+          ? []
+          : labelData.flatMap((d) => {
+              const icon = getAxisVendorIcon(d.row.hwKey);
+              if (!icon) return [];
+              const width = barMarkWidth(icon, iconHeight);
+              return vendorMarkVariants(icon).map((variant, index) => ({
+                key: `${d.row.resultKey}:${index}`,
+                ...variant,
+                width,
+                x: bandMid(d.row) - width / 2,
+                y: revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - iconHeight,
+              }));
+            });
         group
-          .selectAll<SVGImageElement, ProfitSegment>('image.bar-vendor-mark')
-          .data(
-            horizontal ? [] : labelData.filter((d) => getAxisVendorIcon(d.row.hwKey)),
-            (d) => d.row.resultKey,
-          )
+          .selectAll<SVGImageElement, (typeof barMarks)[number]>('image.bar-vendor-mark')
+          .data(barMarks, (d) => d.key)
           .join('image')
-          .attr('class', (d) =>
-            getAxisVendorIcon(d.row.hwKey)?.monochrome
-              ? 'bar-vendor-mark dark:invert'
-              : 'bar-vendor-mark',
-          )
+          .attr('class', (d) => `bar-vendor-mark ${d.className}`.trim())
           .attr('aria-hidden', 'true')
-          .attr('href', (d) => getAxisVendorIcon(d.row.hwKey)?.href ?? '')
-          .attr('width', (d) => barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight))
+          .attr('href', (d) => d.href)
+          .attr('width', (d) => d.width)
           .attr('height', iconHeight)
-          .attr('x', (d) => {
-            const w = barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight);
-            return bandMid(d.row) - w / 2;
-          })
-          .attr('y', (d) => revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - iconHeight)
+          .attr('x', (d) => d.x)
+          .attr('y', (d) => d.y)
           .attr('pointer-events', 'none');
         const revenueText = group
           .selectAll<SVGTextElement, ProfitSegment>('.revenue-label')
@@ -1176,16 +1180,18 @@ export default function ProfitEstimatorChart({
               const textWidth =
                 measured > 0 ? measured : estimateTextWidth(line.text, CHART_TYPE.axisLabel);
               const width = barMarkWidth(mark, ROW_MARK_HEIGHT_PX);
-              tick
-                .append('image')
-                .attr('class', mark.monochrome ? 'row-vendor-mark dark:invert' : 'row-vendor-mark')
-                .attr('aria-hidden', 'true')
-                .attr('href', mark.href)
-                .attr('width', width)
-                .attr('height', ROW_MARK_HEIGHT_PX)
-                .attr('x', Number(x) - textWidth - ROW_MARK_GAP_PX - width)
-                .attr('y', top + (lineHeight - ROW_MARK_HEIGHT_PX) / 2)
-                .attr('pointer-events', 'none');
+              for (const variant of vendorMarkVariants(mark)) {
+                tick
+                  .append('image')
+                  .attr('class', `row-vendor-mark ${variant.className}`.trim())
+                  .attr('aria-hidden', 'true')
+                  .attr('href', variant.href)
+                  .attr('width', width)
+                  .attr('height', ROW_MARK_HEIGHT_PX)
+                  .attr('x', Number(x) - textWidth - ROW_MARK_GAP_PX - width)
+                  .attr('y', top + (lineHeight - ROW_MARK_HEIGHT_PX) / 2)
+                  .attr('pointer-events', 'none');
+              }
             }
             top += lineHeight;
           }
