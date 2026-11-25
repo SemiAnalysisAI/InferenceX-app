@@ -15,15 +15,16 @@ import {
   VIDEO_HISTORY_MAX_PAGES,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
-import { isSelectedVideoArtifact } from '@/lib/video/video-publication';
 import { recordVideoHistory } from '@/lib/video/video-history-store';
 import { liveVideoArtifact, liveVideoRunPage } from '@/lib/video/video-live-run';
+import { mergeSelection } from '@/lib/video/video-provenance';
 import { liveTrustedQuality, publishVideoQuality } from '@/lib/video/video-quality';
-import { withQuality } from '@/components/video-benchmark/stored';
+import { withQuality, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   approveVideoPublication,
   readStoredArtifact,
   readVideoPublication,
+  requireSelectedSource,
   storedArtifacts,
   storeVideoArtifact,
   videoStorageEnabled,
@@ -105,7 +106,6 @@ export async function GET(request: NextRequest) {
     (runId && !id(runId)) ||
     (artifactId && (!runId || !id(artifactId))) ||
     !id(page) ||
-    !Number.isSafeInteger(Number(page)) ||
     (history && (runId || artifactId)) ||
     (live && !runId) ||
     !/^[1-9]$/u.test(pages) ||
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
         );
         if (!saved) return new Response(null, { status: 204, headers });
         // PSNR without media: an unstored run has no published candidate or reference clips.
-        const quality = await liveTrustedQuality(saved, github, deadline).catch(() => null);
+        const quality = await liveTrustedQuality(saved, github, deadline);
         return NextResponse.json(quality ? withQuality(saved, quality) : saved, { headers });
       }
       return NextResponse.json(await liveVideoRunPage(runId, artifacts, github, deadline), {
@@ -258,7 +258,7 @@ export async function GET(request: NextRequest) {
       const [runResponse, listing, saved] = await Promise.all([
         github(`/actions/runs/${runId}`),
         firstArtifactPage(runId),
-        storedArtifacts(runId).catch(() => []),
+        storedArtifacts(runId),
       ]);
       if (!runResponse.ok)
         return NextResponse.json(
@@ -326,16 +326,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid publication request' }, { status: 400, headers });
   }
   const body = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
-  const {
-    runId,
-    artifactId: republishId,
-    selectedArtifact,
-    mergeRunId,
-    history,
-  } = body as Record<string, unknown>;
+  const { runId, artifactId, mergeRunId, history } = body as Record<string, unknown>;
   if (history === 'backfill' && Object.keys(body).length === 1) {
     try {
-      return NextResponse.json(await recordVideoHistory(null), { headers });
+      return NextResponse.json(await recordVideoHistory(null, null), { headers });
     } catch {
       return NextResponse.json(
         { error: 'Video history backfill failed, retry shortly' },
@@ -346,93 +340,73 @@ export async function POST(request: Request) {
       purgeVideo();
     }
   }
-  // A merge run approves the artifact its selection names. Without a merge run nothing is
+  // A merge run approves the artifact when its selection names it. Without a merge run nothing is
   // approved: the request republishes an artifact that already holds an approval.
-  const approval =
-    typeof mergeRunId === 'string' &&
-    id(mergeRunId) &&
-    isSelectedVideoArtifact(selectedArtifact) &&
-    republishId === undefined
-      ? { mergeRunId, selected: selectedArtifact }
-      : null;
-  const artifactId =
-    approval?.selected.id ??
-    (mergeRunId === null && selectedArtifact === undefined ? republishId : undefined);
-  if (typeof runId !== 'string' || !id(runId) || typeof artifactId !== 'string' || !id(artifactId))
+  if (
+    typeof runId !== 'string' ||
+    !id(runId) ||
+    typeof artifactId !== 'string' ||
+    !id(artifactId) ||
+    (mergeRunId !== null && (typeof mergeRunId !== 'string' || !id(mergeRunId)))
+  )
     return NextResponse.json({ error: 'Invalid publication identity' }, { status: 400, headers });
   const deadline = AbortSignal.timeout(270000);
   try {
-    // Publication accepts artifacts only from a public repository.
-    const repository = await github('');
-    const repo = repository.ok ? await repository.json() : null;
-    if (repo?.private !== false)
-      return NextResponse.json(
-        { error: 'Public H3 repository unavailable' },
-        { status: 503, headers },
-      );
-    const metaResponse = await github(`/actions/artifacts/${artifactId}`);
-    if (!metaResponse.ok)
-      return NextResponse.json(
-        { error: 'Artifact unavailable' },
-        { status: metaResponse.status, headers },
-      );
-    const artifact: CIArtifact = await metaResponse.json();
-    if (
-      artifact.id !== Number(artifactId) ||
-      !Number.isSafeInteger(artifact.id) ||
-      videoArtifactIdentity(artifact.name)?.run !== runId ||
-      String(artifact.workflow_run?.id) !== runId ||
-      (artifact.digest !== undefined && !/^sha256:[a-f0-9]{64}$/u.test(artifact.digest))
-    )
-      return NextResponse.json(
-        { error: 'Artifact does not belong to this H3 run' },
-        { status: 404, headers },
-      );
-    if (artifact.expired)
-      return NextResponse.json(
-        { error: 'This GitHub artifact has expired' },
-        { status: 410, headers },
-      );
-    if (artifact.size_in_bytes > MAX_BYTES)
-      return NextResponse.json(
-        { error: 'Artifact exceeds the 256 MiB viewer limit' },
-        { status: 413, headers },
-      );
-    let saved = await readStoredArtifact(runId, artifact);
-    let receipt: VideoPublicationReceipt | null = null;
-    if (approval) {
-      if (!saved) {
+    let saved: StoredArtifact | null;
+    let receipt: VideoPublicationReceipt | null;
+    if (mergeRunId === null) {
+      // A republish reads storage alone, so it outlives the GitHub copy of the artifact.
+      const stored = await storedArtifacts(runId);
+      const artifact = stored.find((item) => item.id === Number(artifactId));
+      saved = artifact ? await readStoredArtifact(runId, artifact) : null;
+      receipt = saved ? await readVideoPublication(runId, saved.artifact, saved) : null;
+      if (!saved || !receipt)
+        return NextResponse.json(
+          { error: 'Artifact has no approval to republish' },
+          { status: 409, headers },
+        );
+    } else {
+      const catalog = await runArtifacts(runId, await firstArtifactPage(runId));
+      if (!catalog)
+        return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
+      const selection = await mergeSelection(mergeRunId, runId, catalog, github, deadline);
+      if (!selection)
+        return NextResponse.json(
+          { error: 'Merge run does not authorize publishing this run' },
+          { status: 403, headers },
+        );
+      const selected = selection.find((item) => item.artifact.id === Number(artifactId));
+      if (!selected)
+        return NextResponse.json(
+          { error: 'Artifact is not in the merge selection' },
+          { status: 409, headers },
+        );
+      const { artifact } = selected;
+      saved = await readStoredArtifact(runId, artifact);
+      if (saved) requireSelectedSource(saved, selected);
+      else {
+        if (artifact.size_in_bytes > MAX_BYTES)
+          return NextResponse.json(
+            { error: 'Artifact exceeds the 256 MiB viewer limit' },
+            { status: 413, headers },
+          );
         const zip = await github(`/actions/artifacts/${artifactId}/zip`, deadline);
         if (!zip.ok || !zip.body)
           return NextResponse.json(
             { error: `Artifact download failed (${zip.status})` },
             { status: 502, headers },
           );
-        await storeVideoArtifact(
+        saved = await storeVideoArtifact(
           runId,
           artifact,
           await new Response(limitedZip(zip)).blob(),
           deadline,
-          approval.selected,
+          selected,
         );
-        saved = await readStoredArtifact(runId, artifact);
-        if (!saved) throw new Error('Stored video index readback failed');
       }
-      receipt = await approveVideoPublication(
-        runId,
-        artifact,
-        saved,
-        approval.mergeRunId,
-        deadline,
-        approval.selected,
-      );
-    } else if (saved) receipt = await readVideoPublication(runId, artifact, saved);
-    if (!saved || !receipt)
-      return NextResponse.json(
-        { error: 'Artifact has no approval to republish' },
-        { status: 409, headers },
-      );
-    await recordVideoHistory(saved);
+      receipt = await approveVideoPublication(saved, mergeRunId, selected, deadline);
+    }
+    await recordVideoHistory(saved, receipt);
     // Quality arrives from a separate workflow, often after publication; it never blocks it.
     const quality = await publishVideoQuality(saved, github, deadline).then(
       (stored) => stored?.pairs.length ?? null,

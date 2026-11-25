@@ -13,6 +13,7 @@ import {
 } from '@/components/video-benchmark/reference-quality';
 import type { StoredArtifact, StoredQuality } from '@/components/video-benchmark/stored';
 import { artifactFiles, type GithubRead } from './video-live-run';
+import { trustedMainRun } from './video-provenance';
 import { readStoredQuality, storeReferenceMedia, storeVideoQuality } from './video-storage';
 
 async function sealedFile(path: string, expected: string): Promise<Blob> {
@@ -60,16 +61,6 @@ async function verifiedReference(
   return blob;
 }
 
-/** A `head_branch` is only a ref name; the run's commit must also be main or one of its ancestors. */
-async function onMain(sha: unknown, github: GithubRead, signal: AbortSignal) {
-  if (typeof sha !== 'string' || !/^[a-f0-9]{40}$/u.test(sha)) return false;
-  const response = await github(`/compare/${sha}...main`, signal);
-  if (response.status === 404) return false;
-  if (!response.ok) throw new Error('Quality workflow commit unavailable');
-  const { status } = await response.json();
-  return status === 'identical' || status === 'ahead';
-}
-
 /**
  * The newest unexpired `h3-quality-<run>-<attempt>` artifact uploaded by a video-quality.yml
  * workflow_run or dispatch of a main commit of the public repository. Trust comes from the
@@ -89,18 +80,14 @@ export async function trustedQualityArtifact(
     .filter((item) => item.name === name && !item.expired && item.workflow_run?.id)
     .toSorted((a, b) => b.id - a.id);
   for (const artifact of candidates) {
-    const response = await github(`/actions/runs/${artifact.workflow_run!.id}`, signal);
-    if (!response.ok) throw new Error('Quality workflow run unavailable');
-    const run = await response.json();
-    if (
-      run.path === QUALITY_WORKFLOW &&
-      (run.event === 'workflow_run' || run.event === 'workflow_dispatch') &&
-      run.head_branch === 'main' &&
-      run.repository?.full_name === GITHUB_REPO_FULL &&
-      run.head_repository?.full_name === GITHUB_REPO_FULL &&
-      (await onMain(run.head_sha, github, signal))
-    )
-      return artifact;
+    const run = await trustedMainRun(
+      artifact.workflow_run!.id,
+      QUALITY_WORKFLOW,
+      ['workflow_run', 'workflow_dispatch'],
+      github,
+      signal,
+    );
+    if (run) return artifact;
   }
   return null;
 }

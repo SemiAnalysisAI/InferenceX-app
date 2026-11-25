@@ -15,6 +15,7 @@ import {
   readStoredArtifact,
   readVideoPublication,
   videoStorageEnabled,
+  type VideoPublicationReceipt,
 } from './video-storage';
 
 /** Bump when projected entries can change, so snapshots written by older code are ignored. */
@@ -207,10 +208,14 @@ export async function publishedVideoHistory(
 
 /**
  * Write a new History snapshot. Records still bound to their index and receipt are kept. `saved` is
- * projected from the published artifact in hand, and `null` backfills every index without a record.
- * Indexes that cannot be projected exactly stay out of the snapshot, so reads project them directly.
+ * projected from the published artifact in hand under `approval`, the receipt that publication
+ * returned, and `null` backfills every index without a record. Indexes that cannot be projected
+ * exactly stay out of the snapshot, so reads project them directly.
  */
-export async function recordVideoHistory(saved: StoredArtifact | null) {
+export async function recordVideoHistory(
+  saved: StoredArtifact | null,
+  approval: VideoPublicationReceipt | null,
+) {
   const { indexes, receipts, snapshots, latest } = await historyState();
   const previous = await readRecords(latest);
   const records: Record<string, HistoryRecord> = {};
@@ -229,9 +234,10 @@ export async function recordVideoHistory(saved: StoredArtifact | null) {
         if (!source) throw new Error('Published artifact unavailable');
         const receiptAt = receipts.get(approvalPath(index.runId, index.artifact)) ?? null;
         const receipt =
-          receiptAt === null
+          approval ??
+          (receiptAt === null
             ? null
-            : await readVideoPublication(index.runId, index.artifact, source);
+            : await readVideoPublication(index.runId, index.artifact, source));
         if (receiptAt !== null && !receipt) throw new Error('Approval receipt unavailable');
         records[index.pathname] = {
           receiptAt,

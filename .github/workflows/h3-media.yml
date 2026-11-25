@@ -20,7 +20,7 @@ permissions:
 jobs:
   publish:
     name: 'Publish H3 media'
-    # A merge dispatch without its run IDs or selection is never skipped: it fails in the steps below.
+    # A dispatch that names no source run is never skipped: it fails in the step below.
     if: github.repository == 'SemiAnalysisAI/InferenceX-app' && !inputs.backfill_renditions
     # Keep distinct publication dispatches queued while the shared History snapshot is written.
     concurrency:
@@ -36,25 +36,14 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version-file: package.json
-      - name: Read the merge-selected artifact list
-        if: github.event_name == 'repository_dispatch'
-        id: selection
-        env:
-          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-        run: python3 packages/app/scripts/read-video-publication-selection.py
       - name: Persist completed H3 artifacts
         env:
           H3_RUN_ID: ${{ inputs.run_id || github.event.client_payload.source_run_id }}
           H3_MERGE_RUN_ID: ${{ github.event.client_payload.merge_run_id }}
-          H3_SELECTION_PATH: ${{ steps.selection.outputs.path }}
-          H3_PUBLICATION_EVENT: ${{ github.event_name }}
           INFERENCEX_APP_URL: ${{ vars.APP_URL }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
-        run: |
-          : "${INFERENCEX_APP_URL:?APP_URL repository variable is not set}"
-          : "${INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET is not set}"
-          bun packages/app/scripts/warm-video-results.ts
+        run: bun packages/app/scripts/warm-video-results.ts
 
   renditions:
     name: 'Encode web playback renditions'
