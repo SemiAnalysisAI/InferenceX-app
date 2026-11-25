@@ -179,3 +179,14 @@ describe('ProfitEstimatorChart vendor marks', () => {
     expect(Number(marks.find(isAws)?.getAttribute('width'))).toBeGreaterThan(0);
   });
 });
+
+describe('ProfitEstimatorChart column labels', () => {
+  it('sets the label size inline so the global 12px tick rule cannot clip slanted labels', () => {
+    draw(DEFAULT_COLORS);
+    const labels = [...container.querySelectorAll<SVGTextElement>('g.tick text')].filter(
+      (label) => label.style.fill === 'var(--foreground)',
+    );
+    expect(labels).toHaveLength(ROWS.length);
+    for (const label of labels) expect(label.style.fontSize).toBe('10px');
+  });
+});
