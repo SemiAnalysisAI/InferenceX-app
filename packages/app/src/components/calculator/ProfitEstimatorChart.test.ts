@@ -621,6 +621,16 @@ describe('phone row layout', () => {
     ]);
   });
 
+  it('wraps the chip name short of the vendor mark placed before it', () => {
+    const name = 'GB300 NVL72';
+    const fits = Math.ceil(estimateTextWidth(name, 12));
+    expect(wrapRowLabel(`${name} (FP4)`, fits)[0]).toEqual({ text: name, sub: false });
+    expect(wrapRowLabel(`${name} (FP4)`, fits, 20).slice(0, 2)).toEqual([
+      { text: 'GB300', sub: false },
+      { text: 'NVL72', sub: false },
+    ]);
+  });
+
   it('grows the row step only when a wrapped label needs more than the minimum', () => {
     expect(rowStepPx([])).toBe(52);
     expect(rowStepPx([[{ text: 'B200', sub: false }]])).toBe(52);
