@@ -398,7 +398,7 @@ describe('history projection version', () => {
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
       // the publish endpoint took over merge provenance and reads stopped recomputing receipts; a
       // recorded entry was approved by a receipt that still approves it, so entries are unchanged.
-      sources: 'e0c3570b97a00906bd974670a3101df7e89828e21827fa1f6fbf7b46a8263db4',
+      sources: '41a4d6d3ba8f137fe08ebd5a69c869b6cc058d1bb3c3eb00f7a98a7ba617f7a6',
     });
   });
 });

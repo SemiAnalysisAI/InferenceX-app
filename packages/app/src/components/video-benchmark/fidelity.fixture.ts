@@ -242,15 +242,8 @@ export async function fidelityFixture({
     assets: [...files.keys()].map((path) => [path, asset(runId, path)]),
     texts,
   };
-  const read = (path: string) => {
-    const file = files.get(path);
-    if (!file) throw new Error(`Missing synthetic fixture file: ${path}`);
-    return Promise.resolve(file);
-  };
   return {
     runId,
-    files,
-    read,
     documents,
     checksums,
     published,

@@ -48,6 +48,7 @@ const {
   approveVideoPublication,
   readStoredArtifact,
   readVideoPublication,
+  requireSelectedSource,
   derivedMedia,
   storedArtifacts,
   storeVideoArtifact,
@@ -80,6 +81,7 @@ afterEach(() => {
   mocked(storeVideoArtifact).mockClear();
   mocked(approveVideoPublication).mockReset();
   mocked(readVideoPublication).mockReset();
+  mocked(requireSelectedSource).mockReset();
   mocked(derivedMedia).mockReset().mockResolvedValue(new Map());
   unstubAllEnvs();
   vi.restoreAllMocks();
@@ -670,6 +672,21 @@ describe('explicit H3 publication', () => {
     const result = await POST(post(mergeBody));
     expect(result.status).toBe(status);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
+    expect(approveVideoPublication).not.toHaveBeenCalled();
+    expect(recordVideoHistory).not.toHaveBeenCalled();
+  });
+
+  it('does not approve an already stored artifact whose copy differs from the selection', async () => {
+    stubEnv('INVALIDATE_SECRET', 'test-secret');
+    mocked(videoStorageEnabled).mockReturnValue(true);
+    mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    mocked(requireSelectedSource).mockImplementation(() => {
+      throw new Error('Stored source differs from the merge selection');
+    });
+    mockGithub();
+    const result = await POST(post(mergeBody));
+    expect(result.status).toBe(502);
+    expect(requireSelectedSource).toHaveBeenCalledWith(saved, { artifact, ...selected });
     expect(approveVideoPublication).not.toHaveBeenCalled();
     expect(recordVideoHistory).not.toHaveBeenCalled();
   });

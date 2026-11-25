@@ -1,8 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'bun:test';
-import { at, sha256, text, type Json } from './bundle';
-import { fidelityEvidence, fidelitySource, loadFidelityBundle } from './fidelity';
+import { at, sha256, type Json } from './bundle';
+import { fidelityEvidence, fidelitySource } from './fidelity';
 import { fidelityFixture } from './fidelity.fixture';
 import { storedBundle, storedFidelityBundle } from './stored';
 import { servingCells } from './serving';
@@ -27,12 +25,11 @@ const both = (documents: Map<string, Json>, mutate: (value: Json) => void) => {
 };
 
 describe('native H3 fidelity evidence (synthetic fixtures)', () => {
-  it('loads the sealed native artifact and restores stored media references without a fake manifest', async () => {
-    const loaded = await loadFidelityBundle(fixture.read, fixture.runId);
+  it('restores the stored native artifact and its media references without a fake manifest', () => {
+    const loaded = storedFidelityBundle(fixture.published);
     expect(loaded.comparisonSha256).toBe(fixture.checksums.get('comparison.json'));
     expect(at(loaded.comparison, 'summary', 'matched_valid_pairs')).toBe(2);
     expect(loaded.documents.has('manifest.json')).toBe(false);
-    expect(storedFidelityBundle(fixture.published).comparison).toEqual(loaded.comparison);
     expect(at(fidelitySource(loaded, 'baseline'), 'ci', 'databaseId')).toBe(101);
     expect(at(fidelitySource(loaded, 'candidate'), 'ci', 'databaseId')).toBe(102);
     for (const original of fixture.originals)
@@ -110,20 +107,10 @@ describe('native H3 fidelity evidence (synthetic fixtures)', () => {
     expect(() => verify(documents, checksums, fixture.runId)).toThrow('slots');
   });
   it('rejects copied hardware metadata changed and resealed only in the comparison artifact', async () => {
-    const files = new Map(fixture.files);
     const { documents, checksums } = changed();
     const path = 'sources/101/ci.json';
     Object.assign(at(documents.get(path), 'site')!, { gpu_model: 'Substituted hardware' });
-    const altered = new Blob([JSON.stringify(documents.get(path))]);
-    files.set(path, altered);
-    checksums.set(path, await sha256(altered));
-    files.set(
-      'SHA256SUMS',
-      new Blob([[...checksums].map(([name, hash]) => `${hash}  ${name}`).join('\n')]),
-    );
-    await expect(
-      loadFidelityBundle((name) => Promise.resolve(files.get(name)!), fixture.runId),
-    ).rejects.toThrow('snapshot differs from original inventory: ci.json');
+    checksums.set(path, await sha256(new Blob([JSON.stringify(documents.get(path))])));
     expect(() =>
       storedFidelityBundle({
         ...fixture.published,
@@ -157,40 +144,4 @@ describe('native H3 fidelity evidence (synthetic fixtures)', () => {
       );
     }
   });
-  it('checks actual bytes before rendering any evidence', async () => {
-    await expect(
-      loadFidelityBundle(
-        (path) =>
-          path === 'comparison.json' ? Promise.resolve(new Blob(['{}'])) : fixture.read(path),
-        fixture.runId,
-      ),
-    ).rejects.toThrow('SHA256 mismatch');
-  });
 });
-
-const realDirectory = process.env.H3_FIDELITY_ARTIFACT_DIR;
-it.skipIf(!realDirectory)(
-  'loads an explicitly supplied real compact artifact without copying it into fixtures',
-  async () => {
-    const bundle = await loadFidelityBundle(
-      async (path) => new Blob([await readFile(join(realDirectory!, path))]),
-    );
-    expect(at(bundle.comparison, 'bundle_type')).toBe('mvp_comparison');
-    expect(at(bundle.comparison, 'summary', 'matched_valid_pairs')).toBe(20);
-    expect(fidelitySource(bundle, 'baseline')).not.toBeNull();
-    expect(fidelitySource(bundle, 'candidate')).not.toBeNull();
-    const texts: [string, string][] = [];
-    for (const [path, file] of bundle.files)
-      if (path === 'report/index.html' || path.endsWith('/original-SHA256SUMS'))
-        texts.push([path, await file.text()]);
-    const stored = storedFidelityBundle({
-      id: text(at(bundle.comparison, 'producer', 'run_id')),
-      kind: 'fidelity',
-      documents: [...bundle.documents],
-      checksums: [...bundle.checksums],
-      assets: [],
-      texts,
-    });
-    expect(stored.comparisonSha256).toBe(bundle.comparisonSha256);
-  },
-);

@@ -1,14 +1,4 @@
-import {
-  at,
-  canonical,
-  number,
-  readVerifiedFiles,
-  ROLES,
-  rows,
-  safePath,
-  text,
-  type Json,
-} from './bundle';
+import { at, canonical, number, ROLES, rows, safePath, text, type Json } from './bundle';
 import { videoArtifactIdentity } from './artifact-identity';
 
 export interface FidelityBundle {
@@ -183,16 +173,4 @@ export function fidelitySource(bundle: FidelityBundle, role: (typeof ROLES)[numb
         at(bundle.comparison, role, 'run_bundle_sha256'),
     ) ?? null
   );
-}
-
-export async function loadFidelityBundle(
-  read: (path: string) => Promise<Blob>,
-  runId?: string,
-): Promise<FidelityBundle> {
-  const data = await readVerifiedFiles(read, 'comparison.json');
-  const originalSeals = new Map<string, string>();
-  for (const [path, file] of data.files)
-    if (/^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path))
-      originalSeals.set(path, await file.text());
-  return { ...data, ...fidelityEvidence(data.documents, data.checksums, runId, originalSeals) };
 }

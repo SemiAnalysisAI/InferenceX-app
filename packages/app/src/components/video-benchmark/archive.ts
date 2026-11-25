@@ -59,13 +59,7 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
           artifact.workflow_run.head_sha !== at(comparison, 'producer', 'git_commit')))
     )
       throw new Error('Comparison and GitHub artifact identify different runs');
-    return [
-      {
-        id: identity.run,
-        kind: 'fidelity' as const,
-        read: (path: string) => Promise.resolve(read(path)),
-      },
-    ];
+    return [{ id: identity.run, read: (path: string) => Promise.resolve(read(path)) }];
   }
   if (
     index &&
