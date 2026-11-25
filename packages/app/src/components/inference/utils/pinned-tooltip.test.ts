@@ -369,7 +369,7 @@ describe('reader-facing fields', () => {
       ).html,
     );
 
-  it('shows every aggregate width and marks unrecorded ones unknown', () => {
+  it('shows every recorded aggregate width and omits unrecorded ones', () => {
     expect(aggregate({})).toContain(
       'TP 8 · EP 8 · DP 2 · DPA on · PP 1 · DCP 4 · PCP 2 · DWDP 4 · Workers 2',
     );
@@ -386,6 +386,6 @@ describe('reader-facing fields', () => {
         decode_pcp_size: undefined,
         prefill_dwdp_size: undefined,
       }),
-    ).toContain('TP 8 · EP ? · DP ? · DPA ? · PP ? · DCP ? · PCP ? · DWDP 1');
+    ).toContain('10,888TP 8 · DWDP 1 ');
   });
 });
