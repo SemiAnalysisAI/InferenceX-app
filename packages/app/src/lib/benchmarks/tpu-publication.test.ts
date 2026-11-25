@@ -35,8 +35,8 @@ describe('TPU publication paths', () => {
       expect(pointLabelText(point, true, false, false)).toBe('4');
       expect(pointLabelText(point, false, true, false)).toBe('TP1/DP8');
       expect(point.tput_per_gpu).toBeCloseTo(3674.8418266267754);
-      expect(point.tpPerMw!.y).toBeCloseTo((3674.8418266267754 * 1000) / 1.207);
-      expect(point.jTotal!.y).toBeCloseTo(1207 / 3674.8418266267754);
+      expect(point.tpPerMw!.y).toBeCloseTo((3674.8418266267754 * 1000) / 1.5);
+      expect(point.jTotal!.y).toBeCloseTo(1500 / 3674.8418266267754);
       expect(calculatePowerForGpus([point], { tpuv7: 1.5 })[0].powerUser!.y).toBeGreaterThan(0);
     }
     const evals = normalizeEvalArtifactRows(
@@ -85,6 +85,6 @@ describe('TPU publication paths', () => {
     });
     expect(Object.values(groups.grouped)[0][0].costh).toBeCloseTo(internal.costh.y);
     expect(getGpuSpecs('h100_vllm', 'internal')).toEqual(getGpuSpecs('h100_vllm'));
-    expect(getGpuSpecs('tpuv7_vllm').power).toBe(1.207);
+    expect(getGpuSpecs('tpuv7_vllm').power).toBe(1.5);
   });
 });

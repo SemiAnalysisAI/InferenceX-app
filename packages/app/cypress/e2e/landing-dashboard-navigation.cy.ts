@@ -142,9 +142,25 @@ describe('landing model curation', () => {
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-5"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
-        cy.get('[data-testid="landing-huawei-results-link"]')
+        cy.get('[data-testid="landing-trainium-glm-5-2-results-link"]')
           .should('match', ':first-child')
-          .and('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`)
+          .and('have.attr', 'href', `${prefix}/infx/inference/glm-5-3?i_vendor=AWS`)
+          .and('contain.text', 'Amazon Trainium3')
+          .and(
+            'contain.text',
+            prefix ? 'GLM 5.2 · 7440 亿参数 · AgentX' : 'GLM 5.2 · 744B Parameters · AgentX',
+          )
+          .next()
+          .should('have.attr', 'data-testid', 'landing-huawei-results-link');
+        cy.get('[data-new-badge="landing-trainium-glm-5-2"]')
+          .should('contain.text', prefix ? '新' : 'New')
+          .and('have.class', 'new-badge-flash');
+        cy.get('[data-testid="landing-trainium-glm-5-2-amazon-logo"] path').should(
+          'have.length',
+          2,
+        );
+        cy.get('[data-testid="landing-huawei-results-link"]')
+          .should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`)
           .next()
           .should('have.attr', 'data-testid', 'landing-tpu-kimi-k3-results-link')
           .parent()
@@ -152,20 +168,11 @@ describe('landing model curation', () => {
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
           .should('have.attr', 'data-testid', 'compare-agentx-model-kimi-k31-pro');
-        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
-          .should('contain.text', 'MiniMax M3.1 Flash')
-          .and('contain.text', 'AgentX')
-          .and('have.attr', 'href', `${prefix}/infx/inference/minimax-m31-flash`);
-        cy.get('[data-new-badge="landing-minimax-m31-flash"]').should('not.exist');
+        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-huawei-results-link"]')
           .find('[data-new-badge="landing-huawei"]')
           .should('contain.text', prefix ? '新' : 'New')
           .and('have.class', 'new-badge-flash');
-        cy.get('[data-testid="landing-minimax-m31-flash-minimax-logo"]').should(
-          'have.attr',
-          'src',
-          '/logos/minimax-color.svg',
-        );
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
           .should('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
           .and('contain.text', 'Google TPU')
@@ -208,9 +215,7 @@ describe('landing model curation', () => {
           'currentColor',
         );
         cy.get('[data-testid="landing-jalapeno-results-link"]')
-          .next()
-          .should('have.attr', 'data-testid', 'landing-minimax-m31-flash-results-link');
-        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
+          .should('match', ':last-child')
           .parent()
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
@@ -220,7 +225,7 @@ describe('landing model curation', () => {
 
       cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-trainium-glm-5-2-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
@@ -241,23 +246,6 @@ describe('landing model curation', () => {
           );
         }
       });
-    });
-
-    it(`opens MiniMax M3.1 Flash AgentX results from ${prefix || '/'} and retains them on reload`, () => {
-      cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-minimax-m31-flash-results-link"]').click();
-      cy.location('pathname').should('eq', `${prefix}/infx/inference/minimax-m31-flash`);
-      cy.get('[data-testid="model-selector"]')
-        .invoke('text')
-        .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
-      cy.get('[data-testid="scenario-selector"]')
-        .invoke('text')
-        .should('match', /Agentic|智能体/u);
-      cy.reload();
-      cy.location('pathname').should('eq', `${prefix}/infx/inference/minimax-m31-flash`);
-      cy.get('[data-testid="model-selector"]')
-        .invoke('text')
-        .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
     });
 
     it(`opens Kimi K3.1 Pro AgentX results from ${prefix || '/'} and retains them on reload`, () => {

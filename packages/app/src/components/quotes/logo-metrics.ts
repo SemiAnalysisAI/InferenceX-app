@@ -20,6 +20,7 @@ export interface LogoMetrics {
 
 export const LOGO_METRICS: Record<string, LogoMetrics> = {
   'adaptive-ml.svg': { ratio: 6.383, aspect: 6.76, fill: 0.94, invertInDark: true },
+  'amazon.svg': { ratio: 3.313, aspect: 3.32, fill: 1, invertInDark: true },
   'amd.svg': { ratio: 3.704, aspect: 4.15, fill: 0.69, invertInDark: true },
   'anyscale.svg': { ratio: 4.128, aspect: 4.12, fill: 1, invertInDark: true },
   'baseten.svg': { ratio: 1, aspect: 1, fill: 1 },

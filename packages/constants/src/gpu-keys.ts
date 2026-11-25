@@ -150,9 +150,21 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     badgeLabel: 'TPU7x',
     sort: 11,
     tdp: 980,
-    power: 1.207,
+    power: 1.5,
     costh: 1.21,
     costr: 2,
+  },
+  trn3: {
+    vendor: 'AWS',
+    arch: 'Trainium3',
+    label: 'Trainium3',
+    badgeLabel: 'Trn3',
+    sort: 12,
+    // TDP is an unverified placeholder, per adding-entities.md.
+    tdp: 9.99,
+    power: 1.2,
+    costh: 1.05,
+    costr: 1.05,
   },
 };
 
@@ -172,6 +184,7 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
 );
 
 export const GOOGLE_BLUE = '#4285F4';
+export const AWS_ORANGE = '#FF9900';
 
 export const HUAWEI_CHART_PALETTE = {
   colors: { light: '#946A00', dark: '#EBC04A' },
@@ -192,6 +205,7 @@ export const VENDOR_OKLCH_ZONES: Record<
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
   openai: { start: 290, end: 330, chroma: { light: 0.16, dark: 0.18 } },
   google: { start: 250, end: 275, chroma: { light: 0.16, dark: 0.18 } },
+  aws: { start: 60, end: 75, chroma: { light: 0.17, dark: 0.18 } },
   unknown: { start: 185, end: 235, chroma: { light: 0.12, dark: 0.14 } },
 };
 

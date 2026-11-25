@@ -20,9 +20,11 @@ import {
 import {
   includesJalapenoResult,
   includesTpuv7Result,
+  includesTrainium3Result,
   includesVeraRubinResult,
   JalapenoOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
+  Trainium3OfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 import { Card } from '@/components/ui/card';
@@ -677,6 +679,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
   const showsJalapenoPreview = includesJalapenoResult(legendHwKeys);
   const showsVeraRubinPreview = includesVeraRubinResult(legendHwKeys);
   const showsTpuv7Preview = includesTpuv7Result(legendHwKeys);
+  const showsTrainium3Preview = includesTrainium3Result(legendHwKeys);
 
   const caption = (
     <>
@@ -694,6 +697,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
       {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
       {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
+      {showsTrainium3Preview && <Trainium3OfficialPreviewNotice />}
     </>
   );
 
@@ -968,8 +972,8 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                       label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
                       tooltip={
                         locale === 'zh'
-                          ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                          : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                          ? '外部客户价格或内部持有成本；目前仅影响 TPUv7 和 Trainium3。'
+                          : 'External customer pricing or internal owner cost; currently affects only TPUv7 and Trainium3.'
                       }
                     />
                     <TcoBasisToggle source="first_token" className="md:h-9" />

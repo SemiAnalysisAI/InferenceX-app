@@ -47,6 +47,20 @@ export const TPUV7_PREVIEW_STRINGS = {
   },
 } as const;
 
+export const TRAINIUM3_PREVIEW_STRINGS = {
+  en: {
+    title: 'InferenceX Official Preview',
+    description:
+      'Trainium3 results are an official preview and may change as validation and publication continue.',
+    chartDetail: 'Results may change as validation and publication continue.',
+  },
+  zh: {
+    title: 'InferenceX 官方预览',
+    description: 'Trainium3 结果为官方预览；随着验证和发布工作的推进，数据可能会调整。',
+    chartDetail: '随着验证和发布工作的推进，结果可能会调整。',
+  },
+} as const;
+
 export const OFFICIAL_PREVIEW_SERIES = [
   {
     id: 'jalapeno-official-preview',
@@ -62,6 +76,11 @@ export const OFFICIAL_PREVIEW_SERIES = [
     id: 'tpuv7-official-preview',
     baseGpuKeys: ['tpuv7'],
     strings: TPUV7_PREVIEW_STRINGS,
+  },
+  {
+    id: 'trainium3-official-preview',
+    baseGpuKeys: ['trn3'],
+    strings: TRAINIUM3_PREVIEW_STRINGS,
   },
 ] as const;
 
@@ -87,11 +106,16 @@ export function includesTpuv7Result(hardwareKeys: Iterable<string>): boolean {
   return includesHardwareResult(hardwareKeys, OFFICIAL_PREVIEW_SERIES[2].baseGpuKeys);
 }
 
+export function includesTrainium3Result(hardwareKeys: Iterable<string>): boolean {
+  return includesHardwareResult(hardwareKeys, OFFICIAL_PREVIEW_SERIES[3].baseGpuKeys);
+}
+
 interface OfficialPreviewNoticeProps {
   strings:
     | typeof JALAPENO_PREVIEW_STRINGS
     | typeof VERA_RUBIN_PREVIEW_STRINGS
-    | typeof TPUV7_PREVIEW_STRINGS;
+    | typeof TPUV7_PREVIEW_STRINGS
+    | typeof TRAINIUM3_PREVIEW_STRINGS;
   testId: string;
   variant?: OfficialPreviewNoticeVariant;
 }
@@ -168,6 +192,18 @@ export function Tpuv7OfficialPreviewNotice({
     <OfficialPreviewNotice
       strings={TPUV7_PREVIEW_STRINGS}
       testId="tpuv7-official-preview-notice"
+      variant={variant}
+    />
+  );
+}
+
+export function Trainium3OfficialPreviewNotice({
+  variant,
+}: { variant?: OfficialPreviewNoticeVariant } = {}) {
+  return (
+    <OfficialPreviewNotice
+      strings={TRAINIUM3_PREVIEW_STRINGS}
+      testId="trainium3-official-preview-notice"
       variant={variant}
     />
   );

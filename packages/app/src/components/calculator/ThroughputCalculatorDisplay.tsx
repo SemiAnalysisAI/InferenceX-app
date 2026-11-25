@@ -44,9 +44,11 @@ import {
   includesJalapenoResult,
   includesVeraRubinResult,
   includesTpuv7Result,
+  includesTrainium3Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
+  Trainium3OfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -74,7 +76,12 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
 } from '@/lib/catalog/data-mappings';
-import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import {
+  getGpuSpecs,
+  getHardwareConfig,
+  getModelSortIndex,
+  hasInternalOwnerCost,
+} from '@/lib/catalog/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
@@ -214,7 +221,7 @@ const STRINGS = {
     tokenTypePlaceholder: 'Token type',
     tcoBasisLabel: 'TCO Basis',
     tcoBasisTooltip:
-      'Choose External customer pricing or Internal owner cost. Internal only changes hardware with a separate owner cost, currently TPUv7.',
+      'Choose External customer pricing or Internal owner cost. Internal only changes hardware with a separate owner cost, currently TPUv7 and Trainium3.',
     metricLabel: 'Metric',
     metricTooltip:
       'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), or cost per million tokens.',
@@ -278,7 +285,7 @@ const STRINGS = {
     tokenTypePlaceholder: 'token 类型',
     tcoBasisLabel: 'TCO 口径',
     tcoBasisTooltip:
-      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
+      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7 和 Trainium3。',
     metricLabel: '指标',
     metricTooltip:
       '图表中显示的比较指标。吞吐量（tok/s/chip）、能效（tok/s/MW）或每百万 token 成本。',
@@ -595,6 +602,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   );
   const showsTpuv7Preview = useMemo(
     () => includesTpuv7Result(results.map((result) => result.hwKey)),
+    [results],
+  );
+  const showsTrainium3Preview = useMemo(
+    () => includesTrainium3Result(results.map((result) => result.hwKey)),
     [results],
   );
   const barResultsKey = useMemo(
@@ -931,7 +942,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   }
 
   const showsTcoBasis =
-    scenarioShowsTcoBasis && barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7');
+    scenarioShowsTcoBasis && barResults.some((r) => hasInternalOwnerCost(r.hwKey));
 
   const secondaryConfig = (
     <>
@@ -1242,7 +1253,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   const captionContent = (
                     <>
                       {chartHeading}
-                      {(showsJalapenoPreview || showsVeraRubinPreview || showsTpuv7Preview) && (
+                      {(showsJalapenoPreview ||
+                        showsVeraRubinPreview ||
+                        showsTpuv7Preview ||
+                        showsTrainium3Preview) && (
                         <div className="mt-3 space-y-1">
                           {showsJalapenoPreview && (
                             <JalapenoOfficialPreviewNotice variant="inline" />
@@ -1251,6 +1265,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             <VeraRubinOfficialPreviewNotice variant="inline" />
                           )}
                           {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice variant="inline" />}
+                          {showsTrainium3Preview && (
+                            <Trainium3OfficialPreviewNotice variant="inline" />
+                          )}
                         </div>
                       )}
                     </>

@@ -396,9 +396,10 @@ describe('history projection version', () => {
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
       // approved under a receipt without one must be projected again. The walk skips type-only
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
-      // the publish endpoint took over merge provenance and reads stopped recomputing receipts; a
-      // recorded entry was approved by a receipt that still approves it, so entries are unchanged.
-      sources: '41a4d6d3ba8f137fe08ebd5a69c869b6cc058d1bb3c3eb00f7a98a7ba617f7a6',
+      // the publish endpoint took over merge provenance and reads stopped recomputing receipts (a
+      // recorded entry was approved by a receipt that still approves it), and after Trn3/TPU7x
+      // all-in power changed in gpu-keys (video entries read no power), so entries are unchanged.
+      sources: 'bc5f36cc4214c7400596773f489113162e51770a802ea8e80930da8d25ccf9d1',
     });
   });
 });
