@@ -150,7 +150,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     badgeLabel: 'TPU7x',
     sort: 11,
     tdp: 980,
-    power: 1.207,
+    power: 1.5,
     costh: 1.21,
     costr: 2,
   },
@@ -160,9 +160,9 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'Trainium3',
     badgeLabel: 'Trn3',
     sort: 12,
-    // TDP and all-in power are unverified placeholders, per adding-entities.md.
+    // TDP is an unverified placeholder, per adding-entities.md.
     tdp: 9.99,
-    power: 9.99,
+    power: 1.2,
     costh: 1.05,
     costr: 1.05,
   },
