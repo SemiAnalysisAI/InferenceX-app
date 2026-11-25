@@ -1188,7 +1188,12 @@ export default function ProfitEstimatorChart({
                   .attr('href', variant.href)
                   .attr('width', width)
                   .attr('height', ROW_MARK_HEIGHT_PX)
-                  .attr('x', Number(x) - textWidth - ROW_MARK_GAP_PX - width)
+                  // Glyphs can run wider than the estimate the label column is sized from, so keep
+                  // the mark inside the column instead of clipping it at the SVG edge.
+                  .attr(
+                    'x',
+                    Math.max(-margin.left, Number(x) - textWidth - ROW_MARK_GAP_PX - width),
+                  )
                   .attr('y', top + (lineHeight - ROW_MARK_HEIGHT_PX) / 2)
                   .attr('pointer-events', 'none');
               }
@@ -1198,7 +1203,7 @@ export default function ProfitEstimatorChart({
         });
       },
     }),
-    [labelMap, rowLabels, rowMarks],
+    [labelMap, rowLabels, rowMarks, margin.left],
   );
 
   const columnAxisConfig = useMemo(
