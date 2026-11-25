@@ -1,7 +1,7 @@
 import { frontierArea } from '@/components/inference/utils/best-series-per-sku';
+import { globalParetoFrontier } from '@/lib/charts/pareto-frontier';
 import { chipConfigKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import { engineSort } from './engines';
-import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
 import { isLossy, optimizationsOf } from './optimizations';
 import type { VideoPoint } from './metrics';
@@ -293,7 +293,7 @@ export function resultsChartSeries(
   const groups = Map.groupBy(plottedPoints(cells, selection), ({ point }) => seriesKey(point.cell));
   const series = [...groups].map(([key, plotted]): ResultsChartSeries => {
     const points = plotted.map(({ point }) => point);
-    const frontier = paretoFrontier(points, x.better, y.better);
+    const frontier = globalParetoFrontier(points, x.better === 'higher', y.better === 'higher');
     for (const point of frontier) point.optimal = true;
     return {
       key,

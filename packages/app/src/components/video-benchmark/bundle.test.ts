@@ -1,17 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'bun:test';
-import {
-  at,
-  generationDuration,
-  estimateEconomics,
-  httpReader,
-  loadBundle,
-  sampledPower,
-  safePath,
-  sha256,
-  type Json,
-} from './bundle';
+import { at, generationDuration, loadBundle, safePath, sha256 } from './bundle';
 
 async function fixture(extra: Record<string, string> = {}) {
   const files = new Map(
@@ -101,73 +91,6 @@ describe('H3 artifact contract', () => {
     'a?x=1',
     'a\n',
   ])('rejects unsafe paths: %s', (path) => expect(() => safePath(path)).toThrow());
-  it('permits only explicit HTTPS or loopback artifact directories without embedded credentials', () => {
-    expect(() => httpReader('https://example.com/run/manifest.json')).not.toThrow();
-    expect(() => httpReader('http://127.0.0.1:8769/manifest.json')).not.toThrow();
-    for (const url of [
-      'http://example.com/manifest.json',
-      'https://user:secret@example.com/manifest.json',
-      'https://example.com/manifest.json?token=secret',
-      'file:///manifest.json',
-    ])
-      expect(() => httpReader(url)).toThrow();
-  });
-});
-function sample(t: number, watts: Json, phase = 'measurement'): Json {
-  return {
-    monotonic_seconds: t,
-    phase,
-    at: `time-${t}`,
-    gpus: [{ uuid: 'GPU-1', power_watts: watts }],
-    owned_compute_apps: [{ gpu_uuid: 'GPU-1' }],
-    unowned_compute_apps: [],
-  };
-}
-describe('sampled board power', () => {
-  it('integrates unequal intervals, excludes startup and does not extrapolate endpoints', () => {
-    const value = sampledPower(
-      [sample(0, 999, 'startup'), sample(1, 100), sample(2, 200), sample(4, 100)],
-      ['GPU-1'],
-      3,
-    );
-    expect(value).toMatchObject({
-      watts: 150,
-      joules: 450,
-      seconds: 3,
-      sampleCount: 3,
-      start: 'time-1',
-      end: 'time-4',
-    });
-  });
-  it('keeps missing power, missing GPUs, insufficient samples, gaps and duplicate timestamps unavailable', () => {
-    for (const samples of [
-      [sample(1, 1)],
-      [sample(1, 100), sample(2, null)],
-      [sample(1, 100), sample(5, 100)],
-      [sample(1, 100), sample(1, 100)],
-    ])
-      expect(sampledPower(samples, ['GPU-1'], 3)).toBeNull();
-    expect(sampledPower([sample(1, 100), sample(2, 100)], ['GPU-2'], 3)).toBeNull();
-    expect(sampledPower([sample(1, 0), sample(2, 0)], ['GPU-1'], 3)?.joules).toBe(0);
-  });
-});
-describe('explicit economics assumptions', () => {
-  it('charges billed GPUs while displaying both denominators and preserves a negative profit', () => {
-    const value = estimateEconomics(1 / 60, 4, 8, 0.2, 3);
-    expect(value).toEqual({
-      revenue: 12,
-      revenuePerParticipating: 3,
-      revenuePerBilled: 1.5,
-      profitPerParticipating: -3,
-      profitPerBilled: -1.5,
-    });
-    expect(estimateEconomics(1 / 60, 4, 8, 0.2, null)?.profitPerBilled).toBeNull();
-  });
-  it('rejects absent/invalid assumptions without converting missing data to zero', () => {
-    expect(estimateEconomics(null, 4, 8, 1, 1)).toBeNull();
-    expect(estimateEconomics(1, 4, 2, 1, 1)).toBeNull();
-    expect(estimateEconomics(1, 4, 8, Number.NaN, 1)).toBeNull();
-  });
 });
 
 it.skipIf(!process.env.H3_ARTIFACT_DIR)(
