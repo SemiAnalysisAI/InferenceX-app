@@ -710,8 +710,13 @@ export function InferenceProvider({
   const requestedHwKeysRef = useRef<ReadonlySet<string> | null>(null);
   // Model, sequence and precision picks render as transitions, and the hardware reset below runs
   // only once one lands. Until then the legend still shows the old scope, and a click there commits
-  // first. Holds the pick until its reset, with the hardware the reader chose since, which wins.
-  const scopePickRef = useRef<{ hardware: Set<string> | null } | null>(null);
+  // first. Holds the pick until its reset, with the hardware the reader chose since, which wins,
+  // and the best-per-SKU choice and defaults flag the pick left, for when none of it carries over.
+  const scopePickRef = useRef<{
+    hardware: Set<string> | null;
+    bestPerSku: boolean | null;
+    defaultsOverridden: boolean | 'page';
+  } | null>(null);
 
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
@@ -901,16 +906,17 @@ export function InferenceProvider({
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
       if (v !== selectedModel) {
-        scopePickRef.current = { hardware: null };
+        const bestPerSkuReset = activeTab === 'inference' ? null : false;
+        const defaultsOverridden =
+          initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false;
+        scopePickRef.current = { hardware: null, bestPerSku: bestPerSkuReset, defaultsOverridden };
         if (activeTab === 'inference' && v === Model.Qwen3_5) {
           setRequestedXAxisMode(null);
         }
-        setBestPerSku(activeTab === 'inference' ? null : false);
+        setBestPerSku(bestPerSkuReset);
         setPendingActiveHwTypes(null);
         requestedHwKeysRef.current = null;
-        setHardwareDefaultsOverridden(
-          initialActiveHwTypes?.length || autoSelectAllGpus ? 'page' : false,
-        );
+        setHardwareDefaultsOverridden(defaultsOverridden);
       }
       setSelectedModel(v);
       clearScopedSelectionOnChange();
@@ -926,15 +932,33 @@ export function InferenceProvider({
   );
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
-      if (v !== effectiveSequence) scopePickRef.current = { hardware: null };
+      if (v !== effectiveSequence) {
+        scopePickRef.current = {
+          hardware: null,
+          bestPerSku: bestPerSkuChoice,
+          defaultsOverridden: hardwareDefaultsOverridden,
+        };
+      }
       setSelectedSequence(v);
       clearScopedSelectionOnChange();
     },
-    [effectiveSequence, setSelectedSequence, clearScopedSelectionOnChange],
+    [
+      effectiveSequence,
+      bestPerSkuChoice,
+      hardwareDefaultsOverridden,
+      setSelectedSequence,
+      clearScopedSelectionOnChange,
+    ],
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
-      if (v.join(',') !== effectivePrecisions.join(',')) scopePickRef.current = { hardware: null };
+      if (v.join(',') !== effectivePrecisions.join(',')) {
+        scopePickRef.current = {
+          hardware: null,
+          bestPerSku: bestPerSkuChoice,
+          defaultsOverridden: hardwareDefaultsOverridden,
+        };
+      }
       if (activeTab === 'inference' && selectedModel === Model.Qwen3_5) {
         setRequestedXAxisMode(null);
       }
@@ -945,6 +969,8 @@ export function InferenceProvider({
       activeTab,
       selectedModel,
       effectivePrecisions,
+      bestPerSkuChoice,
+      hardwareDefaultsOverridden,
       setSelectedPrecisions,
       clearScopedSelectionOnChange,
     ],
@@ -1467,18 +1493,25 @@ export function InferenceProvider({
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
     if (modelChanged) preferredHwTypesRef.current = new Set();
-    const pickedHardware = scopeChanged ? scopePickRef.current?.hardware : null;
+    const scopePick = scopeChanged ? scopePickRef.current : null;
     if (scopeChanged) scopePickRef.current = null;
-    if (pickedHardware && !bestPerSku) {
-      const kept = new Set([...pickedHardware].filter((key) => selectableHwTypes.has(key)));
+    let best = bestPerSku;
+    let defaultsOverridden = hardwareDefaultsOverridden;
+    if (scopePick?.hardware && !bestPerSku) {
+      const kept = new Set([...scopePick.hardware].filter((key) => selectableHwTypes.has(key)));
       if (kept.size > 0) {
         setActiveHwTypes(exclusion ? resolveHwSelection(kept, previousSelection).result : kept);
         return;
       }
+      // None of it carries over, so the new scope starts as the pick left it, not as the click did.
+      best = scopePick.bestPerSku ?? bestPerSkuDefault;
+      defaultsOverridden = scopePick.defaultsOverridden;
+      setBestPerSku(scopePick.bestPerSku);
+      setHardwareDefaultsOverridden(scopePick.defaultsOverridden);
     }
     // Loading an overlay changes the scope; keep the page's request instead of the defaults.
     const request = requestedHwKeysRef.current;
-    if (request && requestedHwActiveRef.current && !bestPerSku) {
+    if (request && requestedHwActiveRef.current && !best) {
       const matched = matchRequestedHw(request, selectableHwTypes);
       if (matched.size > 0) {
         const selection = exclusion
@@ -1498,15 +1531,13 @@ export function InferenceProvider({
         return;
       }
     }
-    const candidates = bestPerSku ? bestHwTypes : selectableHwTypes;
+    const candidates = best ? bestHwTypes : selectableHwTypes;
     const automaticSelection =
-      activeTab === 'inference' && !hardwareDefaultsOverridden
-        ? automaticHardware(candidates)
-        : candidates;
+      activeTab === 'inference' && !defaultsOverridden ? automaticHardware(candidates) : candidates;
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
-      if (droppedGroups.length > 0 && hardwareDefaultsOverridden === true) {
+      if (droppedGroups.length > 0 && defaultsOverridden === true) {
         setEngineConflict({
           kind: 'resolved',
           ...exclusionResolutionFamilies(automaticSelection, result, exclusion),
@@ -1523,6 +1554,7 @@ export function InferenceProvider({
     selectableHwTypes,
     bestHwTypes,
     bestPerSku,
+    bestPerSkuDefault,
     exclusion,
     pendingActiveHwTypes,
     resolveHwSelection,

@@ -38,17 +38,21 @@ mock.module('@/providers/unofficial-run-provider', () => ({
 await loadSystemPowerModeler();
 
 const DATE = '2026-06-12';
-const MODELS = [Model.DeepSeek_V4_Pro, Model.Kimi_K3];
-const HARDWARE = ['b200', 'b300', 'h200'];
+// DeepSeek V4 Pro and Kimi K3 run vLLM on the same three chips at both precisions, so a pick
+// between them never changes which legend entries exist. Qwen 3.5 lacks B200, and its defaults
+// leave H200 off, so it starts with less hardware than it has.
+const HARDWARE = new Map<Model, string[]>([
+  [Model.DeepSeek_V4_Pro, ['b200', 'b300', 'h200']],
+  [Model.Kimi_K3, ['b200', 'b300', 'h200']],
+  [Model.Qwen3_5, ['b300', 'h200']],
+]);
 const PRECISIONS = [Precision.FP4, Precision.FP8];
 const SOLO_KEY = 'b300_vllm';
 
-// Both models run vLLM on the same three chips at both precisions, so a pick never changes which
-// legend entries exist, only which hardware the new scope starts with.
 const AVAILABILITY = compactAvailability(
-  MODELS.flatMap((model) =>
+  [...HARDWARE].flatMap(([model, hardwareKeys]) =>
     PRECISIONS.flatMap((precision) =>
-      HARDWARE.map((hardware): AvailabilityRow => ({
+      hardwareKeys.map((hardware): AvailabilityRow => ({
         model: DISPLAY_MODEL_TO_DB[model]![0]!,
         precision,
         hardware,
@@ -66,7 +70,7 @@ const AVAILABILITY = compactAvailability(
 let nextRowId = 1;
 const benchmarkRows = (model: Model): BenchmarkRow[] =>
   PRECISIONS.flatMap((precision) =>
-    HARDWARE.flatMap((hardware) =>
+    HARDWARE.get(model)!.flatMap((hardware) =>
       [16, 64].map(
         (conc) =>
           ({
@@ -106,7 +110,7 @@ const benchmarkRows = (model: Model): BenchmarkRow[] =>
       ),
     ),
   );
-const ROWS = new Map(MODELS.map((model) => [model as string, benchmarkRows(model)]));
+const ROWS = new Map([...HARDWARE.keys()].map((model) => [model as string, benchmarkRows(model)]));
 
 const fetchMock = vi.fn((input: string) => {
   const url = new URL(input, 'http://localhost');
@@ -153,7 +157,10 @@ async function settle(until: () => boolean): Promise<void> {
   for (let pass = 0; pass < 5; pass++) await act(() => sleep(0));
 }
 
-const chartReady = () => !loading && hwTypesWithData.size === HARDWARE.length;
+const chartReady = () =>
+  !loading &&
+  selectedModel !== null &&
+  hwTypesWithData.size === HARDWARE.get(selectedModel)!.length;
 
 async function mount() {
   act(() =>
@@ -238,5 +245,18 @@ describe('a legend pick made while a scope pick is still rendering', () => {
 
     expect(selectedModel).toBe(Model.Kimi_K3);
     expect([...activeHwTypes].toSorted()).toEqual(defaults);
+  });
+
+  it('gives way to the new model defaults when the new model has none of that hardware', async () => {
+    await mount();
+
+    act(() => {
+      pickModel(Model.Qwen3_5);
+      actions!.toggleHwType('b200_vllm');
+    });
+    await settle(() => selectedModel === Model.Qwen3_5 && chartReady());
+
+    expect(selectedModel).toBe(Model.Qwen3_5);
+    expect([...activeHwTypes]).toEqual([SOLO_KEY]);
   });
 });
