@@ -62,9 +62,11 @@ import {
   includesJalapenoResult,
   includesVeraRubinResult,
   includesTpuv7Result,
+  includesTrainium3Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
+  Trainium3OfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 import { metricChartTitle, metricLabel } from '@/lib/charts/chart-utils';
 import { frameworkDasharray } from '@/lib/charts/framework-dash';
@@ -444,6 +446,7 @@ export default function HistoricalTrendsDisplay() {
   const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
   const showsTpuv7Preview = includesTpuv7Result(lineConfigs.map((config) => config.hwKey));
+  const showsTrainium3Preview = includesTrainium3Result(lineConfigs.map((config) => config.hwKey));
 
   // Chart heading: model, workload and the view's title, with the result's preview notices.
   const caption = (title: string, qualifier: string | null) => (
@@ -462,6 +465,7 @@ export default function HistoricalTrendsDisplay() {
       {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
       {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
       {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
+      {showsTrainium3Preview && <Trainium3OfficialPreviewNotice />}
     </>
   );
 

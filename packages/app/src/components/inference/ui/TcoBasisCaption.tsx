@@ -5,6 +5,7 @@ import { isCostMetric } from '@/components/ui/chart-display-helpers';
 import { InfoHelp } from '@/components/ui/option-info';
 import { CaptionField } from '@/components/ui/result-context';
 import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+import { hasInternalOwnerCost } from '@/lib/catalog/constants';
 import { showsTcoBasisSelector } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
@@ -15,14 +16,14 @@ const STRINGS = {
     external: 'External',
     internal: 'Internal',
     tooltip:
-      'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
+      'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7 and Trainium3.',
   },
   zh: {
     label: 'TCO 口径',
     external: '外部',
     internal: '内部',
     tooltip:
-      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
+      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7 和 Trainium3。',
   },
 } as const;
 
@@ -44,7 +45,7 @@ export function TcoBasisCaption({
   if (
     !isCostMetric(selectedYAxisMetric) ||
     !showsTcoBasisSelector(selectedModel, selectedSequence) ||
-    ![...hardwareKeys].some((key) => key.split('_')[0] === 'tpuv7')
+    ![...hardwareKeys].some(hasInternalOwnerCost)
   ) {
     return null;
   }

@@ -17,9 +17,11 @@ import {
   includesJalapenoResult,
   includesVeraRubinResult,
   includesTpuv7Result,
+  includesTrainium3Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
+  Trainium3OfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -550,6 +552,9 @@ export default function FleetLifecycle({
   const showsTpuv7Preview = includesTpuv7Result(
     visibleHistoricalProgressions.map((progression) => progression.hwKey),
   );
+  const showsTrainium3Preview = includesTrainium3Result(
+    visibleHistoricalProgressions.map((progression) => progression.hwKey),
+  );
 
   const anchorDate = useMemo(() => {
     if (releaseDate) return releaseDate;
@@ -898,6 +903,7 @@ export default function FleetLifecycle({
       {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
       {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
       {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
+      {showsTrainium3Preview && <Trainium3OfficialPreviewNotice />}
     </>
   );
 

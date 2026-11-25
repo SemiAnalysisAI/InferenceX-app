@@ -1786,8 +1786,8 @@ function ProfitEstimatorInner({
                           label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
                           tooltip={
                             locale === 'zh'
-                              ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                              : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                              ? '外部客户价格或内部持有成本；目前仅影响 TPUv7 和 Trainium3。'
+                              : 'External customer pricing or internal owner cost; currently affects only TPUv7 and Trainium3.'
                           }
                         />
                         <TcoBasisToggle source="profit" className="md:h-9" />
