@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import history from '../../../cypress/fixtures/api/video-history.json';
 import { at, type Json } from './bundle';
-import { caseKey, caseRecords, compareSide, pairCases, type CaseRecord } from './compare';
+import { caseRecords, compareSide } from './compare';
 import type { VideoHistoryPage } from './history';
 import { qualifies, videoPoints } from './points';
 import { servingCells } from './serving';
@@ -96,52 +96,13 @@ describe('caseRecords', () => {
       mediaPath: null,
     });
     expect(records[1]).toMatchObject({ mediaPath: null, seconds: null, valid: null });
-    // A slot that names no plan case and carries no identity has nothing to pair on.
+    // A slot that names no plan case carries no identity.
     set(at(run, 'records', 3), 'slot_id', 'measurement-r003');
-    expect(caseKey(caseRecords({ run, runPath: 'gpu/c1/baseline/run.json' })[2])).toBeNull();
-  });
-});
-
-const records = (requests: number) =>
-  caseRecords(servingCells(servingFixture('1', 'NVIDIA H100 80GB HBM3', requests))[0]);
-
-describe('pairCases', () => {
-  it('pairs the k-th repetition of a prompt + seed on each side and counts the rest', () => {
-    const { pairs, unmatched } = pairCases(records(4), records(6));
-    expect(pairs).toHaveLength(4);
-    expect(pairs.map((p) => p.repetition)).toEqual([0, 1, 2, 3]);
-    expect(pairs[1]).toMatchObject({
-      caseId: 'drum-taps',
-      prompt: 'A drummer taps a snare drum.',
-      seed: 11,
-      baseline: { slotId: 'measurement-r002-c001' },
-      candidate: { slotId: 'measurement-r002-c001' },
-    });
-    expect(unmatched).toEqual({ baseline: 0, candidate: 2 });
-    expect(pairCases(records(6), records(4)).unmatched).toEqual({ baseline: 2, candidate: 0 });
-  });
-  it('never pairs different seeds or records without identity', () => {
-    const other = records(4).map((r): CaseRecord => ({ ...r, seed: 12 }));
-    expect(pairCases(records(4), other)).toEqual({
-      pairs: [],
-      unmatched: { baseline: 4, candidate: 4 },
-    });
-    const blank = records(2).map((r): CaseRecord => ({
-      ...r,
+    expect(caseRecords({ run, runPath: 'gpu/c1/baseline/run.json' })[2]).toMatchObject({
       caseId: null,
       prompt: null,
       seed: null,
-    }));
-    expect(pairCases(blank, records(2)).unmatched).toEqual({ baseline: 2, candidate: 2 });
-  });
-  it('falls back to the case id only when prompt or seed is unknown', () => {
-    const [record] = records(1);
-    expect(caseKey(record)).toBe('ps\u000011\u0000A drummer taps a snare drum.');
-    expect(caseKey({ ...record, seed: null })).toBe('id\u0000drum-taps');
-    expect(caseKey({ ...record, prompt: null, caseId: null })).toBeNull();
-    const byId = pairCases([{ ...record, seed: null }], [{ ...record, prompt: null }]);
-    expect(byId.pairs).toHaveLength(1);
-    expect(byId.pairs[0]).toMatchObject({ prompt: 'A drummer taps a snare drum.', seed: 11 });
+    });
   });
 });
 

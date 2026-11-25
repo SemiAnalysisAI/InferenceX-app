@@ -61,8 +61,6 @@ const b200: VideoPoint = {
   enforcedLimitW: 4000,
 };
 const opts: MetricOptions = { tier: 'h' };
-// H3 768p list price captured 2026-09-19, USD per video-second.
-const priced: MetricOptions = { ...opts, apiPricePerVideoSecond: 0.034 };
 
 describe('video metrics', () => {
   it('derives throughput per GPU-hour from valid clips, wall time and participating GPUs', () => {
@@ -100,37 +98,8 @@ describe('video metrics', () => {
       metricValue(h200, 'videosPerDollar', opts)! * metricValue(h200, 'dollarsPerVideo', opts)!,
     ).toBeCloseTo(1, 12);
   });
-  it('exposes latency, energy and board power against the enforced limit', () => {
-    expect(metricValue(h200, 'p90Latency', opts)).toBeCloseTo(151.105, 3);
-    expect(metricValue(h200, 'p50Latency', opts)).toBeCloseTo(150.614, 3);
+  it('reports GPU-board energy per video', () => {
     expect(metricValue(h200, 'kjPerVideo', opts)).toBeCloseTo(410.954, 2);
-    expect(metricValue(h200, 'powerPctCap', opts)).toBeCloseTo(97.41, 1);
-    expect(metricValue(b200, 'powerPctCap', opts)).toBeCloseTo(96.4, 1);
-  });
-  it('prices the clip at the API list price, independent of hardware and tier', () => {
-    // 0.034 $/video-s × 8 s clip.
-    expect(metricValue(h200, 'apiPricePerVideo', priced)).toBeCloseTo(0.272, 6);
-    expect(metricValue(h100, 'apiPricePerVideo', { ...priced, tier: 'r' })).toBeCloseTo(0.272, 6);
-    expect(
-      metricValue({ ...b200, hardwareKey: null, wallSeconds: null }, 'apiPricePerVideo', priced),
-    ).toBeCloseTo(0.272, 6);
-    expect(
-      metricValue(h200, 'apiPricePerVideo', { ...priced, apiPricePerVideoSecond: 0.047 }),
-    ).toBeCloseTo(0.376, 6);
-  });
-  it('returns null for the API list price without a positive price or clip length', () => {
-    expect(metricValue(h200, 'apiPricePerVideo', opts)).toBeNull();
-    for (const price of [null, 0, -0.01, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(
-        metricValue(h200, 'apiPricePerVideo', { ...opts, apiPricePerVideoSecond: price }),
-      ).toBeNull();
-    }
-    expect(metricValue({ ...h200, durationSeconds: null }, 'apiPricePerVideo', priced)).toBeNull();
-    expect(metricValue({ ...h200, durationSeconds: 0 }, 'apiPricePerVideo', priced)).toBeNull();
-    // The price never leaks into the TCO metrics.
-    expect(metricValue(h200, 'dollarsPerVideo', priced)).toBe(
-      metricValue(h200, 'dollarsPerVideo', opts),
-    );
   });
   it('returns null instead of zero for missing inputs', () => {
     const broken: VideoPoint = {
@@ -139,7 +108,6 @@ describe('video metrics', () => {
       energyKj: null,
       valid: 0,
       wallSeconds: null,
-      enforcedLimitW: null,
     };
     for (const id of [
       'videosPerDollar',
@@ -148,12 +116,10 @@ describe('video metrics', () => {
       'kjPerVideo',
     ] as const)
       expect(metricValue(broken, id, opts)).toBeNull();
-    expect(metricValue(broken, 'powerPctCap', opts)).toBeNull();
     expect(metricValue({ ...h200, participating: null }, 'videosPerGpuHour', opts)).toBeNull();
     expect(metricValue({ ...h200, participating: 0 }, 'videosPerGpuHour', opts)).toBeNull();
     expect(metricValue({ ...h200, participating: 2.5 }, 'videosPerGpuHour', opts)).toBeNull();
     expect(metricValue({ ...h200, energyKj: 0 }, 'kjPerVideo', opts)).toBeNull();
-    expect(metricValue({ ...h200, avgPowerW: 0 }, 'powerPctCap', opts)).toBeNull();
     // Hardware outside HW_REGISTRY has a rate but no price.
     expect(
       metricValue({ ...h200, hardwareKey: 'unknown-gpu' }, 'videosPerGpuHour', opts),

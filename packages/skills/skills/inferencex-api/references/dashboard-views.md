@@ -547,8 +547,7 @@ which API selectors belong together.
 
 With no `run`/`artifact`, `/api/v1/views/video` returns the results overview
 (`view=overview`, see [VideoGenX results overview](#videogenx-results-overview)),
-not CI discovery. `view=dashboard`, `view=compare` and every `v_*` selector were
-removed and return 400. Legacy stored sources remain in
+not CI discovery. Legacy stored sources remain in
 stored History but cannot enter default charts without a matching immutable
 publication receipt. Authorization to publish is separate from benchmark qualification.
 All public video GET paths, including a `format=media` cache miss, are read-only;
@@ -561,8 +560,7 @@ the miss returns 204. Read resolved `params`. Unknown/repeated query names retur
   newest cell is present. `coverage.pagesRead`, `coverage.nextPage` and
   `coverage.truncated` describe the paged window; this is not all-history or
   date-range coverage. `/vgx`, the overview and that read of older deployments
-  admit a cell with one rule: a complete 20-clip run at concurrency 1 of a known
-  workload on listed hardware, with at least 10 valid samples.
+  share the admission rule stated under `r_model` and `r_workload` below.
 - A History read whose index or approval receipt could not be read returns 502:
   retry instead of treating fewer cells as complete. A failed live read of an
   unstored `unofficialrun` returns its source status instead of an empty overlay.
@@ -1156,13 +1154,13 @@ admits another run and clearing it cannot promote unapproved evidence. Dismissal
 retains a workload selector only if it remains in the approved choices. Approved
 cohorts retain default preference; a workload found only in the named run requires
 explicit selection or no matching approved cohort. Both channels use the same
-qualification and metric rules. Legacy dashboard/compare views stay approved-only.
+qualification and metric rules.
 The overview returns JSON by default. `format=csv` is available only with `view=overview`; it exports the current official and named cells with exact source/workload/run/artifact identity, approval, units and participating/allocated GPU costs. `duration_s` retains the requested plan duration; `video_seconds_per_s`, next to `clips_per_s`, reports validated decoded output seconds per wall second. Empty CSV cells mean missing evidence. The response is private and no-store.
 
 中文：默认结果必须有匹配的发布批准记录。指定运行的通道只包含该运行，保留实际批准状态；
 清除叠加运行后不会将未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。默认优先选择有已批准结果的工作负载；
 仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。两条通道共用准入和计算规则。
-旧 dashboard/compare 视图仍仅接纳已批准结果。overview 默认返回 JSON；仅 `view=overview` 接受 `format=csv`，导出当前筛选的正式及指定运行数据点，保留来源与批准状态、单位及参与/已分配 GPU 成本。`duration_s` 保留计划请求时长；紧邻 `clips_per_s` 的 `video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。空单元格表示缺失数据，CSV 响应设置 `Cache-Control: private, no-store`。
+overview 默认返回 JSON；仅 `view=overview` 接受 `format=csv`，导出当前筛选的正式及指定运行数据点，保留来源与批准状态、单位及参与/已分配 GPU 成本。`duration_s` 保留计划请求时长；紧邻 `clips_per_s` 的 `video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。空单元格表示缺失数据，CSV 响应设置 `Cache-Control: private, no-store`。
 
 ### Landing-page Huawei link
 

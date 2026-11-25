@@ -50,15 +50,10 @@ export interface VideoPoint {
   approved?: boolean;
 }
 
-export type XMetricId = 'p90Latency' | 'p50Latency';
-export type YMetricId = 'videosPerDollar' | 'dollarsPerVideo' | 'videosPerGpuHour' | 'kjPerVideo';
-/** Axis metrics plus mean board power against its limit and the API list price. */
-export type MetricId = XMetricId | YMetricId | 'powerPctCap' | 'apiPricePerVideo';
+export type MetricId = 'videosPerDollar' | 'dollarsPerVideo' | 'videosPerGpuHour' | 'kjPerVideo';
 
 export interface MetricOptions {
   tier: CostTier;
-  /** USD an API bills per video-second of the same clip. Missing or non-positive → the API list price is null. */
-  apiPricePerVideoSecond?: number | null;
 }
 
 export const COST_TIERS: readonly CostTier[] = ['h', 'r'];
@@ -103,14 +98,6 @@ export function metricValue(
 ): number | null {
   let value: number | null = null;
   switch (id) {
-    case 'p90Latency': {
-      value = point.p90;
-      break;
-    }
-    case 'p50Latency': {
-      value = point.p50;
-      break;
-    }
     case 'videosPerGpuHour': {
       value = videosPerGpuHour(point);
       break;
@@ -126,20 +113,6 @@ export function metricValue(
     }
     case 'kjPerVideo': {
       value = positive(point.energyKj) ? point.energyKj : null;
-      break;
-    }
-    case 'powerPctCap': {
-      value =
-        positive(point.avgPowerW) && positive(point.enforcedLimitW)
-          ? (point.avgPowerW / point.enforcedLimitW) * 100
-          : null;
-      break;
-    }
-    case 'apiPricePerVideo': {
-      // List price × clip length; the reader's override is validated upstream.
-      const price = options.apiPricePerVideoSecond;
-      value =
-        positive(price) && positive(point.durationSeconds) ? price * point.durationSeconds : null;
       break;
     }
   }

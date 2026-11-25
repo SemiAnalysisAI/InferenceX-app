@@ -184,7 +184,7 @@ beforeEach(() => {
   });
 });
 
-describe('published VideoGenX dashboard projection', () => {
+describe('VideoGenX view API', () => {
   it('prefers the older slower named clip over a faster official clip on the same hardware', async () => {
     const named = referenceQualityFixture(20);
     const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64));
@@ -564,7 +564,7 @@ describe('VideoGenX qualification', () => {
       [entry('1', [{ ...h100, id: 'full' }])],
       ['full'],
     ],
-  ])('gives the API and /vgx the same cells for %s', async (_name, window, older, cells) => {
+  ])('gives the API and /vgx the same cells for %s', async (_name, window, older, expected) => {
     const history: VideoHistoryPage = {
       schemaVersion: 1,
       nextPage: null,
@@ -577,11 +577,11 @@ describe('VideoGenX qualification', () => {
     );
     const response = await GET(request());
     const body = await response.json();
-    expect(body.cells.map((cell: { point: { id: string } }) => cell.point.id)).toEqual(cells);
+    expect(body.cells.map((cell: { point: { id: string } }) => cell.point.id)).toEqual(expected);
     expect(
       resultProjection(videoPoints([history]), parseResultsState('')).cells.map(
         (cell) => cell.point.id,
       ),
-    ).toEqual(cells);
+    ).toEqual(expected);
   });
 });

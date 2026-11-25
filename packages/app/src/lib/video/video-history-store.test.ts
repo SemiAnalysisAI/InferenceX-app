@@ -6,7 +6,6 @@ import { mocked, stubEnv, unstubAllEnvs } from '@/test/helpers';
 import { BlobNotFoundError, del, head, list, put, type HeadBlobResult } from '@vercel/blob';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
-import { qualifies, videoPoints } from '@/components/video-benchmark/points';
 import { servingArtifact } from '../../../cypress/support/video-artifacts';
 import {
   publishedVideoHistory as publishedVideoHistoryRead,
@@ -207,13 +206,6 @@ describe('published video history', () => {
     const page = await publishedVideoHistory(1, VIDEO_HISTORY_MAX_PAGES);
     expect(page.nextPage).toBe(VIDEO_HISTORY_MAX_PAGES + 1);
     expect(page.entries.at(-1)?.runId).toBe('100');
-    expect(
-      new Set(
-        videoPoints([page])
-          .filter(qualifies)
-          .map((cell) => cell.hardwareKey),
-      ),
-    ).toEqual(new Set(['h100', 'h200']));
   });
 
   it('lists every index page, orders by publication date, and reads only ten unapproved indexes', async () => {
@@ -397,7 +389,7 @@ describe('history projection version', () => {
       projection: 8,
       // Projection 8: a cell's energy and power need a power document whose verdict is true, and
       // entries no longer carry clipsGpuHour, so entries recorded under 7 must be projected again.
-      sources: '71eccd710c92825b25f52f06f1c26bacf7ac332075b8d1df1d303af8cd2292b8',
+      sources: '8a8af4e9897fa5c5cb9f2cea108bffe13d5c419f94da965ad14c86629a324e1a',
     });
   });
 });

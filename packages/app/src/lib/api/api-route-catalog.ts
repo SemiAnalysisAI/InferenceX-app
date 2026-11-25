@@ -1710,7 +1710,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: '714599ea787469f7ed52fd5814d0ede91a7ec3dc255cfcba768473ed521748fd',
+    sourceSha256: '442a1813fac098b9b683ca5b49abc75384635e4dc0e79903a2a7e1c3f38d88e7',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1734,7 +1734,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/compare.ts',
-    sourceSha256: '460e6486a1d262c30b6f15b585fdfd7d6ddf938efd6726b51ba6c8e1cc56de34',
+    sourceSha256: 'fce48f6f55b57a3bcc85807b1e12c7870fa221cf337c5e16d4f876f1f9edb88e',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
