@@ -211,17 +211,24 @@ describe('getHardwareConfig', () => {
     expect(getHardwareConfig('b200_vllm_mtp').suffix).toBe('(vLLM, MTP)');
   });
 
-  it('registered power is positive for every published hardware entry', () => {
+  it('registers a positive TDP and a positive or unpublished all-in power for every entry', () => {
     for (const entry of Object.values(HW_REGISTRY)) {
-      expect(entry.power).toBeGreaterThan(0);
       expect(entry.tdp).toBeGreaterThan(0);
+      if (entry.power !== null) expect(entry.power).toBeGreaterThan(0);
     }
   });
 
-  it('HW_REGISTRY has non-negative cost rates for all entries', () => {
+  it('registers each cost tier as a positive rate or unpublished (null)', () => {
     for (const entry of Object.values(HW_REGISTRY)) {
-      expect(entry.costh).toBeGreaterThanOrEqual(0);
-      expect(entry.costr).toBeGreaterThanOrEqual(0);
+      for (const rate of [entry.costh, entry.costr]) {
+        if (rate !== null) expect(rate).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('never registers the old 9.99 placeholder as a power or cost value', () => {
+    for (const [gpu, entry] of Object.entries(HW_REGISTRY)) {
+      expect([gpu, entry.power, entry.costh, entry.costr]).not.toContain(9.99);
     }
   });
 
@@ -229,9 +236,14 @@ describe('getHardwareConfig', () => {
     for (const [gpu, entry] of Object.entries(HW_REGISTRY)) {
       for (const tier of ['costh', 'costr'] as const) {
         const value = entry[tier];
+        if (value === null) continue;
         expect(`${gpu}.${tier}=${value}`).toBe(`${gpu}.${tier}=${Math.round(value * 100) / 100}`);
       }
     }
+  });
+
+  it('leaves A100 rental and all-in power unpublished until the TCO model has them', () => {
+    expect(HW_REGISTRY.a100).toMatchObject({ power: null, costh: 0.78, costr: null });
   });
 
   it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
@@ -254,6 +266,10 @@ describe('getHardwareConfig', () => {
 });
 
 describe('getGpuSpecs', () => {
+  it('reads unpublished A100 rental and power as 0, like unregistered hardware', () => {
+    expect(getGpuSpecs('a100')).toMatchObject({ power: 0, costh: 0.78, costr: 0 });
+  });
+
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
     expect(specs.tdp).toBe(700);
@@ -284,9 +300,9 @@ describe('getGpuSpecs', () => {
   it('returns registry external rates for all base GPUs in HW_REGISTRY', () => {
     for (const [base, entry] of Object.entries(HW_REGISTRY)) {
       const result = getGpuSpecs(base, 'external');
-      expect(result.power).toBe(entry.power);
+      expect(result.power).toBe(entry.power ?? 0);
       expect(result.tdp).toBe(entry.tdp);
-      expect(result.costh).toBe(entry.costh);
+      expect(result.costh).toBe(entry.costh ?? 0);
     }
   });
 

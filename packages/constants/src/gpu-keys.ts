@@ -5,9 +5,19 @@ export interface HwEntry {
   badgeLabel?: string;
   sort: number;
   tdp: number;
-  power: number;
-  costh: number;
-  costr: number;
+  /** All-in kW per GPU; null when no modeled value is published. */
+  power: number | null;
+  /** $/GPU/hr owning at hyperscaler volume; null when unpublished. */
+  costh: number | null;
+  /** $/GPU/hr renting on a 3-year commit; null when unpublished. */
+  costr: number | null;
+}
+
+/** A registry entry whose all-in power and both cost tiers are published. */
+export type PublishedHwEntry = HwEntry & { power: number; costh: number; costr: number };
+
+export function isPublishedHwEntry(entry: HwEntry): entry is PublishedHwEntry {
+  return entry.power !== null && entry.costh !== null && entry.costr !== null;
 }
 
 export const HW_REGISTRY: Record<string, HwEntry> = {
@@ -37,10 +47,10 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     label: 'A100',
     sort: 7.5,
     tdp: 400,
-    // All-in power and rental pricing are unverified placeholders, per adding-entities.md.
-    power: 9.99,
+    // No published all-in power or 3-year rental rate yet.
+    power: null,
     costh: 0.78,
-    costr: 9.99,
+    costr: null,
   },
   h200: {
     vendor: 'NVIDIA',

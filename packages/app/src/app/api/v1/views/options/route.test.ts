@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/options', () => {
-  it('exposes A100 with the hyperscaler ownership assumption', async () => {
+  it('exposes A100 ownership and leaves its unpublished rental rate null', async () => {
     const res = await GET(request('/api/v1/views/options'));
     const body = await res.json();
     expect(body.hardware.find((hw: { key: string }) => hw.key === 'a100')).toMatchObject({
@@ -26,7 +26,7 @@ describe('GET /api/v1/views/options', () => {
       vendor: 'NVIDIA',
       arch: 'Ampere',
       tdpW: 400,
-      costPerHour: { h: 0.78, r: 9.99 },
+      costPerHour: { h: 0.78, r: null },
     });
   });
 

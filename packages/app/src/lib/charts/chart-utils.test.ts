@@ -1395,9 +1395,11 @@ describe('createChartDataPoint output cost edge cases', () => {
     expect(point.costri.y).toBeCloseTo(0.7 / 2.16, 9);
   });
 
-  it('gives no tokens per dollar for hardware without a price', () => {
+  it('plots no cost or tokens per dollar for hardware without a price', () => {
     const e = entry({ tput_per_gpu: 1000, output_tput_per_gpu: 400, input_tput_per_gpu: 600 });
     const keys = [
+      'costh',
+      'costr',
       'tokensPerDollarH',
       'tokensPerDollarR',
       'outputTokensPerDollarH',
@@ -1406,9 +1408,19 @@ describe('createChartDataPoint output cost edge cases', () => {
       'inputTokensPerDollarR',
     ] as const;
     const unpriced = { power: 700, tdp: 700, costh: 0, costr: 0 };
-    expect(buildDerivedChartFields(e, 'h100', keys, undefined, unpriced)).toEqual(
-      Object.fromEntries(keys.map((key) => [key, { y: 0, roof: false }])),
-    );
+    expect(buildDerivedChartFields(e, 'h100', keys, undefined, unpriced)).toEqual({});
+  });
+
+  it('keeps the published owner rate when only the rental rate is unpublished', () => {
+    const e = entry({ tput_per_gpu: 1000 });
+    const ownerOnly = { power: 0, tdp: 400, costh: 0.78, costr: 0 };
+    const keys = ['costh', 'costr', 'tokensPerDollarH', 'tokensPerDollarR', 'jTotal'] as const;
+    const fields = buildDerivedChartFields(e, 'a100', keys, undefined, ownerOnly);
+    expect(fields.costh?.y).toBeGreaterThan(0);
+    expect(fields.tokensPerDollarH?.y).toBeGreaterThan(0);
+    expect(fields.costr).toBeUndefined();
+    expect(fields.tokensPerDollarR).toBeUndefined();
+    expect(fields.jTotal).toBeUndefined();
   });
 
   it('treats missing throughputs as zero and omits the output and input series', () => {

@@ -27,6 +27,7 @@ const STRINGS = {
     participating: 'Participating GPUs',
     official: 'SemiAnalysis InferenceX™',
     overlay: 'SemiAnalysis InferenceX™ + unofficial overlays',
+    unpublished: 'n/a',
   },
   zh: {
     tier: '成本层级',
@@ -37,6 +38,7 @@ const STRINGS = {
     participating: '参与计算的 GPU',
     official: 'SemiAnalysis InferenceX™',
     overlay: 'SemiAnalysis InferenceX™ + 非官方 overlays',
+    unpublished: '暂无',
   },
 } as const;
 
@@ -56,18 +58,12 @@ export default function VideoCostContext({
   const locale = useLocale();
   const s = STRINGS[locale];
   const tierLabel = TIER_LABELS[state.costTier][locale];
-  const rates = hardwareKeys.flatMap((key) => {
-    const rate = costPerGpuHour(key, state.costTier);
-    return rate === null
-      ? []
-      : [
-          {
-            base: key,
-            label: HW_REGISTRY[key]?.badgeLabel ?? hardwareLabel(key),
-            value: rate.toFixed(2),
-          },
-        ];
-  });
+  // Hardware without a published rate for this tier stays in the table as n/a.
+  const rates = hardwareKeys.map((key) => ({
+    base: key,
+    label: HW_REGISTRY[key]?.badgeLabel ?? hardwareLabel(key),
+    value: costPerGpuHour(key, state.costTier)?.toFixed(2) ?? s.unpublished,
+  }));
   // The shared price table scrolls sideways once its GPU columns outgrow a phone.
   const context = useRef<HTMLDivElement>(null);
   useScrollFade(context, `[data-testid="${TCO_TABLE}"]`, rates.length);

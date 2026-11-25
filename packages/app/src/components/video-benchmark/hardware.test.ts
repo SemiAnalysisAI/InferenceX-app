@@ -30,6 +30,8 @@ describe('video hardware mapping', () => {
     expect(costPerGpuHour('h200', 'h')).toBe(1.22);
     expect(costPerGpuHour('h200', 'r')).toBe(2.9);
     expect(costPerGpuHour('unknown', 'h')).toBeNull();
+    expect(costPerGpuHour('a100', 'h')).toBe(0.78);
+    expect(costPerGpuHour('a100', 'r')).toBeNull();
   });
   it('keeps MI355X in the campaign roster as unavailable with its failed run', () => {
     const mi355x = VIDEO_HARDWARE_ROSTER.find((item) => item.key === 'mi355x');

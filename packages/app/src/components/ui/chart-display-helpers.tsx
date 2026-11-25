@@ -53,7 +53,7 @@ export function isCostMetric(metric: string): boolean {
 const POWER_VALUES = Object.fromEntries(
   Object.entries(HW_REGISTRY).map(([base, specs]) => [
     base,
-    specs.power > 0 ? `${specs.power}kW` : '—',
+    specs.power !== null && specs.power > 0 ? `${specs.power}kW` : '—',
   ]),
 );
 

@@ -30,10 +30,11 @@ describe('cn merging of custom typography tokens', () => {
 });
 
 const actual = { ...(await import('@/lib/catalog/constants')) };
+const getGpuSpecs = vi.fn(() => ({ power: 700, costh: 2.8, costr: 0.7 }));
 mock.module('@/lib/catalog/constants', () => ({
   ...actual,
   getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-  getGpuSpecs: vi.fn(() => ({ power: 700, costh: 2.8, costr: 0.7 })),
+  getGpuSpecs,
 }));
 
 function pt(overrides: Partial<InferenceData> = {}): InferenceData {
@@ -254,6 +255,16 @@ describe('computeOutputCostFields', () => {
     const result = computeOutputCostFields([item]);
     expect(result[0].costhOutput?.y).toBe(42);
     expect(result[0].costrOutput?.y).toBe(0.222);
+  });
+
+  it('leaves rental fields out for hardware without a published rental rate', () => {
+    getGpuSpecs.mockReturnValueOnce({ power: 0, costh: 0.78, costr: 0 });
+    const [result] = computeOutputCostFields([
+      pt({ hwKey: 'a100', outputTputPerGpu: { y: 1000, roof: false } }),
+    ]);
+    expect(result.costhOutput?.y).toBeGreaterThan(0);
+    expect(result.costrOutput).toBeUndefined();
+    expect(result.outputTokensPerDollarR).toBeUndefined();
   });
 
   it('returns an empty array for empty input', () => {

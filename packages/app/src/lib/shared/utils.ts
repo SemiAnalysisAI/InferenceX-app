@@ -171,24 +171,23 @@ export function computeOutputCostFields(
     const costrOutput =
       millionOutputTokensPerHour > 0 ? specs.costr / millionOutputTokensPerHour : 0;
 
+    // Unpublished rates read as 0; leave those cost metrics off instead of plotting $0.
     return {
       ...item,
-      costhOutput: item.costhOutput ?? {
-        y: parseFloat(costhOutput.toFixed(3)),
-        roof: false,
-      },
-      costrOutput: item.costrOutput ?? {
-        y: parseFloat(costrOutput.toFixed(3)),
-        roof: false,
-      },
-      outputTokensPerDollarH: item.outputTokensPerDollarH ?? {
-        y: specs.costh > 0 ? outputTokensPerHour / specs.costh : 0,
-        roof: false,
-      },
-      outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
-        y: specs.costr > 0 ? outputTokensPerHour / specs.costr : 0,
-        roof: false,
-      },
+      ...(specs.costh > 0 && {
+        costhOutput: item.costhOutput ?? { y: parseFloat(costhOutput.toFixed(3)), roof: false },
+        outputTokensPerDollarH: item.outputTokensPerDollarH ?? {
+          y: outputTokensPerHour / specs.costh,
+          roof: false,
+        },
+      }),
+      ...(specs.costr > 0 && {
+        costrOutput: item.costrOutput ?? { y: parseFloat(costrOutput.toFixed(3)), roof: false },
+        outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
+          y: outputTokensPerHour / specs.costr,
+          roof: false,
+        },
+      }),
     };
   });
 }
@@ -301,22 +300,20 @@ export function computeInputCostFields(
 
     return {
       ...item,
-      costhi: item.costhi ?? {
-        y: parseFloat(costhi.toFixed(3)),
-        roof: false,
-      },
-      costri: item.costri ?? {
-        y: parseFloat(costri.toFixed(3)),
-        roof: false,
-      },
-      inputTokensPerDollarH: item.inputTokensPerDollarH ?? {
-        y: specs.costh > 0 ? inputTokensPerHour / specs.costh : 0,
-        roof: false,
-      },
-      inputTokensPerDollarR: item.inputTokensPerDollarR ?? {
-        y: specs.costr > 0 ? inputTokensPerHour / specs.costr : 0,
-        roof: false,
-      },
+      ...(specs.costh > 0 && {
+        costhi: item.costhi ?? { y: parseFloat(costhi.toFixed(3)), roof: false },
+        inputTokensPerDollarH: item.inputTokensPerDollarH ?? {
+          y: inputTokensPerHour / specs.costh,
+          roof: false,
+        },
+      }),
+      ...(specs.costr > 0 && {
+        costri: item.costri ?? { y: parseFloat(costri.toFixed(3)), roof: false },
+        inputTokensPerDollarR: item.inputTokensPerDollarR ?? {
+          y: inputTokensPerHour / specs.costr,
+          roof: false,
+        },
+      }),
     };
   });
 }

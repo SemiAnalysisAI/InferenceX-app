@@ -6,6 +6,7 @@ import {
   numberSchema,
   booleanSchema,
   nullableStringSchema,
+  nullableNumberSchema,
   objectSchema,
   arraySchema,
 } from '@/lib/api/api-documentation-helpers';
@@ -74,9 +75,9 @@ const responseSchema = objectSchema(
           description: 'Per-chip rated TDP in watts, shared with chip pages. B300 uses 1100 W.',
         },
         costPerHour: {
-          ...objectSchema({ h: numberSchema, r: numberSchema }),
+          ...objectSchema({ h: nullableNumberSchema, r: nullableNumberSchema }),
           description:
-            'USD per chip-hour: h is hyperscaler ownership, r is committed rental. A100 h=0.78 is a user-supplied assumption; its r=9.99 is an unverified placeholder, not a rental quote.',
+            'USD per chip-hour: h is hyperscaler ownership, r is committed rental. null means no published rate; A100 has no published rental rate yet.',
         },
       }),
     ),
