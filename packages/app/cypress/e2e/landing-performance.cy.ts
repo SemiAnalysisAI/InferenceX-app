@@ -92,7 +92,7 @@ describe('Landing page performance', () => {
     cy.get('[data-banner-variant="ubenchx"]:visible').should('not.exist');
     cy.get('[data-testid="launch-banner"]:visible')
       .should('have.length', 1)
-      .and('have.attr', 'href', '/infx/inference/glm-5-3?i_vendor=AWS');
+      .and('have.attr', 'href', '/infx/inference/glm-5-3');
     cy.get('[data-testid="intro-section"]').should('contain.text', 'All quotes and supporters');
     cy.get('[data-testid="compare-agentx-primary"]').should('be.visible');
     cy.get('[data-testid="supporters-more-row"]')

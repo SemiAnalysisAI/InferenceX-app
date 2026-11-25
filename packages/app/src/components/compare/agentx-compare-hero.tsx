@@ -452,7 +452,7 @@ const LANDING_HARDWARE_RESULTS = [
     titleZh: 'Amazon Trainium3',
     subtitle: 'GLM 5.2 · 744B Parameters · AgentX',
     subtitleZh: 'GLM 5.2 · 7440 亿参数 · AgentX',
-    href: `${getDashboardRoute('inference').path}/glm-5-3?i_vendor=AWS`,
+    href: `${getDashboardRoute('inference').path}/glm-5-3`,
     model: 'glm-5-3',
     analyticsEvent: 'landing_trainium_results_clicked',
     isNew: true,

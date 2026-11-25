@@ -110,21 +110,21 @@ describe('NUDGE_REGISTRY integrity', () => {
       const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === id);
       if (banner?.type !== 'banner') throw new Error(`Missing launch banner ${id}`);
       banner.content.onLinkClick?.();
-      expect(location.href).toBe('/zh/infx/inference/glm-5-3?i_vendor=AWS');
+      expect(location.href).toBe('/zh/infx/inference/glm-5-3');
     }
 
     location.href = '';
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'trainium3-agentx-launch-modal');
     if (modal?.type !== 'modal') throw new Error('Missing Trainium3 launch modal');
     modal.content.primaryAction?.onClick();
-    expect(location.href).toBe('/zh/infx/inference/glm-5-3?i_vendor=AWS');
+    expect(location.href).toBe('/zh/infx/inference/glm-5-3');
   });
 
   it('shows the Trainium3 banner on both A/B arms', () => {
     const arms = NUDGE_REGISTRY.filter((nudge) => nudge.variant);
     expect(arms.map((arm) => [arm.variant, arm.content.href])).toEqual([
-      ['ubenchx', '/infx/inference/glm-5-3?i_vendor=AWS'],
-      ['operatorx', '/infx/inference/glm-5-3?i_vendor=AWS'],
+      ['ubenchx', '/infx/inference/glm-5-3'],
+      ['operatorx', '/infx/inference/glm-5-3'],
     ]);
     for (const arm of arms) {
       expect(arm.content.title).toBe('Amazon Trainium3 Results');
@@ -161,7 +161,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(modal?.content.secondaryAction).toBeUndefined();
     expect(modal?.content.additionalActions).toBeUndefined();
     modal?.content.primaryAction?.onClick();
-    expect(location.href).toBe(`${prefix}/infx/inference/glm-5-3?i_vendor=AWS`);
+    expect(location.href).toBe(`${prefix}/infx/inference/glm-5-3`);
   });
 
   it('centers the Trainium3 launch modal on the landing page', () => {

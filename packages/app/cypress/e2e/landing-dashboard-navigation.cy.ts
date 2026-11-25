@@ -144,7 +144,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
         cy.get('[data-testid="landing-trainium-glm-5-2-results-link"]')
           .should('match', ':first-child')
-          .and('have.attr', 'href', `${prefix}/infx/inference/glm-5-3?i_vendor=AWS`)
+          .and('have.attr', 'href', `${prefix}/infx/inference/glm-5-3`)
           .and('contain.text', 'Amazon Trainium3')
           .and(
             'contain.text',

@@ -197,7 +197,7 @@ describe('Landing nudges — Trainium3 launch modal', { testIsolation: true }, (
       cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
       cy.get('[data-testid="launch-modal-action"]').should('have.text', 'GLM 5.2').click();
       cy.location('pathname').should('eq', `${prefix}/infx/inference/glm-5-3`);
-      cy.location('search').should('eq', '?i_vendor=AWS');
+      cy.location('search').should('eq', '');
       cy.window().then((win) => {
         expect(Number(win.localStorage.getItem(LAUNCH_MODAL_KEY))).to.be.greaterThan(1);
       });
@@ -249,7 +249,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/infx/inference/glm-5-3?i_vendor=AWS');
+      .and('have.attr', 'href', '/infx/inference/glm-5-3');
     cy.get('[data-testid="launch-banner"]:visible').click();
 
     cy.location('pathname').should('eq', '/infx/inference/glm-5-3');
