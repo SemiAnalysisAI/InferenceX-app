@@ -24,7 +24,7 @@ describe('Landing banner A/B arms', () => {
     );
 
     const operatorx = get('[data-banner-variant="operatorx"] [data-testid="launch-banner"]');
-    expect(operatorx.getAttribute('href')).toBe('/opx');
+    expect(operatorx.getAttribute('href')).toBe('/infx/inference/glm-5-3?i_vendor=AWS');
     click(operatorx);
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onAction.mock.calls[0][0].variant).toBe('operatorx');

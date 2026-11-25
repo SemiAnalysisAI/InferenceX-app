@@ -6,7 +6,7 @@ import { isDismissed, markDismissed, markShown } from './persistence';
 import {
   NUDGE_REGISTRY,
   TELEMETRY_TUTORIAL_STORAGE_KEY,
-  TPUV7_LAUNCH_MODAL_STORAGE_KEY,
+  LAUNCH_MODAL_STORAGE_KEY,
 } from './registry';
 afterEach(() => {
   unstubAllGlobals();
@@ -78,11 +78,11 @@ describe('NUDGE_REGISTRY integrity', () => {
       'export',
       'filter-hint',
       'gradient-label',
-      'huawei-ascend-950pr-ubenchx-banner',
-      'operatorx-banner',
       'reproducibility',
       'star-nudge',
-      'tpuv7-agentx-launch-modal',
+      'trainium3-agentx-launch-modal',
+      'trainium3-glm-5-2-banner',
+      'trainium3-glm-5-2-banner-b',
     ]);
   });
 
@@ -105,35 +105,34 @@ describe('NUDGE_REGISTRY integrity', () => {
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
 
-    const banner = NUDGE_REGISTRY.find(
-      (nudge) => nudge.id === 'huawei-ascend-950pr-ubenchx-banner',
-    );
-    if (banner?.type !== 'banner') throw new Error('Missing launch banner');
-    banner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/ubx/core-memory-profiles');
-
-    const operatorxBanner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'operatorx-banner');
-    if (operatorxBanner?.type !== 'banner') throw new Error('Missing OperatorX banner');
-    operatorxBanner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/opx');
+    for (const id of ['trainium3-glm-5-2-banner', 'trainium3-glm-5-2-banner-b']) {
+      location.href = '';
+      const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === id);
+      if (banner?.type !== 'banner') throw new Error(`Missing launch banner ${id}`);
+      banner.content.onLinkClick?.();
+      expect(location.href).toBe('/zh/infx/inference/glm-5-3?i_vendor=AWS');
+    }
 
     location.href = '';
-    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
-    if (modal?.type !== 'modal') throw new Error('Missing TPUv7 launch modal');
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'trainium3-agentx-launch-modal');
+    if (modal?.type !== 'modal') throw new Error('Missing Trainium3 launch modal');
     modal.content.primaryAction?.onClick();
-    expect(location.href).toBe(
-      '/zh/infx/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
-    );
+    expect(location.href).toBe('/zh/infx/inference/glm-5-3?i_vendor=AWS');
   });
 
-  it('splits the landing banner into comparable A/B arms', () => {
+  it('shows the Trainium3 banner on both A/B arms', () => {
     const arms = NUDGE_REGISTRY.filter((nudge) => nudge.variant);
     expect(arms.map((arm) => [arm.variant, arm.content.href])).toEqual([
-      ['ubenchx', '/ubx/core-memory-profiles'],
-      ['operatorx', '/opx'],
+      ['ubenchx', '/infx/inference/glm-5-3?i_vendor=AWS'],
+      ['operatorx', '/infx/inference/glm-5-3?i_vendor=AWS'],
     ]);
     for (const arm of arms) {
-      // Same slot, same dismissal, same event names: only the destination differs.
+      expect(arm.content.title).toBe('Amazon Trainium3 Results');
+      expect(arm.content.titleZh).toBe('Amazon Trainium3 结果');
+      expect(arm.content.description).toBe('GLM 5.2 AgentX Preview Results');
+      expect(arm.content.descriptionZh).toBe('GLM 5.2 AgentX 预览结果');
+    }
+    for (const arm of arms) {
       expect(arm).toMatchObject({
         type: 'banner',
         scope: 'landing',
@@ -150,52 +149,37 @@ describe('NUDGE_REGISTRY integrity', () => {
     }
   });
 
-  it.each(['', '/zh'])('offers all four launch models in the %s route tree', (prefix) => {
+  it.each(['', '/zh'])('opens Trainium3 GLM 5.2 results in the %s route tree', (prefix) => {
     const location = { pathname: prefix || '/', href: '' };
     stubGlobal('window', { location });
-    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
-    expect(modal?.content.title).toBe('TPUv7 Preliminary Results Across Multiple Models');
-    expect(modal?.content.titleZh).toBe('TPUv7 多模型初步结果');
-    expect(modal?.content.description).toBe('AgentX Preview Submissions');
-    expect(modal?.content.descriptionZh).toBe('AgentX 预览版提交结果');
-    expect(modal?.content.primaryAction?.label).toBe('Qwen3.5');
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'trainium3-agentx-launch-modal');
+    expect(modal?.content.title).toBe('Amazon Trainium3 Preliminary Results');
+    expect(modal?.content.titleZh).toBe('Amazon Trainium3 初步结果');
+    expect(modal?.content.description).toBe('GLM 5.2 AgentX Preview Submission');
+    expect(modal?.content.descriptionZh).toBe('GLM 5.2 AgentX 预览版提交结果');
+    expect(modal?.content.primaryAction?.label).toBe('GLM 5.2');
+    expect(modal?.content.secondaryAction).toBeUndefined();
+    expect(modal?.content.additionalActions).toBeUndefined();
     modal?.content.primaryAction?.onClick();
-    expect(location.href).toBe(
-      `${prefix}/infx/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
-    );
-    expect(modal?.content.secondaryAction?.label).toBe('Kimi K3');
-    modal?.content.secondaryAction?.onClick();
-    expect(location.href).toBe(`${prefix}/infx/inference/kimi-k3`);
-    expect(modal?.content.additionalActions?.map((action) => action.label)).toEqual([
-      'GLM5.3',
-      'Muse Spark 1.3/Open',
-    ]);
-    modal?.content.additionalActions?.[0].onClick();
-    expect(location.href).toBe(
-      `${prefix}/infx/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
-    );
-    modal?.content.additionalActions?.[1].onClick();
-    expect(location.href).toBe(`${prefix}/infx/inference/muse-spark-open`);
+    expect(location.href).toBe(`${prefix}/infx/inference/glm-5-3?i_vendor=AWS`);
   });
 
-  it('centers the TPUv7 launch modal on the landing page', () => {
-    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
+  it('centers the Trainium3 launch modal on the landing page', () => {
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'trainium3-agentx-launch-modal');
     expect(modal?.scope).toBe('landing');
     expect(modal?.content.centered).toBe(true);
-    expect(modal?.storageKey).toBe(TPUV7_LAUNCH_MODAL_STORAGE_KEY);
-    expect(TPUV7_LAUNCH_MODAL_STORAGE_KEY).toBe(
-      'inferencex-tpuv7-agentx-multiple-model-modal-dismissed',
-    );
+    expect(modal?.storageKey).toBe(LAUNCH_MODAL_STORAGE_KEY);
+    expect(LAUNCH_MODAL_STORAGE_KEY).toBe('inferencex-trainium3-agentx-modal-dismissed');
     expect(modal?.dismissal).toEqual({ type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 });
     expect(modal?.analytics).toEqual({
-      shown: 'inference_tpuv7_agentx_modal_shown',
-      dismissed: 'inference_tpuv7_agentx_modal_dismissed',
-      action: 'inference_tpuv7_agentx_modal_clicked',
+      shown: 'inference_trainium3_agentx_modal_shown',
+      dismissed: 'inference_trainium3_agentx_modal_dismissed',
+      action: 'inference_trainium3_agentx_modal_clicked',
     });
   });
 
   it('ignores the old launch dismissal and waits exactly three days after each new dismissal', () => {
-    const oldKey = 'inferencex-tpuv7-agentx-modal-dismissed';
+    const oldKey = 'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
     const storage = new Map<string, string>([[oldKey, '1']]);
     stubGlobal('localStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
@@ -203,7 +187,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     });
     let now = Date.parse('2026-10-18T12:00:00Z');
     vi.spyOn(Date, 'now').mockImplementation(() => now);
-    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal')!;
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'trainium3-agentx-launch-modal')!;
     expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(false);
     markShown(modal.storageKey, modal.dismissal);
     expect(storage.has(modal.storageKey)).toBe(false);

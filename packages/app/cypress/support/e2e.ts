@@ -40,7 +40,7 @@ Cypress.on('window:before:load', (win) => {
   try {
     if (suppressLaunchModal) {
       win.localStorage.setItem(
-        'inferencex-tpuv7-agentx-multiple-model-modal-dismissed',
+        'inferencex-trainium3-agentx-modal-dismissed',
         String(win.Date.now()),
       );
     }

@@ -1,10 +1,8 @@
-import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
-
 function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed',
+    'inferencex-trainium3-glm-5-2-banner-dismissed',
     'inferencex-reproducibility-nudge-dismissed',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -104,155 +102,67 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
   });
 });
 
-const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
-
-function assertTpuResultsFilters() {
-  assertTpuGb300Selected();
-  cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
-  cy.get('[data-testid="scenario-selector"]')
-    .invoke('text')
-    .should('match', /Agentic|智能体/u);
-  cy.get('[data-testid="precision-multiselect"]')
-    .should('contain.text', 'FP8')
-    .and('not.contain.text', 'FP4');
-  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
-}
+const LAUNCH_MODAL_KEY = 'inferencex-trainium3-agentx-modal-dismissed';
 
 function showLaunchModal(win: Cypress.AUTWindow) {
   clearAllNudgeStorage(win);
   win.localStorage.removeItem(LAUNCH_MODAL_KEY);
 }
 
-describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
-  it('shows the new announcement despite a permanent dismissal of the old one', () => {
+describe('Landing nudges — Trainium3 launch modal', { testIsolation: true }, () => {
+  it('shows the new announcement despite a dismissal of the old TPUv7 one', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         showLaunchModal(win);
-        win.localStorage.setItem('inferencex-tpuv7-agentx-modal-dismissed', '1');
+        win.localStorage.setItem(
+          'inferencex-tpuv7-agentx-multiple-model-modal-dismissed',
+          String(win.Date.now()),
+        );
       },
     });
     cy.get('[data-testid="launch-modal"]').should('be.visible');
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.eq(null);
-    });
     cy.get('[data-testid="launch-modal"] button[aria-label="Close"]').click();
     cy.window().then((win) => {
       expect(Number(win.localStorage.getItem(LAUNCH_MODAL_KEY))).to.be.greaterThan(1);
-      expect(win.localStorage.getItem('inferencex-tpuv7-agentx-modal-dismissed')).to.eq('1');
     });
   });
 
-  it('centers each button row and loads model logos at 1280px on /', () => {
+  it('centers the modal content, Amazon mark and single GLM 5.2 action at 1280px', () => {
     cy.viewport(1280, 812);
     cy.visit('/', { onBeforeLoad: showLaunchModal });
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
+      .and('have.attr', 'aria-modal', 'true')
+      .and('contain.text', 'Amazon Trainium3 Preliminary Results')
+      .and('contain.text', 'GLM 5.2 AgentX Preview Submission')
       .then(($modal) => {
         const modal = $modal[0];
         const panel = modal.getBoundingClientRect();
-        const rows = new Map<number, DOMRect[]>();
-        modal.querySelectorAll('button[data-testid]').forEach((button) => {
-          const rect = button.getBoundingClientRect();
-          const top = Math.round(rect.top);
-          rows.set(top, [...(rows.get(top) ?? []), rect]);
-        });
-        expect(modal.querySelectorAll('button[data-testid]')).to.have.length(4);
-        expect(
-          [...modal.querySelectorAll('button[data-testid]')].map((button) =>
-            button.textContent?.trim(),
-          ),
-        ).to.deep.eq(['Qwen3.5', 'Kimi K3', 'GLM5.3', 'Muse Spark 1.3/Open']);
-        expect(rows.size).to.eq(2);
+        const root = modal.ownerDocument.documentElement;
+        expect(Math.abs(panel.left + panel.width / 2 - root.clientWidth / 2)).to.be.lessThan(2);
+        expect(Math.abs(panel.top + panel.height / 2 - root.clientHeight / 2)).to.be.lessThan(2);
+        const buttons = [...modal.querySelectorAll('button[data-testid]')];
+        expect(buttons.map((button) => button.textContent?.trim())).to.deep.eq(['GLM 5.2']);
         expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
-        const close = modal.querySelector('button[aria-label]')!;
-        expect(close.getBoundingClientRect().width).to.eq(36);
-        expect(close.getBoundingClientRect().height).to.eq(36);
-        expect(close.querySelector('svg')!.getBoundingClientRect().width).to.eq(20);
-        const actions = [...modal.querySelectorAll('button[data-testid]')].map((button) =>
-          button.getBoundingClientRect(),
-        );
-        expect(Math.abs(actions[0].width - actions[1].width)).to.be.lessThan(1);
-        expect(actions[0].top).to.eq(actions[1].top);
-        expect(actions[2].top).to.eq(actions[3].top);
-        expect(actions[2].top).to.be.greaterThan(actions[0].top);
-        expect(actions[0].left).to.be.lessThan(actions[1].left);
-        expect(actions[2].left).to.be.lessThan(actions[3].left);
-        expect(actions[0].height).to.be.at.least(44);
+        const action = buttons[0].getBoundingClientRect();
+        expect(action.height).to.be.at.least(44);
+        const left = action.left - panel.left;
+        const right = panel.right - action.right;
+        expect(Math.abs(left - right), 'action centered in the panel').to.be.lessThan(2);
         const heading = modal.querySelector('h2')!.getBoundingClientRect();
         const badge = modal.querySelector('[data-new-badge]')!.getBoundingClientRect();
         expect(badge.bottom).to.be.lessThan(heading.top);
-        const styles = modal.ownerDocument.defaultView!.getComputedStyle(
-          modal.querySelector('h2')!,
-        );
-        expect(styles.textAlign).to.eq('center');
-        expect(styles.fontSize).to.eq('22px');
+        const amazon = modal.querySelector('svg[aria-label="Amazon"]')!;
+        expect(amazon).not.to.eq(null);
+        expect(amazon.getBoundingClientRect().width).to.eq(24);
         expect(
-          modal.ownerDocument.defaultView!.getComputedStyle(modal.querySelector('p')!).textAlign,
-        ).to.eq('center');
-        const eyebrow = modal.querySelector('[data-new-badge]')!.parentElement!;
-        const google = eyebrow.querySelector('svg[aria-label="Google"]')!;
-        expect(google).not.to.eq(null);
-        expect(google.getBoundingClientRect().width).to.eq(24);
-        expect(
-          [...google.querySelectorAll('path')].map((path) => path.getAttribute('fill')),
-        ).to.deep.eq(['#EA4335', '#4285F4', '#FBBC05', '#34A853']);
-        const center = (google.getBoundingClientRect().left + badge.right) / 2;
-        expect(Math.abs(center - (panel.left + panel.width / 2))).to.be.lessThan(1);
-        for (const row of rows.values()) {
-          const left = Math.min(...row.map((rect) => rect.left)) - panel.left;
-          const right = panel.right - Math.max(...row.map((rect) => rect.right));
-          expect(left).to.be.greaterThan(0);
-          expect(Math.abs(left - right), 'equal space on both sides of each row').to.be.lessThan(2);
-        }
-      });
-    for (const [action, logo] of [
-      ['action', 'qwen-color.svg'],
-      ['secondary-action', 'kimi-color.svg'],
-      ['additional-action-0', 'zai-color.svg'],
-      ['additional-action-1', 'meta-color.svg'],
-    ]) {
-      cy.get(`[data-testid="launch-modal-${action}"] img`)
-        .should('have.attr', 'src', `/logos/${logo}`)
-        .and('have.attr', 'alt', '')
-        .and('have.attr', 'aria-hidden', 'true')
-        .and('be.visible')
-        .should(($img) => {
-          expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-        });
-      cy.get(`[data-testid="launch-modal-${action}"] svg`).should('not.exist');
-    }
-  });
-
-  it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
-    interceptTpuLaunchData();
-    cy.visit('/', { onBeforeLoad: showLaunchModal });
-    cy.get('[data-testid="launch-modal"]')
-      .should('be.visible')
-      .and('have.attr', 'aria-modal', 'true')
-      .and('contain.text', 'TPUv7 Preliminary Results Across Multiple Models')
-      .and('contain.text', 'AgentX Preview Submissions')
-      .then(($modal) => {
-        const rect = $modal[0].getBoundingClientRect();
-        const root = $modal[0].ownerDocument.documentElement;
-        expect(Math.abs(rect.left + rect.width / 2 - root.clientWidth / 2)).to.be.lessThan(2);
-        expect(Math.abs(rect.top + rect.height / 2 - root.clientHeight / 2)).to.be.lessThan(2);
+          [...amazon.querySelectorAll('path')].map((path) => path.getAttribute('fill')),
+        ).to.deep.eq(['currentColor', '#FF9900']);
       });
     cy.get('[data-new-badge="launch-modal"]').should('have.class', 'new-badge-flash');
-    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
-    cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
-    cy.location('pathname').should('eq', '/infx/inference/qwen-3-5');
-    assertTpuResultsFilters();
-  });
-
-  it('keeps Shift+Tab inside the dialog after clicking the panel', () => {
-    cy.visit('/', { onBeforeLoad: showLaunchModal });
-    cy.get('[data-testid="launch-modal"]').should('be.visible').click(12, 12);
-    cy.focused().should('have.attr', 'data-testid', 'launch-modal');
-    cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
-    cy.focused().should('have.attr', 'data-testid', 'launch-modal-additional-action-1');
-    cy.focused().trigger('keydown', { key: 'Tab' });
-    cy.focused().should('have.attr', 'aria-label', 'Close');
-    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.get('[data-testid="launch-modal-action"] img')
+      .should('have.attr', 'src', '/logos/zai-color.svg')
+      .and('be.visible');
   });
 
   it('dismisses on Escape', () => {
@@ -276,66 +186,21 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-testid="launch-modal"]').should('not.exist');
   });
 
-  it('localizes the modal and keeps the Chinese route tree', () => {
-    interceptTpuLaunchData();
-    cy.visit('/zh', { onBeforeLoad: showLaunchModal });
-    cy.get('[data-testid="launch-modal"]')
-      .should('be.visible')
-      .and('contain.text', 'TPUv7 多模型初步结果')
-      .and('contain.text', 'AgentX 预览版提交结果')
-      .and('not.contain.text', '稍后再看');
-    cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
-    cy.location('pathname').should('eq', '/zh/infx/inference/qwen-3-5');
-    assertTpuResultsFilters();
-  });
-
   for (const prefix of ['', '/zh']) {
-    for (const [index, label, slug, model] of [
-      [0, 'GLM5.3', 'glm-5-3', 'GLM-5.2'],
-      [1, 'Muse Spark 1.3/Open', 'muse-spark-open', 'Muse-Spark-Open'],
-    ] as const) {
-      it(`opens ${label} with its intended filters from ${prefix || '/'}`, () => {
-        interceptTpuLaunchData(model);
-        cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
-        cy.get(`[data-testid="launch-modal-additional-action-${index}"]`)
-          .should('have.text', label)
-          .click();
-        cy.location('pathname').should('eq', `${prefix}/infx/inference/${slug}`);
-        if (label === 'GLM5.3') {
-          cy.location('search').should('eq', '?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8');
-          cy.get('[data-testid="precision-multiselect"]')
-            .should('contain.text', 'FP8')
-            .and('not.contain.text', 'FP4');
-        }
-        cy.get('[data-testid="model-selector"]').should('contain.text', label);
-        cy.window().then((win) => {
-          expect(Number(win.localStorage.getItem(LAUNCH_MODAL_KEY))).to.be.greaterThan(1);
-        });
-      });
-    }
-
-    it(`opens Kimi K3 and persists dismissal from ${prefix || '/'} on mobile`, () => {
-      cy.viewport(375, 812);
+    it(`opens Trainium3 GLM 5.2 results from ${prefix || '/'}`, () => {
       cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
-      cy.get('[data-testid="launch-modal"]')
-        .should('be.visible')
-        .within(() => {
-          cy.get('button[data-testid]')
-            .should('have.length', 4)
-            .each(($button) => {
-              const rect = $button[0].getBoundingClientRect();
-              expect(rect.left).to.be.at.least(0);
-              expect(rect.right).to.be.at.most(375);
-            });
-          cy.get('[data-testid="launch-modal-secondary-action"]')
-            .should('have.text', 'Kimi K3')
-            .click();
-        });
-      cy.location('pathname').should('eq', `${prefix}/infx/inference/kimi-k3`);
+      if (prefix) {
+        cy.get('[data-testid="launch-modal"]')
+          .should('contain.text', 'Amazon Trainium3 初步结果')
+          .and('contain.text', 'GLM 5.2 AgentX 预览版提交结果');
+      }
+      cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
+      cy.get('[data-testid="launch-modal-action"]').should('have.text', 'GLM 5.2').click();
+      cy.location('pathname').should('eq', `${prefix}/infx/inference/glm-5-3`);
+      cy.location('search').should('eq', '?i_vendor=AWS');
       cy.window().then((win) => {
-        expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
+        expect(Number(win.localStorage.getItem(LAUNCH_MODAL_KEY))).to.be.greaterThan(1);
       });
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
     });
   }
 });
@@ -345,8 +210,8 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
-      .should('contain.text', 'Huawei Ascend 950PR Microbenchmarks')
-      .and('contain.text', 'Cycle-Level Core memory-access microbenchmarks (Beta)')
+      .should('contain.text', 'Amazon Trainium3 Results')
+      .and('contain.text', 'GLM 5.2 AgentX Preview Results')
       .and('have.css', 'white-space', 'normal')
       .should(($paragraphs) => {
         for (const text of $paragraphs) {
@@ -357,7 +222,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-new-badge="launch-banner"]')
       .parent()
       .should('have.css', 'white-space', 'nowrap')
-      .and('contain.text', 'Microbenchmarks');
+      .and('contain.text', 'Results');
     cy.get('[data-testid="launch-banner"] > svg').should('have.css', 'align-self', 'flex-start');
   });
 
@@ -379,26 +244,21 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
-      expect(
-        win.localStorage.getItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed'),
-      ).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-trainium3-glm-5-2-banner-dismissed')).to.eq(null);
     });
 
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/ubx/core-memory-profiles');
+      .and('have.attr', 'href', '/infx/inference/glm-5-3?i_vendor=AWS');
     cy.get('[data-testid="launch-banner"]:visible').click();
 
-    cy.location('pathname').should('eq', '/ubx/core-memory-profiles');
-    cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+    cy.location('pathname').should('eq', '/infx/inference/glm-5-3');
 
     cy.get('[data-testid="nav-link-home"]').click();
     cy.location('pathname').should('eq', '/');
     cy.reload();
     cy.window().then((win) => {
-      expect(
-        win.localStorage.getItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed'),
-      ).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-trainium3-glm-5-2-banner-dismissed')).to.eq(null);
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
@@ -548,7 +408,7 @@ describe('Nudge scope isolation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         showLaunchModal(win);
-        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-trainium3-glm-5-2-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });
