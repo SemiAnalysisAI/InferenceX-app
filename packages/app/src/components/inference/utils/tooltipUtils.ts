@@ -892,35 +892,46 @@ const PARALLELISM_STRINGS = {
   },
 } as const;
 
-const known = (v: number | null | undefined) => (v === null || v === undefined ? '?' : v);
+const width = (label: string, v: number | null | undefined) =>
+  v !== null && v !== undefined && `${label} ${v}`;
 
 const configLinesHTML = (d: InferenceData, locale: Locale): string => {
   const t = PARALLELISM_STRINGS[locale];
   const dpa = (v: boolean | string | undefined) =>
-    `DPA ${v === undefined ? '?' : asBool(v) ? t.on : t.off}`;
+    v !== undefined && `DPA ${asBool(v) ? t.on : t.off}`;
   if (!d.disagg) {
     const dwdp = d.prefill_dwdp_size ?? 1;
     return factsLineHTML('', [
-      `TP ${known(d.decode_tp)}`,
-      `EP ${known(d.ep)}`,
-      `DP ${known(d.dp)}`,
+      width('TP', d.decode_tp),
+      width('EP', d.ep),
+      width('DP', d.dp),
       dpa(d.dp_attention),
-      `PP ${known(d.pp)}`,
-      `DCP ${known(meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size) ?? d.decode_dcp_size ?? d.prefill_dcp_size)}`,
-      `PCP ${known(meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size) ?? d.prefill_pcp_size ?? d.decode_pcp_size)}`,
+      width('PP', d.pp),
+      width(
+        'DCP',
+        meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size) ??
+          d.decode_dcp_size ??
+          d.prefill_dcp_size,
+      ),
+      width(
+        'PCP',
+        meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size) ??
+          d.prefill_pcp_size ??
+          d.decode_pcp_size,
+      ),
       `DWDP ${dwdp}`,
-      dwdp > 1 && `${t.workers} ${known(d.prefill_num_workers)}`,
+      dwdp > 1 && width(t.workers, d.prefill_num_workers),
     ]);
   }
   return [true, false]
     .map((prefill) =>
       factsLineHTML(prefill ? t.prefill : t.decode, [
-        `TP ${known(prefill ? d.prefill_tp : d.decode_tp)}`,
-        `EP ${known((prefill ? d.prefill_ep : d.decode_ep) ?? d.ep)}`,
+        width('TP', prefill ? d.prefill_tp : d.decode_tp),
+        width('EP', (prefill ? d.prefill_ep : d.decode_ep) ?? d.ep),
         dpa((prefill ? d.prefill_dp_attention : d.decode_dp_attention) ?? d.dp_attention),
-        `PP ${known((prefill ? d.prefill_pp : d.decode_pp) ?? d.pp)}`,
-        `DCP ${known(prefill ? d.prefill_dcp_size : d.decode_dcp_size)}`,
-        `PCP ${known(prefill ? d.prefill_pcp_size : d.decode_pcp_size)}`,
+        width('PP', (prefill ? d.prefill_pp : d.decode_pp) ?? d.pp),
+        width('DCP', prefill ? d.prefill_dcp_size : d.decode_dcp_size),
+        width('PCP', prefill ? d.prefill_pcp_size : d.decode_pcp_size),
         prefill && `DWDP ${d.prefill_dwdp_size ?? 1}`,
       ]),
     )
