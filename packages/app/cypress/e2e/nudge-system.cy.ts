@@ -62,7 +62,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
     cy.get('[data-new-badge]:visible')
-      .should('have.length', 3)
+      .should('have.length', 4)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
