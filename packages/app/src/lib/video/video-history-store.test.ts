@@ -392,8 +392,9 @@ describe('history projection version', () => {
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
       // approved under a receipt without one must be projected again. The walk skips type-only
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
-      // uncalled helpers left bundle.ts and metrics.ts; entries are unchanged.
-      sources: '983a3ebffcfe3cad4861432ce954b6365b93bbc6c5417e8dea7fa6d27ccba436',
+      // uncalled helpers left bundle.ts and metrics.ts, and after the TPU7x and Trainium3 all-in
+      // power change in gpu-keys; entries are unchanged.
+      sources: 'ce2885df3c8304adff4e614bb2f4c72b86c12fea504f0fab9d627e2b27fb3dc7',
     });
   });
 });

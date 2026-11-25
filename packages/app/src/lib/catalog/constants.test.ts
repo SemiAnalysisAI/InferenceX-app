@@ -295,12 +295,12 @@ describe('getGpuSpecs', () => {
     const internal = getGpuSpecs('tpuv7_vllm', 'internal');
 
     expect(external).toMatchObject({
-      power: 1.207,
+      power: 1.5,
       costh: 1.21,
       costr: 2,
     });
     expect(internal).toMatchObject({
-      power: 1.207,
+      power: 1.5,
       costh: 1.03,
       costr: 2,
     });
