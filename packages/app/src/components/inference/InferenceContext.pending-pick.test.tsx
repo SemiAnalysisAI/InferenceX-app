@@ -259,4 +259,25 @@ describe('a legend pick made while a scope pick is still rendering', () => {
     expect(selectedModel).toBe(Model.Qwen3_5);
     expect([...activeHwTypes]).toEqual([SOLO_KEY]);
   });
+
+  it('gives way to the model pick defaults when a precision pick follows it before it lands', async () => {
+    await mount();
+    // The reader's own best-per-SKU choice marks the hardware as theirs, which a model pick undoes.
+    act(() => actions!.setBestPerSku(false));
+
+    act(() => {
+      pickModel(Model.Qwen3_5);
+      startTransition(() => actions!.setSelectedPrecisions([Precision.FP8]));
+      actions!.toggleHwType('b200_vllm');
+    });
+    await settle(
+      () =>
+        selectedModel === Model.Qwen3_5 &&
+        selectedPrecisions.join(',') === Precision.FP8 &&
+        chartReady(),
+    );
+
+    expect(selectedModel).toBe(Model.Qwen3_5);
+    expect([...activeHwTypes]).toEqual([SOLO_KEY]);
+  });
 });

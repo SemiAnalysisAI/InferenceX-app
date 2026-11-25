@@ -933,10 +933,12 @@ export function InferenceProvider({
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
       if (v !== effectiveSequence) {
+        // A pick still pending set the flags this render predates, so they stay.
         scopePickRef.current = {
-          hardware: null,
           bestPerSku: bestPerSkuChoice,
           defaultsOverridden: hardwareDefaultsOverridden,
+          ...scopePickRef.current,
+          hardware: null,
         };
       }
       setSelectedSequence(v);
@@ -953,10 +955,12 @@ export function InferenceProvider({
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
       if (v.join(',') !== effectivePrecisions.join(',')) {
+        // A pick still pending set the flags this render predates, so they stay.
         scopePickRef.current = {
-          hardware: null,
           bestPerSku: bestPerSkuChoice,
           defaultsOverridden: hardwareDefaultsOverridden,
+          ...scopePickRef.current,
+          hardware: null,
         };
       }
       if (activeTab === 'inference' && selectedModel === Model.Qwen3_5) {
