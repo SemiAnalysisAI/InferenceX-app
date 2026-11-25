@@ -105,17 +105,11 @@ describe('video history projection', () => {
     expect(source.observedAt).toBe('2026-09-09T01:00:00Z');
     expect(source.releaseQualified).toBe(false);
     expect(
-      source.observations.map((point) => [
-        point.concurrency,
-        point.p50,
-        point.p90,
-        point.clipsGpuHour,
-        point.energyKj,
-      ]),
+      source.observations.map((point) => [point.concurrency, point.p50, point.p90, point.energyKj]),
     ).toEqual([
-      [1, 120, null, 15, 168],
-      [2, 240, null, 15, 168],
-      [4, 300, null, 15, 168],
+      [1, 120, null, 168],
+      [2, 240, null, 168],
+      [4, 300, null, 168],
     ]);
   });
   it('carries GPU counts, wall time, clip shape, board power and server layout per cell', () => {
@@ -160,13 +154,20 @@ describe('video history projection', () => {
       status: 'failed',
       p50: null,
       p90: null,
-      clipsGpuHour: null,
       energyKj: null,
       wallSeconds: null,
       avgPowerW: null,
       enforcedLimitW: null,
       workloadKey: null,
     });
+  });
+  it('reports no energy or board power for a legacy cell whose power document is invalid', () => {
+    const artifact = saved();
+    const power = new Map(artifact.sources[0].documents).get('gpu/c1/power.json');
+    Object.assign(power!, { valid: false });
+    const [c1, c2] = videoHistoryEntry(artifact, null).sources[0].observations;
+    expect([c1.energyKj, c1.avgPowerW, c1.results?.powerValid]).toEqual([null, null, false]);
+    expect([c2.energyKj, c2.avgPowerW, c2.results?.powerValid]).toEqual([168, 1400, true]);
   });
   it('retains source provenance and failure when a new artifact contract is unsupported', () => {
     const artifact = saved();

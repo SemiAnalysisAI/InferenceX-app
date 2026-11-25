@@ -137,7 +137,6 @@ describe('native srt-slurm H3 bundle', () => {
       samples: 4,
       p50: 119,
       p90: null,
-      clipsGpuHour: 120,
       energyKj: 18.00025,
       avgPowerW: 1201,
       enforcedLimitW: null,

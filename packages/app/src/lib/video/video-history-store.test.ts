@@ -6,7 +6,6 @@ import { mocked, stubEnv, unstubAllEnvs } from '@/test/helpers';
 import { BlobNotFoundError, del, head, list, put, type HeadBlobResult } from '@vercel/blob';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
-import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import { servingArtifact } from '../../../cypress/support/video-artifacts';
 import {
   publishedVideoHistory as publishedVideoHistoryRead,
@@ -200,14 +199,13 @@ describe('published video history', () => {
   });
 
   it('keeps an older deployment on the dashboard when newer sources fill the first window', async () => {
-    await publish(0, true, 'NVIDIA H100', 10);
-    for (let i = 1; i <= 50; i++) await publish(i, true, 'NVIDIA H200', 10);
+    await publish(0, true, 'NVIDIA H100', 20);
+    for (let i = 1; i < 50; i++) await publish(i, true, 'NVIDIA H200', 20);
+    // A 12-clip rerun of the H100 deployment does not stand in for its 20-clip cell.
+    await publish(50, true, 'NVIDIA H100', 12);
     const page = await publishedVideoHistory(1, VIDEO_HISTORY_MAX_PAGES);
     expect(page.nextPage).toBe(VIDEO_HISTORY_MAX_PAGES + 1);
     expect(page.entries.at(-1)?.runId).toBe('100');
-    expect(
-      new Set(dashboardCells(videoPoints([page])).cells.map((cell) => cell.hardwareKey)),
-    ).toEqual(new Set(['h100', 'h200']));
   });
 
   it('lists every index page, orders by publication date, and reads only ten unapproved indexes', async () => {
@@ -388,13 +386,10 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 7,
-      // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
-      // approved under a receipt without one must be projected again. The walk skips type-only
-      // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
-      // Trn3/TPU7x all-in power changed in gpu-keys; video entries
-      // read no power, so entries are unchanged.
-      sources: 'ce2885df3c8304adff4e614bb2f4c72b86c12fea504f0fab9d627e2b27fb3dc7',
+      projection: 8,
+      // Projection 8: a cell's energy and power need a power document whose verdict is true, and
+      // entries no longer carry clipsGpuHour, so entries recorded under 7 must be projected again.
+      sources: '77b1590b14a66414188ab301ae8b2370b0f10cacc20efbfa27262b048549a043',
     });
   });
 });

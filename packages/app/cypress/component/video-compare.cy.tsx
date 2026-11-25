@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { parseStage, writeStage } from '@/components/video-benchmark/clip-stage';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
-import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import { qualifies, videoPoints } from '@/components/video-benchmark/points';
 import type { ResultCell } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
@@ -17,8 +17,8 @@ import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 // Retained H100/H200/B200 C1/C2/C4 observations; clips come from synthetic stored artifacts.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
 // The retained native H200 run under the sample floor never becomes a side.
-const cells = dashboardCells(points).cells;
-const c1 = (key: string) => cells.find((p) => p.hardwareKey === key && p.concurrency === 1)!;
+const cells = points.filter(qualifies);
+const c1 = (key: string) => cells.find((p) => p.hardwareKey === key)!;
 const COLORS: Record<string, string> = {
   h100: 'rgb(10, 20, 30)',
   h200: 'rgb(40, 50, 60)',

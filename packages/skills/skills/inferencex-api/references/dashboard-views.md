@@ -541,69 +541,44 @@ which API selectors belong together.
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families, `asOf` for image age/release status, and `includeHistory` for daily age history.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. One telemetry source per run; full-record statistics computed on read. Not a serving-window/role-pool projection. Responses are no-store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `ubenchx`                       | Test selector (`test`: `mem-bw`, `sm-l2-distance`, `tpc-skyline`, `core-memory-profiles`, or `all`) plus GPU selector (`all` or one GPU). `mem-bw` returns static device-memory copy bandwidth rows with derived MBU and latency. The Huawei key is `Huawei 950PR` (measured SKU `Ascend950PR_9579`): FP16 rotating-pool graph timings, 360 observations per size, and explicit 1,638.4 GB/s derived-reference qualification in `peakBandwidthSource`. `metadata.protocol`, CANN/torch_npu versions, and absent sizes distinguish them from the GPU protocol. `timeMs` is amortized graph-copy time for these rows; optional row fields retain p10/p90 bandwidth, process medians, slots and working-set bytes. An explicit device filter leaves unavailable tests empty. `sm-l2-distance` returns SM-to-SM L2 latency difference matrix with GPC/die topology and summary statistics. `tpc-skyline` additionally returns `skuConfigurations`, separately from measured NVIDIA `gpus`: nine contributor-supplied Huawei 950PR configurations, not topology measurements. `gpu=all` (default) or `gpu=Huawei 950PR` includes all configurations; `gpu=Ascend 950PR_9579` selects one. Each row preserves core counts, clocks in MHz, memory in GiB, L2 in MiB, virtualisation options, raw DDR Rate values (`unit=null`) and screenshot provenance (`vendorSourceVerified=false`). The same filtered array appears under `tpcSkyline` for `test=all`; absent measurements stay empty. The table has no additional data filters; the profile link and horizontal scrolling are presentation-only. Source metadata remains in the API; the page omits the source footer. `tpc-skyline` returns measured TPCs per GPC (sorted descending) with GPC, TPC, and SM counts, defaulting to every GPU. `core-memory-profiles` combines B200 SXM and Ascend on `/ubx/core-memory-profiles`, defaulting to `gpu=all`; the hardware selector maps to `gpu=B200 SXM` or `gpu=Ascend 950PR_9579`. The old `/ubx/sm-l2-distance` page redirects here, but its API remains backward compatible. B200 retains the SM matrix, GPC/die metadata and statistics, with `unit=clock64 cycles` and its own `colorLimits`. The Ascend result returns all four Ascend 950PR_9579 scalar-controller matrices (Cube/Vector, isolated/concurrent), actual core IDs, color limits shared only across its four panels, per-die-group means and provenance. Values are mean absolute differences between matched-address profiles in raw `SYS_CNT ticks`, not core-to-core latency or calibrated cycles. No grid-wide barrier is used in concurrent launches. Cell hover, pinning and dismissal by outside click or Escape are presentation-only; all matrix cells remain available in the API. The idle instructions and Clear selection buttons are omitted in both locales; this presentation-only change does not alter the API contract. `all` (default) returns every test. Explicit device filters leave unavailable test sections empty. The Y-axis selector on `/ubx/mem-bw` is presentation-only. |
-| `video`                         | Default VideoGenX dashboard: shared workload, deployment, axes, cost tier, API-price reference, optimal and hidden-hardware filters. `view=compare` adds published matched-case selection. Legacy run/artifact discovery/results/tradeoff remain explicit. No-store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `video`                         | Default VideoGenX results overview (`view=overview`): `r_*` selectors and one named-run overlay, as JSON or CSV. Legacy run/artifact discovery/results/tradeoff remain explicit. No-store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### VideoGenX selection and coverage
 
-With no `run`/`artifact`, `/api/v1/views/video` returns the current dashboard's
-approved-history projection, not CI discovery. Legacy stored sources remain in
+With no `run`/`artifact`, `/api/v1/views/video` returns the results overview
+(`view=overview`, see [VideoGenX results overview](#videogenx-results-overview)),
+not CI discovery. Legacy stored sources remain in
 stored History but cannot enter default charts without a matching immutable
 publication receipt. Authorization to publish is separate from benchmark qualification.
 All public video GET paths, including a `format=media` cache miss, are read-only;
-the miss returns 204. Copy its URL selectors directly:
-`v_x`, `v_y`, `v_tier`, `v_optimal`, `v_api`, `v_hidden`, `v_base`, `v_cand`, `v_case`.
-`v_view=chart|table` is presentation only. Read resolved `params`; malformed values
-use the same defaults as the UI. Unknown/repeated query names still return 400.
+the miss returns 204. Read resolved `params`. Unknown/repeated query names return 400.
 
-- Defaults: P90 seconds vs videos/USD TCO, owning tier `h`, optimal deployments
-  only; `r` selects renting. `v_optimal=0` includes dominated deployments. Queued
-  client-concurrency cells stay in evidence, outside chart/table.
-- `v_hidden` is a comma-separated roster-key list (for example `h100,mi355x`),
-  default empty. It filters chart/table only; KPI/Compare/Evidence keep their
-  original scope. Unknown keys are ignored, remaining keys are sorted/deduplicated.
 - Allocated GPUs require retained scheduler allocation evidence; native power device counts
   do not prove the reservation. Missing allocation and allocation-normalized metrics stay null.
-- Metrics use participating GPUs. API list price is USD/video-second multiplied
-  by clip duration, not TCO, revenue or measured power. `metricDefinitions`
-  declares units and optimization direction; missing values remain null.
 - The server reads the same first **five published history pages** as the UI,
   plus the latest source of every deployment older than them, so each deployment's
   newest cell is present. `coverage.pagesRead`, `coverage.nextPage` and
   `coverage.truncated` describe the paged window; this is not all-history or
-  date-range coverage. It applies
-  the UI's canonical workload selection, sample floor and newest-cell rules.
-- Evidence rows share one known workload and deployment layout. Hardware without
-  C1 keeps raw concurrency measurements only within that cohort, with null ratios.
-  Without any known C1 cohort, concurrency evidence is empty.
-- Default mode leaves `comparison.cases.status=not-requested`. `view=compare`
-  reads at most two already-published media artifacts and returns the matched
-  pair selected by `v_case` (zero-based), `resolvedCaseIndex`, pair count and
-  unmatched counts. `not-published`, `no-pair` and `unavailable` are explicit
-  alternatives to `ready`; `no-pair` means a missing baseline/candidate.
-  `ready` means both artifacts were read, not that a matched case exists: always
-  inspect `count` and `selected` (they can be 0 and null).
-  Returned media paths are relative; private asset URLs and raw bundles are omitted.
+  date-range coverage. `/vgx`, the overview and that read of older deployments
+  share the admission rule stated under `r_model` and `r_workload` below.
+- A History read whose index or approval receipt could not be read returns 502:
+  retry instead of treating fewer cells as complete. A failed live read of an
+  unstored `unofficialrun` returns its source status instead of an empty overlay.
 - Use `view=discovery&page=1` for the CI listing, including standard `run-sweep` runs; follow `nextPage` even when a page contains no video runs. Runs may have no video artifacts. Per-run listings include all artifact pages and legacy or uniquely named native matrix artifacts. `run=…&artifact=…` retains
   the legacy result/serving/fidelity contract; `view=results|tradeoff` is explicit.
-  Legacy selectors and `v_*` selectors cannot be mixed. Legacy missing artifacts
+  Legacy selectors and `r_*` selectors cannot be mixed. Legacy missing artifacts
   return 204; an unpublished `compare` ref is skipped and listed in
-  `unpublishedCompare`. Dashboard mode returns its empty/partial projection and coverage.
+  `unpublishedCompare`.
 
 Example (check deployed OpenAPI availability first; no authentication or write):
 
 ```js
 const url = new URL('https://inferencex.semianalysis.com/api/v1/views/video');
 url.search = new URLSearchParams({
-  view: 'compare',
-  v_x: 'p50Latency',
-  v_y: 'videosPerGpuHour',
-  v_tier: 'r',
-  v_optimal: '0',
-  v_api: '0.08',
-  v_hidden: 'mi355x',
-  v_base: 'h200',
-  v_cand: 'b200',
-  v_case: '3',
+  view: 'overview',
+  r_tier: 'r',
+  r_deadline: '120',
+  r_hidden: 'mi355x',
 }).toString();
 const response = await fetch(url);
 if (!response.ok) throw new Error(`Video view HTTP ${response.status}`);
@@ -612,9 +587,8 @@ console.log(
   JSON.stringify({
     params: data.params,
     coverage: data.coverage,
-    rows: data.rows,
-    comparison: data.comparison,
-    provenance: data.provenance,
+    cells: data.cells,
+    clipQuality: data.clipQuality,
   }),
 );
 ```
@@ -1048,7 +1022,8 @@ API 在 `params` 中返回实际采用的参数，并在 `historicalWindow` 中�
 `/vgx` and `/zh/vgx`. It reads five stored history pages plus each older
 deployment's latest source; `coverage.truncated` describes the paged window. It
 never triggers media publication.
-The earlier dashboard/compare and run/artifact results views remain available.
+It is the default without `run`/`artifact`; the run/artifact discovery, results and
+tradeoff views remain available.
 
 HTTP responses remain `private, no-store`. The underlying published History and
 media metadata reader reuses payloads for at most 30 seconds in each server
@@ -1179,13 +1154,13 @@ admits another run and clearing it cannot promote unapproved evidence. Dismissal
 retains a workload selector only if it remains in the approved choices. Approved
 cohorts retain default preference; a workload found only in the named run requires
 explicit selection or no matching approved cohort. Both channels use the same
-qualification and metric rules. Legacy dashboard/compare views stay approved-only.
+qualification and metric rules.
 The overview returns JSON by default. `format=csv` is available only with `view=overview`; it exports the current official and named cells with exact source/workload/run/artifact identity, approval, units and participating/allocated GPU costs. `duration_s` retains the requested plan duration; `video_seconds_per_s`, next to `clips_per_s`, reports validated decoded output seconds per wall second. Empty CSV cells mean missing evidence. The response is private and no-store.
 
 中文：默认结果必须有匹配的发布批准记录。指定运行的通道只包含该运行，保留实际批准状态；
 清除叠加运行后不会将未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。默认优先选择有已批准结果的工作负载；
 仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。两条通道共用准入和计算规则。
-旧 dashboard/compare 视图仍仅接纳已批准结果。overview 默认返回 JSON；仅 `view=overview` 接受 `format=csv`，导出当前筛选的正式及指定运行数据点，保留来源与批准状态、单位及参与/已分配 GPU 成本。`duration_s` 保留计划请求时长；紧邻 `clips_per_s` 的 `video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。空单元格表示缺失数据，CSV 响应设置 `Cache-Control: private, no-store`。
+overview 默认返回 JSON；仅 `view=overview` 接受 `format=csv`，导出当前筛选的正式及指定运行数据点，保留来源与批准状态、单位及参与/已分配 GPU 成本。`duration_s` 保留计划请求时长；紧邻 `clips_per_s` 的 `video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。空单元格表示缺失数据，CSV 响应设置 `Cache-Control: private, no-store`。
 
 ### Landing-page Huawei link
 

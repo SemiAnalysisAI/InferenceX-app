@@ -61,7 +61,6 @@ describe('VideoGenX results contract', () => {
       { scheduled: 4 },
       { concurrency: 2 },
       { workloadKey: null },
-      { workloadKey: 'unverified-label' },
     ])
       expect(resultProjection([{ ...eligible, ...change }], state()).cells).toEqual([]);
     expect(

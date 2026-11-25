@@ -1,5 +1,5 @@
 import { canonical, type Json } from './bundle';
-import { deploymentKey, runtimeKey } from './deployment';
+import { chipConfigKey, deploymentKey, runtimeKey } from './deployment';
 import { hardwareKey, hardwareSort } from './hardware';
 import type { VideoHistoryEntry, VideoHistoryObservation, VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
@@ -19,7 +19,6 @@ export function videoPoints(pages: VideoHistoryPage[]): VideoPoint[] {
 }
 
 export function namedRunPoints(pages: VideoHistoryPage[], runId: string | null): VideoPoint[] {
-  if (!runId || !/^[1-9]\d*$/u.test(runId) || !Number.isSafeInteger(Number(runId))) return [];
   return historyPoints(
     pages.flatMap((page) => page.entries.filter((entry) => entry.runId === runId)),
   );
@@ -140,27 +139,39 @@ export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
   });
 }
 
+export const RESULTS_HARDWARE = [
+  'gb200',
+  'b300',
+  'b200',
+  'mi355x',
+  'h200',
+  'h100',
+  'a100',
+] as const;
+
 /** Valid clips a cell needs before the dashboard counts it, so a smoke run of a few clips stays in History only. */
 export const DASHBOARD_SAMPLE_FLOOR = 10;
 
-/** Positive when `a` was published after `b`: the published history order (time, then artifact id). */
-function publicationOrder(a: VideoPoint, b: VideoPoint): number {
-  return (a.publishedAt ?? '').localeCompare(b.publishedAt ?? '') || a.artifactId - b.artifactId;
+/**
+ * The one admission rule of /vgx, its API and the History carry: a complete 20-clip run at
+ * concurrency 1 of a known workload on listed hardware, with at least the sample floor.
+ */
+export function qualifies(p: VideoPoint): boolean {
+  return Boolean(
+    RESULTS_HARDWARE.some((key) => key === p.hardwareKey) &&
+    p.workloadKey &&
+    p.concurrency === 1 &&
+    p.scheduled === 20 &&
+    p.samples >= DASHBOARD_SAMPLE_FLOOR &&
+    p.status === 'complete',
+  );
 }
 
-/** Unknown legacy workloads stay inside their sealed source, never merge by display label. */
-export function workloadGroup(point: Pick<VideoPoint, 'workloadKey' | 'id'>): string {
-  return point.workloadKey || `unknown:${point.id.split(':')[0]}`;
-}
-
-/** Qualified approved cells, keyed by workload, hardware, deployment and concurrency. */
+/** Qualified approved cells, keyed by workload, hardware and deployment. */
 const qualifiedCells = (entries: VideoHistoryEntry[]) =>
   historyPoints(entries.filter((entry) => entry.approved === true))
-    .filter((p) => p.samples >= DASHBOARD_SAMPLE_FLOOR)
-    .map(
-      (p) =>
-        `${workloadGroup(p)}:${p.hardwareKey ?? p.hardwareName}:${deploymentKey(p)}:${p.concurrency ?? 'na'}`,
-    );
+    .filter(qualifies)
+    .map((p) => `${p.workloadKey}:${chipConfigKey(p)}`);
 
 /**
  * Approved entries of `older` (newest first) holding a qualified cell that neither `window` nor a
@@ -177,60 +188,4 @@ export function latestOlderEntries(
     for (const cell of unseen) seen.add(cell);
     return unseen.length > 0;
   });
-}
-
-/**
- * Cells the dashboard reads. Published history also carries smoke runs (a few
- * clips of a shorter plan) and superseded exports, while the chart, cards,
- * Compare and Evidence must all describe one frozen workload: drop cells under
- * the sample floor, keep the workload measured on the most hardware (ties: more
- * cells, then the newer publication), then the newest cell per hardware,
- * deployment (runtime and layout) and concurrency. Everything else stays
- * visible in the Performance history list.
- */
-export function dashboardCells(points: VideoPoint[]): {
-  cells: VideoPoint[];
-  workload: string | null;
-  otherWorkloads: number;
-} {
-  const qualified = points.filter((p) => p.samples >= DASHBOARD_SAMPLE_FLOOR);
-  const hardware = new Map<string, Set<string>>();
-  const cellKeys = new Map<string, Set<string>>();
-  const newest = new Map<string, VideoPoint>();
-  for (const p of qualified) {
-    const group = workloadGroup(p);
-    const hardwareId = p.hardwareKey ?? p.hardwareName;
-    hardware.set(group, (hardware.get(group) ?? new Set()).add(hardwareId));
-    cellKeys.set(
-      group,
-      (cellKeys.get(group) ?? new Set()).add(
-        `${hardwareId}:${deploymentKey(p)}:${p.concurrency ?? 'na'}`,
-      ),
-    );
-    const latest = newest.get(group);
-    if (!latest || publicationOrder(p, latest) > 0) newest.set(group, p);
-  }
-  let workloadKey: string | null = null;
-  for (const group of hardware.keys()) {
-    if (workloadKey === null) {
-      workloadKey = group;
-      continue;
-    }
-    const order =
-      hardware.get(group)!.size - hardware.get(workloadKey)!.size ||
-      cellKeys.get(group)!.size - cellKeys.get(workloadKey)!.size ||
-      publicationOrder(newest.get(group)!, newest.get(workloadKey)!);
-    if (order > 0) workloadKey = group;
-  }
-  const others = new Set(points.map(workloadGroup));
-  if (workloadKey !== null) others.delete(workloadKey);
-  const cells =
-    workloadKey === null
-      ? []
-      : latestVideoCells(qualified.filter((p) => workloadGroup(p) === workloadKey));
-  return {
-    cells,
-    workload: cells[0]?.workload.split(' · ').slice(0, 5).join(' · ') ?? null,
-    otherWorkloads: others.size,
-  };
 }

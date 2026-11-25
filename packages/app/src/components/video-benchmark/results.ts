@@ -1,10 +1,10 @@
-import { at, generationDuration, number, rows, text, type Json } from './bundle';
+import { at, generationDuration, number, text, type Json } from './bundle';
 import { costPerGpuHour, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
 import { chipConfigKey, compareDeployments } from './deployment';
 import { engineSort } from './engines';
 import { optimizationsOf } from './optimizations';
-import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
+import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells, qualifies, RESULTS_HARDWARE } from './points';
 import type { ResultsEvidence } from './results-evidence';
 import {
   isResultsXMetric,
@@ -13,16 +13,6 @@ import {
   type ResultsXMetric,
   type ResultsYMetric,
 } from './results-chart';
-
-export const RESULTS_HARDWARE = [
-  'gb200',
-  'b300',
-  'b200',
-  'mi355x',
-  'h200',
-  'h100',
-  'a100',
-] as const;
 
 /** Listed before its first matched run so readers see it is coming; other hardware appears with data. */
 const PLANNED_HARDWARE: readonly string[] = ['mi355x'];
@@ -241,19 +231,6 @@ export function resultMetadata(point: VideoPoint) {
   const width = number(at(generation, 'width')),
     height = number(at(generation, 'height'));
   return {
-    canonicalWorkload: Boolean(
-      text(at(plan, 'model_id')) &&
-      text(at(plan, 'model_revision')) &&
-      positive(width) &&
-      positive(height) &&
-      positive(generationDuration(generation)) &&
-      positive(number(at(generation, 'fps'))) &&
-      positive(number(at(generation, 'num_inference_steps'))) &&
-      rows(at(plan, 'cases')).length > 0 &&
-      rows(at(plan, 'cases')).every(
-        (c) => text(at(c, 'prompt')) && Number.isInteger(number(at(c, 'seed'))),
-      ),
-    ),
     model: text(at(plan, 'model_id')) || point.model,
     resolution: positive(width) && positive(height) ? `${width}×${height}` : null,
     duration: generationDuration(generation) ?? point.durationSeconds,
@@ -390,20 +367,6 @@ function workloadRuns(points: readonly VideoPoint[]): ResultsRun[] {
   return [...first]
     .toSorted(([a, aAt], [b, bAt]) => aAt.localeCompare(bAt) || Number(a) - Number(b))
     .map(([id, observed]) => ({ id, date: observed.slice(0, 10) }));
-}
-
-function qualifies(p: VideoPoint): boolean {
-  return Boolean(
-    RESULTS_HARDWARE.some((key) => key === p.hardwareKey) &&
-    p.workloadKey &&
-    resultMetadata(p).canonicalWorkload &&
-    p.concurrency === 1 &&
-    p.scheduled === 20 &&
-    p.samples >= DASHBOARD_SAMPLE_FLOOR &&
-    positive(p.valid) &&
-    p.valid >= DASHBOARD_SAMPLE_FLOOR &&
-    p.status === 'complete',
-  );
 }
 
 /** Workload keys, the one most hardware types cover first. */

@@ -176,7 +176,7 @@ export function servingFixture(
       },
       jobHash,
     );
-    save(`${root}/power.json`, { schema_version: '1.0.0', phases }, powerHash);
+    save(`${root}/power.json`, { schema_version: '1.0.0', valid: true, phases }, powerHash);
     return {
       concurrency,
       status: 'complete',

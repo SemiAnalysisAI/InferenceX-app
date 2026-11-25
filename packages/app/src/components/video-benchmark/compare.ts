@@ -1,79 +1,7 @@
 import { at, number, rows, safePath, text } from './bundle';
-import {
-  metricValue,
-  VIDEO_METRICS,
-  type MetricId,
-  type MetricOptions,
-  type VideoPoint,
-} from './metrics';
-import { leadCell } from './deployment';
-import { latestVideoCells } from './points';
+import type { VideoPoint } from './metrics';
 import { servingCells, type ServingCell } from './serving';
 import { storedBundle, type StoredArtifact, type StoredMedia, type StoredSource } from './stored';
-
-/** Metrics the compare table shows, in row order. */
-export const COMPARE_METRICS = [
-  'p50Latency',
-  'dollarsPerVideo',
-  'kjPerVideo',
-] as const satisfies readonly MetricId[];
-export type CompareMetricId = (typeof COMPARE_METRICS)[number];
-
-export interface CompareRow {
-  id: CompareMetricId;
-  baseline: number | null;
-  candidate: number | null;
-  /** candidate / baseline; null when either side is missing. */
-  ratio: number | null;
-  /** (ratio − 1) × 100. */
-  deltaPercent: number | null;
-  /** By registry polarity; null when not comparable or when both sides are equal. */
-  candidateBetter: boolean | null;
-}
-
-/**
- * One cell a reader can pick per registry hardware: its most efficient
- * non-queued deployment (per participating GPU) with a P50. Queued cells never qualify.
- */
-export function comparablePoints(points: VideoPoint[]): VideoPoint[] {
-  const cells = latestVideoCells(points);
-  const keys = [...new Set(cells.flatMap((p) => (p.hardwareKey === null ? [] : [p.hardwareKey])))];
-  return keys.flatMap((key) => {
-    const lead = leadCell(cells, key, { tier: 'h' });
-    return lead && lead.p50 !== null ? [lead] : [];
-  });
-}
-
-/** Side-by-side deltas; every null input stays null (never 0). */
-export function compareMetrics(
-  baseline: VideoPoint,
-  candidate: VideoPoint,
-  options: MetricOptions,
-): CompareRow[] {
-  return COMPARE_METRICS.map((id) => {
-    const b = metricValue(baseline, id, options);
-    const c = metricValue(candidate, id, options);
-    if (b === null || c === null || !(b > 0))
-      return {
-        id,
-        baseline: b,
-        candidate: c,
-        ratio: null,
-        deltaPercent: null,
-        candidateBetter: null,
-      };
-    const ratio = c / b;
-    const lower = VIDEO_METRICS[id].polarity === 'lower';
-    return {
-      id,
-      baseline: b,
-      candidate: c,
-      ratio,
-      deltaPercent: (ratio - 1) * 100,
-      candidateBetter: c === b ? null : lower ? c < b : c > b,
-    };
-  });
-}
 
 /** One measurement request of a serving cell, with its case identity and retained media path. */
 export interface CaseRecord {
@@ -124,67 +52,6 @@ export function caseRecords(cell: Pick<ServingCell, 'run' | 'runPath'>): CaseRec
         mediaPath,
       };
     });
-}
-
-export interface CasePair {
-  /** Case identity shared by both records. */
-  key: string;
-  caseId: string | null;
-  prompt: string | null;
-  seed: number | null;
-  /** 0-based repetition among pairs with the same identity. */
-  repetition: number;
-  baseline: CaseRecord;
-  candidate: CaseRecord;
-}
-
-/** Identity used for pairing: prompt + seed when known, else the plan case id. */
-export function caseKey(record: Pick<CaseRecord, 'caseId' | 'prompt' | 'seed'>): string | null {
-  if (record.prompt !== null && record.seed !== null)
-    return `ps\u0000${record.seed}\u0000${record.prompt}`;
-  return record.caseId === null ? null : `id\u0000${record.caseId}`;
-}
-
-/**
- * Match the k-th repetition of a case on one side with the k-th on the other,
- * in baseline order. Records without any case identity, and repetitions the
- * other side lacks, are counted rather than invented.
- */
-export function pairCases(
-  baseline: CaseRecord[],
-  candidate: CaseRecord[],
-): { pairs: CasePair[]; unmatched: { baseline: number; candidate: number } } {
-  const queues = new Map<string, CaseRecord[]>();
-  let unmatchedCandidate = 0;
-  for (const record of candidate) {
-    const key = caseKey(record);
-    if (key === null) unmatchedCandidate++;
-    else queues.set(key, [...(queues.get(key) ?? []), record]);
-  }
-  const pairs: CasePair[] = [];
-  const repetitions = new Map<string, number>();
-  let unmatchedBaseline = 0;
-  for (const record of baseline) {
-    const key = caseKey(record);
-    const match = key === null ? undefined : queues.get(key)?.shift();
-    if (key === null || match === undefined) {
-      unmatchedBaseline++;
-      continue;
-    }
-    const repetition = repetitions.get(key) ?? 0;
-    repetitions.set(key, repetition + 1);
-    pairs.push({
-      key,
-      caseId: record.caseId ?? match.caseId,
-      prompt: record.prompt ?? match.prompt,
-      seed: record.seed ?? match.seed,
-      repetition,
-      baseline: record,
-      candidate: match,
-    });
-  }
-  for (const queue of queues.values()) unmatchedCandidate += queue.length;
-  return { pairs, unmatched: { baseline: unmatchedBaseline, candidate: unmatchedCandidate } };
 }
 
 /** Case records of one dashboard point plus the published media of each path. */

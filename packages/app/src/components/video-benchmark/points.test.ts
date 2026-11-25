@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
-import { dashboardCells, latestVideoCells, namedRunPoints, videoPoints } from './points';
+import { latestVideoCells, namedRunPoints, videoPoints } from './points';
 import type { ResultsEvidence } from './results-evidence';
 
 const observation: VideoHistoryObservation = {
@@ -20,7 +20,6 @@ const observation: VideoHistoryObservation = {
   samples: 20,
   p50: 150.6,
   p90: 151.1,
-  clipsGpuHour: 5.97,
   energyKj: 410.95,
   participating: 4,
   allocated: 4,
@@ -255,98 +254,24 @@ const pageOf = (
   ],
 });
 
-describe('dashboardCells', () => {
-  const FORMAL =
-    '1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 29 · A single continuous shot';
-  const SHORT =
-    '1344 × 768 · 4 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11 · A single continuous shot';
-  const cell = (over: Partial<VideoHistoryObservation>): VideoHistoryObservation => ({
-    ...observation,
-    workload: FORMAL,
-    ...over,
-  });
+const served = (
+  id: string,
+  hardware: string,
+  engine: string,
+  server: typeof observation.server,
+  optimizations: string[] = [],
+) => ({
+  ...observation,
+  id,
+  hardware,
+  server,
+  results: { engine, optimizations } as ResultsEvidence,
+});
 
-  it('drops cells under the sample floor even when they are the most efficient', () => {
-    // A two-GPU smoke with four clips: the best videos per GPU-hour, no P90, not a benchmark point.
-    const smoke = cell({
-      id: 'sha:smoke',
-      cell: 'smoke',
-      samples: 4,
-      valid: 4,
-      scheduled: 4,
-      p90: null,
-      clipsGpuHour: 15.06,
-      participating: 2,
-      allocated: 2,
-      server: { tp: 1, ulysses: 2, attention: 'auto' },
-    });
-    const { cells, workload, otherWorkloads } = dashboardCells(
-      videoPoints([pageOf('1', 'NVIDIA H200', [cell({}), smoke])]),
-    );
-    expect(cells.map((p) => p.id)).toEqual(['sha:c1']);
-    expect(workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
-    expect(otherWorkloads).toBe(0);
-  });
-
-  it('keeps the workload measured on the most hardware and counts the hidden ones', () => {
-    const pages = [
-      pageOf('1', 'NVIDIA H200', [
-        cell({}),
-        cell({ id: 'sha:short', cell: 'c1s', workload: SHORT, workloadKey: 'short-plan' }),
-      ]),
-      pageOf('2', 'NVIDIA B200', [cell({ id: 'sha:b1', hardware: 'NVIDIA B200' })]),
-    ];
-    const result = dashboardCells(videoPoints(pages));
-    expect(result.workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
-    expect(result.cells.map((p) => p.id).toSorted()).toEqual(['sha:b1', 'sha:c1']);
-    expect(result.otherWorkloads).toBe(1);
-  });
-
-  it('returns no cells and no workload when nothing reaches the floor', () => {
-    const result = dashboardCells(
-      videoPoints([pageOf('1', 'NVIDIA H200', [cell({ samples: 3 })])]),
-    );
-    expect(result).toEqual({ cells: [], workload: null, otherWorkloads: 1 });
-  });
-
-  it('does not replace the frozen workload with a newer cell whose cases differ', () => {
-    const result = dashboardCells(
-      videoPoints([
-        pageOf('3', 'NVIDIA H200', [
-          cell({ id: 'new:c1', workloadKey: 'different-prompt-and-seed' }),
-        ]),
-        pageOf('2', 'NVIDIA H200', [cell({ id: 'formal:c1' })]),
-        pageOf('1', 'NVIDIA B200', [cell({ id: 'b:c1', hardware: 'NVIDIA B200' })]),
-      ]),
-    );
-    expect(result.cells.map((p) => p.id)).toEqual(['b:c1', 'formal:c1']);
-    expect(result.otherWorkloads).toBe(1);
-    expect(result.workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
-  });
-
-  it('breaks a full hardware and cell tie by the newer publication, not roster order', () => {
-    // Newer publication of an older artifact (backfill) on the later roster SKU.
-    const newer = pageOf('1', 'NVIDIA H200', [cell({ id: 'new:c1', workloadKey: 'new-plan' })]);
-    newer.entries[0].publishedAt = '2026-09-12T00:00:00Z';
-    const older = pageOf('2', 'NVIDIA B200', [
-      cell({ id: 'old:c1', hardware: 'NVIDIA B200', workloadKey: 'old-plan' }),
-    ]);
-    const result = dashboardCells(videoPoints([newer, older]));
-    expect(result.cells.map((p) => p.id)).toEqual(['new:c1']);
-    expect(result.otherWorkloads).toBe(1);
-  });
-
-  const served = (
-    id: string,
-    hardware: string,
-    engine: string,
-    server: typeof observation.server,
-    optimizations: string[] = [],
-  ) => cell({ id, hardware, server, results: { engine, optimizations } as ResultsEvidence });
-
+describe('latestVideoCells', () => {
   it('never lets one engine replace another engine at the same hardware, GPUs and concurrency', () => {
     const split = { tp: 1, ulysses: 4, attention: null };
-    const result = dashboardCells(
+    const cells = latestVideoCells(
       videoPoints([
         // Nor is a stock cell an older layout of the same engine with caching.
         pageOf('6', 'H100', [
@@ -360,7 +285,7 @@ describe('dashboardCells', () => {
         pageOf('1', 'H200', [served('h200-sglang:c1', 'H200', 'sglang', null)]),
       ]),
     );
-    expect(result.cells.map((p) => p.id).toSorted()).toEqual([
+    expect(cells.map((p) => p.id).toSorted()).toEqual([
       'b200-sglang:c1',
       'b200-vllm:c1',
       'h100-cached:c1',
@@ -368,21 +293,5 @@ describe('dashboardCells', () => {
       'h200-sglang:c1',
       'h200-vllm:c1',
     ]);
-  });
-
-  it('keeps legacy cells together only inside their sealed source, never by label', () => {
-    const result = dashboardCells(
-      videoPoints([
-        pageOf('2', 'NVIDIA H200', [
-          cell({ id: 'source-a:c1', workloadKey: null }),
-          cell({ id: 'source-a:c2', cell: 'c2', concurrency: 2, workloadKey: null }),
-        ]),
-        pageOf('1', 'NVIDIA B200', [
-          cell({ id: 'source-b:c1', hardware: 'NVIDIA B200', workloadKey: undefined }),
-        ]),
-      ]),
-    );
-    expect(result.cells.map((p) => p.id)).toEqual(['source-a:c1', 'source-a:c2']);
-    expect(result.otherWorkloads).toBe(1);
   });
 });

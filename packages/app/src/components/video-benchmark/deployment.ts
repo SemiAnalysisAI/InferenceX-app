@@ -72,12 +72,6 @@ function workloadLayout(p: VideoPoint): unknown[] | null {
   return [p.workloadKey, ...layout];
 }
 
-/** Known workload, runtime and layout required for a measured evidence comparison. */
-export function evidenceComparisonKey(p: VideoPoint): string | null {
-  const known = workloadLayout(p);
-  return known && JSON.stringify([runtimeKey(p), ...known]);
-}
-
 /** Run, hardware, engine, workload and layout: everything but the optimizations. */
 function twinKey(p: VideoPoint): string | null {
   const known = workloadLayout(p);
@@ -104,40 +98,6 @@ export function losslessTwin<T extends VideoPoint>(
   for (const p of pool)
     if (!isLossy(p) && twinKey(p) === key && (best === null || rank(p) < rank(best))) best = p;
   return best;
-}
-
-/**
- * One lossless C1 cell per hardware on the known workload, runtime and deployment
- * layout that the most hardware share (ties keep the first in cell order), so a
- * cross-hardware comparison holds the runtime constant. Hardware without that
- * workload, runtime and layout is omitted.
- * Cells arrive in hardware order and stay in it.
- */
-export function sharedLayoutCells<T extends VideoPoint>(cells: T[]): T[] {
-  const deployments = cells.filter(
-    (p) =>
-      p.hardwareKey !== null &&
-      p.concurrency === 1 &&
-      !isLossy(p) &&
-      evidenceComparisonKey(p) !== null,
-  );
-  const hardwareByLayout = new Map<string, Set<string>>();
-  for (const p of deployments) {
-    const key = evidenceComparisonKey(p)!;
-    const set = hardwareByLayout.get(key) ?? new Set<string>();
-    set.add(p.hardwareKey!);
-    hardwareByLayout.set(key, set);
-  }
-  let shared: string | null = null;
-  for (const [key, set] of hardwareByLayout)
-    if (shared === null || set.size > hardwareByLayout.get(shared)!.size) shared = key;
-  const keys = [...new Set(deployments.map((p) => p.hardwareKey!))];
-  return keys.flatMap((hardwareKey) => {
-    const cell = deployments.find(
-      (p) => p.hardwareKey === hardwareKey && evidenceComparisonKey(p) === shared,
-    );
-    return cell ? [cell] : [];
-  });
 }
 
 /**

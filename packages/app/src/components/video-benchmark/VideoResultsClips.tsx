@@ -53,7 +53,8 @@ import {
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
-import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
+import { RESULTS_HARDWARE } from './points';
+import { resultMetadata, type ResultCell } from './results';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
 import { cost as dollarsOf, reading as figuresOf } from './format';
