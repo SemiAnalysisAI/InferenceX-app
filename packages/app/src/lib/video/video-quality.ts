@@ -13,7 +13,7 @@ import {
 } from '@/components/video-benchmark/reference-quality';
 import type { StoredArtifact, StoredQuality } from '@/components/video-benchmark/stored';
 import { artifactFiles, type GithubRead } from './video-live-run';
-import { trustedMainRun } from './video-provenance';
+import { newestFirst, trustedMainRun } from './video-provenance';
 import { readStoredQuality, storeReferenceMedia, storeVideoQuality } from './video-storage';
 
 async function sealedFile(path: string, expected: string): Promise<Blob> {
@@ -76,12 +76,10 @@ export async function trustedQualityArtifact(
   const listing = await github(`/actions/artifacts?name=${name}&per_page=100`, signal);
   if (!listing.ok) throw new Error('Quality artifact listing unavailable');
   const { artifacts = [] }: { artifacts?: CIArtifact[] } = await listing.json();
-  const candidates = artifacts
-    .filter((item) => item.name === name && !item.expired && item.workflow_run?.id)
-    .toSorted((a, b) => b.id - a.id);
-  for (const artifact of candidates) {
+  for (const artifact of newestFirst(artifacts, name)) {
+    if (!artifact.workflow_run?.id) continue;
     const run = await trustedMainRun(
-      artifact.workflow_run!.id,
+      artifact.workflow_run.id,
       QUALITY_WORKFLOW,
       ['workflow_run', 'workflow_dispatch'],
       github,

@@ -43,6 +43,10 @@ export async function trustedMainRun(
     : null;
 }
 
+/** A listing's unexpired artifacts named `name`, newest (highest ID) first. */
+export const newestFirst = (artifacts: CIArtifact[], name: string) =>
+  artifacts.filter((item) => item.name === name && !item.expired).toSorted((a, b) => b.id - a.id);
+
 /** A bundle a merge selection names, with its one artifact in the source run. */
 export interface SelectedArtifact extends VideoPublicationSelection {
   artifact: CIArtifact;
@@ -50,10 +54,11 @@ export interface SelectedArtifact extends VideoPublicationSelection {
 
 /**
  * The bundles a Merge Ingest push to main selected from source run `runId`, or null when that
- * merge run does not authorize publishing the run. Names and digests come from the run's one
- * unexpired `video-publication-selection` artifact, and each name must be exactly one unexpired
- * artifact of `catalog`. Merge Ingest dispatches publication from its own last step, so a run
- * still in progress qualifies; a failed or cancelled one does not.
+ * merge run does not authorize publishing the run. Names and digests come from the run's newest
+ * unexpired `video-publication-selection` artifact, because a rerun of Merge Ingest uploads
+ * another one, and each name must be exactly one unexpired artifact of `catalog`. Merge Ingest
+ * dispatches publication from its own last step, so a run still in progress qualifies; a failed
+ * or cancelled one does not.
  */
 export async function mergeSelection(
   mergeRunId: string,
@@ -70,14 +75,9 @@ export async function mergeSelection(
   );
   if (!listing.ok) throw new Error('Merge run artifact listing unavailable');
   const { artifacts }: { artifacts: CIArtifact[] } = await listing.json();
-  const selections = artifacts.filter((item) => item.name === SELECTION && !item.expired);
-  if (selections.length !== 1) return null;
-  const files = await artifactFiles(
-    selections[0],
-    github,
-    signal,
-    (path) => path === `${SELECTION}.json`,
-  );
+  const [newest] = newestFirst(artifacts, SELECTION);
+  if (!newest) return null;
+  const files = await artifactFiles(newest, github, signal, (path) => path === `${SELECTION}.json`);
   const selection: Json = JSON.parse(new TextDecoder().decode(files.get(`${SELECTION}.json`)));
   if (at(selection, 'version') !== 1 || at(selection, 'source_run_id') !== runId) return null;
   const selected: SelectedArtifact[] = [];

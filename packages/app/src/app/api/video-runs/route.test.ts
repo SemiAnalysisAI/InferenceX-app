@@ -524,24 +524,36 @@ describe('explicit H3 publication', () => {
     sources: [{ id: '10', sha256: 'd'.repeat(64), checkoutSha: 'e'.repeat(40) }],
   };
   const repository = { full_name: 'SemiAnalysisAI/InferenceX', private: false };
-  /**
-   * GitHub as a merge approval reads it: source run 10 with both artifacts, Merge Ingest run 99
-   * still in progress on main, and its one selection artifact, which names artifact 20.
-   */
-  function mockGithub({ run = {}, selection = {} }: { run?: object; selection?: object } = {}) {
-    const zip = zipSync({
+  const selectionZip = (fields: object) =>
+    zipSync({
       'video-publication-selection.json': strToU8(
         JSON.stringify({
           version: 1,
           source_run_id: '10',
           artifacts: [entry(artifact.name)],
-          ...selection,
+          ...fields,
         }),
       ),
     });
+  /**
+   * GitHub as a merge approval reads it: source run 10 with both artifacts, Merge Ingest run 99
+   * still in progress on main, and its selection artifact 7, which names artifact 20. `older` adds
+   * selection artifact 6, as an earlier attempt of run 99 would have uploaded it.
+   */
+  function mockGithub({
+    run = {},
+    selection = {},
+    older,
+  }: { run?: object; selection?: object; older?: object } = {}) {
+    const zips: Record<string, Uint8Array> = {
+      ...(older && { 6: selectionZip(older) }),
+      7: selectionZip(selection),
+    };
     fetchMock.mockImplementation((input, init) => {
       const url = String(input);
-      if (url === 'https://storage.test/selection.zip') {
+      const stored = /^https:\/\/storage\.test\/selection-(?<id>\d+)\.zip$/u.exec(url)?.groups!.id;
+      if (stored) {
+        const zip = zips[stored];
         const range = /^bytes=(?<start>\d+)-(?<end>\d+)$/u.exec(
           new Headers(init?.headers).get('range')!,
         )!.groups!;
@@ -554,15 +566,16 @@ describe('explicit H3 publication', () => {
         );
       }
       const path = url.replace('https://api.github.com/repos/SemiAnalysisAI/InferenceX', '');
-      if (path === '/actions/artifacts/7/zip')
+      if (path === '/actions/artifacts/20/zip')
+        return Promise.resolve(new Response(new Uint8Array([80, 75, 3, 4])));
+      const download = /^\/actions\/artifacts\/(?<id>\d+)\/zip$/u.exec(path)?.groups!.id;
+      if (download)
         return Promise.resolve(
           new Response(null, {
             status: 302,
-            headers: { Location: 'https://storage.test/selection.zip' },
+            headers: { Location: `https://storage.test/selection-${download}.zip` },
           }),
         );
-      if (path === '/actions/artifacts/20/zip')
-        return Promise.resolve(new Response(new Uint8Array([80, 75, 3, 4])));
       const answers: Record<string, object> = {
         '/actions/runs/10/artifacts?per_page=100': { artifacts: [artifact, unselected] },
         '/actions/runs/99': {
@@ -578,14 +591,12 @@ describe('explicit H3 publication', () => {
         },
         [`/compare/${'c'.repeat(40)}...main`]: { status: 'identical' },
         '/actions/runs/99/artifacts?name=video-publication-selection&per_page=100': {
-          artifacts: [
-            {
-              id: 7,
-              name: 'video-publication-selection',
-              expired: false,
-              size_in_bytes: zip.length,
-            },
-          ],
+          artifacts: Object.entries(zips).map(([id, zip]) => ({
+            id: Number(id),
+            name: 'video-publication-selection',
+            expired: false,
+            size_in_bytes: zip.length,
+          })),
         },
       };
       if (!(path in answers)) throw new Error(`Unexpected GitHub read: ${path}`);
@@ -674,6 +685,24 @@ describe('explicit H3 publication', () => {
     expect(storeVideoArtifact).not.toHaveBeenCalled();
     expect(approveVideoPublication).not.toHaveBeenCalled();
     expect(recordVideoHistory).not.toHaveBeenCalled();
+  });
+
+  it('reads the newest selection after a Merge Ingest rerun uploaded a second one', async () => {
+    stubEnv('INVALIDATE_SECRET', 'test-secret');
+    mocked(videoStorageEnabled).mockReturnValue(true);
+    mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    mockGithub({
+      older: { artifacts: [{ ...entry(artifact.name), manifest_sha256: '0'.repeat(64) }] },
+    });
+    const result = await POST(post(mergeBody));
+    expect(result.status).toBe(200);
+    expect(approveVideoPublication).toHaveBeenCalledWith(
+      saved,
+      '99',
+      { artifact, ...selected },
+      expect.any(AbortSignal),
+    );
   });
 
   it('does not approve an already stored artifact whose copy differs from the selection', async () => {
