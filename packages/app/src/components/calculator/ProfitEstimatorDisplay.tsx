@@ -42,7 +42,7 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
-import { ModelSelector } from '@/components/ui/chart-selectors';
+import { ModelSelector, PrecisionSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
@@ -507,6 +507,7 @@ export default function ProfitEstimatorDisplay({
         <GlobalFilterProvider
           initialModel={urlSeed.model}
           initialSequence={Sequence.AgenticTraces}
+          initialPrecisions={urlSeed.precisions}
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
         >
@@ -573,9 +574,10 @@ function ProfitEstimatorInner({
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availableModels, availability, availabilitySettled } = useGlobalFilterAvailability();
+  const { availableModels, availablePrecisions, availability, availabilitySettled } =
+    useGlobalFilterAvailability();
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(
     () => profitAgenticModels(PROFIT_BASIS_TAB[basis], availableModels, availability?.lines),
@@ -1086,6 +1088,15 @@ function ProfitEstimatorInner({
       track('profit_model_selected', { model: value });
     },
     [setSelectedModel],
+  );
+
+  const handlePrecisionChange = useCallback(
+    (value: string[]) => {
+      setVisibilityIntent(null);
+      setSelectedPrecisions(value);
+      track('profit_precision_selected', { precision: value.join(',') });
+    },
+    [setSelectedPrecisions],
   );
 
   const handleBasisChange = useCallback(
@@ -1798,8 +1809,18 @@ function ProfitEstimatorInner({
                     <ControlPanel
                       legend={t.chartGroup}
                       data-testid="profit-chart-panel"
-                      className="xl:w-fit xl:shrink-0"
+                      className="grid-cols-1 gap-x-4 sm:grid-cols-[minmax(10rem,auto)_auto] xl:w-fit xl:shrink-0"
                     >
+                      <PrecisionSelector
+                        id="profit-precision"
+                        data-testid="profit-precision-selector"
+                        value={selectedPrecisions}
+                        onChange={handlePrecisionChange}
+                        open={openDropdown === 'precision'}
+                        onOpenChange={handleDropdownOpenChange('precision')}
+                        onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
+                        availablePrecisions={availablePrecisions}
+                      />
                       <div className="flex min-w-0 flex-col space-y-1.5">
                         <LabelWithTooltip label={t.basisLabel} tooltip={t.basisTooltip} />
                         <SegmentedToggle<ProfitBasis>

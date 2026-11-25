@@ -1216,7 +1216,8 @@ export default function ProfitEstimatorChart({
           const text = d3
             .select(this)
             .select<SVGTextElement>('text')
-            .attr('font-size', px(fontPx))
+            // Inline, so the global 12px `.tick text` rule cannot outsize the margins sized for it.
+            .style('font-size', px(fontPx))
             .style('fill', 'var(--foreground)');
           if (labelLayout === 'stacked') {
             const [config, date] = splitHistoryLabel(labelMap.get(String(d)) ?? String(d));
