@@ -392,9 +392,9 @@ describe('history projection version', () => {
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
       // approved under a receipt without one must be projected again. The walk skips type-only
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
-      // Trn3/TPU7x all-in power changed in gpu-keys; video entries
-      // read no power, so entries are unchanged.
-      sources: 'ce2885df3c8304adff4e614bb2f4c72b86c12fea504f0fab9d627e2b27fb3dc7',
+      // the Trn3 label became Trainium3 PDS in gpu-keys; no video entry names Trn3, so entries
+      // are unchanged.
+      sources: 'f037ccec8a8c306d6abab7211946e32d50f14bcac81c9416121cab7f450c2391',
     });
   });
 });
