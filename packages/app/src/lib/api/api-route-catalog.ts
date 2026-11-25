@@ -2143,7 +2143,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-chart-series.ts',
-    sourceSha256: 'ce00cbd168df883f1759cd7268726575d5effc3fe038a7f74d805df79072ab3a',
+    // Reviewed for log-style sanitization of served source ids, endpoint URLs and engine labels
+    // (documented on /api/v1/trace-server-metrics). Same CHART_SERIES_VERSION: every stored
+    // endpoint is private, so stored rows would not change.
+    sourceSha256: '17dd1c8cbfb966240fcc53aef43e34fc1df489dc634007fb9f898a87ebb52c58',
     reviewArea: {
       en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
       zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',

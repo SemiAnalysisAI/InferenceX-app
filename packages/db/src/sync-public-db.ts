@@ -16,7 +16,10 @@
  * selected runs. Values already in the target are not refreshed, so
  * public backfills of existing rows (e.g. recomputed `aggregate_stats`) do not
  * propagate. Source columns the target schema lacks (newer public migrations)
- * are skipped and reported.
+ * are skipped and reported. Copied server-log text is sanitized as ingest does,
+ * and further for runs from repositories that are not public. Those runs are
+ * stored without `html_url`; the URL is first appended to an operator-only JSONL
+ * file (`--url-map <path>`, default under `~/.inferencex/redacted-run-urls/`).
  *
  * Each run commits in its own transaction, so an interrupted sync resumes by
  * rerunning the command.
@@ -42,6 +45,7 @@ import type postgres from 'postgres';
 
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, type Sql } from './etl/db-utils.js';
+import { nonPublicRepository, sanitizeLogText } from './etl/repo-visibility.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
 import { purgeRuns } from './lib/run-purge';
 import {
@@ -57,6 +61,7 @@ import {
   type RunSummary,
   type RunSyncPlan,
 } from './lib/public-db-sync.js';
+import { recordRedactedRunUrls, redactedRunUrlsPath } from './lib/redacted-run-urls.js';
 import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 
 type Row = Record<string, postgres.ParameterOrJSON<never>>;
@@ -118,6 +123,7 @@ const PASSTHROUGH_TYPES = {
 const { limit } = parseLimitForceFlags();
 const dryRun = process.argv.includes('--dry-run');
 const toPublic = process.argv.includes('--to-public');
+const urlMapFile = redactedRunUrlsPath();
 const runIdIndex = process.argv.indexOf('--run-id');
 let runSelectors: RunSelector[] | null = null;
 if (runIdIndex !== -1) {
@@ -359,6 +365,7 @@ async function copyServerLog(
   db: Db,
   sourceLogId: string,
   logIds: Map<string, string>,
+  repositories: readonly string[],
 ): Promise<string | null> {
   const known = logIds.get(sourceLogId);
   if (known) return known;
@@ -375,13 +382,21 @@ async function copyServerLog(
     select ${source(columns.server_logs)} from server_logs where id = ${sourceLogId}
   `;
   if (!log) throw new Error(`source server_logs row ${sourceLogId} vanished`);
-  const id = await insertReturningId(db, 'server_logs', log);
+  const id = await insertReturningId(db, 'server_logs', {
+    ...log,
+    server_log: sanitizeLogText(String(log.server_log), repositories),
+  });
   logIds.set(sourceLogId, id);
-  await copyServerLogFiles(db, sourceLogId, id);
+  await copyServerLogFiles(db, sourceLogId, id, repositories);
   return id;
 }
 
-async function copyServerLogFiles(db: Db, sourceLogId: string, targetLogId: string): Promise<void> {
+async function copyServerLogFiles(
+  db: Db,
+  sourceLogId: string,
+  targetLogId: string,
+  repositories: readonly string[],
+): Promise<void> {
   const present = await db<{ file_name: string }[]>`
     select file_name from server_log_files where server_log_id = ${targetLogId}
   `;
@@ -404,7 +419,11 @@ async function copyServerLogFiles(db: Db, sourceLogId: string, targetLogId: stri
     await insertRows(
       db,
       'server_log_files',
-      rows.map((row) => ({ ...row, server_log_id: targetLogId })),
+      rows.map((row) => ({
+        ...row,
+        server_log_id: targetLogId,
+        log_text: sanitizeLogText(String(row.log_text), repositories),
+      })),
     );
   }
 }
@@ -705,6 +724,7 @@ async function syncBenchmarks(
   sourceRunId: string,
   targetRunId: string,
   configIds: Map<string, string>,
+  repositories: readonly string[],
 ): Promise<void> {
   const sourceRows = await source<Row[]>`
     select id::text, ${source(columns.benchmark_results)} from benchmark_results
@@ -755,12 +775,12 @@ async function syncBenchmarks(
     if (row.server_log_id !== null) {
       const sourceLogId = String(row.server_log_id);
       if (existing.server_log_id === null) {
-        const logId = await copyServerLog(db, sourceLogId, logIds);
+        const logId = await copyServerLog(db, sourceLogId, logIds, repositories);
         if (logId !== null) {
           await db`update benchmark_results set server_log_id = ${logId} where id = ${existing.id}`;
         }
       } else if (plan.shortTables.includes('server_log_files')) {
-        await copyServerLogFiles(db, sourceLogId, existing.server_log_id);
+        await copyServerLogFiles(db, sourceLogId, existing.server_log_id, repositories);
       }
     }
     if (row.trace_replay_id !== null && existing.trace_replay_id === null) {
@@ -781,7 +801,7 @@ async function syncBenchmarks(
     const serverLogId =
       row.server_log_id === null
         ? null
-        : await copyServerLog(db, String(row.server_log_id), logIds);
+        : await copyServerLog(db, String(row.server_log_id), logIds, repositories);
     const traceReplayId =
       row.trace_replay_id === null ? null : await replayFor(String(row.trace_replay_id));
     await insertReturningId(db, 'benchmark_results', {
@@ -861,18 +881,30 @@ async function syncRun(plan: RunSyncPlan, configIds: Map<string, string>): Promi
   `;
   if (!sourceRun) throw new Error('source run vanished');
   const sourceRunId = String(sourceRun.id);
+  const runUrl = sourceRun.html_url;
+  const repository = await nonPublicRepository(typeof runUrl === 'string' ? runUrl : null);
+  const repositories = repository === null ? [] : [repository];
+  if (repository !== null && !dryRun) {
+    // The target stores no URL for this run, and --to-public deletes the source run afterwards.
+    recordRedactedRunUrls(urlMapFile, [
+      { github_run_id: String(github_run_id), run_attempt, html_url: String(runUrl) },
+    ]);
+    console.log(`  run ${github_run_id}: private repository URL recorded in ${urlMapFile}`);
+  }
 
   // Restore counters on rollback so the summary reports committed rows only.
   const committed = { ...inserted };
   try {
     await target.begin(async (tx) => {
-      await insertRows(tx, 'workflow_runs', [sourceRun]);
+      await insertRows(tx, 'workflow_runs', [
+        repository === null ? sourceRun : { ...sourceRun, html_url: null },
+      ]);
       const [targetRun] = await tx<{ id: string }[]>`
         select id::text from workflow_runs
         where github_run_id = ${github_run_id} and run_attempt = ${run_attempt}
       `;
       const targetRunId = targetRun!.id;
-      await syncBenchmarks(tx, plan, sourceRunId, targetRunId, configIds);
+      await syncBenchmarks(tx, plan, sourceRunId, targetRunId, configIds, repositories);
       await syncEvals(tx, plan, sourceRunId, targetRunId, configIds);
       await syncRunChildren(tx, 'run_stats', sourceRunId, targetRunId);
       await syncRunChildren(tx, 'changelog_entries', sourceRunId, targetRunId);

@@ -1,7 +1,39 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ArtifactMeta } from './github-artifacts';
-import { repositoryFromRunUrl, selectBenchmarkArtifacts } from './runtime-metadata-artifacts';
+import {
+  repositoryFromRunUrl,
+  selectBenchmarkArtifacts,
+  storedRunRepository,
+} from './runtime-metadata-artifacts';
+
+describe('storedRunRepository', () => {
+  const redacted = new Map([
+    ['101', 'https://github.com/example-org/private-repo/actions/runs/101'],
+  ]);
+
+  it('reads the repository from the run URL', () => {
+    expect(
+      storedRunRepository(
+        {
+          github_run_id: 1,
+          html_url: 'https://github.com/example-org/example-repo/actions/runs/1',
+        },
+        redacted,
+      ),
+    ).toBe('example-org/example-repo');
+  });
+
+  it('reads a cleared URL from the redaction URL map', () => {
+    expect(storedRunRepository({ github_run_id: 101, html_url: null }, redacted)).toBe(
+      'example-org/private-repo',
+    );
+  });
+
+  it('leaves a run that never had a URL to the INGEST_REPO fallback', () => {
+    expect(storedRunRepository({ github_run_id: 102, html_url: null }, redacted)).toBeNull();
+  });
+});
 
 const artifact = (name: string, created_at = '2026-07-16T00:00:00Z'): ArtifactMeta => ({
   name,

@@ -12,6 +12,57 @@ import {
 export const serverLogBlocksEnabled = (): boolean => process.env.SERVER_LOG_BLOCKS === '1';
 
 const INSERT_BATCH = 32;
+/** Advisory-lock namespace for one stored server-log file (`pg_advisory_xact_lock(int, int)`). */
+export const SERVER_LOG_FILE_LOCK_SPACE = 61_457_203;
+
+/**
+ * Hold one server-log file's advisory lock until the transaction ends, so compaction never builds
+ * blocks from text that a redaction backfill is rewriting, and the reverse.
+ */
+export async function lockServerLogFile(
+  tx: TransactionSql,
+  serverLogId: number | string,
+  fileName: string,
+): Promise<void> {
+  await tx`
+    select pg_advisory_xact_lock(
+      ${SERVER_LOG_FILE_LOCK_SPACE}::int, hashtext(${String(serverLogId)} || '/' || ${fileName})
+    )
+  `;
+}
+
+/**
+ * Build blocks for one stored file from its text column, under the file's advisory lock, so a
+ * redaction backfill cannot rewrite the text between the length read and the range reads.
+ */
+export async function compactStoredServerLogFile(
+  tx: TransactionSql,
+  logId: string,
+  fileName: string,
+  primary: boolean,
+): Promise<{ chars: number; written: boolean }> {
+  await lockServerLogFile(tx, logId, fileName);
+  const [row] = primary
+    ? await tx<{ chars: string }[]>`
+        select char_length(server_log)::text as chars from server_logs
+        where id = ${logId} and file_name = ${fileName}`
+    : await tx<{ chars: string }[]>`
+        select char_length(log_text)::text as chars from server_log_files
+        where server_log_id = ${logId} and file_name = ${fileName}`;
+  if (!row) return { chars: 0, written: false };
+  const chars = Number(row.chars);
+  const written = await writeServerLogBlocks(tx, logId, fileName, chars, async (start, length) => {
+    const [{ text }] = primary
+      ? await tx<{ text: string }[]>`
+          select substring(server_log from ${start + 1}::integer for ${length}::integer) as text
+          from server_logs where id = ${logId}`
+      : await tx<{ text: string }[]>`
+          select substring(log_text from ${start + 1}::integer for ${length}::integer) as text
+          from server_log_files where server_log_id = ${logId} and file_name = ${fileName}`;
+    return text;
+  });
+  return { chars, written };
+}
 
 async function insertBlocks(
   tx: TransactionSql,
