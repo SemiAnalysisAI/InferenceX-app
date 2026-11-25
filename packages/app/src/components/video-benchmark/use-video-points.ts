@@ -22,7 +22,11 @@ export function useVideoPoints(
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replay, setReplay] = useState(initial?.replay ?? false);
   const [attempt, setAttempt] = useState(0);
-  const [live, setLive] = useState<{ key: string; page: VideoHistoryPage | null } | null>(null);
+  const [live, setLive] = useState<{
+    key: string;
+    page: VideoHistoryPage | null;
+    error: string | null;
+  } | null>(null);
   useEffect(() => {
     if (pending || (initial && attempt === 0)) return;
     const controller = new AbortController();
@@ -68,16 +72,23 @@ export function useVideoPoints(
         signal: controller.signal,
         cache: 'no-store',
       });
-      const data = response.ok ? ((await response.json()) as VideoHistoryPage) : null;
-      return data?.schemaVersion === 1 && Array.isArray(data.entries) ? data : null;
+      if (!response.ok) throw new Error(`Named run HTTP ${response.status}`);
+      const data = (await response.json()) as VideoHistoryPage;
+      if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
+        throw new Error('Unsupported named run projection');
+      return { page: data, error: null };
     })()
-      .catch(() => null)
-      .then((page) => {
-        if (!controller.signal.aborted) setLive({ key: liveKey, page });
+      .catch((error: unknown) => ({
+        page: null,
+        error: error instanceof Error ? error.message : String(error),
+      }))
+      .then((read) => {
+        if (!controller.signal.aborted) setLive({ key: liveKey, ...read });
       });
     return () => controller.abort();
   }, [readLive, live?.key, liveKey, runId]);
-  const livePage = readLive && live?.key === liveKey ? live.page : null;
+  const liveRead = readLive && live?.key === liveKey ? live : null;
+  const livePage = liveRead?.page ?? null;
   const namedPoints = useMemo(
     () => (livePage ? namedRunPoints([livePage], runId) : storedNamed),
     [livePage, runId, storedNamed],
@@ -88,5 +99,13 @@ export function useVideoPoints(
     namedSource = 'pending';
   else if (namedPoints.length > 0) namedSource = 'live';
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { points, namedPoints, namedSource, loading, error: loadError, replay, retry };
+  return {
+    points,
+    namedPoints,
+    namedSource,
+    loading,
+    error: loadError ?? liveRead?.error ?? null,
+    replay,
+    retry,
+  };
 }

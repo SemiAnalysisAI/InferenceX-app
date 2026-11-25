@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  deploymentKey,
-  isQueueing,
-  layoutLabel,
-  leadCell,
-  losslessTwin,
-  sharedLayoutCells,
-} from './deployment';
+import { deploymentKey, isQueueing, layoutLabel, leadCell, losslessTwin } from './deployment';
 import type { VideoPoint } from './metrics';
 import { resultsClipPoints } from './results-clips';
 import type { ResultsEvidence } from './results-evidence';
@@ -75,35 +68,6 @@ describe('deployment', () => {
     expect(layoutLabel({ ...base, server: null }, 'en')).toBe('4 GPU');
     expect(layoutLabel({ ...base, participating: null, server: null }, 'en')).toBe('—');
   });
-  it('picks the layout most hardware share without substituting an unmatched layout', () => {
-    const b200Eight = {
-      ...base,
-      id: 'b8',
-      hardwareKey: 'b200',
-      participating: 8,
-      server: { tp: 4, ulysses: 2, attention: null },
-      wallSeconds: 900,
-    };
-    const b200Four = {
-      ...base,
-      id: 'b4',
-      hardwareKey: 'b200',
-      wallSeconds: 1500,
-    };
-    const h100Two = {
-      ...base,
-      id: 'h2',
-      hardwareKey: 'h100',
-      participating: 2,
-      server: { tp: 2, ulysses: 1, attention: null },
-    };
-    const queued = { ...base, id: 'q', concurrency: 2 };
-    // 4g:tp2:u2 is shared by h200 and b200; h100's 2-GPU cell cannot join this comparison.
-    expect(
-      sharedLayoutCells([base, queued, b200Eight, b200Four, h100Two]).map((p) => p.id),
-    ).toEqual(['a', 'b4']);
-    expect(sharedLayoutCells([])).toEqual([]);
-  });
   it('leads with the most efficient non-queued, lossless deployment of the hardware', () => {
     const eightBoards = {
       ...base,
@@ -143,31 +107,6 @@ describe('deployment', () => {
       options,
     );
     expect(clips.map((p) => p.id)).toEqual(['f']);
-  });
-  it('requires a known shared workload and layout at C1 for evidence comparisons', () => {
-    const matching = { ...base, id: 'b', hardwareKey: 'b200' };
-    const variants: VideoPoint[] = [
-      {
-        ...base,
-        id: 'different-workload',
-        hardwareKey: 'h100',
-        workloadKey: 'other',
-      },
-      {
-        ...base,
-        id: 'missing-workload',
-        hardwareKey: 'h100',
-        workloadKey: null,
-      },
-      { ...base, id: 'missing-layout', hardwareKey: 'h100', server: null },
-      { ...base, id: 'different-replicas', hardwareKey: 'h100', replicas: 2 },
-      { ...base, id: 'c2', hardwareKey: 'h100', concurrency: 2, replicas: 2 },
-    ];
-    for (const variant of variants)
-      expect(sharedLayoutCells([base, matching, variant]).map((p) => p.id)).toEqual(['a', 'b']);
-    expect(sharedLayoutCells([{ ...base, workloadKey: null }])).toEqual([]);
-    expect(sharedLayoutCells([{ ...base, server: null }])).toEqual([]);
-    expect(sharedLayoutCells([{ ...base, concurrency: 2, replicas: 2 }])).toEqual([]);
   });
   it('pairs a lossy cell only with its own run’s lossless cell on the same workload, engine and layout', () => {
     const lossy = { ...base, id: 'lossy', results: results(['cuda-graph', 'first-block-cache']) };

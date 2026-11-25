@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  metricValue,
-  VIDEO_METRICS,
-  X_METRICS,
-  Y_METRICS,
-  type MetricOptions,
-  type VideoPoint,
-} from './metrics';
+import { metricValue, type MetricOptions, type VideoPoint } from './metrics';
 
 // H200, H100 and B200 C1 cells from the retained 2026-09-09 serving-smoke artifacts
 // (cypress/fixtures/api/video-history.json).
@@ -68,22 +61,10 @@ const b200: VideoPoint = {
   enforcedLimitW: 4000,
 };
 const opts: MetricOptions = { tier: 'h' };
-// H3 768p list price captured 2026-09-19 (api-reference.ts), USD per video-second.
+// H3 768p list price captured 2026-09-19, USD per video-second.
 const priced: MetricOptions = { ...opts, apiPricePerVideoSecond: 0.034 };
 
 describe('video metrics', () => {
-  it('registers the two axis groups plus the two card-only metrics', () => {
-    expect([...X_METRICS]).toEqual(['p90Latency', 'p50Latency']);
-    expect([...Y_METRICS]).toEqual([
-      'videosPerDollar',
-      'dollarsPerVideo',
-      'videosPerGpuHour',
-      'kjPerVideo',
-    ]);
-    expect(Object.keys(VIDEO_METRICS).toSorted()).toEqual(
-      [...X_METRICS, ...Y_METRICS, 'powerPctCap', 'apiPricePerVideo'].toSorted(),
-    );
-  });
   it('derives throughput per GPU-hour from valid clips, wall time and participating GPUs', () => {
     // 20 clips × 3600 s / (wall s × 4 boards).
     expect(metricValue(h200, 'videosPerGpuHour', opts)).toBeCloseTo(5.9732, 3);
@@ -160,11 +141,14 @@ describe('video metrics', () => {
       wallSeconds: null,
       enforcedLimitW: null,
     };
-    for (const id of Y_METRICS) expect(metricValue(broken, id, opts)).toBeNull();
+    for (const id of [
+      'videosPerDollar',
+      'dollarsPerVideo',
+      'videosPerGpuHour',
+      'kjPerVideo',
+    ] as const)
+      expect(metricValue(broken, id, opts)).toBeNull();
     expect(metricValue(broken, 'powerPctCap', opts)).toBeNull();
-    // Same display floor as the run views: P90 needs ten valid samples, P50 does not.
-    expect(metricValue({ ...h200, samples: 9 }, 'p90Latency', opts)).toBeNull();
-    expect(metricValue({ ...h200, samples: 9 }, 'p50Latency', opts)).toBeCloseTo(150.614, 3);
     expect(metricValue({ ...h200, participating: null }, 'videosPerGpuHour', opts)).toBeNull();
     expect(metricValue({ ...h200, participating: 0 }, 'videosPerGpuHour', opts)).toBeNull();
     expect(metricValue({ ...h200, participating: 2.5 }, 'videosPerGpuHour', opts)).toBeNull();

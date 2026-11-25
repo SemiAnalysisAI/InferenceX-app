@@ -56,8 +56,6 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
     if (historyResponse.headers.get('x-videogenx-incomplete') === '1')
       throw new Error('Published history incomplete');
     const data: VideoHistoryPage = await historyResponse.json();
-    if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
-      throw new Error('Unsupported published history projection');
     const pages = [data];
     initial.history = { pages, replay: historyResponse.headers.get('x-videogenx-replay') === '1' };
     const projection = resultProjection(

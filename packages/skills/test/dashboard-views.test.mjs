@@ -17,11 +17,10 @@ test('VideoGenX skill example uses documented selectors and preserves partial co
   const requests = [];
   const output = [];
   const data = {
-    params: { view: 'compare', x: 'p50Latency', hidden: ['mi355x'], caseIndex: 3 },
+    params: { view: 'overview', costTier: 'r', deadlineSeconds: 120, hidden: ['mi355x'] },
     coverage: { pagesRead: 5, maxPages: 5, nextPage: 6, truncated: true },
-    rows: [{ point: { id: 'source:c1' }, metrics: { kjPerVideo: null } }],
-    comparison: { cases: { status: 'not-published', selected: null } },
-    provenance: [{ runId: '123', artifactId: 456, publishedAt: '2026-09-20T00:00:00Z' }],
+    cells: [{ point: { id: 'source:c1' }, joulesPerClip: null }],
+    clipQuality: { status: 'partial', groups: [] },
   };
   await example(
     (url) => {
@@ -34,16 +33,10 @@ test('VideoGenX skill example uses documented selectors and preserves partial co
   assert.equal(requests[0].origin, 'https://inferencex.semianalysis.com');
   assert.equal(requests[0].pathname, '/api/v1/views/video');
   assert.deepEqual(Object.fromEntries(requests[0].searchParams), {
-    view: 'compare',
-    v_x: 'p50Latency',
-    v_y: 'videosPerGpuHour',
-    v_tier: 'r',
-    v_optimal: '0',
-    v_api: '0.08',
-    v_hidden: 'mi355x',
-    v_base: 'h200',
-    v_cand: 'b200',
-    v_case: '3',
+    view: 'overview',
+    r_tier: 'r',
+    r_deadline: '120',
+    r_hidden: 'mi355x',
   });
   assert.deepEqual(output, [data]);
 });

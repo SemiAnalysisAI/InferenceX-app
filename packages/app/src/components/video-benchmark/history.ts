@@ -3,7 +3,7 @@ import type { CIArtifact } from './archive';
 import { nativeHardware } from './hardware';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
 import { isNativeH3, servingCells } from './serving';
-import { efficiencyValue, latencyValue, tradeoffPoints } from './tradeoff';
+import { latencyValue, tradeoffPoints } from './tradeoff';
 import { resultsEvidence, type ResultsEvidence } from './results-evidence';
 
 /** Shared bound for dashboard history reads in the browser and view API. */
@@ -29,7 +29,6 @@ export interface VideoHistoryObservation {
   samples: number;
   p50: number | null;
   p90: number | null;
-  clipsGpuHour: number | null;
   energyKj: number | null;
   /** GPU boards that generated the clips (distinct bound UUIDs); null when the binding is ambiguous. */
   participating: number | null;
@@ -161,7 +160,6 @@ export function videoHistoryEntry(
             samples: point.samples,
             p50: latencyValue(point, 'median'),
             p90: latencyValue(point, 'p90'),
-            clipsGpuHour: efficiencyValue(point, 'clipsGpu'),
             energyKj: point.energy === null ? null : point.energy / 1000,
             participating: point.participating,
             allocated: point.allocated,

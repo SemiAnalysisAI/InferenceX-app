@@ -14,6 +14,7 @@ import { isNativeH3, servingCells } from './serving';
 import { allocatedGpus } from './allocation';
 import { nativeHardware } from './hardware';
 import { powerLimitComparison } from './power-limit';
+import { cellPower } from './results-evidence';
 import { serverTimingSummary } from './server-timing';
 
 export interface TradeoffRun {
@@ -132,11 +133,6 @@ function summaryMetrics(run: Json, complete: boolean) {
   };
 }
 
-/** InferenceX's aggregate and window sidecars, when published, must not contradict the power document. */
-const agreesPowerValid = (document: Json) => {
-  const valid = at(document, 'power_valid');
-  return valid === null || valid === true || valid === 1;
-};
 const energyPerClip = (document: Json) => {
   const normalization = at(document, 'energy_normalization');
   return normalization === null || normalization === 'clips';
@@ -233,7 +229,7 @@ function servingTradeoffPoints(run: TradeoffRun) {
     const summary = native ? summaryMetrics(item.run, complete) : null;
     const latencies = complete ? metrics.latencies : [];
     const median = summary?.median ?? null;
-    const phase = at(item.power, 'phases', 'measurement');
+    const phase = cellPower({ documents }, item);
     const aggregate = native ? (documents.get(`gpu/${item.id}/aggregate.json`) ?? null) : null;
     const recordedHardware = native
       ? nativeHardware(b.ci ?? null, text(at(aggregate, 'cluster')))
@@ -241,16 +237,6 @@ function servingTradeoffPoints(run: TradeoffRun) {
     const window = native
       ? (documents.get(`gpu/${item.id}/benchmark_concurrency_${item.concurrency}.json`) ?? null)
       : null;
-    // Native power carries its verdict in three places; any dissent reads as not measured.
-    const powerValid =
-      complete &&
-      at(phase, 'valid') === true &&
-      number(at(phase, 'valid_clips')) === metrics.valid &&
-      (!native ||
-        (at(item.power, 'valid') === true &&
-          at(item.job, 'power', 'valid') === true &&
-          agreesPowerValid(aggregate) &&
-          agreesPowerValid(window)));
     const uuids = rows(at(item.spec, 'gpu_uuids')).map(text).filter(Boolean);
     const devices = rows(at(item.job, 'roles', 'baseline', 'gpu_before', 'gpus')).filter((d) =>
       uuids.includes(text(at(d, 'uuid'))),
@@ -302,20 +288,18 @@ function servingTradeoffPoints(run: TradeoffRun) {
       participating: uuids.length > 0 && new Set(uuids).size === uuids.length ? uuids.length : null,
       replicas: positive(at(b.result, 'execution', 'deployment', 'replica_count')),
       energy:
-        powerValid && energyPerClip(aggregate) && energyPerClip(window)
+        energyPerClip(aggregate) && energyPerClip(window)
           ? positive(at(phase, 'aggregate', 'joules_per_valid_clip'))
           : null,
-      power: powerValid ? number(at(phase, 'aggregate', 'avg_power_w')) : null,
-      powerWindow: powerValid ? number(at(phase, 'duration_seconds')) : null,
-      powerLimit: powerValid
-        ? powerLimitComparison(
-            phase,
-            at(item.job, 'roles', 'baseline', 'power_configuration_before'),
-            at(item.job, 'roles', 'baseline', 'power_configuration_after'),
-            at(item.spec, 'gpu_uuids'),
-            at(item.power, 'semantics', 'power_unit'),
-          )
-        : null,
+      power: number(at(phase, 'aggregate', 'avg_power_w')),
+      powerWindow: number(at(phase, 'duration_seconds')),
+      powerLimit: powerLimitComparison(
+        phase,
+        at(item.job, 'roles', 'baseline', 'power_configuration_before'),
+        at(item.job, 'roles', 'baseline', 'power_configuration_after'),
+        at(item.spec, 'gpu_uuids'),
+        at(item.power, 'semantics', 'power_unit'),
+      ),
       server,
       timing: serverTimingSummary(item.run, complete),
       fidelity: null,

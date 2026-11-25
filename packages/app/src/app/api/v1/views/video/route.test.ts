@@ -1,15 +1,14 @@
-import { compareMetrics } from '@/components/video-benchmark/compare';
-import { resolveCompareSelection } from '@/components/video-benchmark/compare-url-state';
-import { concurrencyPlateau, powerUtilization } from '@/components/video-benchmark/evidence';
 import {
   liveHistoryEntry,
   videoHistoryEntry,
   type VideoHistoryObservation,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
-import { metricValue } from '@/components/video-benchmark/metrics';
-import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
-import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
+import {
+  latestOlderEntries,
+  namedRunPoints,
+  videoPoints,
+} from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { chartedCells } from '@/components/video-benchmark/results-chart';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
@@ -21,10 +20,6 @@ import {
   resultsClipPoints,
 } from '@/components/video-benchmark/results-clips';
 import { withQuality, type StoredArtifact } from '@/components/video-benchmark/stored';
-import {
-  metricOptions,
-  readVideoDashboardState,
-} from '@/components/video-benchmark/video-url-state';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 import { GET } from './route';
@@ -50,7 +45,6 @@ const observation: VideoHistoryObservation = {
   samples: 20,
   p50: 100,
   p90: 110,
-  clipsGpuHour: 5,
   energyKj: 400,
   participating: 4,
   allocated: 8,
@@ -212,10 +206,7 @@ describe('published VideoGenX dashboard projection', () => {
     officialEntry.approved = true;
     namedEntry.sources[0].observedAt = '2025-01-01T00:00:00Z';
     officialEntry.sources[0].observedAt = '2026-01-01T00:00:00Z';
-    for (const entry of officialEntry.sources[0].observations) {
-      entry.p50 = 60;
-      entry.clipsGpuHour = 100;
-    }
+    for (const entry of officialEntry.sources[0].observations) entry.p50 = 60;
     const history: VideoHistoryPage = {
       schemaVersion: 1,
       nextPage: null,
@@ -364,17 +355,13 @@ describe('published VideoGenX dashboard projection', () => {
         ['history', 'live', 'published'].includes(req.nextUrl.searchParams.get('format')),
       ),
     ).toBe(true);
-    const mixed = await GET(request('view=overview&v_api=0.08'));
-    const wrongView = await GET(request('view=dashboard&r_tier=h'));
-    expect(mixed.status).toBe(400);
-    expect(wrongView.status).toBe(400);
     const multiple = await GET(request('view=overview&unofficialruns=123,456'));
     const aliases = await GET(request('view=overview&unofficialrun=123&unofficialruns=456'));
     expect(multiple.status).toBe(400);
     expect(aliases.status).toBe(400);
   });
 
-  it('keeps a stored legacy entry out of the default public dashboard', async () => {
+  it('keeps a stored legacy entry out of the default view', async () => {
     source.mockImplementation((req: NextRequest) =>
       req.nextUrl.searchParams.get('format') === 'history'
         ? Response.json({
@@ -387,7 +374,7 @@ describe('published VideoGenX dashboard projection', () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.rows).toEqual([]);
+    expect(body.cells).toEqual([]);
   });
 
   it('keeps CSV headers when hardware selection removes every cell', async () => {
@@ -400,77 +387,21 @@ describe('published VideoGenX dashboard projection', () => {
       /^channel,approved,published_at,run_id,artifact_id,.*\r\n$/u,
     );
   });
-  it('defaults to the current dashboard, reads history pages and preserves numerical parity', async () => {
+  it('defaults to the overview and reads the first five History pages in one call', async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('no-store');
     const body = await response.json();
-    const state = readVideoDashboardState('');
-    const { cells } = dashboardCells(videoPoints(pages));
-    const options = metricOptions(state);
-    expect(body.params.view).toBe('dashboard');
+    expect(body.params.view).toBe('overview');
     expect(body.coverage).toEqual({ pagesRead: 1, maxPages: 5, nextPage: null, truncated: false });
-    expect(body.plot).toEqual(plotVideoPoints(cells, state, () => '', new Set()));
-    expect(body.rows.map((row: { point: { id: string } }) => row.point.id)).toEqual(
-      listedVideoCells(cells, state, new Set()).map((p) => p.id),
-    );
-    expect(
-      body.rows.find((row: { point: { id: string } }) => row.point.id === 'h200:c1').metrics,
-    ).toMatchObject({
-      p50Latency: 100,
-      p90Latency: 110,
-      videosPerGpuHour: 5,
-      dollarsPerVideo: metricValue(
-        cells.find((p) => p.id === 'h200:c1')!,
-        'dollarsPerVideo',
-        options,
-      ),
-    });
-    expect(body.evidence.power).toEqual(powerUtilization(cells));
-    expect(body.evidence.plateau).toEqual(concurrencyPlateau(cells));
-    expect(body.comparison.cases.status).toBe('not-requested');
-    expect(source).toHaveBeenCalledTimes(1);
+    expect(body.cells.map((cell: { point: { id: string } }) => cell.point.id)).toEqual([
+      'h200:c1',
+      'h200:8g',
+      'h100:c1',
+    ]);
     expect(source.mock.calls[0][0].nextUrl.searchParams.toString()).toBe(
       'format=history&page=1&pages=5',
     );
-  });
-
-  it('shares axis, tier, optimal, API price, compare and hardware-filter semantics with the UI', async () => {
-    const query =
-      'v_x=p50Latency&v_y=dollarsPerVideo&v_tier=r&v_optimal=0&v_api=0.08&v_hidden=h100&v_base=h200&v_cand=h100&v_case=3';
-    const response = await GET(request(query));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    const state = readVideoDashboardState(query);
-    const { cells } = dashboardCells(videoPoints(pages));
-    const options = metricOptions(state);
-    expect(body.plot).toEqual(plotVideoPoints(cells, state, () => '', new Set(['h100'])));
-    expect(body.rows.map((row: { point: { id: string } }) => row.point.id)).toEqual([
-      'h200:c1',
-      'h200:8g',
-    ]);
-    expect(
-      body.rows.every(
-        (row: { metrics: { apiPricePerVideo: number } }) => row.metrics.apiPricePerVideo === 0.64,
-      ),
-    ).toBe(true);
-    const pair = resolveCompareSelection(
-      { baseline: 'h200', candidate: 'h100', caseIndex: 3 },
-      cells,
-    );
-    expect(body.comparison.metrics).toEqual(
-      compareMetrics(pair.baseline!, pair.candidate!, options),
-    );
-    expect(body.params).toMatchObject({
-      hidden: ['h100'],
-      baseline: 'h200',
-      candidate: 'h100',
-      caseIndex: 3,
-    });
-    expect(
-      body.kpis.find((row: { hardwareKey: string }) => row.hardwareKey === 'h100').point,
-    ).not.toBeNull();
-    expect(body.evidence.power).toEqual(powerUtilization(cells));
   });
 
   it('reports the same five-page bound and never silently presents truncated history as complete', async () => {
@@ -479,7 +410,7 @@ describe('published VideoGenX dashboard projection', () => {
     const body = await response.json();
     expect(source).toHaveBeenCalledTimes(1);
     expect(body.coverage).toEqual({ pagesRead: 5, maxPages: 5, nextPage: 6, truncated: true });
-    expect(body.rows).toEqual([]);
+    expect(body.cells).toEqual([]);
   });
 
   it.each([
@@ -498,46 +429,6 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.coverage).toEqual({ pagesRead, maxPages: 5, nextPage: null, truncated: false });
   });
 
-  it('keeps missing published comparison media distinct from an empty successful matched case list', async () => {
-    const response = await GET(request('view=compare&v_base=h200&v_cand=h100&v_case=8'));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.comparison.cases).toMatchObject({
-      status: 'not-published',
-      selected: null,
-      resolvedCaseIndex: 0,
-    });
-    expect(
-      source.mock.calls.filter(([req]) => req.nextUrl.searchParams.get('format') === 'published'),
-    ).toHaveLength(1);
-  });
-
-  it('pairs published cases, clamps the requested index and excludes asset URLs and raw documents', async () => {
-    const saved = storedServingArtifact();
-    source.mockImplementation((req: NextRequest) =>
-      req.nextUrl.searchParams.get('format') === 'published'
-        ? Response.json(saved)
-        : historyResponse(req),
-    );
-    const response = await GET(request('view=compare&v_case=9999'));
-    const body = await response.json();
-    expect(body.comparison.cases).toMatchObject({
-      status: 'ready',
-      count: 4,
-      resolvedCaseIndex: 3,
-      unmatched: { baseline: 0, candidate: 0 },
-      selected: {
-        repetition: 3,
-        baseline: { slotId: 'measurement-r004-c001', seconds: 120 },
-        candidate: { slotId: 'measurement-r004-c001', seconds: 120 },
-      },
-    });
-    expect(JSON.stringify(body)).not.toMatch(/private\.test|secret-token|\/runtime\/sglang/);
-    expect(body.comparison.cases.selected.baseline.mediaPath).toBe(
-      'gpu/c1/baseline/artifacts/measurement-r004-c001.mp4',
-    );
-  });
-
   it('keeps the primary legacy artifact and lists an unpublished compare ref', async () => {
     const saved = storedServingArtifact();
     source.mockImplementation((req: NextRequest) =>
@@ -554,7 +445,7 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.points.length).toBeGreaterThan(0);
   });
 
-  it('retains explicit discovery and treats media read failure as unavailable, not zero pairs', async () => {
+  it('retains explicit discovery and reports a media read failure as unavailable', async () => {
     source.mockImplementation(() => Response.json({ runs: [] }));
     const discoveryResponse = await GET(request('view=discovery&page=2'));
     const discovery = await discoveryResponse.json();
@@ -565,19 +456,21 @@ describe('published VideoGenX dashboard projection', () => {
         ? Response.json({ error: 'secret-token' }, { status: 503 })
         : historyResponse(req),
     );
-    const compareResponse = await GET(request('view=compare'));
-    const body = await compareResponse.json();
-    expect(body.comparison.cases.status).toBe('unavailable');
-    expect(body.rows.length).toBeGreaterThan(0);
+    const overviewResponse = await GET(request('view=overview'));
+    const body = await overviewResponse.json();
+    expect(body.clipQuality.status).toBe('unavailable');
+    expect(body.cells.length).toBeGreaterThan(0);
     expect(JSON.stringify(body)).not.toContain('secret-token');
   });
 
-  it('rejects mixed modes and strips source errors instead of leaking private details', async () => {
+  it('rejects removed views, mixed modes and strips source errors instead of leaking private details', async () => {
     for (const query of [
-      'view=dashboard&run=123',
-      'run=123&v_x=p50Latency',
+      'view=dashboard',
+      'view=compare',
+      'v_x=p50Latency',
       'page=2',
-      'v_hidden=h100&v_hidden=h200',
+      'run=123&r_tier=h',
+      'r_hidden=h100&r_hidden=h200',
     ]) {
       const response = await GET(request(query));
       expect(response.status).toBe(400);
@@ -588,5 +481,107 @@ describe('published VideoGenX dashboard projection', () => {
     const response = await GET(request());
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'Source data unavailable' });
+  });
+
+  it('answers 502 when the History read is incomplete', async () => {
+    source.mockImplementation(() =>
+      Response.json(page([observation], null), { headers: { 'X-VideoGenX-Incomplete': '1' } }),
+    );
+    const response = await GET(request());
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: 'Published history incomplete' });
+  });
+
+  it('answers the live read status when an unstored named run cannot be read', async () => {
+    source.mockImplementation((req: NextRequest) =>
+      req.nextUrl.searchParams.get('format') === 'history'
+        ? historyResponse(req)
+        : Response.json({ error: 'Cannot list CI artifacts' }, { status: 502 }),
+    );
+    const response = await GET(request('view=overview&unofficialrun=999'));
+    expect(response.status).toBe(502);
+  });
+});
+
+/** A complete plan identity; the case list tells two workloads apart. */
+const workloadKey = (cases: number) =>
+  JSON.stringify({
+    plan: {
+      cases: Array.from({ length: cases }, (_, seed) => ({ prompt: 'A drummer.', seed })),
+      generation: {
+        width: 1344,
+        height: 768,
+        fps: 24,
+        num_inference_steps: 50,
+        duration_seconds: 8,
+      },
+      model_id: 'MiniMaxAI/MiniMax-H3',
+      model_revision: 'a'.repeat(40),
+    },
+  });
+const h100 = { ...observation, hardware: 'NVIDIA H100 80GB HBM3', workloadKey: workloadKey(4) };
+const twelve = { scheduled: 12, completed: 12, valid: 12, samples: 12 };
+const entry = (runId: string, observations: VideoHistoryObservation[]) => ({
+  ...page(observations, null).entries[0],
+  id: `${runId}.456`,
+  runId,
+});
+
+describe('VideoGenX qualification', () => {
+  it.each([
+    [
+      'C1 and C4 of one deployment',
+      [
+        entry('1', [
+          { ...h100, id: 'h100:c1' },
+          { ...h100, id: 'h100:c4', cell: 'c4', concurrency: 4 },
+        ]),
+      ],
+      [],
+      ['h100:c1'],
+    ],
+    [
+      'a 12-clip plan on two chips and a 20-clip plan on one',
+      [
+        entry('1', [
+          { ...h100, ...twelve, id: 'a:h100', workloadKey: workloadKey(12) },
+          {
+            ...h100,
+            ...twelve,
+            id: 'a:h200',
+            hardware: 'NVIDIA H200',
+            workloadKey: workloadKey(12),
+          },
+          { ...h100, id: 'b:b200', hardware: 'NVIDIA B200', workloadKey: workloadKey(20) },
+        ]),
+      ],
+      [],
+      ['b:b200'],
+    ],
+    [
+      'a 12-clip rerun in the window and its 20-clip cell past it',
+      [entry('2', [{ ...h100, ...twelve, id: 'rerun' }])],
+      [entry('1', [{ ...h100, id: 'full' }])],
+      ['full'],
+    ],
+  ])('gives the API and /vgx the same cells for %s', async (_name, window, older, cells) => {
+    const history: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [...window, ...latestOlderEntries(window, older)],
+    };
+    source.mockImplementation((req: NextRequest) =>
+      req.nextUrl.searchParams.get('format') === 'history'
+        ? Response.json(history)
+        : new Response(null, { status: 204 }),
+    );
+    const response = await GET(request());
+    const body = await response.json();
+    expect(body.cells.map((cell: { point: { id: string } }) => cell.point.id)).toEqual(cells);
+    expect(
+      resultProjection(videoPoints([history]), parseResultsState('')).cells.map(
+        (cell) => cell.point.id,
+      ),
+    ).toEqual(cells);
   });
 });

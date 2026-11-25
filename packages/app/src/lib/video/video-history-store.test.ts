@@ -6,7 +6,7 @@ import { mocked, stubEnv, unstubAllEnvs } from '@/test/helpers';
 import { BlobNotFoundError, del, head, list, put, type HeadBlobResult } from '@vercel/blob';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
-import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import { qualifies, videoPoints } from '@/components/video-benchmark/points';
 import { servingArtifact } from '../../../cypress/support/video-artifacts';
 import {
   publishedVideoHistory as publishedVideoHistoryRead,
@@ -200,13 +200,19 @@ describe('published video history', () => {
   });
 
   it('keeps an older deployment on the dashboard when newer sources fill the first window', async () => {
-    await publish(0, true, 'NVIDIA H100', 10);
-    for (let i = 1; i <= 50; i++) await publish(i, true, 'NVIDIA H200', 10);
+    await publish(0, true, 'NVIDIA H100', 20);
+    for (let i = 1; i < 50; i++) await publish(i, true, 'NVIDIA H200', 20);
+    // A 12-clip rerun of the H100 deployment does not stand in for its 20-clip cell.
+    await publish(50, true, 'NVIDIA H100', 12);
     const page = await publishedVideoHistory(1, VIDEO_HISTORY_MAX_PAGES);
     expect(page.nextPage).toBe(VIDEO_HISTORY_MAX_PAGES + 1);
     expect(page.entries.at(-1)?.runId).toBe('100');
     expect(
-      new Set(dashboardCells(videoPoints([page])).cells.map((cell) => cell.hardwareKey)),
+      new Set(
+        videoPoints([page])
+          .filter(qualifies)
+          .map((cell) => cell.hardwareKey),
+      ),
     ).toEqual(new Set(['h100', 'h200']));
   });
 
@@ -388,12 +394,10 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 7,
-      // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
-      // approved under a receipt without one must be projected again. The walk skips type-only
-      // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
-      // uncalled helpers left bundle.ts and metrics.ts; entries are unchanged.
-      sources: 'bbfe21ac0c8adb0cb5236bf511d3e155a53d903441c80bfc8f8572bb70e2f864',
+      projection: 8,
+      // Projection 8: a cell's energy and power need a power document whose verdict is true, and
+      // entries no longer carry clipsGpuHour, so entries recorded under 7 must be projected again.
+      sources: '4ef7685a2ea8c793bcca0b22241a98fc1f98c6e63b90d3d9f1cd050976d26562',
     });
   });
 });

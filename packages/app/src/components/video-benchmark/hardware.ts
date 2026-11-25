@@ -43,30 +43,3 @@ export function costPerGpuHour(key: string, tier: CostTier): number | null {
   const value = tier === 'h' ? entry.costh : entry.costr;
   return Number.isFinite(value) && value > 0 ? value : null;
 }
-
-export interface VideoHardwareRosterEntry {
-  key: string;
-  /** Present when the campaign targeted this hardware but no valid observation exists. */
-  unavailable?: { en: string; zh: string; runUrl: string };
-}
-
-/**
- * Hardware the frozen H3 campaign targets. Hardware without a published
- * observation still renders as an unavailable legend/table row so a missing
- * result is never mistaken for an omission. Sorted by HW_REGISTRY order.
- */
-export const VIDEO_HARDWARE_ROSTER: readonly VideoHardwareRosterEntry[] = (
-  [
-    { key: 'h100' },
-    { key: 'h200' },
-    { key: 'b200' },
-    {
-      key: 'mi355x',
-      unavailable: {
-        en: 'No valid published run yet: the 2026-09-09 attempt failed before generation (AMD SMI parser).',
-        zh: '尚无有效的已发布运行：2026-09-09 的尝试在生成前失败（AMD SMI 解析器）。',
-        runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34411615416',
-      },
-    },
-  ] satisfies VideoHardwareRosterEntry[]
-).toSorted((a, b) => hardwareSort(a.key) - hardwareSort(b.key));

@@ -2,7 +2,7 @@ import { replaceClientSearch } from '@/lib/routing/client-navigation';
 import { deploymentKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import type { VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
-import { RESULTS_HARDWARE } from './results';
+import { RESULTS_HARDWARE } from './points';
 import { resultsPointKey } from './results-chart';
 import { resultsClipGroups, type ResultsClipGroup, type ResultsClipSide } from './results-clips';
 

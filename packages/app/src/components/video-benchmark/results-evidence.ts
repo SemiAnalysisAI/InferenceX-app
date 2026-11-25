@@ -1,4 +1,4 @@
-import { at, number, rows, text, type Bundle } from './bundle';
+import { at, number, rows, text, type Bundle, type Json } from './bundle';
 import type { ServingCell } from './serving';
 
 export interface PowerSample {
@@ -33,25 +33,30 @@ export interface ResultsEvidence {
 
 type PowerBundle = Pick<Bundle, 'documents'>;
 
-/** The measurement power phase and whether every record of it agrees the power is valid. */
-function measuredPower(bundle: PowerBundle, cell: ServingCell) {
+/** InferenceX's aggregate and window sidecars, when published, must not contradict the power document. */
+const agreesPowerValid = (document: Json | undefined) => {
+  const valid = at(document, 'power_valid');
+  return valid === null || valid === true || valid === 1;
+};
+
+/**
+ * A cell's measurement power phase, or null unless the cell is verified and complete and its power
+ * document, that phase and every sidecar say the power is valid for every valid clip. The document
+ * verdict must be `true`, as InferenceX's `video_artifacts.py` requires.
+ */
+export function cellPower(bundle: PowerBundle, cell: ServingCell): Json {
   const phase = at(cell.power, 'phases', 'measurement');
-  const sidecars = [
-    bundle.documents.get(`gpu/${cell.id}/aggregate.json`),
-    bundle.documents.get(`gpu/${cell.id}/benchmark_concurrency_${cell.concurrency}.json`),
-  ];
-  const dissent = sidecars.some(
-    (s) => at(s, 'power_valid') === false || at(s, 'power_valid') === 0,
-  );
-  return {
-    phase,
-    valid:
-      at(cell.cell, 'verified') === true &&
-      at(phase, 'valid') === true &&
-      at(cell.power, 'valid') !== false &&
-      at(cell.job, 'power', 'valid') !== false &&
-      !dissent,
-  };
+  return at(cell.cell, 'verified') === true &&
+    at(cell.run, 'status') === 'complete' &&
+    at(cell.power, 'valid') === true &&
+    at(phase, 'valid') === true &&
+    number(at(phase, 'valid_clips')) === number(at(cell.run, 'summary', 'valid')) &&
+    agreesPowerValid(bundle.documents.get(`gpu/${cell.id}/aggregate.json`)) &&
+    agreesPowerValid(
+      bundle.documents.get(`gpu/${cell.id}/benchmark_concurrency_${cell.concurrency}.json`),
+    )
+    ? phase
+    : null;
 }
 
 /** A cell's valid GPU power samples inside its measurement window; empty when its power is invalid. */
@@ -59,7 +64,7 @@ export function powerTrace(bundle: PowerBundle, cell: ServingCell): PowerSample[
   const start = number(at(cell.power, 'window', 'start_unix'));
   const end = number(at(cell.power, 'window', 'end_unix'));
   if (start === null || end === null) return [];
-  if (!measuredPower(bundle, cell).valid) return [];
+  if (cellPower(bundle, cell) === null) return [];
   return rows(at(cell.power, 'sample_series')).flatMap((sample) => {
     const time = number(at(sample, 'unix_seconds'));
     const watts = number(at(sample, 'aggregate_watts'));
@@ -89,7 +94,7 @@ export function resultsEvidence(
     valid.length > 0 &&
     valid.length === number(at(cell.run, 'summary', 'valid')) &&
     latencies.every((n): n is number => n !== null && n > 0);
-  const { phase, valid: powerValid } = measuredPower(bundle, cell);
+  const power = cellPower(bundle, cell);
   const warmups = rows(at(cell.run, 'records')).filter((r) => at(r, 'phase') === 'warmup');
   const warmupTimes = warmups.map((r) => number(at(r, 'submit_to_media_seconds')));
   const failureRecords = measured.filter(
@@ -145,9 +150,12 @@ export function resultsEvidence(
     clientP50: verified
       ? number(at(cell.run, 'serving', 'client_ready_latency_seconds', 'p50'))
       : null,
-    powerValid: at(cell.power, 'valid') === null && at(phase, 'valid') === null ? null : powerValid,
+    powerValid:
+      at(cell.power, 'valid') === null && at(cell.power, 'phases', 'measurement', 'valid') === null
+        ? null
+        : power !== null,
     powerSamples: powerTrace(bundle, cell).length,
-    peakPowerW: powerValid ? number(at(phase, 'aggregate', 'observed_peak_power_w')) : null,
+    peakPowerW: number(at(power, 'aggregate', 'observed_peak_power_w')),
     gpuMemoryMiB: null,
     warmupSeconds:
       verified &&

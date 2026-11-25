@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  costPerGpuHour,
-  hardwareKey,
-  hardwareLabel,
-  hardwareSort,
-  VIDEO_HARDWARE_ROSTER,
-} from './hardware';
+import { costPerGpuHour, hardwareKey, hardwareLabel, hardwareSort } from './hardware';
 
 describe('video hardware mapping', () => {
   it('maps artifact device names to HW_REGISTRY keys', () => {
@@ -30,17 +24,5 @@ describe('video hardware mapping', () => {
     expect(costPerGpuHour('h200', 'h')).toBe(1.22);
     expect(costPerGpuHour('h200', 'r')).toBe(2.9);
     expect(costPerGpuHour('unknown', 'h')).toBeNull();
-  });
-  it('keeps MI355X in the campaign roster as unavailable with its failed run', () => {
-    const mi355x = VIDEO_HARDWARE_ROSTER.find((item) => item.key === 'mi355x');
-    expect(mi355x?.unavailable?.runUrl).toBe(
-      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34411615416',
-    );
-    expect(VIDEO_HARDWARE_ROSTER.map((item) => item.key)).toEqual([
-      'b200',
-      'mi355x',
-      'h200',
-      'h100',
-    ]);
   });
 });
