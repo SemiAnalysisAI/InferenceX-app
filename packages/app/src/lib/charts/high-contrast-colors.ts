@@ -1,4 +1,5 @@
 import {
+  AWS_ORANGE,
   GOOGLE_BLUE,
   HUAWEI_CHART_COLORS,
   HUAWEI_CHART_PALETTE,
@@ -13,6 +14,7 @@ const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
   amd: (hue) => hue >= 120 && hue <= 195,
   openai: (hue) => hue < 290 || hue > 350,
   google: (hue) => hue < 255 || hue > 300,
+  aws: null,
   huawei: null,
   unknown: null,
 };
@@ -25,6 +27,7 @@ const PREFERRED_ZONE: Record<
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 },
   openai: { hmin: 300, hmax: 340 },
   google: { hmin: 265, hmax: 295 },
+  aws: null,
   huawei: HUAWEI_CHART_PALETTE.lab,
   unknown: null,
 };
@@ -68,6 +71,10 @@ export const generateHighContrastColors = (
     }
     if (vendor === 'google' && count === 1) {
       colors[vendorKeys[0]] = GOOGLE_BLUE;
+      continue;
+    }
+    if (vendor === 'aws' && count === 1) {
+      colors[vendorKeys[0]] = AWS_ORANGE;
       continue;
     }
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
