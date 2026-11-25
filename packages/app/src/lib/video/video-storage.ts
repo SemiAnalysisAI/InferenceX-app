@@ -270,13 +270,24 @@ interface PublicationSource {
   checkoutSha: string;
 }
 
+/** The digests a merge selection names for one bundle. */
+export interface VideoPublicationSelection {
+  manifestSha256: string;
+  sha256sumsSha256: string;
+}
+
+/**
+ * Version 2 carries the merge run and the selection it was verified against. Version 1 was
+ * written before merge selections existed; nothing writes it any more.
+ */
 export interface VideoPublicationReceipt {
-  version: 1;
+  version: 1 | 2;
   runId: string;
   artifactId: number;
   artifactName: string;
   artifactDigest: string | null;
   mergeRunId: string | null;
+  selected?: VideoPublicationSelection;
   sources: PublicationSource[];
 }
 
@@ -312,7 +323,8 @@ function expectedReceipt(
   runId: string,
   artifact: CIArtifact,
   saved: StoredArtifact,
-  mergeRunId: string | null,
+  mergeRunId: string,
+  selected?: VideoPublicationSelection,
 ): VideoPublicationReceipt {
   if (
     saved.runId !== runId ||
@@ -321,15 +333,25 @@ function expectedReceipt(
     (artifact.digest !== undefined && saved.artifact.digest !== artifact.digest)
   )
     throw new Error('Stored video source does not match the GitHub artifact');
-  return {
-    version: 1,
+  const identity = {
     runId,
     artifactId: artifact.id,
     artifactName: artifact.name,
     artifactDigest: saved.artifact.digest ?? null,
     mergeRunId,
-    sources: publicationSources(saved),
   };
+  const sources = publicationSources(saved);
+  if (!selected) return { version: 1, ...identity, sources };
+  const { manifestSha256, sha256sumsSha256 } = selected;
+  if (
+    sources.length !== 1 ||
+    sources[0].id !== runId ||
+    sources[0].kind !== 'observation' ||
+    sources[0].sha256 !== manifestSha256 ||
+    !/^[a-f0-9]{64}$/u.test(String(sha256sumsSha256))
+  )
+    throw new Error('Stored source differs from the selected manifest');
+  return { version: 2, ...identity, selected: { manifestSha256, sha256sumsSha256 }, sources };
 }
 
 export async function readVideoPublication(
@@ -355,31 +377,45 @@ export async function readVideoPublication(
   const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) throw new Error('Video publication receipt unavailable');
   const receipt: VideoPublicationReceipt = await response.json();
+  // A receipt approves only when it names a merge run.
   if (
-    receipt.mergeRunId !== null &&
-    (typeof receipt.mergeRunId !== 'string' ||
-      !/^[1-9]\d*$/u.test(receipt.mergeRunId) ||
-      !Number.isSafeInteger(Number(receipt.mergeRunId)))
+    typeof receipt.mergeRunId !== 'string' ||
+    !/^[1-9]\d*$/u.test(receipt.mergeRunId) ||
+    !Number.isSafeInteger(Number(receipt.mergeRunId))
   )
-    throw new Error('Invalid video publication merge identity');
-  const expected = expectedReceipt(runId, artifact, saved, receipt.mergeRunId);
+    return null;
+  const expected = expectedReceipt(
+    runId,
+    artifact,
+    saved,
+    receipt.mergeRunId,
+    receipt.version === 2 ? receipt.selected : undefined,
+  );
   if (JSON.stringify(receipt) !== JSON.stringify(expected))
     throw new Error('Video publication receipt does not match its stored source');
   return receipt;
 }
 
+/**
+ * The only writer of an approval: a merge run approves the bundle its selection names. The stored
+ * manifest and SHA256SUMS must be the selected ones before the receipt is written or reused.
+ */
 export async function approveVideoPublication(
   runId: string,
   artifact: CIArtifact,
   saved: StoredArtifact,
-  mergeRunId: string | null,
+  mergeRunId: string,
   signal: AbortSignal,
+  selected: VideoPublicationSelection,
 ): Promise<VideoPublicationReceipt> {
-  const expected = expectedReceipt(runId, artifact, saved, mergeRunId);
+  const expected = expectedReceipt(runId, artifact, saved, mergeRunId, selected);
+  const sealUrl = saved.sources[0].assets.find(([path]) => path === 'SHA256SUMS')?.[1].url;
+  const seal = sealUrl ? await fetch(sealUrl, { signal }) : null;
+  if (!seal?.ok || (await sha256(await seal.blob())) !== selected.sha256sumsSha256)
+    throw new Error('Stored source differs from the selected SHA256SUMS');
   const existing = await readVideoPublication(runId, artifact, saved);
   if (existing) {
-    // A manual republish names no merge run; it reuses the approval instead of asserting a new one.
-    if (mergeRunId !== null && JSON.stringify(existing) !== JSON.stringify(expected))
+    if (JSON.stringify(existing) !== JSON.stringify(expected))
       throw new Error('Video publication already has a different merge identity');
     return existing;
   }
@@ -400,13 +436,28 @@ export async function storeVideoArtifact(
   artifact: CIArtifact,
   zip: Blob,
   signal: AbortSignal,
+  selected?: VideoPublicationSelection,
 ): Promise<StoredArtifact> {
   const sources: StoredSource[] = [];
   const uploads = new Map<string, Promise<{ url: string; downloadUrl: string }>>();
-  for (const source of await archiveSources(zip, artifact)) {
+  const archived = await archiveSources(zip, artifact);
+  for (const source of archived) {
     const fidelity = 'kind' in source && source.kind === 'fidelity';
     const fidelityBundle = fidelity ? await loadFidelityBundle(source.read, source.id) : null;
     const bundle = fidelityBundle ?? (await loadBundle(source.read));
+    // A merge selection names one observation bundle. Any other is refused before the first write.
+    if (selected) {
+      if (
+        archived.length !== 1 ||
+        fidelity ||
+        source.id !== runId ||
+        bundle.checksums.get('manifest.json') !== selected.manifestSha256
+      )
+        throw new Error('Bundle differs from the selected manifest');
+      const seal = bundle.files.get('SHA256SUMS');
+      if (!seal || (await sha256(seal)) !== selected.sha256sumsSha256)
+        throw new Error('Bundle differs from the selected SHA256SUMS');
+    }
     const publishedMedia = fidelityBundle
       ? await verifyPublishedSources(fidelityBundle, signal)
       : null;
