@@ -157,7 +157,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
   trn3: {
     vendor: 'AWS',
     arch: 'Trainium3',
-    label: 'Trainium3',
+    label: 'Trainium3 PDS',
     badgeLabel: 'Trn3',
     sort: 12,
     // TDP is an unverified placeholder, per adding-entities.md.
