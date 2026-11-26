@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## UX, DX and AX
+
+- Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
+- Make the best decision that will elevate all three: the user experience (UX), developer experience (DX), and agent experience (AX) always, without breaking anything.
+
+## Repository guidance
+
 InferenceX App is a Next.js dashboard for ML inference benchmark data (Neon PostgreSQL → `/api/v1/*` routes → React Query hooks → D3 charts). Setup, scripts, and package layout are in [README.md](./README.md). The `@/*` import alias maps to `packages/app/src/`.
 
 For detailed subsystem docs, see [docs/index.md](./docs/index.md). **MUST ALWAYS READ IN CASE OF RELEVANT INFORMATION.**
