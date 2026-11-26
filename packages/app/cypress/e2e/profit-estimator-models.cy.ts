@@ -3,7 +3,11 @@ import { profitBenchmarkRows } from '../support/profit-fixtures';
 
 describe('Muse Spark profit estimates', () => {
   for (const prefix of ['', '/zh']) {
-    for (const basis of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
+    for (const basis of [
+      'profit-estimator',
+      'profit-estimator-per-million-dollars',
+      'profit-estimator-per-gigawatt',
+    ]) {
       it(`prices Open benchmarks with Muse 1.3 rates on ${prefix}/${basis}`, () => {
         stubOpenRouter();
         cy.visit(`${prefix}/infx/${basis}/muse-spark-open`, { onBeforeLoad: suppressNudges });

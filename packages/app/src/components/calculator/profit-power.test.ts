@@ -375,6 +375,18 @@ describe('profit power basis preview', () => {
     ).toEqual(estimateProfitRows([result], specs, pricing, assumptions));
   });
 
+  it.each(['chip-hour', 'spend-1m'] as const)(
+    'ignores the power basis on the %s basis, which has no power budget',
+    (basis) => {
+      const unpowered = { ...assumptions, basis };
+      for (const powerBasis of ['modeled', 'compare'] as const) {
+        expect(
+          estimateProfitByPower([result], specs, pricing, unpowered, powerBasis, 45, labels),
+        ).toEqual(estimateProfitRows([result], specs, pricing, unpowered));
+      }
+    },
+  );
+
   it.each([2])(
     'prices a validated %i-GPU allocation as a labeled full-chassis extrapolation',
     (gpus) => {

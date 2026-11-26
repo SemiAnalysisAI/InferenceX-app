@@ -6,12 +6,19 @@ import {
 import { isModelVisible, Model, MODEL_OPTIONS } from '@/lib/catalog/data-mappings';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-export const MODEL_ROUTE_TABS = [
-  'calculator',
-  'historical',
+/** The profit estimator's pages, one per estimate basis. */
+export const PROFIT_ROUTE_TABS = [
   'profit-estimator',
+  'profit-estimator-per-million-dollars',
   'profit-estimator-per-gigawatt',
 ] as const;
+export type ProfitRouteTab = (typeof PROFIT_ROUTE_TABS)[number];
+
+export function isProfitRouteTab(tab: string): tab is ProfitRouteTab {
+  return (PROFIT_ROUTE_TABS as readonly string[]).includes(tab);
+}
+
+export const MODEL_ROUTE_TABS = ['calculator', 'historical', ...PROFIT_ROUTE_TABS] as const;
 export type ModelRouteTab = (typeof MODEL_ROUTE_TABS)[number];
 
 export const DEFAULT_ROUTE_MODEL: Model = Model.DeepSeek_V4_Pro;
@@ -20,6 +27,7 @@ const MODEL_ROUTE_TAB_DEFAULT_MODEL: Record<ModelRouteTab, Model> = {
   calculator: DEFAULT_ROUTE_MODEL,
   historical: DEFAULT_ROUTE_MODEL,
   'profit-estimator': Model.Kimi_K3,
+  'profit-estimator-per-million-dollars': Model.Kimi_K3,
   'profit-estimator-per-gigawatt': Model.Kimi_K3,
 };
 
@@ -37,6 +45,7 @@ const PROFIT_ESTIMATOR_MODELS: readonly Model[] = [
 ];
 const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> = {
   'profit-estimator': PROFIT_ESTIMATOR_MODELS,
+  'profit-estimator-per-million-dollars': PROFIT_ESTIMATOR_MODELS,
   'profit-estimator-per-gigawatt': PROFIT_ESTIMATOR_MODELS,
 };
 
@@ -115,7 +124,7 @@ export function parseModelRoutePathname(pathname: string): ParsedModelRoutePathn
       if (!rest) return null;
       const [slug, ...filters] = rest.split('/');
       if (filters.length > 0) {
-        if (tab !== 'profit-estimator' && tab !== 'profit-estimator-per-gigawatt') return null;
+        if (!isProfitRouteTab(tab)) return null;
         if (filters.length % 2 !== 0 || filters.some((part) => !part)) return null;
       }
       return { tab, zh, slug, filters };
@@ -139,10 +148,7 @@ export function modelRoutePathnameRewrite(pathname: string, model: Model): strin
   if (!slug) return null;
   if (parsed.slug === slug) return null;
   if (!parsed.slug && model === defaultRouteModel(parsed.tab)) return null;
-  const suffix =
-    parsed.tab === 'profit-estimator' || parsed.tab === 'profit-estimator-per-gigawatt'
-      ? parsed.filters.join('/')
-      : '';
+  const suffix = isProfitRouteTab(parsed.tab) ? parsed.filters.join('/') : '';
   const enPath = `${modelRoutePath(parsed.tab, slug)}${suffix ? `/${suffix}` : ''}`;
   return parsed.zh ? `/zh${enPath}` : enPath;
 }

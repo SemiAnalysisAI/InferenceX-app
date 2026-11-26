@@ -68,6 +68,24 @@ describe('profitAxisTickFormat', () => {
   it('leaves the compact gigawatt-year ticks alone', () => {
     expect(profitAxisTickFormat('gw-year', [0, 40e9])(35e9)).toBe('$35B');
   });
+
+  it('keeps per-$1M-spend ticks distinct across the $1k boundary', () => {
+    const format = profitAxisTickFormat('spend-1m', [0, 1_800]);
+    expect([0, 200, 800, 1_000, 1_200, 1_800].map(format)).toEqual([
+      '$0',
+      '$200',
+      '$800',
+      '$1.0k',
+      '$1.2k',
+      '$1.8k',
+    ]);
+  });
+
+  it('keeps a decimal when compact ticks step in fractions of the unit', () => {
+    const format = profitAxisTickFormat('spend-1m', [0, 3_400]);
+    expect([500, 1_000, 1_500, 2_000].map(format)).toEqual(['$500', '$1.0k', '$1.5k', '$2.0k']);
+    expect(profitAxisTickFormat('gw-year', [0, 3.4e9])(1.5e9)).toBe('$1.5B');
+  });
 });
 
 const hardwareConfig = {
@@ -238,6 +256,31 @@ describe('profitPointDetails', () => {
     expect(all).toContain('$400');
     expect(all).toContain('30%');
     expect(all).toContain('60%');
+  });
+
+  it('lists the chips $1M per year affords on the per-$1M-spend basis', () => {
+    const spend = { ...assumptions, basis: 'spend-1m' } as const;
+    const spendRow = row({
+      gpuHours: 1_000_000 / 8_760 / 1.05,
+      revenue: 1_767.7,
+      tco: 114.155,
+      labCut: 353.5,
+      profit: 1_300,
+    });
+    const en = profitPointDetails(spendRow, hardwareConfig, spend, 'en');
+    expect(en.metrics[0]).toEqual({ value: '$1.3k', label: 'Profit' });
+    expect(en.rows).toContainEqual({ label: 'Chips per $1M per year', value: '108.7' });
+    expect(en.rows).toContainEqual({ label: 'Revenue per GPU-hour', value: '$3.00/GPU/hr' });
+    expect(JSON.stringify(en)).not.toContain('GPU-hours per GW-year');
+    const zh = profitPointDetails(spendRow, hardwareConfig, spend, 'zh');
+    expect(zh.rows).toContainEqual({ label: '每年百万美元可运行芯片数', value: '108.7' });
+    const chip = profitPointDetails(
+      row({ gpuHours: 1 }),
+      hardwareConfig,
+      { ...assumptions, basis: 'chip-hour' },
+      'en',
+    );
+    expect(JSON.stringify(chip)).not.toContain('Chips per $1M per year');
   });
 
   it('puts the run date of a compare-history bar in the date line, not the title', () => {

@@ -1,6 +1,6 @@
 import type { Model } from '@/lib/catalog/data-mappings';
 import type { DashboardRouteKey } from '@/lib/routing/dashboard-routes';
-import { modelRouteAvailableForTab } from '@/lib/routing/model-routes';
+import { isProfitRouteTab, modelRouteAvailableForTab } from '@/lib/routing/model-routes';
 
 /**
  * Selections carried between the inference chart and the profit estimators when the reader
@@ -34,7 +34,7 @@ let profitHardwareSeed: ProfitHardwareSeed | null = null;
 
 export function selectionTabKind(tab: DashboardRouteKey): SelectionTabKind | null {
   if (tab === 'inference') return 'inference';
-  if (tab === 'profit-estimator' || tab === 'profit-estimator-per-gigawatt') return 'profit';
+  if (isProfitRouteTab(tab)) return 'profit';
   return null;
 }
 

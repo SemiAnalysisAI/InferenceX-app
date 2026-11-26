@@ -45,6 +45,7 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   'first-token': 'First-Token Limits',
   'cache-reuse': 'Prefix Cache Reuse',
   'profit-estimator': 'Profit Estimator',
+  'profit-estimator-per-million-dollars': 'Profit Estimator per $1M',
   'profit-estimator-per-gigawatt': 'Profit Estimator per GW',
   'gpu-specs': 'Chip Specs',
   submissions: 'Submissions',
@@ -75,6 +76,7 @@ const currentTabClass = (active: boolean) =>
 const SELECTION_TABS: ReadonlySet<DashboardRouteKey> = new Set([
   'inference',
   'profit-estimator',
+  'profit-estimator-per-million-dollars',
   'profit-estimator-per-gigawatt',
 ]);
 

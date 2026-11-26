@@ -414,11 +414,24 @@ describe('Profit Estimator per GW — chart height follows the viewport', () => 
 });
 
 describe('VR publication economics', () => {
-  for (const basis of ['chip-hour', 'gw-year']) {
+  for (const basis of ['chip-hour', 'spend-1m', 'gw-year'] as const) {
     it(`prices cached-input TRTLLM data per ${basis} under /en`, () => {
       interceptVrPublicationData();
       interceptOpenRouterPricing();
-      const page = basis === 'chip-hour' ? 'profit-estimator' : 'profit-estimator-per-gigawatt';
+      const page = {
+        'chip-hour': 'profit-estimator',
+        'spend-1m': 'profit-estimator-per-million-dollars',
+        'gw-year': 'profit-estimator-per-gigawatt',
+      }[basis];
+      // GPU-hours bought per unit of each basis for a chip drawing `kw` all-in at `cost` $/GPU/hr.
+      const gpuHours = (kw: number, cost: number) =>
+        ({
+          'chip-hour': 1,
+          'spend-1m': 1_000_000 / 8760 / cost,
+          'gw-year': (1_000_000 / kw) * 8760,
+        })[basis];
+      // Per gigawatt opens on the owning tier; the other two bases open on the rental tier.
+      const rental = basis !== 'gw-year';
       cy.visit(`/infx/${page}/deepseek-v4`, {
         onBeforeLoad: suppressNudges,
       });
@@ -443,10 +456,12 @@ describe('VR publication economics', () => {
           const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
           expect(vr, 'VR is priced').not.to.equal(undefined);
           expect(gb, 'GB300 remains priced').not.to.equal(undefined);
-          const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
-          const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
-          expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
-          expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
+          const vrCost = rental ? 8.5 : 3.61;
+          const gbCost = rental ? 5 : 2.31;
+          const vrHours = gpuHours(3.3, vrCost);
+          const gbHours = gpuHours(2.12, gbCost);
+          expect(vr!.tco).to.be.closeTo(vrHours * vrCost, 0.01);
+          expect(gb!.tco).to.be.closeTo(gbHours * gbCost, 0.01);
           const revenuePerHour =
             (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) * 3600) /
               1_000_000) *

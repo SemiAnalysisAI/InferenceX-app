@@ -323,6 +323,8 @@ describe('proxy matcher', () => {
     '/infx/historical/Kimi-K3?i_seq=1k%2F1k',
     '/infx/calculator/kimi',
     '/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/30/percentile/p75',
+    '/infx/profit-estimator-per-million-dollars/kimi-k3/target/30/percentile/p75',
+    '/zh/infx/profit-estimator-per-million-dollars/glm?i_pctl=p75',
     '/infx/profit-estimator/kimi-k3?i_pctl=p75',
     '/zh/infx/profit-estimator/kimi-k3/target/30?percentile=p50',
     '/opx?op=model',

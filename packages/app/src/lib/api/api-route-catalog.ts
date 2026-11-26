@@ -184,6 +184,14 @@ export const apiRouteCatalog = [
     sourceSha256: '3b513949eb51668aa52b07324d2cecc5506f8167df05464e8269446715a9c734',
   },
   {
+    source: 'src/app/api/v1/views/profit-estimator-per-million-dollars/route.ts',
+    path: '/api/v1/views/profit-estimator-per-million-dollars',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-profit-estimator-per-million-dollars-view',
+    sourceSha256: '471664095677a7598db14cfca2a6eb961fd475c836dc180f089d29ce96163416',
+  },
+  {
     source: 'src/app/api/v1/views/rankings/route.ts',
     path: '/api/v1/views/rankings',
     method: 'GET',
@@ -1470,7 +1478,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-power.ts',
-    sourceSha256: 'e2b76e9625af7f2aba4968c41525f9939727477dce81215a57974a100998cd23',
+    sourceSha256: 'a1d679daafa1924b187622419fb8b469fa0f22d88779f9cf06a7b49b7a7f8b4c',
     reviewArea: {
       en: 'Power-valid curve selection at fixed targets, compatible power bases, paired throughput and provisioned fallback shared by Profit UI and API.',
       zh: '利润界面与 API 共用的有效功耗曲线选择、固定目标值、功耗口径兼容性、配对吞吐量与预配估算回退。',
@@ -1574,7 +1582,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: 'ff9cf222674166bcd893f041bb135b9f5816ef3518c8a9e3b260fbdc15871b82',
+    sourceSha256: 'fb6ab2a9c8935f9c07732fe092069f3474c4d38330fa695d0d4625ea36b767aa',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1873,7 +1881,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'c3082fab095dbf821fd0c4ca9132770e7073e5e65d4517193fa856ca01759a06',
+    sourceSha256: 'f937b042578e6b07ea12a9f5da63565f0b8859066e1715ba2b31481bff460c85',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1909,7 +1917,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '8aeb6c8f774c998f04c701f0e5d47c6db2be0cbddb07324683b9dae62f64a9e4',
+    sourceSha256: 'a0ac26339538e33448dffcc823dfa4e5e171010f117bfc2d093214af6c987570',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

@@ -5,6 +5,7 @@ import {
   estimateProfitRows,
   estimateSkuProfit,
   isProfitEstimatorRow,
+  profitBasisUsesPower,
   type ProfitEstimatorAssumptions,
   type ProfitEstimatorOutput,
   type ProfitEstimatorSkipReason,
@@ -153,7 +154,7 @@ export function estimateProfitByPower(
   target: number,
   labels: { provisioned: string; modeled: string; extrapolated: string },
 ): ProfitEstimatorOutput {
-  if (powerBasis === 'provisioned' || assumptions.basis === 'chip-hour') {
+  if (powerBasis === 'provisioned' || !profitBasisUsesPower(assumptions.basis)) {
     return estimateProfitRows(results, specsFor, pricing, assumptions);
   }
   const output: ProfitEstimatorOutput = { rows: [], skipped: [] };

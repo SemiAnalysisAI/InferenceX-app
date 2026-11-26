@@ -102,7 +102,9 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
       cy.get('[data-testid="profit-controls"] h1').should('not.contain.text', perGwTitle);
       cy.get('[data-testid="profit-controls"]').should(
         'contain.text',
-        prefix ? '按每 GPU 小时或每吉瓦年估算' : 'per GPU-hour or per gigawatt-year',
+        prefix
+          ? '按每 GPU 小时、每百万美元年度算力支出或每吉瓦年估算'
+          : 'per GPU-hour, per $1M of yearly compute spend or per gigawatt-year',
       );
       cy.get('[data-testid="profit-basis-gw-year"]').click();
       cy.location('pathname').should('eq', perGw);
@@ -126,6 +128,45 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
       cy.go('forward');
       cy.location('pathname').should('eq', perGw);
       cy.get('[data-testid="profit-basis-gw-year"]').should('have.attr', 'aria-pressed', 'true');
+    });
+
+    it(`opens the per-$1M-spend basis in ${prefix || '/'} from either neighbour, keeping route state`, () => {
+      const route = 'deepseek-v4/target/24/cache-hit-mode/actual';
+      const perSpend = `${prefix}/infx/profit-estimator-per-million-dollars/${route}`;
+      const perSpendTitle = prefix ? '每百万美元支出' : 'per $1M spend';
+      cy.visit(`${prefix}/infx/profit-estimator/${route}?utm_source=test`, {
+        onBeforeLoad: suppressNudges,
+      });
+      cy.get('[data-testid="profit-estimator-chart"]').should('exist');
+      cy.get('[data-testid="profit-controls"] h1').should('not.contain.text', perSpendTitle);
+      cy.get('[data-testid="profit-basis-spend-1m"]').click();
+      cy.location('pathname').should('eq', perSpend);
+      cy.location('search').should('eq', '?utm_source=test');
+      cy.get('[data-testid="profit-basis-spend-1m"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="profit-basis-chip-hour"]').should('have.attr', 'aria-pressed', 'false');
+      cy.get('[data-testid="profit-controls"] h1').should('contain.text', perSpendTitle);
+      cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+      // $1M a year is $114.155 an hour, spent in full on every chip.
+      cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
+        const rows = [...$bars].map(
+          (node) => (node as unknown as { __data__: { row: { tco: number } } }).__data__.row,
+        );
+        expect(rows.length).to.be.greaterThan(0);
+        for (const row of rows) expect(row.tco).to.be.closeTo(1_000_000 / 8760, 0.001);
+      });
+      cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+        'have.attr',
+        'data-tab-active',
+        'true',
+      );
+      cy.get('[data-testid="profit-basis-gw-year"]').click();
+      cy.location('pathname').should('eq', `${prefix}/infx/profit-estimator-per-gigawatt/${route}`);
+      cy.get('[data-testid="profit-basis-spend-1m"]').click();
+      cy.location('pathname').should('eq', perSpend);
+      cy.get('[data-testid="profit-basis-spend-1m"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="profit-basis-chip-hour"]').click();
+      cy.location('pathname').should('eq', `${prefix}/infx/profit-estimator/${route}`);
+      cy.get('[data-testid="profit-basis-chip-hour"]').should('have.attr', 'aria-pressed', 'true');
     });
   }
 
