@@ -172,8 +172,8 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     event.preventDefault();
     // Loaded on click so the selection handoff stays out of every dashboard route's first load.
     // The source page has already loaded its dependencies, so this resolves at once.
-    void import('@/lib/routing/cross-tab-href').then(({ crossTabHref }) => {
-      router.push(crossTabHref(current, destination, path) ?? path);
+    void import('@/lib/routing/cross-tab-href').then(({ prepareCrossTabNavigation }) => {
+      router.push(prepareCrossTabNavigation(current, destination, path));
     });
   };
   const search = useClientRouteSearch();

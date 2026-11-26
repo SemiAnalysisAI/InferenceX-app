@@ -236,11 +236,12 @@ function navigationUrlParams(pathname: string, search: string): NavigationUrlPar
 
 export function refreshUrlParams(): UrlStateParams {
   if (typeof window === 'undefined') return _initialParams;
+  return applyNavigationUrlParams(window.location.pathname, window.location.search);
+}
+
+function applyNavigationUrlParams(pathname: string, search: string): UrlStateParams {
   flushPendingParams();
-  const { explicit, cleared } = navigationUrlParams(
-    window.location.pathname,
-    window.location.search,
-  );
+  const { explicit, cleared } = navigationUrlParams(pathname, search);
   for (const key of URL_STATE_KEYS) delete explicitUrlParams[key];
   for (const key of cleared) {
     delete _initialParams[key];
@@ -270,6 +271,17 @@ export function peekNavigationUrlParams(
 }
 
 let lastRefreshedPathname: string | null = null;
+
+/**
+ * Applies the URL state of a client navigation the app is about to start. The destination page
+ * renders before the browser URL changes, so its own refresh would read the previous page's query.
+ */
+export function prepareNavigationUrlParams(href: string): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(href, window.location.origin);
+  applyNavigationUrlParams(url.pathname, url.search);
+  lastRefreshedPathname = url.pathname;
+}
 
 export function refreshUrlParamsOnNavigation(pathname: string): boolean {
   if (lastRefreshedPathname === pathname) return false;
