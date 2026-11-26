@@ -33,7 +33,6 @@ import {
   getInferenceNavigationModel,
   subscribeInferenceNavigationModel,
 } from '@/lib/routing/inference-navigation-state';
-import { crossTabParams, selectionTabKind } from '@/lib/routing/cross-tab-selection';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
@@ -73,27 +72,11 @@ const tabLinkClass = cn(
 const currentTabClass = (active: boolean) =>
   active ? 'border-brand text-foreground' : 'hover:text-foreground';
 
-/**
- * The href a tab switch between inference and the profit estimators opens, built from the live
- * selections at click time because filter changes do not update the rendered tab hrefs.
- */
-export function crossTabHref(
-  current: DashboardRouteKey,
-  destination: DashboardRouteKey,
-  destinationPath: string,
-  liveSearch: string,
-): string | null {
-  const from = selectionTabKind(current);
-  const to = selectionTabKind(destination);
-  if (!from || !to || current === destination) return null;
-  const live = new URLSearchParams(liveSearch);
-  const model = getInferenceNavigationModel();
-  if (model) live.set('g_model', model);
-  const params = crossTabParams(from, to, live);
-  if (to === 'profit') return profitRoutePathname(destinationPath, params);
-  const search = params.toString();
-  return `${destinationPath}${search ? `?${search}` : ''}`;
-}
+const SELECTION_TABS: ReadonlySet<DashboardRouteKey> = new Set([
+  'inference',
+  'profit-estimator',
+  'profit-estimator-per-gigawatt',
+]);
 
 function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
@@ -179,14 +162,18 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     path: string,
   ) => {
     if (event.defaultPrevented || !isPlainClick(event)) return;
-    if (current === destination || !selectionTabKind(current) || !selectionTabKind(destination)) {
+    if (
+      current === destination ||
+      !SELECTION_TABS.has(current) ||
+      !SELECTION_TABS.has(destination)
+    ) {
       return;
     }
     event.preventDefault();
-    // The source page has already loaded the URL-state module, so this resolves at once without
-    // adding it to every dashboard route's first load.
-    void import('@/lib/routing/url-state').then(({ currentChartSearch }) => {
-      router.push(crossTabHref(current, destination, path, currentChartSearch()) ?? path);
+    // Loaded on click so the selection handoff stays out of every dashboard route's first load.
+    // The source page has already loaded its dependencies, so this resolves at once.
+    void import('@/lib/routing/cross-tab-href').then(({ crossTabHref }) => {
+      router.push(crossTabHref(current, destination, path) ?? path);
     });
   };
   const search = useClientRouteSearch();
