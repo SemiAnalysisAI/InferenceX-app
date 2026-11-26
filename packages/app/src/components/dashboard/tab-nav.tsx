@@ -1,8 +1,9 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
+  type MouseEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -32,6 +33,8 @@ import {
   getInferenceNavigationModel,
   subscribeInferenceNavigationModel,
 } from '@/lib/routing/inference-navigation-state';
+import { crossTabParams, selectionTabKind } from '@/lib/routing/cross-tab-selection';
+import { currentChartSearch } from '@/lib/routing/url-state';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
@@ -70,6 +73,31 @@ const tabLinkClass = cn(
 
 const currentTabClass = (active: boolean) =>
   active ? 'border-brand text-foreground' : 'hover:text-foreground';
+
+/**
+ * The href a tab switch between inference and the profit estimators opens, built from the live
+ * selections at click time because filter changes do not update the rendered tab hrefs.
+ */
+export function crossTabHref(
+  current: DashboardRouteKey,
+  destination: DashboardRouteKey,
+  destinationPath: string,
+): string | null {
+  const from = selectionTabKind(current);
+  const to = selectionTabKind(destination);
+  if (!from || !to || current === destination) return null;
+  const live = new URLSearchParams(currentChartSearch());
+  const model = getInferenceNavigationModel();
+  if (model) live.set('g_model', model);
+  const params = crossTabParams(from, to, live);
+  if (to === 'profit') return profitRoutePathname(destinationPath, params);
+  const search = params.toString();
+  return `${destinationPath}${search ? `?${search}` : ''}`;
+}
+
+function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
 
 function handleMobileSelect(tab: DashboardRouteKey) {
   window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
@@ -144,6 +172,18 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
   const { navRef, indicator, animate } = useTabIndicator(current, featureGateUnlocked);
+  const router = useRouter();
+  const followCrossTab = (
+    event: MouseEvent<HTMLAnchorElement>,
+    destination: DashboardRouteKey,
+    path: string,
+  ) => {
+    if (event.defaultPrevented || !isPlainClick(event)) return;
+    const href = crossTabHref(current, destination, path);
+    if (href === null) return;
+    event.preventDefault();
+    router.push(href);
+  };
   const search = useClientRouteSearch();
   const retainedModel = useSyncExternalStore(
     subscribeInferenceNavigationModel,
@@ -186,7 +226,10 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
             const enPath = pathname === '/zh' ? '/' : pathname.replace(/^\/zh(?=\/)/u, '');
             return enPath === route.path || enPath === route.canonicalPath;
           }}
-          onSelect={handleMobileSelect}
+          onSelect={(tab, event, href) => {
+            handleMobileSelect(tab);
+            followCrossTab(event, tab, href);
+          }}
         />
 
         <div className="hidden overflow-x-auto border-b border-border/30 lg:block">
@@ -202,7 +245,10 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
                 data-testid={`tab-trigger-${route.key}`}
                 data-ph-capture-attribute-tab={route.key}
                 data-tab-active={current === route.key || undefined}
-                onClick={() => handleDesktopClick(route.key)}
+                onClick={(event) => {
+                  handleDesktopClick(route.key);
+                  followCrossTab(event, route.key, localePath(route.path, locale));
+                }}
                 className={cn(
                   tabLinkClass,
                   currentTabClass(current === route.key && !indicator),
@@ -226,7 +272,10 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
               <HiddenTabsPopover
                 current={current}
                 tabHref={(path) => tabHref(localePath(path, locale))}
-                onSelect={handleDesktopClick}
+                onSelect={(tab, event, href) => {
+                  handleDesktopClick(tab);
+                  followCrossTab(event, tab, href);
+                }}
                 tabLabel={tabLabel}
                 locale={locale}
               />
@@ -250,7 +299,7 @@ function HiddenTabsPopover({
 }: {
   current: DashboardRouteKey;
   tabHref: (path: string) => string;
-  onSelect: (tab: DashboardRouteKey) => void;
+  onSelect: (tab: DashboardRouteKey, event: MouseEvent<HTMLAnchorElement>, href: string) => void;
   tabLabel: (route: DashboardRoute) => string;
   locale: 'en' | 'zh';
   testId?: string;
@@ -284,9 +333,9 @@ function HiddenTabsPopover({
                   href={tabHref(route.path)}
                   data-testid={`tab-trigger-${route.key}`}
                   data-ph-capture-attribute-tab={route.key}
-                  onClick={() => {
+                  onClick={(event) => {
                     setOpen(false);
-                    onSelect(route.key);
+                    onSelect(route.key, event, localePath(route.path, locale));
                   }}
                   className={cn(
                     'block rounded-sm px-2 py-1.5 text-sm',
@@ -326,7 +375,7 @@ function MobileTabStrip({
   tabLabel: (route: DashboardRoute) => string;
   tabHref: (path: string) => string;
   isCurrentPage: (route: DashboardRoute) => boolean;
-  onSelect: (tab: DashboardRouteKey) => void;
+  onSelect: (tab: DashboardRouteKey, event: MouseEvent<HTMLAnchorElement>, href: string) => void;
 }) {
   const scrollerRef = useRef<HTMLElement>(null);
   const [edges, setEdges] = useState({ start: false, end: false });
@@ -372,7 +421,7 @@ function MobileTabStrip({
             event.preventDefault();
             return;
           }
-          onSelect(route.key);
+          onSelect(route.key, event, localePath(route.path, locale));
         }}
         className={cn(tabLinkClass, currentTabClass(active), 'min-h-11 shrink-0 py-0')}
       >
