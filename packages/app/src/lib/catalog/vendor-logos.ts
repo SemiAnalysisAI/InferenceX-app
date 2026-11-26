@@ -81,6 +81,8 @@ export interface AxisVendorLogoIcon extends VendorLogoIcon {
   monochrome: boolean;
   /** Separate dark-theme artwork; when set, it replaces `href` in dark mode instead of inverting. */
   darkHref?: string;
+  /** Dark-theme class for color artwork that is flipped rather than swapped. */
+  darkClassName?: string;
 }
 
 export interface VendorMarkVariant {
@@ -96,7 +98,12 @@ export function vendorMarkVariants(icon: AxisVendorLogoIcon): VendorMarkVariant[
       { href: icon.darkHref, className: 'hidden dark:inline' },
     ];
   }
-  return [{ href: icon.href, className: icon.monochrome ? 'dark:invert' : '' }];
+  return [
+    {
+      href: icon.href,
+      className: icon.darkClassName ?? (icon.monochrome ? 'dark:invert' : ''),
+    },
+  ];
 }
 
 const NVIDIA_COLOR_LOGO_SVG = nvidiaEyeSvg('#76B900');
@@ -105,12 +112,13 @@ export const AXIS_VENDOR_LOGO_ICONS: Record<string, AxisVendorLogoIcon> = {
   Google: { href: svgDataUri(GOOGLE_LOGO_SVG), width: 10, height: 10, monochrome: true },
   NVIDIA: { href: svgDataUri(NVIDIA_COLOR_LOGO_SVG), width: 21, height: 14, monochrome: false },
   AMD: { href: svgDataUri(AMD_LOGO_SVG), width: 10, height: 10, monochrome: true },
+  // The Amazon logo from the Nafea Bshara supporter quote, with the same hue-preserving dark flip.
   AWS: {
-    href: svgDataUri(awsLogoSvg(AWS_SQUID_INK)),
-    darkHref: svgDataUri(awsLogoSvg('#FFFFFF')),
-    width: 16.7,
+    href: '/logos/amazon.svg',
+    width: 33.1,
     height: 10,
     monochrome: false,
+    darkClassName: 'dark:invert dark:hue-rotate-180',
   },
 };
 

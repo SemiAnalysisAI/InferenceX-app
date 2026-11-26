@@ -63,11 +63,9 @@ describe('vendor logo icons', () => {
     expect(getHwVendorDarkLogo('NVIDIA')).toBeUndefined();
 
     const axis = getAxisVendorIcon('trn3_vllm');
-    expect(axis?.href).toBe(`data:image/svg+xml,${encodeURIComponent(light)}`);
-    expect(axis?.darkHref).toBe(`data:image/svg+xml,${encodeURIComponent(dark)}`);
+    expect(axis?.href).toBe('/logos/amazon.svg');
     expect(vendorMarkVariants(axis!)).toEqual([
-      { href: axis!.href, className: 'dark:hidden' },
-      { href: axis!.darkHref!, className: 'hidden dark:inline' },
+      { href: '/logos/amazon.svg', className: 'dark:invert dark:hue-rotate-180' },
     ]);
     expect(getLineLabelVendorIcon('trn3')).toBe(VENDOR_LOGO_ICONS.AWS);
     expect(pathsOf(decodeURIComponent(VENDOR_MARK_HREFS.AWS ?? ''))).toEqual(pathsOf(light));
