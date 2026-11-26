@@ -7,8 +7,11 @@ import {
 import {
   applyCacheHitMode,
   DEFAULT_CACHE_HIT_MODE,
+  DEFAULT_PROFIT_COST_PROVIDER,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
+  profitBasisForTab,
+  profitBasisUsesPower,
   profitModelDefaults,
   type CacheHitMode,
 } from '@/components/calculator/profit-estimator';
@@ -40,6 +43,7 @@ export type CalculatorExtension =
   | 'first-token'
   | 'cache-reuse'
   | 'profit-estimator'
+  | 'profit-estimator-per-million-dollars'
   | 'profit-estimator-per-gigawatt';
 
 export function calculatorExtension(view: CalculatorExtension, request: NextRequest) {
@@ -123,7 +127,8 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       });
     }
     const defaults = profitModelDefaults(params.model as Model);
-    const basis = view === 'profit-estimator' ? 'chip-hour' : 'gw-year';
+    const basis = profitBasisForTab(view);
+    const usesPower = profitBasisUsesPower(basis);
     const target = parseNumberParam(search.get('target'), 'target', defaults.interactivity, {
       min: 0.001,
     });
@@ -141,7 +146,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       search.get('costProvider'),
       'costProvider',
       ['costh', 'costr', 'custom'],
-      basis === 'chip-hour' ? 'costr' : 'costh',
+      DEFAULT_PROFIT_COST_PROVIDER[basis],
     );
     const customCosts = parseNumberMap(search.get('customCosts'), 'customCosts');
     const powerBasis = parseEnumParam(
@@ -205,7 +210,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
           target,
           'interactivity_to_throughput',
           costProvider === 'custom' ? 'costh' : costProvider,
-          basis === 'gw-year' ? powerBasis : 'provisioned',
+          usesPower ? powerBasis : 'provisioned',
         );
         return result && result.value > 0
           ? [{ ...result, ...group.groupMeta[key], resultKey: key }]

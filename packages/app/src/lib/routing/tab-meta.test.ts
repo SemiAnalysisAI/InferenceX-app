@@ -45,6 +45,17 @@ describe('per-model profit estimator metadata', () => {
     expect(MODEL_TAB_META['profit-estimator'].description(kimi.seoName)).toContain('chip-hour');
   });
 
+  it('gives the per-$1M-spend view its own Kimi-defaulted route and spend wording', () => {
+    const tab = 'profit-estimator-per-million-dollars';
+    expect(defaultRouteModel(tab)).toBe(Model.Kimi_K3);
+    expect(modelTabCanonicalPath(tab, kimi)).toBe('/infx/profit-estimator-per-million-dollars');
+    expect(modelTabCanonicalPath(tab, deepseek)).toBe(
+      `/infx/profit-estimator-per-million-dollars/${deepseek.slug}`,
+    );
+    expect(MODEL_TAB_META[tab].title(kimi.seoName)).toContain('per $1M Spend');
+    expect(MODEL_TAB_META[tab].description(kimi.seoName)).toContain('$1M a year');
+  });
+
   it('names the model in the title and description', () => {
     const meta = modelTabMetadata('profit-estimator', deepseek);
     expect(meta.title).toBe(MODEL_TAB_META['profit-estimator'].title(deepseek.seoName));

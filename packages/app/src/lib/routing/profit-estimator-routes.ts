@@ -2,12 +2,14 @@ import type { Model } from '@/lib/catalog/data-mappings';
 import { getDashboardRoute } from './dashboard-routes';
 import {
   defaultRouteModel,
+  isProfitRouteTab,
   modelRouteSlug,
   parseModelRoutePathname,
   resolveModelRouteSlug,
+  type ProfitRouteTab,
 } from './model-routes';
 
-export type ProfitRouteTab = 'profit-estimator' | 'profit-estimator-per-gigawatt';
+export { isProfitRouteTab, PROFIT_ROUTE_TABS, type ProfitRouteTab } from './model-routes';
 
 export const PROFIT_ROUTE_PARAMS = {
   target: 'c_ivtarget',
@@ -23,10 +25,6 @@ export const PROFIT_ROUTE_PARAMS = {
   end: 'i_dend',
   'unofficial-runs': 'unofficialruns',
 } as const;
-
-export function isProfitRouteTab(tab: string): tab is ProfitRouteTab {
-  return tab === 'profit-estimator' || tab === 'profit-estimator-per-gigawatt';
-}
 
 export function parseProfitRouteFilters(filters: readonly string[]): URLSearchParams | null {
   if (filters.length % 2 !== 0) return null;

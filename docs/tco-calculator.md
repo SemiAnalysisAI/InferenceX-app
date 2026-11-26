@@ -456,19 +456,31 @@ the notes now carry the correction instead: which figures are affected (Input an
 never Total), in which direction (flattering), by how much, and that the Fleet Lifecycle
 page is deliberately on a different basis.
 
-## Profit Estimator (`/infx/profit-estimator`, `/infx/profit-estimator-per-gigawatt`)
+## Profit Estimator (`/infx/profit-estimator`, `/infx/profit-estimator-per-million-dollars`, `/infx/profit-estimator-per-gigawatt`)
 
 Fleet Lifecycle answers "what did a fixed fleet earn over its life". This tab
 answers a narrower, present-tense question: at one interactivity operating point, what
-does each chip earn today, and who keeps it? The two pages differ only in the denominator
-(`ProfitBasis`), either one GPU-hour (`chip-hour`) or the GPU-hours one all-in utility
+does each chip earn today, and who keeps it? The pages differ only in the denominator
+(`ProfitBasis`): one GPU-hour (`chip-hour`), one hour of a $1M per year compute
+budget spent on that SKU (`spend-1m`), or the GPU-hours one all-in utility
 gigawatt-year buys for that SKU (`gw-year`). They share one dashboard tab. The
-"Estimate basis" switch in the Chart config panel moves between the two URLs with a
-client-side push that keeps the model slug, path filters, query and hash, and both URLs
-mark the Profit estimator tab active (`navGroup: 'merged'` in `dashboard-routes.ts`).
+"Estimate basis" switch in the Chart config panel moves between the URLs with a
+client-side push that keeps the model slug, path filters, query and hash, and every URL
+marks the Profit estimator tab active (`navGroup: 'merged'` in `dashboard-routes.ts`).
 Each page keeps its own title, metadata and canonical URL.
 
-Both pages offer the same model list. A model needs AgentX (`agentic_traces`)
+`spend-1m` is the per chip-hour chart scaled to a fixed budget. $1,000,000 a year
+is $1,000,000 / 365 / 24 = $114.155 an hour, and chips per $1M per year is that
+figure divided by the SKU's TCO $/GPU/hr. Every bar segment is the per chip-hour
+figure times that count, in USD per hour, so the compute-expense segment is
+$114.155 on every bar and the bars compare return on spend. Multiply by 8,760 for
+the yearly figure. It opens on the same rental tier as the per chip-hour page,
+needs no power figure, shows no power controls, and skips a SKU with no tier cost
+(`no-cost`); `gw-year` opens on the owning tier. `PROFIT_BASES` in
+`profit-estimator.ts` is the single list the switch, the routes and the API views
+are generated from.
+
+All pages offer the same model list. A model needs AgentX (`agentic_traces`)
 measurements with an interpolable operating point and a token price source.
 The page intersects its supported routes with live AgentX availability, so a
 model without current trace data disappears from the selector.
@@ -488,7 +500,7 @@ isolate curve coverage:
 | DeepSeek V4 Pro     |              35 |           6 |                170 |              16 |
 | DeepSeek V4.1 Flash |             125 |          17 |                150 |              18 |
 
-Both profit views returned the same counts. DeepSeek V4 Pro reaches 16 rows
+Both views swept (per chip-hour and per gigawatt) returned the same counts. DeepSeek V4 Pro reaches 16 rows
 only at 170 in this sweep; its immediately adjacent steps return 15, so that
 default is especially sensitive to new measurements. The Kimi K3 MI355X
 whitepaper still uses 45 tok/s/user; its estimator links explicitly retain

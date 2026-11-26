@@ -12,6 +12,7 @@ import {
   modelRoutesForTab,
   modelRouteSlug,
   parseModelRoutePathname,
+  PROFIT_ROUTE_TABS,
   resolveModelRouteSlug,
   routeModelForPathname,
 } from './model-routes';
@@ -39,11 +40,13 @@ describe('MODEL_ROUTES registry', () => {
       'calculator',
       'historical',
       'profit-estimator',
+      'profit-estimator-per-million-dollars',
       'profit-estimator-per-gigawatt',
     ]);
     expect(defaultRouteModel('calculator')).toBe(DEFAULT_ROUTE_MODEL);
     expect(defaultRouteModel('historical')).toBe(DEFAULT_ROUTE_MODEL);
     expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
+    expect(defaultRouteModel('profit-estimator-per-million-dollars')).toBe(Model.Kimi_K3);
     expect(defaultRouteModel('profit-estimator-per-gigawatt')).toBe(Model.Kimi_K3);
     for (const tab of MODEL_ROUTE_TABS) {
       expect(MODEL_ROUTES.some((route) => route.model === defaultRouteModel(tab))).toBe(true);
@@ -180,8 +183,8 @@ describe('modelRoutePathnameRewrite', () => {
 });
 
 describe('modelRoutesForTab', () => {
-  it('serves the supported agentic models on both profit estimators and every model elsewhere', () => {
-    for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
+  it('serves the supported agentic models on every profit estimator and every model elsewhere', () => {
+    for (const tab of PROFIT_ROUTE_TABS) {
       expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
         Model.DeepSeek_V4_1_Flash,
         Model.GLM_5_2,

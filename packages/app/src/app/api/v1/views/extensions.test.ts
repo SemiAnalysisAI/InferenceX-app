@@ -12,6 +12,7 @@ import { GET as cache } from './cache-reuse/route';
 import { GET as first } from './first-token/route';
 import { GET as gpu } from './gpu-metrics/route';
 import { GET as gw } from './profit-estimator-per-gigawatt/route';
+import { GET as spend } from './profit-estimator-per-million-dollars/route';
 import { GET as profit } from './profit-estimator/route';
 import { GET as submissions } from './submissions/route';
 import { GET as video } from './video/route';
@@ -330,6 +331,7 @@ describe('new dashboard projections', () => {
       ['first-token', first],
       ['cache-reuse', cache],
       ['profit-estimator', profit],
+      ['profit-estimator-per-million-dollars', spend],
       ['profit-estimator-per-gigawatt', gw],
     ] as const) {
       const query = `model=DeepSeek-V4-Pro${view.startsWith('profit') ? '&priceSource=custom&utilization=50&labCut=10&powerBasis=compare' : ''}`;
@@ -344,6 +346,7 @@ describe('new dashboard projections', () => {
   });
   it.each([
     ['profit-estimator', profit],
+    ['profit-estimator-per-million-dollars', spend],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
     '%s shares the DeepSeek V4 Pro default and preserves explicit targets',
@@ -419,6 +422,7 @@ describe('new dashboard projections', () => {
       );
       for (const [view, handler] of [
         ['profit-estimator', profit],
+        ['profit-estimator-per-million-dollars', spend],
         ['profit-estimator-per-gigawatt', gw],
       ] as const) {
         const query = `model=${encodeURIComponent(model)}&priceSource=custom`;
@@ -451,6 +455,7 @@ describe('new dashboard projections', () => {
   );
   it.each([
     ['profit-estimator', profit],
+    ['profit-estimator-per-million-dollars', spend],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
     '%s applies model defaults to official and unofficial runs',
@@ -504,8 +509,36 @@ describe('new dashboard projections', () => {
       }
     },
   );
+  it('prices $1M per year of spend as the per chip-hour estimate times the chips it affords', async () => {
+    mocks.benchmarks.mockImplementation(() => Response.json([agenticRow()]));
+    const query = 'model=DeepSeek-V4-Pro&target=45&priceSource=custom';
+    const read = async (
+      view: 'profit-estimator' | 'profit-estimator-per-million-dollars',
+      handler: typeof profit,
+    ) => {
+      const response = await handler(req(view, query));
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    const chip = await read('profit-estimator', profit);
+    const million = await read('profit-estimator-per-million-dollars', spend);
+    expect(million.view).toBe('profit-estimator-per-million-dollars');
+    expect(million.params.costProvider).toBe('costr');
+    expect(million.params.powerBasis).toBe('provisioned');
+    expect(hardwareKeys(million.data)).toEqual(hardwareKeys(chip.data));
+    const [chipRow] = chip.data.rows;
+    const [spendRow] = million.data.rows;
+    // $1,000,000 / 365 / 24 = $114.155 per hour, spent in full on every SKU.
+    expect(spendRow.tco).toBeCloseTo(1_000_000 / 365 / 24, 6);
+    expect(spendRow.gpuHours).toBeCloseTo(1_000_000 / 365 / 24 / chipRow.tco, 6);
+    expect(spendRow.revenuePerGpuHour).toBe(chipRow.revenuePerGpuHour);
+    for (const key of ['revenue', 'labCut', 'grossMargin', 'profit'] as const) {
+      expect(spendRow[key]).toBeCloseTo(chipRow[key] * spendRow.gpuHours, 6);
+    }
+  });
   it.each([
     ['profit-estimator', profit],
+    ['profit-estimator-per-million-dollars', spend],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
     '%s defaults to theoretical cache pricing but honors actual',

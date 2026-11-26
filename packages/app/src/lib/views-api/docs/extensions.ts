@@ -8,6 +8,7 @@ import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-bas
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
 import { RESULT_CSV_COLUMNS } from '@/components/video-benchmark/results-csv';
 import { text } from '@/lib/api/api-documentation-helpers';
+import { isProfitRouteTab } from '@/lib/routing/model-routes';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 
 const object: ApiSchema = { type: 'object', additionalProperties: true };
@@ -203,8 +204,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150 and Muse Spark 1.3/Open 100 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable operating-point assumptions, not hosted API P90-equivalent measurements.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark 1.3/Open 为 100 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的工作点假设，并非与托管 API P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Every profit view uses model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150 and Muse Spark 1.3/Open 100 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable operating-point assumptions, not hosted API P90-equivalent measurements.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。各利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark 1.3/Open 为 100 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的工作点假设，并非与托管 API P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -643,8 +644,7 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
               'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
               '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
             ] as const)
-          : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
-              name === 'model'
+          : isProfitRouteTab(view) && name === 'model'
             ? ([
                 `${MODEL_PARAM_FORMS.en} The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.`,
                 `${MODEL_PARAM_FORMS.zh}仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。`,
@@ -702,6 +702,11 @@ const NEW_VIEWS = {
   'profit-estimator': [
     'Profit per chip-hour',
     '每芯片小时利润',
+    { pricing: object, data: object, overlays: object, comparisons: objects },
+  ],
+  'profit-estimator-per-million-dollars': [
+    'Profit per hour per $1M of yearly compute spend',
+    '每年每百万美元算力支出的每小时利润',
     { pricing: object, data: object, overlays: object, comparisons: objects },
   ],
   'profit-estimator-per-gigawatt': [

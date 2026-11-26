@@ -1,12 +1,14 @@
 import type { Locale } from '@/lib/i18n/i18n';
 
-type ProfitHeadingBasis = 'chip-hour' | 'gw-year';
+type ProfitHeadingBasis = 'chip-hour' | 'spend-1m' | 'gw-year';
 
 const HEADINGS = {
   en: {
     title: {
       'gw-year': (model: string, workload: string) =>
         `${model} ${workload} revenue & profit estimates per gigawatt per year`,
+      'spend-1m': (model: string, workload: string) =>
+        `${model} ${workload} revenue & profit estimates per hour per $1M of yearly spend`,
       'chip-hour': (model: string, workload: string) =>
         `${model} ${workload} revenue & profit estimates per chip per hour`,
     },
@@ -17,6 +19,8 @@ const HEADINGS = {
     title: {
       'gw-year': (model: string, workload: string) =>
         `${model} ${workload} 每吉瓦每年收入与利润估算`,
+      'spend-1m': (model: string, workload: string) =>
+        `${model} ${workload} 每年每百万美元支出的每小时收入与利润估算`,
       'chip-hour': (model: string, workload: string) =>
         `${model} ${workload} 每芯片每小时收入与利润估算`,
     },

@@ -9,11 +9,13 @@ mock.module('next/navigation', () => ({
   },
 }));
 
+import { PROFIT_ROUTE_TABS } from '@/lib/routing/profit-estimator-routes';
+
 import { profitRouteInput } from './profit-route-input';
 import { calculatorUrlSeed } from './url-seed';
 
 describe('profit route input', () => {
-  for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
+  for (const tab of PROFIT_ROUTE_TABS) {
     for (const zh of [false, true]) {
       const locale = zh ? '/zh' : '';
 

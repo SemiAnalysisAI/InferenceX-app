@@ -246,15 +246,20 @@ const STRINGS = {
     yAxisModeled: 'Revenue per all-in utility GW per year ($ USD)',
     yAxis: {
       'gw-year': 'Revenue per all-in provisioned utility GW per year ($ USD)',
+      'spend-1m': 'Revenue per hour per $1M of yearly compute spend ($ USD)',
       'chip-hour': 'Revenue per chip per hour ($ USD)',
     },
     yAxisCompact: {
       'gw-year': 'Revenue per provisioned GW-year ($ USD)',
+      'spend-1m': 'Revenue per hour per $1M/yr spend ($ USD)',
       'chip-hour': 'Revenue per chip-hour ($ USD)',
     },
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
-    gpuHoursPerGwYear: 'GPU-hours per GW-year',
+    gpuHours: {
+      'gw-year': 'GPU-hours per GW-year',
+      'spend-1m': 'Chips per $1M per year',
+    },
     tco: 'Compute Expense',
     grossMargin: 'Gross Margin',
     labCut: 'Model License Fee',
@@ -281,15 +286,20 @@ const STRINGS = {
     yAxisModeled: '每吉瓦设施总功耗对应的年收入（美元）',
     yAxis: {
       'gw-year': '每全电源配置吉瓦每年收入（美元）',
+      'spend-1m': '每年每百万美元算力支出的每小时收入（美元）',
       'chip-hour': '每芯片每小时收入（美元）',
     },
     yAxisCompact: {
       'gw-year': '每吉瓦每年收入（美元）',
+      'spend-1m': '每年每百万美元支出的每小时收入（美元）',
       'chip-hour': '每芯片小时收入（美元）',
     },
     revenue: '收入',
     revenuePerGpuHour: '每 GPU 小时收入',
-    gpuHoursPerGwYear: '每吉瓦年 GPU 小时数',
+    gpuHours: {
+      'gw-year': '每吉瓦年 GPU 小时数',
+      'spend-1m': '每年百万美元可运行芯片数',
+    },
     tco: '算力支出',
     grossMargin: '毛利',
     labCut: '模型许可费',
@@ -535,10 +545,25 @@ export function profitAxisTickFormat(
   domain: readonly [number, number],
   tickCount = PROFIT_Y_TICK_COUNT,
 ): (value: number) => string {
-  if (basis !== 'chip-hour') return (value) => formatProfitUsd(value, basis, 0);
   const [start, stop] = d3.scaleLinear().domain(domain).nice().domain();
-  const digits = Number.isInteger(d3.tickStep(start, stop, tickCount)) ? 0 : 2;
+  const step = d3.tickStep(start, stop, tickCount);
+  if (basis !== 'chip-hour') {
+    return (value) => formatProfitUsd(value, basis, compactTickDigits(value, step));
+  }
+  const digits = Number.isInteger(step) ? 0 : 2;
   return (value) => formatUsdPerChipHour(value, digits);
+}
+
+/**
+ * Decimals a compact tick needs so neighbouring ticks stay distinct. A $500
+ * step would otherwise print $1k, $2k, $2k for $1,000, $1,500 and $2,000.
+ */
+function compactTickDigits(value: number, step: number): number {
+  const abs = Math.abs(value);
+  const unit = abs >= 1e9 ? 1e9 : abs >= 1e6 ? 1e6 : abs >= 1e3 ? 1e3 : 1;
+  const tenths = (step / unit) * 10;
+  if (Math.abs(tenths - Math.round(tenths)) > 1e-9) return 2;
+  return Math.round(tenths) % 10 === 0 ? 0 : 1;
 }
 
 export function rowLabel(
@@ -601,9 +626,17 @@ export function profitPointDetails(
         value: usd(row.labCut),
       },
       { label: t.revenuePerGpuHour, value: `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr` },
-      ...(assumptions.basis === 'gw-year'
-        ? [{ label: t.gpuHoursPerGwYear, value: Math.round(row.gpuHours).toLocaleString('en-US') }]
-        : []),
+      ...(assumptions.basis === 'chip-hour'
+        ? []
+        : [
+            {
+              label: t.gpuHours[assumptions.basis],
+              // $1M per year runs at most hundreds of chips, so the count keeps one decimal.
+              value: row.gpuHours.toLocaleString('en-US', {
+                maximumFractionDigits: assumptions.basis === 'gw-year' ? 0 : 1,
+              }),
+            },
+          ]),
     ],
   };
 }
