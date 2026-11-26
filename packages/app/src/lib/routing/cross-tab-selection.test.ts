@@ -85,6 +85,48 @@ describe('cross-tab selection', () => {
     expect(back.has('i_active')).toBe(false);
   });
 
+  it('keeps the profit hardware when inference shows a model the profit estimator lacks', () => {
+    setProfitHardwareSeed({ model: 'MiniMax-M3', keys: ['b300_trt'] });
+    const llama = new URLSearchParams({
+      g_model: 'Llama-3.3-70B-Instruct-FP8',
+      i_active: 'h100_vllm',
+    });
+    crossTabParams('inference', 'profit', llama);
+    expect(getProfitHardwareSeed()).toEqual({ model: 'MiniMax-M3', keys: ['b300_trt'] });
+  });
+
+  it('takes the profit model back to inference when the reader picked hardware on it', () => {
+    crossTabParams(
+      'inference',
+      'profit',
+      new URLSearchParams({ g_model: 'Llama-3.3-70B-Instruct-FP8' }),
+    );
+    recordProfitPick('i_active', 'b300_trt');
+    const back = crossTabParams(
+      'profit',
+      'inference',
+      new URLSearchParams({ g_model: 'MiniMax-M3', i_prec: 'fp8' }),
+    );
+    expect(back.get('g_model')).toBe('MiniMax-M3');
+    expect(back.get('i_prec')).toBe('fp8');
+    expect(back.get('i_active')).toBe('b300_trt');
+    expect(back.get('i_seq')).toBe('agentic-traces');
+  });
+
+  it('returns to the inference model when nothing was picked on another profit model', () => {
+    crossTabParams(
+      'inference',
+      'profit',
+      new URLSearchParams({ g_model: 'Llama-3.3-70B-Instruct-FP8' }),
+    );
+    const back = crossTabParams(
+      'profit',
+      'inference',
+      new URLSearchParams({ g_model: 'MiniMax-M3' }),
+    );
+    expect(back.get('g_model')).toBe('Llama-3.3-70B-Instruct-FP8');
+  });
+
   it('carries unofficial runs between tabs', () => {
     const live = inferenceLive();
     live.set('unofficialruns', '42');
