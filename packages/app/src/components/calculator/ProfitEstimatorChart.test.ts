@@ -73,6 +73,12 @@ describe('profitAxisTickFormat', () => {
     const format = profitAxisTickFormat('mw-hour', [0, 14_000]);
     expect([0, 5_000, 10_000].map(format)).toEqual(['$0', '$5k', '$10k']);
   });
+
+  it('keeps a decimal when compact ticks step in fractions of the unit', () => {
+    const format = profitAxisTickFormat('mw-hour', [0, 3_400]);
+    expect([500, 1_000, 1_500, 2_000].map(format)).toEqual(['$500', '$1.0k', '$1.5k', '$2.0k']);
+    expect(profitAxisTickFormat('gw-year', [0, 3.4e9])(1.5e9)).toBe('$1.5B');
+  });
 });
 
 const hardwareConfig = {

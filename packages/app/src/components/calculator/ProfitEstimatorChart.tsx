@@ -552,10 +552,25 @@ export function profitAxisTickFormat(
   domain: readonly [number, number],
   tickCount = PROFIT_Y_TICK_COUNT,
 ): (value: number) => string {
-  if (basis !== 'chip-hour') return (value) => formatProfitUsd(value, basis, 0);
   const [start, stop] = d3.scaleLinear().domain(domain).nice().domain();
-  const digits = Number.isInteger(d3.tickStep(start, stop, tickCount)) ? 0 : 2;
+  const step = d3.tickStep(start, stop, tickCount);
+  if (basis !== 'chip-hour') {
+    return (value) => formatProfitUsd(value, basis, compactTickDigits(value, step));
+  }
+  const digits = Number.isInteger(step) ? 0 : 2;
   return (value) => formatUsdPerChipHour(value, digits);
+}
+
+/**
+ * Decimals a compact tick needs so neighbouring ticks stay distinct. A $500
+ * step would otherwise print $1k, $2k, $2k for $1,000, $1,500 and $2,000.
+ */
+function compactTickDigits(value: number, step: number): number {
+  const abs = Math.abs(value);
+  const unit = abs >= 1e9 ? 1e9 : abs >= 1e6 ? 1e6 : abs >= 1e3 ? 1e3 : 1;
+  const tenths = (step / unit) * 10;
+  if (Math.abs(tenths - Math.round(tenths)) > 1e-9) return 2;
+  return Math.round(tenths) % 10 === 0 ? 0 : 1;
 }
 
 export function rowLabel(
