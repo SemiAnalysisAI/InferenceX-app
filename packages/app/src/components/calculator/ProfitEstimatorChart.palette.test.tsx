@@ -140,42 +140,33 @@ describe('ProfitEstimatorChart palette changes', () => {
   });
 });
 
-const isAws = (mark: SVGImageElement) =>
-  /#161D26|#FFFFFF/u.test(decodeURIComponent(mark.getAttribute('href') ?? ''));
+const isAws = (mark: SVGImageElement) => mark.getAttribute('href') === '/logos/amazon.svg';
 
-function expectAwsPair(marks: SVGImageElement[]) {
+function expectAwsMark(marks: SVGImageElement[]) {
   const aws = marks.filter(isAws);
-  expect(aws.map((mark) => mark.getAttribute('class'))).toEqual([
-    expect.stringContaining('dark:hidden'),
-    expect.stringContaining('hidden dark:inline'),
-  ]);
-  expect(decodeURIComponent(aws[0]!.getAttribute('href')!)).toContain('#161D26');
-  expect(decodeURIComponent(aws[1]!.getAttribute('href')!)).toContain('#FFFFFF');
-  expect(aws[0]!.getAttribute('x')).toBe(aws[1]!.getAttribute('x'));
-  expect(aws[0]!.getAttribute('y')).toBe(aws[1]!.getAttribute('y'));
-  expect(aws.some((mark) => mark.classList.contains('dark:invert'))).toBe(false);
+  expect(aws).toHaveLength(1);
+  expect(aws[0]!.getAttribute('class')).toContain('dark:invert dark:hue-rotate-180');
 }
 
 describe('ProfitEstimatorChart vendor marks', () => {
   const trn3: ProfitEstimatorRow = { ...ROWS[0]!, hwKey: 'trn3_vllm', resultKey: 'trn3_vllm' };
-  it('puts each vendor mark before the chip name on phone rows, with the AWS light/dark pair', () => {
+  it('puts each vendor mark before the chip name on phone rows, with the Amazon logo', () => {
     chartWidth = 393;
     draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
     expect(container.querySelectorAll('image.bar-vendor-mark')).toHaveLength(0);
     const marks = [...container.querySelectorAll<SVGImageElement>('image.row-vendor-mark')];
-    expect(marks).toHaveLength(4);
+    expect(marks).toHaveLength(3);
     for (const mark of marks) {
       expect(Number(mark.getAttribute('x')) + Number(mark.getAttribute('width'))).toBeLessThan(0);
     }
-    expectAwsPair(marks);
-    expect(marks.filter((mark) => mark.classList.contains('dark:invert'))).toHaveLength(1);
+    expectAwsMark(marks);
   });
 
-  it('tops every vendor bar, Trainium3 included, with the AWS light/dark pair', () => {
+  it('tops every vendor bar, Trainium3 included, with the Amazon logo', () => {
     draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
     const marks = [...container.querySelectorAll<SVGImageElement>('image.bar-vendor-mark')];
-    expect(marks).toHaveLength(4);
-    expectAwsPair(marks);
+    expect(marks).toHaveLength(3);
+    expectAwsMark(marks);
     expect(Number(marks.find(isAws)?.getAttribute('width'))).toBeGreaterThan(0);
   });
 });

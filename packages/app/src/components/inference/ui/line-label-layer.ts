@@ -116,8 +116,6 @@ export interface PillOccluder {
 const NARROW_PLOT_WIDTH = 360;
 const NARROW_PILL_LIMIT = 3;
 const NARROW_PILL_SHARE = 0.45;
-/** Up to this many curves, an exported pill may cover another line rather than leave a curve unnamed. */
-const FEW_SERIES_LABEL_LIMIT = 8;
 
 export function pillWidthBudget(plotWidth: number): number {
   return plotWidth < NARROW_PLOT_WIDTH ? plotWidth * NARROW_PILL_SHARE : Infinity;
@@ -322,8 +320,6 @@ function layoutPills(
   const limit = narrow ? NARROW_PILL_LIMIT : Infinity;
   const maxLeader = narrow ? NARROW_LEADER_MAX_LENGTH : LEADER_MAX_LENGTH;
   const lines = occluders.filter((occluder) => occluder.points.length > 0).map(boundOccluder);
-  const fewSeries =
-    labelEverySeries && items.filter(({ label }) => label.visible).length <= FEW_SERIES_LABEL_LIMIT;
   let shown = 0;
 
   for (const { node, label } of items) {
@@ -344,7 +340,7 @@ function layoutPills(
       const ty = cy + shift.y;
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
     };
-    const placeNear = (anchor: CartesianPoint, avoidLines = true) => {
+    const placeNear = (anchor: CartesianPoint, avoidLines = true, reach = maxLeader) => {
       const ax = anchor.x + offsetX;
       const ay = anchor.y + offsetY;
       const mirrorX = 2 * anchor.x - ax - local.left - local.right;
@@ -362,8 +358,8 @@ function layoutPills(
       }
       const farSlots = () => {
         const columnStep = (local.right - local.left) / 2;
-        const colReach = Math.ceil((maxLeader + local.right - local.left) / columnStep);
-        const rowReach = Math.ceil((maxLeader + local.bottom - local.top) / rowHeight);
+        const colReach = Math.ceil((reach + local.right - local.left) / columnStep);
+        const rowReach = Math.ceil((reach + local.bottom - local.top) / rowHeight);
         const colMin = Math.max(
           -colReach,
           Math.floor((bounds.left - ax - local.left) / columnStep),
@@ -397,7 +393,7 @@ function layoutPills(
             y: Math.min(Math.max(anchor.y, box.top), box.bottom),
           };
           const length = Math.hypot(end.x - anchor.x, end.y - anchor.y);
-          if (length > maxLeader) continue;
+          if (length > reach) continue;
           if (placed.some((other) => rectsStrictlyOverlap(box, other))) continue;
           if (avoidLines && coversOtherPath(box, label.key, lines)) continue;
           const moved = Math.hypot(candidate.tx - ax, candidate.ty - ay) > LEADER_MIN_SHIFT;
@@ -423,12 +419,23 @@ function layoutPills(
         if (chosen) break;
       }
     }
-    // A PNG has no legend, so with few series an unlabelled curve is unidentifiable.
-    if (shown < limit && !chosen && fewSeries) {
+    // Naming every curve: reach anywhere in the plot on a leader line, then let the
+    // pill cross other lines, and only as a last resort overlap another pill. Curves
+    // anchored outside the plot (zoomed out of view) are left unlabeled.
+    const primaryInside =
+      primary.x >= bounds.left &&
+      primary.x <= bounds.right &&
+      primary.y >= bounds.top &&
+      primary.y <= bounds.bottom;
+    if (shown < limit && !chosen && labelEverySeries && primaryInside) {
+      const plotReach = bounds.right - bounds.left + bounds.bottom - bounds.top;
+      chosen = placeNear(primary, true, plotReach);
       for (const anchor of [primary, ...alternateAnchors(label.key, primary, lines, bounds)]) {
-        chosen = placeNear(anchor, false);
         if (chosen) break;
+        chosen = placeNear(anchor, false);
       }
+      chosen ??= placeNear(primary, false, plotReach);
+      chosen ??= { ...clampAt([tx0, ty0]), anchor: primary, moved: false };
     }
     if (!chosen) {
       const fallback = clampAt([tx0, ty0]);
@@ -655,7 +662,7 @@ export function renderLineLabels(
       label: LineLabelPlacement,
     ) => void;
     bounds?: RectBounds | null;
-    /** Static exports have no legend, so few-series charts name every curve. */
+    /** Show a pill for every visible curve instead of hiding pills that find no clear spot. */
     labelEverySeries?: boolean;
     occluders?: readonly PillOccluder[];
   },
@@ -760,6 +767,7 @@ export function updateRenderedLineLabels(
     offsetY?: number;
     bounds?: RectBounds | null;
     occluders?: readonly PillOccluder[];
+    labelEverySeries?: boolean;
   } = {},
 ): void {
   const byKey = new Map(labels.map((label) => [label.key, label]));
@@ -787,7 +795,7 @@ export function updateRenderedLineLabels(
     bounds,
     bounds ? pillObstacles(group, '.parallelism-label') : [],
     options.occluders ?? [],
-    false,
+    options.labelEverySeries ?? false,
   );
 }
 

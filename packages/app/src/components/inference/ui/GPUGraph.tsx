@@ -733,7 +733,7 @@ const GPUGraph = React.memo(
             seriesAttribute: 'data-graph-id',
             opacity: showLineLabels ? 0.95 : 0,
             occluders,
-            labelEverySeries: ctx.surface === 'export',
+            labelEverySeries: true,
           });
         },
         onDisplayUpdate: (zoomGroup, ctx) => {
@@ -747,6 +747,7 @@ const GPUGraph = React.memo(
             seriesAttribute: 'data-graph-id',
             opacity: showLineLabels ? 0.95 : 0,
             occluders,
+            labelEverySeries: true,
           });
           zoomGroup.selectAll('.line-label').raise();
         },
@@ -759,6 +760,7 @@ const GPUGraph = React.memo(
           updateRenderedLineLabels(zoomGroup, labels, {
             opacity: showLineLabels ? 0.95 : 0,
             occluders,
+            labelEverySeries: true,
           });
         },
       };
