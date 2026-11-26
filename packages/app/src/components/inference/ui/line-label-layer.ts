@@ -659,8 +659,16 @@ export function renderLineLabels(
     /** Show a pill for every visible curve instead of hiding pills that find no clear spot. */
     labelEverySeries?: boolean;
     occluders?: readonly PillOccluder[];
+    /**
+     * `'pill'` (default) draws white text on a filled box. `'text'` draws the
+     * label in the series colour with a chart-background halo and no box or logo.
+     */
+    appearance?: 'pill' | 'text';
+    /** Resolved halo colour for `'text'`; CSS variables do not survive PNG export. */
+    halo?: string;
   },
 ): void {
+  const plainText = options.appearance === 'text';
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
   const offsetY = options.offsetY ?? -14;
@@ -704,7 +712,18 @@ export function renderLineLabels(
     const labelGroup = d3.select<SVGGElement, LineLabelPlacement>(this);
     options.configureGroup?.(labelGroup, label);
     const text = labelGroup.select<SVGTextElement>(':scope > text.ll-text');
-    const space = iconSpace(options.iconFor?.(label));
+    const space = plainText ? 0 : iconSpace(options.iconFor?.(label));
+    text.attr('fill', plainText ? label.color : 'white');
+    const halo: [string, string][] = [
+      ['stroke', options.halo ?? 'var(--card)'],
+      ['stroke-width', '3px'],
+      ['stroke-linejoin', 'round'],
+      ['paint-order', 'stroke'],
+    ];
+    for (const [name, value] of halo) {
+      if (plainText) text.style(name, value);
+      else text.style(name, null);
+    }
     if (space > 0) text.attr('x', space);
     else text.attr('x', null);
     if (options.configureText) options.configureText(text, label);
@@ -718,7 +737,7 @@ export function renderLineLabels(
   });
   for (const { node, label, bbox } of measured) {
     const labelGroup = d3.select(node);
-    const icon = options.iconFor?.(label);
+    const icon = plainText ? undefined : options.iconFor?.(label);
     const space = iconSpace(icon);
     labelGroup
       .select('.ll-bg')
@@ -726,7 +745,7 @@ export function renderLineLabels(
       .attr('y', bbox.y - 3)
       .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
-      .attr('fill', whiteTextFill(label.color));
+      .attr('fill', plainText ? 'transparent' : whiteTextFill(label.color));
 
     labelGroup
       .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')

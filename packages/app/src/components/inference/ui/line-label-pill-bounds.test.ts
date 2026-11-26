@@ -635,6 +635,25 @@ describe('labelEverySeries names every curve', () => {
   });
 });
 
+describe('plain-text line labels', () => {
+  it('draws coloured text with no box or logo', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, curves(3), {
+      seriesAttribute: 'data-hw-key',
+      labelEverySeries: true,
+      appearance: 'text',
+      halo: '#fff',
+      iconFor: () => ({ href: 'logo.svg', width: 10, height: 10 }),
+    });
+    for (const node of zoomGroup.selectAll<SVGGElement, unknown>('.line-label').nodes()) {
+      expect(node.style.opacity).not.toBe('0');
+      expect(node.querySelector('.ll-bg')?.getAttribute('fill')).toBe('transparent');
+      expect(node.querySelector('.ll-logo')).toBeNull();
+      expect(node.querySelector<SVGTextElement>('.ll-text')?.style.stroke).toBe('rgb(255, 255, 255)');
+    }
+  });
+});
+
 const measure = (text: string) => text.length * CHAR_WIDTH;
 
 describe('phone pill width budget', () => {

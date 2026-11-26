@@ -2871,6 +2871,8 @@ const ScatterGraph = React.memo(
             seriesAttribute: 'data-series-id',
             occluders: showLineLabels ? pillOccluders(xScale, yScale) : [],
             labelEverySeries: true,
+            appearance: 'text',
+            halo: ir.getCssColor('--card'),
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -2881,6 +2883,7 @@ const ScatterGraph = React.memo(
                 .attr('opacity', 0.95);
             },
             configureText: (text, label) => {
+              const muted = ir.getCssColor('--muted-foreground');
               const config = getHardwareConfig(lineLabelHardwareKey(label.seriesId), modelLabel);
               const meta = lineLabelMeta.get(label.key);
               const suffix = meta?.suffix ?? '';
@@ -2899,20 +2902,20 @@ const ScatterGraph = React.memo(
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
               const runSegments = runTag
-                ? [{ className: 'll-run', text: runTag, fill: 'white', weight: '400' }]
+                ? [{ className: 'll-run', text: runTag, fill: muted, weight: '400' }]
                 : [];
               const variantSegments = suffix
-                ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
+                ? [{ className: 'll-variant', text: suffix, fill: label.color, weight: '500' }]
                 : [];
               const segments = isHardwareLabel
                 ? [
-                    { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
+                    { className: 'll-gpu', text: config.label, fill: label.color, weight: '700' },
                     ...(precisionLabel
                       ? [
                           {
                             className: 'll-precision',
                             text: precisionLabel,
-                            fill: 'white',
+                            fill: label.color,
                             weight: '600',
                           },
                         ]
@@ -2922,7 +2925,7 @@ const ScatterGraph = React.memo(
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: 'white',
+                            fill: muted,
                             weight: '400',
                           },
                         ]
@@ -2934,7 +2937,7 @@ const ScatterGraph = React.memo(
                     {
                       className: 'll-plain',
                       text: coreLabel,
-                      fill: 'white',
+                      fill: label.color,
                       weight: '600',
                     },
                     ...runSegments,
