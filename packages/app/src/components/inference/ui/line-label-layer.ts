@@ -420,8 +420,14 @@ function layoutPills(
       }
     }
     // Naming every curve: reach anywhere in the plot on a leader line, then let the
-    // pill cross other lines, and only as a last resort overlap another pill.
-    if (shown < limit && !chosen && labelEverySeries) {
+    // pill cross other lines, and only as a last resort overlap another pill. Curves
+    // anchored outside the plot (zoomed out of view) are left unlabeled.
+    const primaryInside =
+      primary.x >= bounds.left &&
+      primary.x <= bounds.right &&
+      primary.y >= bounds.top &&
+      primary.y <= bounds.bottom;
+    if (shown < limit && !chosen && labelEverySeries && primaryInside) {
       const plotReach = bounds.right - bounds.left + bounds.bottom - bounds.top;
       chosen = placeNear(primary, true, plotReach);
       for (const anchor of [primary, ...alternateAnchors(label.key, primary, lines, bounds)]) {

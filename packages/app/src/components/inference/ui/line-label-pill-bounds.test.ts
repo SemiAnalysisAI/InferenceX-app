@@ -620,6 +620,17 @@ describe('labelEverySeries names every curve', () => {
     expect(hidden).toHaveLength(0);
   });
 
+  it('leaves a curve anchored outside the plot unlabeled', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('offscreen', 600, 150, 'Off')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(0, 300),
+      labelEverySeries: true,
+    });
+    const node = zoomGroup.select<SVGGElement>('.line-label').node()!;
+    expect(node.style.opacity).toBe('0');
+  });
+
   it('still hides blocked pills without the option', () => {
     const labels = curves(8);
     const { zoomGroup } = renderChart();
