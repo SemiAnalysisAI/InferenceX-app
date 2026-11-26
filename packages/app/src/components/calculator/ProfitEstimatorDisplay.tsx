@@ -90,6 +90,12 @@ import {
 } from '@/lib/catalog/data-mappings';
 import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
+import {
+  getProfitHardwareSeed,
+  recordProfitPick,
+  seededHardwareVisibility,
+  setProfitHardwareSeed,
+} from '@/lib/routing/cross-tab-selection';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
@@ -1038,9 +1044,23 @@ function ProfitEstimatorInner({
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...legendHwKeys].toSorted().join(',')}`;
 
+  // Hardware the reader picked on the inference chart, or on the other profit estimator.
+  const [hardwareSeed, setHardwareSeed] = useState(getProfitHardwareSeed);
   const visibleHwKeys = useMemo(
-    () => resolveCalculatorVisibility(visibilityIntent, selectionKey, legendHwKeys),
-    [visibilityIntent, selectionKey, legendHwKeys],
+    () =>
+      (visibilityIntent === null &&
+        seededHardwareVisibility(hardwareSeed, selectedModel, legendHwKeys)) ||
+      resolveCalculatorVisibility(visibilityIntent, selectionKey, legendHwKeys),
+    [visibilityIntent, hardwareSeed, selectedModel, selectionKey, legendHwKeys],
+  );
+  const pickHardware = useCallback(
+    (visible: Set<string>) => {
+      const all = legendHwKeys.every((key) => visible.has(key));
+      const keys = all ? [] : legendHwKeys.filter((key) => visible.has(key));
+      recordProfitPick('i_active', keys.join(','));
+      setProfitHardwareSeed({ model: selectedModel, keys });
+    },
+    [legendHwKeys, selectedModel],
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const [highContrast, setHighContrast] = useState(false);
@@ -1084,6 +1104,9 @@ function ProfitEstimatorInner({
   const handleModelChange = useCallback(
     (value: string) => {
       setVisibilityIntent(null);
+      setHardwareSeed(null);
+      setProfitHardwareSeed(null);
+      recordProfitPick('g_model', value);
       setSelectedModel(value as Model);
       track('profit_model_selected', { model: value });
     },
@@ -1093,6 +1116,9 @@ function ProfitEstimatorInner({
   const handlePrecisionChange = useCallback(
     (value: string[]) => {
       setVisibilityIntent(null);
+      setHardwareSeed(null);
+      setProfitHardwareSeed(null);
+      recordProfitPick('i_prec', value.join(','));
       setSelectedPrecisions(value);
       track('profit_precision_selected', { precision: value.join(',') });
     },
@@ -1131,9 +1157,10 @@ function ProfitEstimatorInner({
         visible: next,
         known: new Set(legendHwKeys),
       });
+      pickHardware(next);
       track('profit_gpu_toggled', { gpu: hwKey });
     },
-    [legendHwKeys, visibleHwKeys, selectionKey],
+    [legendHwKeys, visibleHwKeys, selectionKey, pickHardware],
   );
 
   const handleResetGpus = useCallback(() => {
@@ -1142,8 +1169,9 @@ function ProfitEstimatorInner({
       visible: new Set(legendHwKeys),
       known: new Set(legendHwKeys),
     });
+    pickHardware(new Set(legendHwKeys));
     track('profit_gpu_reset', { gpu_count: legendHwKeys.length });
-  }, [legendHwKeys, selectionKey]);
+  }, [legendHwKeys, selectionKey, pickHardware]);
 
   const legendItems = useMemo(
     () =>

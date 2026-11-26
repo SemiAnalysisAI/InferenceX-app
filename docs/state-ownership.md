@@ -16,6 +16,20 @@ entry redirect does not reset a user's selection.
 `inference-navigation-state.ts` store. Tab navigation subscribes to that value,
 including selections omitted from share URLs because they match an older default.
 The store survives provider remounts but resets on a full page load.
+
+Inference and the two profit estimators mount separate filter providers, so a tab
+switch between them would otherwise rebuild the destination from route defaults.
+`cross-tab-selection.ts` carries selections across that switch, and `TabNav`
+builds the destination at click time because filter edits do not update the
+rendered tab hrefs. Inference is the source of truth: leaving it records its full
+share state and hands its model (when the profit estimator offers it), explicit
+precision, explicit run date and explicit `i_active` hardware to the profit
+estimator. The profit estimator may correct its model or precision to one with
+agentic data, so leaving it restores the recorded inference view and applies only
+the model, precision and legend picks the reader made there. Profit legend
+visibility has no URL parameter, so the hardware travels as a client-only seed
+that applies only to the same model. This is navigation state only: no URL
+parameter, API contract or `inferencex-skills` behavior changes.
 Share links from the bare inference route explicitly include this model, even
 when it matches the legacy URL-state default.
 
