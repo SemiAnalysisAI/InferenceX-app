@@ -13,12 +13,21 @@ import {
   formatProfitUsd,
   formatUsdCompact,
   formatUsdPerChipHour,
+  DEFAULT_PROFIT_COST_PROVIDER,
+  gpuHoursForBasis,
   gpuHoursPerGwYear,
+  gpuHoursPerMwHour,
   HOURS_PER_YEAR,
   isProfitEstimatorRow,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
   parseTokenPriceInput,
+  PROFIT_BASES,
+  PROFIT_BASIS_TAB,
+  profitBasisForTab,
+  profitBasisUsesPower,
+  profitCsvGpuHours,
+  profitCsvUsd,
   profitModelDefaults,
   type ProfitEstimatorRow,
 } from './profit-estimator';
@@ -64,6 +73,57 @@ describe('gpuHoursPerGwYear', () => {
     expect(gpuHoursPerGwYear(0)).toBeNull();
     expect(gpuHoursPerGwYear(Number.NaN)).toBeNull();
     expect(gpuHoursPerGwYear(-1)).toBeNull();
+  });
+});
+
+describe('gpuHoursPerMwHour', () => {
+  it('is the chips one megawatt powers: 1,000 kW over all-in kW per GPU', () => {
+    expect(gpuHoursPerMwHour(1)).toBe(1_000);
+    expect(gpuHoursPerMwHour(1.2)).toBeCloseTo(833.3333, 4);
+    expect(gpuHoursPerMwHour(1.5)).toBeCloseTo(666.6667, 4);
+    expect(gpuHoursPerMwHour(1.71)).toBeCloseTo(1_000 / 1.71, 9);
+  });
+
+  it('is a gigawatt-year scaled down by 1,000 MW and 8,760 hours', () => {
+    expect(gpuHoursPerMwHour(1.71)! * 1_000 * HOURS_PER_YEAR).toBeCloseTo(B200_GPU_HOURS, 3);
+  });
+
+  it('is null for a missing or zero power figure', () => {
+    expect(gpuHoursPerMwHour(0)).toBeNull();
+    expect(gpuHoursPerMwHour(Number.NaN)).toBeNull();
+    expect(gpuHoursPerMwHour(-1)).toBeNull();
+  });
+});
+
+describe('profit bases', () => {
+  it('lists the bases in toggle order, each with its own page and default TCO tier', () => {
+    expect(PROFIT_BASES).toEqual(['chip-hour', 'mw-hour', 'gw-year']);
+    expect(PROFIT_BASIS_TAB).toEqual({
+      'chip-hour': 'profit-estimator',
+      'mw-hour': 'profit-estimator-per-megawatt',
+      'gw-year': 'profit-estimator-per-gigawatt',
+    });
+    for (const basis of PROFIT_BASES) {
+      expect(profitBasisForTab(PROFIT_BASIS_TAB[basis])).toBe(basis);
+    }
+    expect(DEFAULT_PROFIT_COST_PROVIDER).toEqual({
+      'chip-hour': 'costr',
+      'mw-hour': 'costr',
+      'gw-year': 'costh',
+    });
+  });
+
+  it('marks only the megawatt and gigawatt bases as power budgets', () => {
+    expect(PROFIT_BASES.filter(profitBasisUsesPower)).toEqual(['mw-hour', 'gw-year']);
+  });
+
+  it('counts GPU-hours per basis and needs a power figure only for power budgets', () => {
+    expect(gpuHoursForBasis('chip-hour', 1.71)).toBe(1);
+    expect(gpuHoursForBasis('chip-hour', 0)).toBe(1);
+    expect(gpuHoursForBasis('mw-hour', 1.71)).toBe(gpuHoursPerMwHour(1.71));
+    expect(gpuHoursForBasis('gw-year', 1.71)).toBe(gpuHoursPerGwYear(1.71));
+    expect(gpuHoursForBasis('mw-hour', 0)).toBeNull();
+    expect(gpuHoursForBasis('gw-year', 0)).toBeNull();
   });
 });
 
@@ -241,6 +301,53 @@ describe('estimateSkuProfit', () => {
   });
 });
 
+describe('estimateSkuProfit per deployed megawatt', () => {
+  const TRN3 = { powerKwPerGpu: 1.2, costPerGpuHour: 1.05 };
+  const assumptions = { utilizationPct: 60, labCutPct: 20 };
+
+  it('is the per chip-hour estimate times the chips that fit in a megawatt', () => {
+    const chip = row(
+      estimateSkuProfit(result, TRN3, FLAT_PRICING, { ...assumptions, basis: 'chip-hour' }),
+    );
+    const mw = row(
+      estimateSkuProfit(result, TRN3, FLAT_PRICING, { ...assumptions, basis: 'mw-hour' }),
+    );
+    const chips = 1_000 / 1.2;
+    expect(mw.gpuHours).toBeCloseTo(chips, 9);
+    expect(mw.revenuePerGpuHour).toBe(chip.revenuePerGpuHour);
+    expect(mw.revenue).toBeCloseTo(chip.revenue * chips, 6);
+    expect(mw.tco).toBeCloseTo(1.05 * chips, 6);
+    expect(mw.labCut).toBeCloseTo(chip.labCut * chips, 6);
+    expect(mw.profit).toBeCloseTo(chip.profit * chips, 6);
+    expect(mw.tco + mw.labCut + mw.profit).toBeCloseTo(mw.revenue, 6);
+    expect(mw.profit / mw.revenue).toBeCloseTo(chip.profit / chip.revenue, 12);
+  });
+
+  it('ranks a lower-power chip above an equal earner that draws more', () => {
+    const { rows } = estimateProfitRows(
+      [
+        { hwKey: 'hot', resultKey: 'hot', value: 1_000 },
+        { hwKey: 'cool', resultKey: 'cool', value: 1_000 },
+      ],
+      (hwKey) => ({ powerKwPerGpu: hwKey === 'hot' ? 2.4 : 1.2, costPerGpuHour: 1.05 }),
+      FLAT_PRICING,
+      { ...assumptions, basis: 'mw-hour' },
+    );
+    expect(rows.map((r) => r.resultKey)).toEqual(['cool', 'hot']);
+    expect(rows[0]!.profit).toBeCloseTo(rows[1]!.profit * 2, 6);
+  });
+
+  it('skips a SKU with no all-in power figure', () => {
+    const skipped = estimateSkuProfit(
+      result,
+      { powerKwPerGpu: 0, costPerGpuHour: 1.05 },
+      FLAT_PRICING,
+      { ...assumptions, basis: 'mw-hour' },
+    );
+    expect(isProfitEstimatorRow(skipped) ? null : skipped.reason).toBe('no-power');
+  });
+});
+
 describe('estimateProfitRows', () => {
   it('splits priced rows from skipped SKUs and sorts by profit descending', () => {
     const specs: Record<string, { powerKwPerGpu: number; costPerGpuHour: number }> = {
@@ -279,7 +386,24 @@ describe('formatProfitUsd', () => {
     expect(formatProfitUsd(2.3, 'chip-hour', 0)).toBe('$2.30');
     expect(formatProfitUsd(135.2e9, 'gw-year')).toBe('$135.2B');
     expect(formatProfitUsd(135.2e9, 'gw-year', 0)).toBe('$135B');
+    expect(formatProfitUsd(9_966.7, 'mw-hour')).toBe('$10.0k');
+    expect(formatProfitUsd(9_966.7, 'mw-hour', 0)).toBe('$10k');
+    expect(formatProfitUsd(-412.4, 'mw-hour')).toBe('−$412');
     expect(formatUsdPerChipHour(Number.NaN)).toBe('—');
+  });
+});
+
+describe('profit CSV cells', () => {
+  it('keeps cents per megawatt-hour, whole dollars per GW-year and four decimals per chip-hour', () => {
+    expect(profitCsvUsd(9_966.666, 'mw-hour')).toBe('9966.67');
+    expect(profitCsvUsd(135.2e9 + 0.4, 'gw-year')).toBe(135_200_000_000);
+    expect(profitCsvUsd(11.96, 'chip-hour')).toBe('11.9600');
+  });
+
+  it('appends the chip count only where the basis has one', () => {
+    expect(profitCsvGpuHours(1_000 / 1.2, 'mw-hour')).toEqual(['833.33']);
+    expect(profitCsvGpuHours(B200_GPU_HOURS, 'gw-year')).toEqual([Math.round(B200_GPU_HOURS)]);
+    expect(profitCsvGpuHours(1, 'chip-hour')).toEqual([]);
   });
 });
 

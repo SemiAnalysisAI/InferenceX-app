@@ -46,18 +46,18 @@ export const config: ProxyConfig = {
     { source: '/:locale(zh)?/opx/:category?', has: [{ type: 'query', key: 'op' }] },
     '/:locale(zh)?/:tab(inference|profit-estimator|profit-estimator-per-gigawatt|evaluation|historical|calculator|fleet|first-token|cache-reuse|gpu-specs|submissions|ai-chart|current-inferencex-image|agentic-workload-explorer|agentx|operatorx|ubenchx|powerx|collectivex|video)/:path*',
     '/:locale(zh)?/infx',
-    '/:locale(zh)?/infx/:tab(calculator|historical|profit-estimator|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
+    '/:locale(zh)?/infx/:tab(calculator|historical|profit-estimator|profit-estimator-per-megawatt|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
     {
       source:
-        '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
+        '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-megawatt|profit-estimator-per-gigawatt)/:slug/:filters*',
       has: [{ type: 'query', key: 'i_pctl' }],
     },
     {
       source:
-        '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
+        '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-megawatt|profit-estimator-per-gigawatt)/:slug/:filters*',
       has: [{ type: 'query', key: 'percentile' }],
     },
-    '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*/percentile/:rest+',
+    '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-megawatt|profit-estimator-per-gigawatt)/:slug/:filters*/percentile/:rest+',
     {
       source:
         '/:locale(zh)?/:family(compare|compare-per-dollar|compare-precision|compare-spec-decode)/:slug/:scenario([aA][gG][eE][nN][tT][iI][cC]|[18][kK]-[18][kK])?',

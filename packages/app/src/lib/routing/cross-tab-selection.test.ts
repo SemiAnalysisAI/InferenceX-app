@@ -27,6 +27,7 @@ describe('cross-tab selection', () => {
   it('maps only inference and the profit estimators', () => {
     expect(selectionTabKind('inference')).toBe('inference');
     expect(selectionTabKind('profit-estimator')).toBe('profit');
+    expect(selectionTabKind('profit-estimator-per-megawatt')).toBe('profit');
     expect(selectionTabKind('profit-estimator-per-gigawatt')).toBe('profit');
     expect(selectionTabKind('calculator')).toBeNull();
   });

@@ -184,6 +184,14 @@ export const apiRouteCatalog = [
     sourceSha256: '3b513949eb51668aa52b07324d2cecc5506f8167df05464e8269446715a9c734',
   },
   {
+    source: 'src/app/api/v1/views/profit-estimator-per-megawatt/route.ts',
+    path: '/api/v1/views/profit-estimator-per-megawatt',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-profit-estimator-per-megawatt-view',
+    sourceSha256: 'e226f8a32d0d1362ef8edc15bfa923880902a6f400e5a26bc8ba0f7c87e1701a',
+  },
+  {
     source: 'src/app/api/v1/views/rankings/route.ts',
     path: '/api/v1/views/rankings',
     method: 'GET',
@@ -1574,7 +1582,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: 'ff9cf222674166bcd893f041bb135b9f5816ef3518c8a9e3b260fbdc15871b82',
+    sourceSha256: '1884cc38b4f7cbb731a713ef7a945f7414c0fc8c5e5665628cdd09882f37cc50',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1873,7 +1881,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'c3082fab095dbf821fd0c4ca9132770e7073e5e65d4517193fa856ca01759a06',
+    sourceSha256: '89434f3dc5e9749925139264b68f96908662a597de7b2788d55f9a99288b3b50',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1909,7 +1917,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '8aeb6c8f774c998f04c701f0e5d47c6db2be0cbddb07324683b9dae62f64a9e4',
+    sourceSha256: 'c458da704ec1d855a8b34e8c4d74408ddfbe15dc7d78ebec09118a5fbfe2814d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

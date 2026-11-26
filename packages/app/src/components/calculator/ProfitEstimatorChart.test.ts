@@ -68,6 +68,11 @@ describe('profitAxisTickFormat', () => {
   it('leaves the compact gigawatt-year ticks alone', () => {
     expect(profitAxisTickFormat('gw-year', [0, 40e9])(35e9)).toBe('$35B');
   });
+
+  it('uses compact thousands for megawatt-hour ticks', () => {
+    const format = profitAxisTickFormat('mw-hour', [0, 14_000]);
+    expect([0, 5_000, 10_000].map(format)).toEqual(['$0', '$5k', '$10k']);
+  });
 });
 
 const hardwareConfig = {
@@ -238,6 +243,31 @@ describe('profitPointDetails', () => {
     expect(all).toContain('$400');
     expect(all).toContain('30%');
     expect(all).toContain('60%');
+  });
+
+  it('lists the chips in a megawatt instead of GPU-hours on the per-megawatt basis', () => {
+    const megawatt = { ...assumptions, basis: 'mw-hour' } as const;
+    const mwRow = row({
+      gpuHours: 1_000 / 1.2,
+      revenue: 13_550,
+      tco: 875,
+      labCut: 2_710,
+      profit: 9_965,
+    });
+    const en = profitPointDetails(mwRow, hardwareConfig, megawatt, 'en');
+    expect(en.metrics[0]).toEqual({ value: '$10.0k', label: 'Profit' });
+    expect(en.rows).toContainEqual({ label: 'Chips per MW', value: '833.3' });
+    expect(en.rows).toContainEqual({ label: 'Revenue per GPU-hour', value: '$3.00/GPU/hr' });
+    expect(JSON.stringify(en)).not.toContain('GPU-hours per GW-year');
+    const zh = profitPointDetails(mwRow, hardwareConfig, megawatt, 'zh');
+    expect(zh.rows).toContainEqual({ label: '每兆瓦芯片数', value: '833.3' });
+    const chip = profitPointDetails(
+      row({ gpuHours: 1 }),
+      hardwareConfig,
+      { ...assumptions, basis: 'chip-hour' },
+      'en',
+    );
+    expect(JSON.stringify(chip)).not.toContain('Chips per MW');
   });
 
   it('puts the run date of a compare-history bar in the date line, not the title', () => {

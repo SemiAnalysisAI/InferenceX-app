@@ -4,6 +4,7 @@ import { Model } from '@/lib/catalog/data-mappings';
 import { modelRoutePathnameRewrite } from './model-routes';
 import {
   PROFIT_ROUTE_PARAMS,
+  PROFIT_ROUTE_TABS,
   parseProfitRouteFilters,
   profitRouteParams,
   profitRouteForTab,
@@ -14,7 +15,7 @@ import {
 
 describe('profit estimator route state', () => {
   for (const prefix of ['', '/zh']) {
-    for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
+    for (const tab of PROFIT_ROUTE_TABS) {
       const base = `${prefix}/infx/${tab}/deepseek-v4`;
       it(`round-trips every supported parameter on ${base}`, () => {
         const values = [
@@ -79,6 +80,18 @@ describe('profit estimator route state', () => {
     expect(profitRouteForTab('/infx/profit-estimator/kimi-k3', 'profit-estimator')).toBe(
       '/infx/profit-estimator/kimi-k3',
     );
+    expect(
+      profitRouteForTab(
+        '/zh/infx/profit-estimator/glm-5-3/target/135/chips/trn3_vllm',
+        'profit-estimator-per-megawatt',
+      ),
+    ).toBe('/zh/infx/profit-estimator-per-megawatt/glm-5-3/target/135/chips/trn3_vllm');
+    expect(
+      profitRouteForTab(
+        '/infx/profit-estimator-per-megawatt/glm-5-3/power/modeled',
+        'profit-estimator-per-gigawatt',
+      ),
+    ).toBe('/infx/profit-estimator-per-gigawatt/glm-5-3/power/modeled');
     expect(profitRouteForTab('/infx/calculator/kimi-k3', 'profit-estimator')).toBeNull();
   });
 

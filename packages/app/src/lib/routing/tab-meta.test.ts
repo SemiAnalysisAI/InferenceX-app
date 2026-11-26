@@ -45,6 +45,22 @@ describe('per-model profit estimator metadata', () => {
     expect(MODEL_TAB_META['profit-estimator'].description(kimi.seoName)).toContain('chip-hour');
   });
 
+  it('gives the per-megawatt view its own Kimi-defaulted route and MW wording', () => {
+    expect(defaultRouteModel('profit-estimator-per-megawatt')).toBe(Model.Kimi_K3);
+    expect(modelTabCanonicalPath('profit-estimator-per-megawatt', kimi)).toBe(
+      '/infx/profit-estimator-per-megawatt',
+    );
+    expect(modelTabCanonicalPath('profit-estimator-per-megawatt', deepseek)).toBe(
+      `/infx/profit-estimator-per-megawatt/${deepseek.slug}`,
+    );
+    expect(MODEL_TAB_META['profit-estimator-per-megawatt'].title(kimi.seoName)).toContain(
+      'per MegaWatt',
+    );
+    expect(MODEL_TAB_META['profit-estimator-per-megawatt'].description(kimi.seoName)).toContain(
+      'megawatt',
+    );
+  });
+
   it('names the model in the title and description', () => {
     const meta = modelTabMetadata('profit-estimator', deepseek);
     expect(meta.title).toBe(MODEL_TAB_META['profit-estimator'].title(deepseek.seoName));

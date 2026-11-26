@@ -8,6 +8,7 @@ import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-bas
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
 import { RESULT_CSV_COLUMNS } from '@/components/video-benchmark/results-csv';
 import { text } from '@/lib/api/api-documentation-helpers';
+import { isProfitRouteTab } from '@/lib/routing/model-routes';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 
 const object: ApiSchema = { type: 'object', additionalProperties: true };
@@ -203,8 +204,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150 and Muse Spark 1.3/Open 100 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable operating-point assumptions, not hosted API P90-equivalent measurements.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark 1.3/Open 为 100 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的工作点假设，并非与托管 API P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Every profit view uses model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150 and Muse Spark 1.3/Open 100 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable operating-point assumptions, not hosted API P90-equivalent measurements.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。各利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark 1.3/Open 为 100 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的工作点假设，并非与托管 API P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -275,8 +276,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '模型许可或收入分成百分比，范围 0 至 100，默认值随模型变化。',
   ],
   powerBasis: [
-    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. For GW-year estimates, modeled filters source points to valid system-power inputs before building the curve at the same target, without extrapolation or historical substitution. compare uses identical valid-curve throughput for paired budgets; when no valid curve reaches the target, it retains the original provisioned estimate. provisioned-only keeps the original performance curve. All in Measured adds modeled components and PUE to measured inputs; it is not measured wall power. NVL72 rows need validated GPU telemetry; each compute tray takes an equal share of a modeled liquid-cooled rack, with measured Grace-socket power when the row has complete validated socket telemetry (CPU-rail-only and module-sensor readings are not accepted) and modeled Grace power otherwise. Both interpolation knots must share a power basis. powerSource records topology (chassis or nvl72-tray), cpu (measured or modeled), PUE and the pinned power-model revision. powerLabel marks paired estimates and full-chassis extrapolation; skipped reasons preserve missing coverage.',
-    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。按 GW 年估算时，modeled 先筛选满足系统功耗要求的数据点，再在同一目标值上构建曲线，不外推，也不借用历史数据。compare 的两种功耗方案使用同一条有效曲线的吞吐量；没有有效曲线覆盖目标时，保留原曲线的预配估算。provisioned 单独使用时仍沿用原性能曲线。整体实测功耗在实测输入上叠加组件估算和 PUE，并非墙上电表读数。NVL72 需要通过验证的 GPU 遥测，每个计算 tray 平均分摊建模液冷机架的功耗；带有完整且通过验证的 Grace socket 遥测时使用实测 Grace 功耗（不接受仅有 CPU rail 或模块传感器的读数），否则使用 Grace 功耗估算值。插值的两个数据点须采用相同功耗口径。powerSource 记录拓扑（chassis 或 nvl72-tray）、cpu（measured 或 modeled）、PUE 和固定的功耗模型版本；powerLabel 标明配对估算和整机外推，skipped 保留覆盖缺失原因。',
+    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. For per-megawatt and GW-year estimates, modeled filters source points to valid system-power inputs before building the curve at the same target, without extrapolation or historical substitution. compare uses identical valid-curve throughput for paired budgets; when no valid curve reaches the target, it retains the original provisioned estimate. provisioned-only keeps the original performance curve. All in Measured adds modeled components and PUE to measured inputs; it is not measured wall power. NVL72 rows need validated GPU telemetry; each compute tray takes an equal share of a modeled liquid-cooled rack, with measured Grace-socket power when the row has complete validated socket telemetry (CPU-rail-only and module-sensor readings are not accepted) and modeled Grace power otherwise. Both interpolation knots must share a power basis. powerSource records topology (chassis or nvl72-tray), cpu (measured or modeled), PUE and the pinned power-model revision. powerLabel marks paired estimates and full-chassis extrapolation; skipped reasons preserve missing coverage.',
+    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。按每兆瓦或 GW 年估算时，modeled 先筛选满足系统功耗要求的数据点，再在同一目标值上构建曲线，不外推，也不借用历史数据。compare 的两种功耗方案使用同一条有效曲线的吞吐量；没有有效曲线覆盖目标时，保留原曲线的预配估算。provisioned 单独使用时仍沿用原性能曲线。整体实测功耗在实测输入上叠加组件估算和 PUE，并非墙上电表读数。NVL72 需要通过验证的 GPU 遥测，每个计算 tray 平均分摊建模液冷机架的功耗；带有完整且通过验证的 Grace socket 遥测时使用实测 Grace 功耗（不接受仅有 CPU rail 或模块传感器的读数），否则使用 Grace 功耗估算值。插值的两个数据点须采用相同功耗口径。powerSource 记录拓扑（chassis 或 nvl72-tray）、cpu（measured 或 modeled）、PUE 和固定的功耗模型版本；powerLabel 标明配对估算和整机外推，skipped 保留覆盖缺失原因。',
   ],
   power: [
     'Comma-separated certified and/or legacy power tiers. Omit for all tiers.',
@@ -643,8 +644,7 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
               'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
               '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
             ] as const)
-          : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
-              name === 'model'
+          : isProfitRouteTab(view) && name === 'model'
             ? ([
                 `${MODEL_PARAM_FORMS.en} The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.`,
                 `${MODEL_PARAM_FORMS.zh}仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。`,
@@ -702,6 +702,11 @@ const NEW_VIEWS = {
   'profit-estimator': [
     'Profit per chip-hour',
     '每芯片小时利润',
+    { pricing: object, data: object, overlays: object, comparisons: objects },
+  ],
+  'profit-estimator-per-megawatt': [
+    'Profit per deployed megawatt per hour',
+    '每部署兆瓦每小时利润',
     { pricing: object, data: object, overlays: object, comparisons: objects },
   ],
   'profit-estimator-per-gigawatt': [

@@ -30,6 +30,8 @@ const DYNAMIC_ROUTE_TEMPLATES = [
   '/model/[slug]',
   `${getDashboardRoute('profit-estimator').path}/[model]`,
   `${getDashboardRoute('profit-estimator').path}/[model]/[...filters]`,
+  `${getDashboardRoute('profit-estimator-per-megawatt').path}/[model]`,
+  `${getDashboardRoute('profit-estimator-per-megawatt').path}/[model]/[...filters]`,
   `${getDashboardRoute('profit-estimator-per-gigawatt').path}/[model]`,
   `${getDashboardRoute('profit-estimator-per-gigawatt').path}/[model]/[...filters]`,
   '/rankings/[slug]',

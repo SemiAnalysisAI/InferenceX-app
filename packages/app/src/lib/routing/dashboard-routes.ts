@@ -128,6 +128,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_'],
   },
   {
+    key: 'profit-estimator-per-megawatt',
+    path: '/infx/profit-estimator-per-megawatt',
+    canonicalPath: '/infx/profit-estimator-per-megawatt',
+    navGroup: 'merged',
+    indexable: true,
+    localeMirrored: true,
+    providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_', 'c_'],
+  },
+  {
     key: 'profit-estimator-per-gigawatt',
     path: '/infx/profit-estimator-per-gigawatt',
     canonicalPath: '/infx/profit-estimator-per-gigawatt',
@@ -359,6 +369,7 @@ export function dashboardRouteForPathname(pathname: string): DashboardRoute | un
 }
 
 const MERGED_DASHBOARD_TABS: Partial<Record<DashboardRouteKey, DashboardRouteKey>> = {
+  'profit-estimator-per-megawatt': 'profit-estimator',
   'profit-estimator-per-gigawatt': 'profit-estimator',
 };
 

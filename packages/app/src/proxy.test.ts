@@ -181,6 +181,7 @@ describe('legacy dashboard paths', () => {
       '/zh/profit-estimator-per-gigawatt/kimi-k3/target/30',
       '/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/30',
     ],
+
     [
       '/inference/agentic/206860?i_seq=agentic-traces',
       '/infx/inference/agentic/206860?i_seq=agentic-traces',
@@ -323,6 +324,8 @@ describe('proxy matcher', () => {
     '/infx/historical/Kimi-K3?i_seq=1k%2F1k',
     '/infx/calculator/kimi',
     '/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/30/percentile/p75',
+    '/infx/profit-estimator-per-megawatt/kimi-k3/target/30/percentile/p75',
+    '/zh/infx/profit-estimator-per-megawatt/glm?i_pctl=p75',
     '/infx/profit-estimator/kimi-k3?i_pctl=p75',
     '/zh/infx/profit-estimator/kimi-k3/target/30?percentile=p50',
     '/opx?op=model',

@@ -1,8 +1,12 @@
 /**
  * Profit Estimator — economics of one hardware SKU at a chosen interactivity
- * operating point, on one of two denominators (`ProfitBasis`):
+ * operating point, on one of three denominators (`ProfitBasis`):
  *
  *   chip-hour  one GPU for one hour (GPU-hours = 1), the raw $/GPU/hr view
+ *   mw-hour    one deployed megawatt of all-in utility power for one hour:
+ *              GPU-hours = 1,000 kW / all-in kW per GPU, which is the number
+ *              of chips that fit in the megawatt, so every figure is the
+ *              per chip-hour figure times that chip count
  *   gw-year    one all-in utility gigawatt-year, so SKUs with very different
  *              per-chip power draw compare on the same denominator:
  *              GPU-hours = (1,000,000 kW / all-in kW per GPU) x 8,760 h
@@ -29,10 +33,11 @@ import { modelRoutesForTab } from '@/lib/routing/model-routes';
 import type { ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
 
 import type { ProfitPowerSource } from './profit-power';
-import type { InterpolatedResult } from './types';
+import type { CostProvider, InterpolatedResult } from './types';
 
 /** Calendar hours in a year (365 x 24). */
 export const HOURS_PER_YEAR = 8_760;
+const KW_PER_MW = 1_000;
 const KW_PER_GW = 1_000_000;
 
 export const DEFAULT_PROFIT_INTERACTIVITY = 45;
@@ -186,10 +191,42 @@ export const DEFAULT_CACHE_HIT_MODE: CacheHitMode = 'theoretical';
 export const DEFAULT_UTILIZATION_PCT = 60;
 
 /**
- * Denominator every figure is expressed in. `/infx/profit-estimator` is per chip-hour;
+ * Denominator every figure is expressed in, in the order the basis toggle lists them.
+ * `/infx/profit-estimator` is per chip-hour; `/infx/profit-estimator-per-megawatt`
+ * scales by the chips one deployed megawatt powers for an hour; and
  * `/infx/profit-estimator-per-gigawatt` scales by the GPU-hours one GW-year buys.
  */
-export type ProfitBasis = 'chip-hour' | 'gw-year';
+export const PROFIT_BASES = ['chip-hour', 'mw-hour', 'gw-year'] as const;
+export type ProfitBasis = (typeof PROFIT_BASES)[number];
+
+/** Bases whose denominator is a power budget, so all-in power per chip sets the chip count. */
+export type ProfitPowerBudgetBasis = 'mw-hour' | 'gw-year';
+
+export function profitBasisUsesPower(basis: ProfitBasis): basis is ProfitPowerBudgetBasis {
+  return basis === 'mw-hour' || basis === 'gw-year';
+}
+
+/** The page, and the `/api/v1/views/*` view of the same name, that shows each basis. */
+export const PROFIT_BASIS_TAB: Record<ProfitBasis, ProfitRouteTab> = {
+  'chip-hour': 'profit-estimator',
+  'mw-hour': 'profit-estimator-per-megawatt',
+  'gw-year': 'profit-estimator-per-gigawatt',
+};
+
+export function profitBasisForTab(tab: ProfitRouteTab): ProfitBasis {
+  return PROFIT_BASES.find((basis) => PROFIT_BASIS_TAB[basis] === tab)!;
+}
+
+/**
+ * TCO tier each basis opens on. Per megawatt is the per chip-hour chart times
+ * the chips in a megawatt, so it opens on the same rental tier; a gigawatt-year
+ * is a build-out, so it opens on the owning tier.
+ */
+export const DEFAULT_PROFIT_COST_PROVIDER: Record<ProfitBasis, CostProvider> = {
+  'chip-hour': 'costr',
+  'mw-hour': 'costr',
+  'gw-year': 'costh',
+};
 
 export interface ProfitEstimatorAssumptions {
   powerBasis?: 'provisioned' | 'modeled' | 'compare';
@@ -219,7 +256,10 @@ export interface ProfitEstimatorRow {
    * as the changelog shows it. Falls back to `date` when unset.
    */
   dateLabel?: string;
-  /** GPU-hours in the denominator: 1 per chip-hour, or what one GW-year buys for this SKU. */
+  /**
+   * GPU-hours in the denominator: 1 per chip-hour, the chips one deployed megawatt
+   * powers for an hour, or what one GW-year buys for this SKU.
+   */
   gpuHours: number;
   /** Gross $/GPU/hr at 100% utilization, before any haircut. */
   revenuePerGpuHour: number;
@@ -280,6 +320,32 @@ export function gpuHoursPerGwYear(powerKwPerGpu: number): number | null {
   return (KW_PER_GW / powerKwPerGpu) * HOURS_PER_YEAR;
 }
 
+/**
+ * GPU-hours one deployed megawatt of all-in utility power runs in an hour,
+ * which is the number of chips that fit in the megawatt. Null when the SKU has
+ * no power figure so callers never divide by zero.
+ */
+export function gpuHoursPerMwHour(powerKwPerGpu: number): number | null {
+  if (!(powerKwPerGpu > 0)) return null;
+  return KW_PER_MW / powerKwPerGpu;
+}
+
+/** GPU-hours in one unit of `basis` for a SKU drawing `powerKwPerGpu`; null without a power figure. */
+export function gpuHoursForBasis(basis: ProfitBasis, powerKwPerGpu: number): number | null {
+  switch (basis) {
+    case 'chip-hour': {
+      // One GPU-hour is the denominator, so power never enters.
+      return 1;
+    }
+    case 'mw-hour': {
+      return gpuHoursPerMwHour(powerKwPerGpu);
+    }
+    default: {
+      return gpuHoursPerGwYear(powerKwPerGpu);
+    }
+  }
+}
+
 export interface ProfitEstimatorSpecs {
   /** All-in kW per GPU (chip plus its share of node, network, cooling). */
   powerKwPerGpu: number;
@@ -309,8 +375,7 @@ export function estimateSkuProfit(
     ...(result.date ? { date: result.date } : {}),
   };
   if (result.clamped) return { ...base, reason: 'outside-measured-range' };
-  // Per chip-hour the denominator is one GPU-hour, so power never enters.
-  const gpuHours = assumptions.basis === 'chip-hour' ? 1 : gpuHoursPerGwYear(specs.powerKwPerGpu);
+  const gpuHours = gpuHoursForBasis(assumptions.basis, specs.powerKwPerGpu);
   if (gpuHours === null) return { ...base, reason: 'no-power' };
   if (!(specs.costPerGpuHour > 0)) return { ...base, reason: 'no-cost' };
 
@@ -374,8 +439,9 @@ export function estimateProfitRows(
 }
 
 /**
- * Format a $/GW/yr figure. These run to tens of billions, so the unit is
- * chosen per value and negatives keep their sign in front of the currency.
+ * Format a $/GW/yr or $/MW/hr figure. These run from thousands to tens of
+ * billions, so the unit is chosen per value and negatives keep their sign in
+ * front of the currency.
  */
 export function formatUsdCompact(value: number, digits = 1): string {
   if (!Number.isFinite(value)) return '—';
@@ -396,11 +462,24 @@ export function formatUsdPerChipHour(value: number, digits = 2): string {
 
 /**
  * Formatter for the basis in use. `digits` is the compact-unit precision on
- * the GW-year basis (0 for axis ticks, 1 for labels) and is ignored per
+ * the power-budget bases (0 for axis ticks, 1 for labels) and is ignored per
  * chip-hour, where two decimals always read right.
  */
 export function formatProfitUsd(value: number, basis: ProfitBasis, digits?: number): string {
   return basis === 'chip-hour' ? formatUsdPerChipHour(value) : formatUsdCompact(value, digits);
+}
+
+/** CSV dollar cells: whole dollars per GW-year, cents per MW-hour, and four decimals per chip-hour. */
+export function profitCsvUsd(value: number, basis: ProfitBasis): number | string {
+  if (basis === 'gw-year') return Math.round(value);
+  return value.toFixed(basis === 'mw-hour' ? 2 : 4);
+}
+
+/** The CSV's trailing chip-count cell: GPU-hours per GW-year, chips per MW, or none per chip-hour. */
+export function profitCsvGpuHours(gpuHours: number, basis: ProfitBasis): (number | string)[] {
+  if (basis === 'gw-year') return [Math.round(gpuHours)];
+  if (basis === 'mw-hour') return [gpuHours.toFixed(2)];
+  return [];
 }
 
 /**

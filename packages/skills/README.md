@@ -58,7 +58,7 @@ Single-turn median calculations and the formal TCO workflow are unchanged.
 
 Profit-estimator dashboard links encode share state in named route segments,
 for example `/infx/profit-estimator/deepseek-v4/target/24`.
-The per-gigawatt page and `/zh` pages use the same format. These dashboards
+The per-megawatt and per-gigawatt pages and `/zh` pages use the same format. These dashboards
 are P90-only and remove legacy percentile parameters. Other legacy query links
 remain readable; the separate read-only API and CLI contracts have not changed.
 To reproduce that example through `/api/v1/views/profit-estimator`, continue
@@ -73,7 +73,7 @@ The `inference`, `historical`, `calculator`, and `first-token` views accept
 disaggregated throughput toggle (`g_chips`). See
 [dashboard views](skills/inferencex-api/references/dashboard-views.md#disaggregated-chip-basis).
 
-Both profit estimators and their read-only APIs default to `theoretical`, displayed
+Every profit estimator and its read-only API defaults to `theoretical`, displayed
 as “Theroticial Roofline”. This uses trace-derived infinite-cache reuse, with the
 measured rate as a fallback when unavailable. Choose `cacheHitMode=actual` in the
 API or `/cache-hit-mode/actual` in a dashboard link for measured cache hit rates.

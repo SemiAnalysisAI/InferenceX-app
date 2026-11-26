@@ -414,11 +414,20 @@ describe('Profit Estimator per GW — chart height follows the viewport', () => 
 });
 
 describe('VR publication economics', () => {
-  for (const basis of ['chip-hour', 'gw-year']) {
+  for (const basis of ['chip-hour', 'mw-hour', 'gw-year'] as const) {
     it(`prices cached-input TRTLLM data per ${basis} under /en`, () => {
       interceptVrPublicationData();
       interceptOpenRouterPricing();
-      const page = basis === 'chip-hour' ? 'profit-estimator' : 'profit-estimator-per-gigawatt';
+      const page = {
+        'chip-hour': 'profit-estimator',
+        'mw-hour': 'profit-estimator-per-megawatt',
+        'gw-year': 'profit-estimator-per-gigawatt',
+      }[basis];
+      // GPU-hours bought per unit of each basis for a chip drawing `kw` all-in.
+      const gpuHours = (kw: number) =>
+        ({ 'chip-hour': 1, 'mw-hour': 1_000 / kw, 'gw-year': (1_000_000 / kw) * 8760 })[basis];
+      // Per chip-hour and per megawatt open on the rental tier; per gigawatt on the owning tier.
+      const rental = basis !== 'gw-year';
       cy.visit(`/infx/${page}/deepseek-v4`, {
         onBeforeLoad: suppressNudges,
       });
@@ -443,10 +452,10 @@ describe('VR publication economics', () => {
           const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
           expect(vr, 'VR is priced').not.to.equal(undefined);
           expect(gb, 'GB300 remains priced').not.to.equal(undefined);
-          const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
-          const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
-          expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
-          expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
+          const vrHours = gpuHours(3.3);
+          const gbHours = gpuHours(2.12);
+          expect(vr!.tco).to.be.closeTo(vrHours * (rental ? 8.5 : 3.61), 0.01);
+          expect(gb!.tco).to.be.closeTo(gbHours * (rental ? 5 : 2.31), 0.01);
           const revenuePerHour =
             (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) * 3600) /
               1_000_000) *

@@ -239,6 +239,7 @@ describe('resolveInferenceRoute', () => {
     '/infx/inference/agentic',
     '/infx/inference/logs/1',
     '/infx/historical/not-a-model',
+    '/infx/profit-estimator-per-megawatt',
     '/infx/profit-estimator-per-gigawatt',
     '/opx',
     '/',

@@ -17,6 +17,7 @@ describe('Chart Section Tabs — E2E', () => {
     cy.url().should('include', '/infx/evaluation');
 
     cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-megawatt"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-profit-estimator"]').click();
     cy.location('pathname').should('match', /^\/infx\/profit-estimator(?:\/|$)/u);
 

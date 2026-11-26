@@ -12,6 +12,7 @@ import { GET as cache } from './cache-reuse/route';
 import { GET as first } from './first-token/route';
 import { GET as gpu } from './gpu-metrics/route';
 import { GET as gw } from './profit-estimator-per-gigawatt/route';
+import { GET as mw } from './profit-estimator-per-megawatt/route';
 import { GET as profit } from './profit-estimator/route';
 import { GET as submissions } from './submissions/route';
 import { GET as video } from './video/route';
@@ -330,6 +331,7 @@ describe('new dashboard projections', () => {
       ['first-token', first],
       ['cache-reuse', cache],
       ['profit-estimator', profit],
+      ['profit-estimator-per-megawatt', mw],
       ['profit-estimator-per-gigawatt', gw],
     ] as const) {
       const query = `model=DeepSeek-V4-Pro${view.startsWith('profit') ? '&priceSource=custom&utilization=50&labCut=10&powerBasis=compare' : ''}`;
@@ -344,6 +346,7 @@ describe('new dashboard projections', () => {
   });
   it.each([
     ['profit-estimator', profit],
+    ['profit-estimator-per-megawatt', mw],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
     '%s shares the DeepSeek V4 Pro default and preserves explicit targets',
@@ -419,6 +422,7 @@ describe('new dashboard projections', () => {
       );
       for (const [view, handler] of [
         ['profit-estimator', profit],
+        ['profit-estimator-per-megawatt', mw],
         ['profit-estimator-per-gigawatt', gw],
       ] as const) {
         const query = `model=${encodeURIComponent(model)}&priceSource=custom`;
@@ -451,6 +455,7 @@ describe('new dashboard projections', () => {
   );
   it.each([
     ['profit-estimator', profit],
+    ['profit-estimator-per-megawatt', mw],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
     '%s applies model defaults to official and unofficial runs',
@@ -504,8 +509,41 @@ describe('new dashboard projections', () => {
       }
     },
   );
+  it('prices a deployed megawatt as the per chip-hour estimate times the chips it powers', async () => {
+    mocks.benchmarks.mockImplementation(() => Response.json([agenticRow()]));
+    const query = 'model=DeepSeek-V4-Pro&target=45&priceSource=custom';
+    const read = async (
+      view: 'profit-estimator' | 'profit-estimator-per-megawatt' | 'profit-estimator-per-gigawatt',
+      handler: typeof profit,
+    ) => {
+      const response = await handler(req(view, query));
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    const chip = await read('profit-estimator', profit);
+    const megawatt = await read('profit-estimator-per-megawatt', mw);
+    const gigawatt = await read('profit-estimator-per-gigawatt', gw);
+    expect(megawatt.view).toBe('profit-estimator-per-megawatt');
+    expect(megawatt.params.costProvider).toBe(chip.params.costProvider);
+    expect(megawatt.params.costProvider).toBe('costr');
+    expect(gigawatt.params.costProvider).toBe('costh');
+    expect(megawatt.params.powerBasis).toBe('provisioned');
+    expect(hardwareKeys(megawatt.data)).toEqual(hardwareKeys(chip.data));
+    const [chipRow] = chip.data.rows;
+    const [mwRow] = megawatt.data.rows;
+    const [gwRow] = gigawatt.data.rows;
+    expect(chipRow.gpuHours).toBe(1);
+    // A megawatt-hour is a gigawatt-year divided by 1,000 MW and 8,760 hours.
+    expect(mwRow.gpuHours).toBeCloseTo(gwRow.gpuHours / 1_000 / 8_760, 6);
+    expect(mwRow.gpuHours).toBeGreaterThan(100);
+    expect(mwRow.revenuePerGpuHour).toBe(chipRow.revenuePerGpuHour);
+    for (const key of ['revenue', 'tco', 'labCut', 'grossMargin', 'profit'] as const) {
+      expect(mwRow[key]).toBeCloseTo(chipRow[key] * mwRow.gpuHours, 6);
+    }
+  });
   it.each([
     ['profit-estimator', profit],
+    ['profit-estimator-per-megawatt', mw],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
     '%s defaults to theoretical cache pricing but honors actual',

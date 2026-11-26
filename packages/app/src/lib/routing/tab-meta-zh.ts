@@ -65,6 +65,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '估算每款芯片每小时的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO $/chip/hr）、模型许可费与运营方利润。',
   },
+  'profit-estimator-per-megawatt': {
+    title: '每兆瓦推理利润估算器',
+    description:
+      '估算每款芯片每部署一兆瓦每小时的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。',
+  },
   'profit-estimator-per-gigawatt': {
     title: '每吉瓦推理利润估算器',
     description:
@@ -124,6 +129,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   'first-token': '首 token 延迟约束',
   'cache-reuse': '前缀缓存复用',
   'profit-estimator': '利润估算',
+  'profit-estimator-per-megawatt': '每兆瓦利润估算',
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   'gpu-specs': '芯片规格',
   operatorx: 'OperatorX 算子',
@@ -174,6 +180,11 @@ export const MODEL_TAB_META_ZH: Record<
     title: (seoName) => `${seoName} 推理利润估算器`,
     description: (seoName) =>
       `估算每款芯片每小时运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO $/chip/hr）、模型许可费与运营方利润。`,
+  },
+  'profit-estimator-per-megawatt': {
+    title: (seoName) => `${seoName} 每兆瓦推理利润估算器`,
+    description: (seoName) =>
+      `估算每款芯片每部署一兆瓦每小时运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。`,
   },
   'profit-estimator-per-gigawatt': {
     title: (seoName) => `${seoName} 每吉瓦推理利润估算器`,

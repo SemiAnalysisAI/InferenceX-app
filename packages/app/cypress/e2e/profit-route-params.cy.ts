@@ -102,7 +102,9 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
       cy.get('[data-testid="profit-controls"] h1').should('not.contain.text', perGwTitle);
       cy.get('[data-testid="profit-controls"]').should(
         'contain.text',
-        prefix ? '按每 GPU 小时或每吉瓦年估算' : 'per GPU-hour or per gigawatt-year',
+        prefix
+          ? '按每 GPU 小时、每部署兆瓦或每吉瓦年估算'
+          : 'per GPU-hour, per deployed megawatt or per gigawatt-year',
       );
       cy.get('[data-testid="profit-basis-gw-year"]').click();
       cy.location('pathname').should('eq', perGw);
@@ -126,6 +128,38 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
       cy.go('forward');
       cy.location('pathname').should('eq', perGw);
       cy.get('[data-testid="profit-basis-gw-year"]').should('have.attr', 'aria-pressed', 'true');
+    });
+
+    it(`opens the per-megawatt basis in ${prefix || '/'} from either neighbour, keeping route state`, () => {
+      const route = 'deepseek-v4/target/24/cache-hit-mode/actual';
+      const perMw = `${prefix}/infx/profit-estimator-per-megawatt/${route}`;
+      const perMwTitle = prefix ? '每兆瓦' : 'per megawatt';
+      cy.visit(`${prefix}/infx/profit-estimator/${route}?utm_source=test`, {
+        onBeforeLoad: suppressNudges,
+      });
+      cy.get('[data-testid="profit-estimator-chart"]').should('exist');
+      cy.get('[data-testid="profit-controls"] h1').should('not.contain.text', perMwTitle);
+      cy.get('[data-testid="profit-basis-mw-hour"]').click();
+      cy.location('pathname').should('eq', perMw);
+      cy.location('search').should('eq', '?utm_source=test');
+      cy.get('[data-testid="profit-basis-mw-hour"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="profit-basis-chip-hour"]').should('have.attr', 'aria-pressed', 'false');
+      cy.get('[data-testid="profit-controls"] h1').should('contain.text', perMwTitle);
+      cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+      cy.get('[data-testid="profit-estimator-chart"]').should(
+        'contain.text',
+        prefix ? '兆瓦每小时' : 'MW per hour',
+      );
+      cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+        'have.attr',
+        'data-tab-active',
+        'true',
+      );
+      cy.get('[data-testid="profit-basis-gw-year"]').click();
+      cy.location('pathname').should('eq', `${prefix}/infx/profit-estimator-per-gigawatt/${route}`);
+      cy.get('[data-testid="profit-basis-mw-hour"]').click();
+      cy.location('pathname').should('eq', perMw);
+      cy.get('[data-testid="profit-basis-mw-hour"]').should('have.attr', 'aria-pressed', 'true');
     });
   }
 

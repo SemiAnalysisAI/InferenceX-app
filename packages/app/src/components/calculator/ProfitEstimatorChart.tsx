@@ -33,6 +33,7 @@ import { getAxisVendorIcon, vendorMarkVariants } from '@/lib/catalog/vendor-logo
 import {
   formatProfitUsd,
   formatUsdPerChipHour,
+  profitBasisUsesPower,
   type ProfitBasis,
   type ProfitEstimatorAssumptions,
   type ProfitEstimatorRow,
@@ -243,18 +244,26 @@ export function lossPatternId(resultKey: string): string {
 
 const STRINGS = {
   en: {
-    yAxisModeled: 'Revenue per all-in utility GW per year ($ USD)',
+    yAxisModeled: {
+      'gw-year': 'Revenue per all-in utility GW per year ($ USD)',
+      'mw-hour': 'Revenue per all-in utility MW per hour ($ USD)',
+    },
     yAxis: {
       'gw-year': 'Revenue per all-in provisioned utility GW per year ($ USD)',
+      'mw-hour': 'Revenue per all-in provisioned utility MW per hour ($ USD)',
       'chip-hour': 'Revenue per chip per hour ($ USD)',
     },
     yAxisCompact: {
       'gw-year': 'Revenue per provisioned GW-year ($ USD)',
+      'mw-hour': 'Revenue per provisioned MW per hour ($ USD)',
       'chip-hour': 'Revenue per chip-hour ($ USD)',
     },
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
-    gpuHoursPerGwYear: 'GPU-hours per GW-year',
+    gpuHours: {
+      'gw-year': 'GPU-hours per GW-year',
+      'mw-hour': 'Chips per MW',
+    },
     tco: 'Compute Expense',
     grossMargin: 'Gross Margin',
     labCut: 'Model License Fee',
@@ -278,18 +287,26 @@ const STRINGS = {
     scrollHint: 'Scroll horizontally to view the full chart',
   },
   zh: {
-    yAxisModeled: '每吉瓦设施总功耗对应的年收入（美元）',
+    yAxisModeled: {
+      'gw-year': '每吉瓦设施总功耗对应的年收入（美元）',
+      'mw-hour': '每兆瓦设施总功耗对应的每小时收入（美元）',
+    },
     yAxis: {
       'gw-year': '每全电源配置吉瓦每年收入（美元）',
+      'mw-hour': '每全电源配置兆瓦每小时收入（美元）',
       'chip-hour': '每芯片每小时收入（美元）',
     },
     yAxisCompact: {
       'gw-year': '每吉瓦每年收入（美元）',
+      'mw-hour': '每兆瓦每小时收入（美元）',
       'chip-hour': '每芯片小时收入（美元）',
     },
     revenue: '收入',
     revenuePerGpuHour: '每 GPU 小时收入',
-    gpuHoursPerGwYear: '每吉瓦年 GPU 小时数',
+    gpuHours: {
+      'gw-year': '每吉瓦年 GPU 小时数',
+      'mw-hour': '每兆瓦芯片数',
+    },
     tco: '算力支出',
     grossMargin: '毛利',
     labCut: '模型许可费',
@@ -601,8 +618,16 @@ export function profitPointDetails(
         value: usd(row.labCut),
       },
       { label: t.revenuePerGpuHour, value: `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr` },
-      ...(assumptions.basis === 'gw-year'
-        ? [{ label: t.gpuHoursPerGwYear, value: Math.round(row.gpuHours).toLocaleString('en-US') }]
+      ...(profitBasisUsesPower(assumptions.basis)
+        ? [
+            {
+              label: t.gpuHours[assumptions.basis],
+              // A megawatt holds hundreds of chips, so its count keeps one decimal.
+              value: row.gpuHours.toLocaleString('en-US', {
+                maximumFractionDigits: assumptions.basis === 'mw-hour' ? 1 : 0,
+              }),
+            },
+          ]
         : []),
     ],
   };
@@ -1035,8 +1060,10 @@ export default function ProfitEstimatorChart({
   );
 
   const valueAxisLabel =
-    basis === 'gw-year' && assumptions.powerBasis && assumptions.powerBasis !== 'provisioned'
-      ? t.yAxisModeled
+    profitBasisUsesPower(basis) &&
+    assumptions.powerBasis &&
+    assumptions.powerBasis !== 'provisioned'
+      ? t.yAxisModeled[basis]
       : horizontal
         ? t.yAxisCompact[basis]
         : t.yAxis[basis];

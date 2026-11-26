@@ -234,6 +234,20 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     );
   });
 
+  it('marks the one profit estimator tab active on the per-megawatt page', () => {
+    mountTabNav({ pathname: '/infx/profit-estimator-per-megawatt/glm-5-3/target/135' });
+    cy.get('[data-testid="tab-trigger-profit-estimator"]')
+      .should('have.attr', 'data-tab-active', 'true')
+      .and('have.attr', 'href', '/infx/profit-estimator');
+    cy.get('[data-testid="mobile-tab-profit-estimator"]').should(
+      'have.attr',
+      'aria-current',
+      'page',
+    );
+    cy.get('[data-testid^="tab-trigger-profit-estimator-"]').should('not.exist');
+    cy.get('[data-testid^="mobile-tab-profit-estimator-"]').should('not.exist');
+  });
+
   it('marks the one profit estimator tab active on the per-gigawatt page', () => {
     mountTabNav({ pathname: '/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/45' });
     cy.get('[data-testid="tab-trigger-profit-estimator"]')

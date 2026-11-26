@@ -88,7 +88,7 @@ import {
   Sequence,
   Model,
 } from '@/lib/catalog/data-mappings';
-import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
+import { profitRouteForTab } from '@/lib/routing/profit-estimator-routes';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import {
   getProfitHardwareSeed,
@@ -104,10 +104,16 @@ import {
   applyCacheHitMode,
   clampPercent,
   DEFAULT_CACHE_HIT_MODE,
+  DEFAULT_PROFIT_COST_PROVIDER,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   parseTokenPriceInput,
+  PROFIT_BASES,
+  PROFIT_BASIS_TAB,
+  profitCsvGpuHours,
+  profitCsvUsd,
   profitAgenticModels,
+  profitBasisUsesPower,
   profitModelDefaults,
   type CacheHitMode,
   type ProfitBasis,
@@ -168,11 +174,6 @@ function costProviderOptionLabel(provider: ProfitCostProvider, locale: 'en' | 'z
 
 const CUSTOM_COST_SEED: CostProvider = 'costh';
 
-const DEFAULT_COST_PROVIDER: Record<ProfitBasis, CostProvider> = {
-  'chip-hour': 'costr',
-  'gw-year': 'costh',
-};
-
 function baseGpuOf(hwKey: string): string {
   return hwKey.split('_')[0] ?? hwKey;
 }
@@ -205,17 +206,19 @@ const STRINGS = {
   en: {
     title: {
       'gw-year': 'Revenue & Profit Estimator per gigawatt',
+      'mw-hour': 'Revenue & Profit Estimator per megawatt',
       'chip-hour': 'Revenue & Profit Estimator',
     },
     betaQualifier: 'Beta',
     description:
-      'Estimated revenue, compute cost, model license fee and operator profit for each chip from measured throughput at a target interactivity, per GPU-hour or per gigawatt-year',
+      'Estimated revenue, compute cost, model license fee and operator profit for each chip from measured throughput at a target interactivity, per GPU-hour, per deployed megawatt or per gigawatt-year',
     chartGroup: 'Chart Config',
     basisLabel: 'Estimate basis',
     basisTooltip:
-      'Per GPU-hour shows what one chip earns and costs in an hour. Per gigawatt counts how many of each chip one gigawatt of all-in utility power runs for a year, so chips with different power draw share one budget.',
+      'Per GPU-hour shows what one chip earns and costs in an hour. Per megawatt multiplies that by the number of each chip one megawatt of all-in utility power runs. Per gigawatt counts how many of each chip one gigawatt of all-in utility power runs for a year, so chips with different power draw share one budget.',
     basisOptions: {
       'chip-hour': 'Per GPU-hour',
+      'mw-hour': 'Per megawatt',
       'gw-year': 'Per gigawatt',
     } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: 'Benchmark Config',
@@ -281,11 +284,14 @@ const STRINGS = {
     sourceLabel: 'Source:',
     formulaTitle: {
       'gw-year': 'Revenue per gigawatt Formula',
+      'mw-hour': 'Revenue per megawatt Formula',
       'chip-hour': 'Revenue per Chip-Hour Formula',
     },
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
         `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
+      'mw-hour': (util: number, labCut: number) =>
+        `Revenue = $/GPU/hr × chips per MW × ${util}% utilization, in $ per deployed MW per hour. Chips per MW = 1,000 kW ÷ all-in kW per GPU. Compute expense = TCO $/chip/hr × chips per MW. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
       'chip-hour': (util: number, labCut: number) =>
         `Revenue = $/GPU/hr × ${util}% utilization, where $/GPU/hr = benchmarked tok/s per chip at the target interactivity × the selling price per token. Compute expense = TCO $/chip/hr for the chosen cost tier. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
     },
@@ -301,6 +307,18 @@ const STRINGS = {
         'Margin',
         'Revenue ($/GPU/hr, 100% util)',
         'GPU-hours per GW-year',
+      ],
+      'mw-hour': [
+        'SKU',
+        'Precision',
+        'Revenue ($/MW/hr)',
+        'Compute expense TCO ($/MW/hr)',
+        'Gross margin ($/MW/hr)',
+        'Model license fee ($/MW/hr)',
+        'Profit ($/MW/hr)',
+        'Margin',
+        'Revenue ($/GPU/hr, 100% util)',
+        'Chips per MW',
       ],
       'chip-hour': [
         'SKU',
@@ -330,17 +348,19 @@ const STRINGS = {
   zh: {
     title: {
       'gw-year': '每吉瓦收入与利润估算器',
+      'mw-hour': '每兆瓦收入与利润估算器',
       'chip-hour': '收入与利润估算器',
     },
     betaQualifier: 'Beta',
     description:
-      '基于目标交互性下的实测吞吐量，按每 GPU 小时或每吉瓦年估算各芯片的收入、算力支出、模型许可费与运营方利润',
+      '基于目标交互性下的实测吞吐量，按每 GPU 小时、每部署兆瓦或每吉瓦年估算各芯片的收入、算力支出、模型许可费与运营方利润',
     chartGroup: '图表配置',
     basisLabel: '估算口径',
     basisTooltip:
-      '每 GPU 小时口径展示单颗芯片一小时的收入与成本。每吉瓦口径按一吉瓦全电源配置功率一年可运行的芯片数量折算，让功耗不同的芯片在同一功率预算下比较。',
+      '每 GPU 小时口径展示单颗芯片一小时的收入与成本。每兆瓦口径在此基础上乘以一兆瓦全电源配置功率可运行的芯片数量。每吉瓦口径按一吉瓦全电源配置功率一年可运行的芯片数量折算，让功耗不同的芯片在同一功率预算下比较。',
     basisOptions: {
       'chip-hour': '每 GPU 小时',
+      'mw-hour': '每兆瓦',
       'gw-year': '每吉瓦',
     } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: '基准测试配置',
@@ -406,11 +426,14 @@ const STRINGS = {
     sourceLabel: '来源：',
     formulaTitle: {
       'gw-year': '每吉瓦收入公式',
+      'mw-hour': '每兆瓦收入公式',
       'chip-hour': '每芯片小时收入公式',
     },
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
         `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
+      'mw-hour': (util: number, labCut: number) =>
+        `收入 = $/GPU/hr × 每兆瓦芯片数 × ${util}% 利用率，单位为每部署兆瓦每小时美元。每兆瓦芯片数 = 1,000 kW ÷ 每 GPU 全电源配置 kW。算力支出 = TCO $/chip/hr × 每兆瓦芯片数。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
       'chip-hour': (util: number, labCut: number) =>
         `收入 = $/GPU/hr × ${util}% 利用率，其中 $/GPU/hr = 目标交互性下实测的每芯片 tok/s × 每 token 售价。算力支出 = 所选成本层级的 TCO $/chip/hr。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
     },
@@ -426,6 +449,18 @@ const STRINGS = {
         '利润率',
         '收入（$/GPU/hr，100% 利用率）',
         '每吉瓦年 GPU 小时数',
+      ],
+      'mw-hour': [
+        'SKU',
+        '精度',
+        '收入（$/MW/hr）',
+        '算力支出 TCO（$/MW/hr）',
+        '毛利（$/MW/hr）',
+        '模型许可费（$/MW/hr）',
+        '利润（$/MW/hr）',
+        '利润率',
+        '收入（$/GPU/hr，100% 利用率）',
+        '每兆瓦芯片数',
       ],
       'chip-hour': [
         'SKU',
@@ -495,9 +530,10 @@ function parsePositiveTarget(raw: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-export const PROFIT_BASIS_TAB: Record<ProfitBasis, ProfitRouteTab> = {
-  'chip-hour': 'profit-estimator',
-  'gw-year': 'profit-estimator-per-gigawatt',
+const EXPORT_FILE_SUFFIX: Record<ProfitBasis, string> = {
+  'chip-hour': '',
+  'mw-hour': '_per_megawatt',
+  'gw-year': '_per_gigawatt',
 };
 
 export default function ProfitEstimatorDisplay({
@@ -603,7 +639,7 @@ function ProfitEstimatorInner({
   const mode = 'interactivity_to_throughput' as const;
 
   const [costProvider, setCostProvider] = useState<ProfitCostProvider>(
-    DEFAULT_COST_PROVIDER[basis],
+    DEFAULT_PROFIT_COST_PROVIDER[basis],
   );
   const [priceSource, setPriceSource] = useState<PriceSource>(() =>
     defaultPriceSource(selectedModel),
@@ -618,7 +654,8 @@ function ProfitEstimatorInner({
     setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
   }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
-  const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
+  const usesPower = profitBasisUsesPower(basis);
+  const powerControlsEnabled = usesPower && featureGateUnlocked;
   const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>(
     profitSeed?.powerBasis ?? 'provisioned',
   );
@@ -647,7 +684,7 @@ function ProfitEstimatorInner({
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
   const selectedPercentile = Percentile.P90;
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
-  const includePower = basis === 'gw-year' && powerBasis !== 'provisioned';
+  const includePower = usesPower && powerBasis !== 'provisioned';
   const warmThroughputChange = useWarmThroughputChange({
     sequence: selectedSequence,
     includePower,
@@ -969,7 +1006,7 @@ function ProfitEstimatorInner({
 
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
-    const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
+    const curvePowerBasis = usesPower ? powerBasis : 'provisioned';
     const current = getResults(
       chartTarget,
       mode,
@@ -1017,7 +1054,7 @@ function ProfitEstimatorInner({
     hasData,
     pricing,
     getResults,
-    basis,
+    usesPower,
     cacheHitMode,
     powerBasis,
     t.powerBarLabels,
@@ -1471,13 +1508,10 @@ function ProfitEstimatorInner({
     </div>
   ) : null;
 
-  const exportFileName =
-    basis === 'gw-year'
-      ? `InferenceX_profit_estimator_per_gigawatt_${selectedModel}`
-      : `InferenceX_profit_estimator_${selectedModel}`;
+  const exportFileName = `InferenceX_profit_estimator${EXPORT_FILE_SUFFIX[basis]}_${selectedModel}`;
 
   const handleExportCsv = useCallback(() => {
-    const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
+    const usd = (value: number) => profitCsvUsd(value, basis);
     const includeBasis = powerControlsEnabled && powerBasis !== 'provisioned';
     const basisColumns = (row: ProfitEstimatorRow) => {
       const source = row.powerSource;
@@ -1495,7 +1529,7 @@ function ProfitEstimatorInner({
       usd(row.profit),
       row.revenue > 0 ? (row.profit / row.revenue).toFixed(4) : '',
       row.revenuePerGpuHour.toFixed(4),
-      ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
+      ...profitCsvGpuHours(row.gpuHours, basis),
       ...(includeBasis ? basisColumns(row) : []),
     ]);
     const [sku, precision, ...rest] = t.csvHeaders[basis];
@@ -1854,10 +1888,10 @@ function ProfitEstimatorInner({
                         <SegmentedToggle<ProfitBasis>
                           role="group"
                           value={basis}
-                          options={(['chip-hour', 'gw-year'] as const).map((value) => ({
+                          options={PROFIT_BASES.map((value) => ({
                             value,
                             label: t.basisOptions[value],
-                            badge: value === 'gw-year' ? t.betaQualifier : undefined,
+                            badge: profitBasisUsesPower(value) ? t.betaQualifier : undefined,
                             testId: `profit-basis-${value}`,
                           }))}
                           onValueChange={handleBasisChange}

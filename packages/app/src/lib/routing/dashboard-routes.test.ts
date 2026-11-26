@@ -53,6 +53,7 @@ describe('dashboard route registry', () => {
       (route) => route.key,
     );
     expect(primary.slice(0, 3)).toEqual(['inference', 'profit-estimator', 'evaluation']);
+    expect(primary).not.toContain('profit-estimator-per-megawatt');
     expect(primary).not.toContain('profit-estimator-per-gigawatt');
     expect(primary).not.toContain('calculator');
     expect(primary).not.toContain('fleet');
@@ -60,9 +61,26 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/infx/profit-estimator-per-gigawatt/kimi-k3')?.key).toBe(
       'profit-estimator-per-gigawatt',
     );
+    expect(dashboardRouteForPathname('/infx/profit-estimator-per-megawatt/glm-5-3')?.key).toBe(
+      'profit-estimator-per-megawatt',
+    );
     expect(dashboardRouteForPathname('/infx/profit-estimator/kimi-k3')?.key).toBe(
       'profit-estimator',
     );
+  });
+
+  it('keeps the per-megawatt page indexed and marks the profit estimator tab active on it', () => {
+    const perMw = getDashboardRoute('profit-estimator-per-megawatt');
+    expect(perMw.navGroup).toBe('merged');
+    expect(perMw.indexable).toBe(true);
+    expect(perMw.localeMirrored).toBe(true);
+    expect(perMw.canonicalPath).toBe('/infx/profit-estimator-per-megawatt');
+    for (const pathname of [
+      '/infx/profit-estimator-per-megawatt',
+      '/zh/infx/profit-estimator-per-megawatt/glm-5-3/target/135',
+    ]) {
+      expect(dashboardNavTabForPathname(pathname)).toBe('profit-estimator');
+    }
   });
 
   it('keeps the per-gigawatt page indexed and marks the profit estimator tab active on it', () => {
