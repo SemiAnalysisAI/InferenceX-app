@@ -34,7 +34,6 @@ import {
   subscribeInferenceNavigationModel,
 } from '@/lib/routing/inference-navigation-state';
 import { crossTabParams, selectionTabKind } from '@/lib/routing/cross-tab-selection';
-import { currentChartSearch } from '@/lib/routing/url-state';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
@@ -82,11 +81,12 @@ export function crossTabHref(
   current: DashboardRouteKey,
   destination: DashboardRouteKey,
   destinationPath: string,
+  liveSearch: string,
 ): string | null {
   const from = selectionTabKind(current);
   const to = selectionTabKind(destination);
   if (!from || !to || current === destination) return null;
-  const live = new URLSearchParams(currentChartSearch());
+  const live = new URLSearchParams(liveSearch);
   const model = getInferenceNavigationModel();
   if (model) live.set('g_model', model);
   const params = crossTabParams(from, to, live);
@@ -179,10 +179,15 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     path: string,
   ) => {
     if (event.defaultPrevented || !isPlainClick(event)) return;
-    const href = crossTabHref(current, destination, path);
-    if (href === null) return;
+    if (current === destination || !selectionTabKind(current) || !selectionTabKind(destination)) {
+      return;
+    }
     event.preventDefault();
-    router.push(href);
+    // The source page has already loaded the URL-state module, so this resolves at once without
+    // adding it to every dashboard route's first load.
+    void import('@/lib/routing/url-state').then(({ currentChartSearch }) => {
+      router.push(crossTabHref(current, destination, path, currentChartSearch()) ?? path);
+    });
   };
   const search = useClientRouteSearch();
   const retainedModel = useSyncExternalStore(
