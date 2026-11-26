@@ -60,6 +60,8 @@ export function resetCrossTabSelection(): void {
   profitHardwareSeed = null;
 }
 
+const AGENTIC_SEQUENCE = 'agentic-traces';
+
 const INFERENCE_SHARED_TO_PROFIT = ['i_prec', 'g_rundate'] as const;
 
 /**
@@ -82,9 +84,9 @@ export function crossTabParams(
 
   if (from === 'inference') {
     const model = live.get('g_model');
-    if (model && modelRouteAvailableForTab('profit-estimator', model as Model)) {
-      next.set('g_model', model);
-    }
+    // A model the profit estimator lacks would open its fallback model, so it keeps its own state.
+    if (!model || !modelRouteAvailableForTab('profit-estimator', model as Model)) return next;
+    next.set('g_model', model);
     for (const key of INFERENCE_SHARED_TO_PROFIT) {
       const value = live.get(key);
       if (value) next.set(key, value);
@@ -102,9 +104,17 @@ export function crossTabParams(
     const model = live.get('g_model');
     if (model) next.set('g_model', model);
   }
-  if (profitPicks.g_model !== undefined && profitPicks.g_model !== next.get('g_model')) {
-    next.set('g_model', profitPicks.g_model);
+  // A reader who picked anything on another model than inference's took that model with them.
+  const liveModel = profitPicks.g_model ?? live.get('g_model');
+  const pickedHere = Object.keys(profitPicks).length > 0;
+  if (pickedHere && liveModel && liveModel !== next.get('g_model')) {
+    next.set('g_model', liveModel);
     next.delete('i_active');
+    const livePrecision = live.get('i_prec');
+    if (livePrecision) next.set('i_prec', livePrecision);
+    else next.delete('i_prec');
+    // The profit estimator only shows agentic data.
+    next.set('i_seq', AGENTIC_SEQUENCE);
   }
   if (profitPicks.i_prec !== undefined) next.set('i_prec', profitPicks.i_prec);
   if (profitPicks.i_active !== undefined) {
