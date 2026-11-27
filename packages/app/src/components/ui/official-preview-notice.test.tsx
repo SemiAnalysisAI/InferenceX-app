@@ -9,6 +9,7 @@ import {
   includesTrainium3Result,
   includesVeraRubinResult,
   JalapenoOfficialPreviewNotice,
+  selectPreviewSeries,
   Tpuv7OfficialPreviewNotice,
   Trainium3OfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
@@ -125,5 +126,31 @@ describe('official preview notices', () => {
     expect(notice?.getAttribute('role')).toBe('note');
     expect(notice?.textContent).toContain('InferenceX Official Preview');
     expect(notice?.textContent).toContain('Vera Rubin NVL72 results are an official preview');
+  });
+});
+
+describe('selectPreviewSeries', () => {
+  const points = [
+    { hwKey: 'gb300_sglang', x: 1, y: 1 },
+    { hwKey: 'vr200_dynamo-sglang', x: 2, y: 2 },
+    { hwKey: 'vr200_tokenspeed', x: 3, y: 3 },
+    { hwKey: 'vr200_dynamo-sglang', x: 4, y: 4 },
+  ];
+
+  it('keeps only the labelled series so the arrow cannot point at another framework', () => {
+    const series = selectPreviewSeries(points, ['vr200']);
+    expect(series?.hwKey).toBe('vr200_dynamo-sglang');
+    expect(series?.points.map((point) => point.x)).toEqual([2, 4]);
+  });
+
+  it('follows the plotted series when the first framework is hidden', () => {
+    const visible = points.filter((point) => point.hwKey !== 'vr200_dynamo-sglang');
+    const series = selectPreviewSeries(visible, ['vr200']);
+    expect(series?.hwKey).toBe('vr200_tokenspeed');
+    expect(series?.points.map((point) => point.x)).toEqual([3]);
+  });
+
+  it('returns null when no preview hardware is plotted', () => {
+    expect(selectPreviewSeries(points, ['tpuv7'])).toBeNull();
   });
 });

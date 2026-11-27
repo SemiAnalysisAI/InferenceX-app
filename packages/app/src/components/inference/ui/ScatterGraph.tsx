@@ -44,12 +44,11 @@ import {
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
-import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
 import {
-  getHardwareConfig,
-  getModelSortIndex,
-  hardwareKeyMatchesAnyBase,
-} from '@/lib/catalog/constants';
+  OFFICIAL_PREVIEW_SERIES,
+  selectPreviewSeries,
+} from '@/components/ui/official-preview-notice';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import {
   getChartWatermark,
   getPrecisionLabel,
@@ -1135,12 +1134,10 @@ const ScatterGraph = React.memo(
           .map((p) => ({ x: p.x, y: p.y })),
       }));
       for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
-        const previewPoints = filteredData.filter((point) =>
-          hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
-        );
-        if (previewPoints.length === 0) continue;
+        const previewSeries = selectPreviewSeries(filteredData, previewConfig.baseGpuKeys);
+        if (previewSeries === null) continue;
 
-        const hwKey = String(previewPoints[0]!.hwKey);
+        const { hwKey, points: previewPoints } = previewSeries;
         const previewCopy = previewConfig.strings[locale];
         annotations.push({
           preview: {

@@ -110,6 +110,21 @@ export function includesTrainium3Result(hardwareKeys: Iterable<string>): boolean
   return includesHardwareResult(hardwareKeys, OFFICIAL_PREVIEW_SERIES[3].baseGpuKeys);
 }
 
+/**
+ * The series a chart preview callout describes: the first matching hardware
+ * key and only that series' points, so the arrow never lands on another
+ * framework's curve of the same hardware (e.g. Dynamo SGLang vs TokenSpeed).
+ */
+export function selectPreviewSeries<P extends { hwKey: unknown }>(
+  points: readonly P[],
+  baseGpuKeys: readonly string[],
+): { hwKey: string; points: P[] } | null {
+  const first = points.find((point) => hardwareKeyMatchesAnyBase(String(point.hwKey), baseGpuKeys));
+  if (first === undefined) return null;
+  const hwKey = String(first.hwKey);
+  return { hwKey, points: points.filter((point) => String(point.hwKey) === hwKey) };
+}
+
 interface OfficialPreviewNoticeProps {
   strings:
     | typeof JALAPENO_PREVIEW_STRINGS
