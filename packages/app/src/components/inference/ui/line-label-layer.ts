@@ -490,13 +490,13 @@ export function parallelismLabelBoxes(root: SVGGElement | null): PlacedBox[] {
   return boxes;
 }
 
-function pillObstacles(
+export function pillObstacles(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   selector = '.line-label, .parallelism-label',
 ): RectBounds[] {
   const boxes: RectBounds[] = [];
   zoomGroup.selectAll<SVGGElement, unknown>(selector).each(function () {
-    if (this.style.opacity === '0') return;
+    if (this.style.opacity === '0' || this.style.display === 'none') return;
     const match = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(
       this.getAttribute('transform') ?? '',
     );

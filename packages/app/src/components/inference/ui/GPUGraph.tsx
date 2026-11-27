@@ -123,6 +123,7 @@ import {
 import {
   keepPointLabelsInPlot,
   parallelismLabelBoxes,
+  pillObstacles,
   placeLineLabels,
   renderLineLabels,
   updateRenderedLineLabels,
@@ -1009,6 +1010,7 @@ const GPUGraph = React.memo(
           const layouts = computePerfRulerLabelLayouts(geometries, {
             chartWidth: width,
             chartHeight: height,
+            obstacles: pillObstacles(zoomGroup),
           });
           for (const [index, ruler] of state.rulers.entries()) {
             const geometry = geometries[index];
@@ -1088,6 +1090,8 @@ const GPUGraph = React.memo(
       getDisplaySelection,
       perfRulerMode,
       perfRulerState,
+      showLineLabels,
+      showFrameworkLabel,
       drawPerfRuler,
       dataIdentity,
       rooflines,

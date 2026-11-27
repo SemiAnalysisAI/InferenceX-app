@@ -30,6 +30,7 @@ import {
   avoidPointLabelCollisions,
   fitPillSegments,
   parallelismLabelBoxes,
+  pillObstacles,
   pillWidthBudget,
   placeLineLabels,
   updateRenderedLineLabels,
@@ -2160,6 +2161,7 @@ const ScatterGraph = React.memo(
           const layouts = computePerfRulerLabelLayouts(geometries, {
             chartWidth: width,
             chartHeight: height,
+            obstacles: pillObstacles(zoomGroup),
           });
           for (const [index, ruler] of state.rulers.entries()) {
             const geometry = geometries[index];
@@ -4244,6 +4246,10 @@ const ScatterGraph = React.memo(
       getDisplaySelection,
       perfRulerMode,
       perfRulerState,
+      activeOverlayHwTypes,
+      showGradientLabels,
+      showLineLabels,
+      showFrameworkLabel,
       drawPerfRuler,
       dataIdentity,
       effectiveActiveHwTypes,
