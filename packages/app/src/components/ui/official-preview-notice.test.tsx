@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import {
   includesJalapenoResult,
   includesTpuv7Result,
+  includesTrainium3Result,
   includesVeraRubinResult,
   JalapenoOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
+  Trainium3OfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 
@@ -51,6 +53,10 @@ describe('official preview notices', () => {
     expect(includesTpuv7Result(['b200_vllm', 'tpuv7_vllm'])).toBe(true);
     expect(includesTpuv7Result(['tpuv7_fp8'])).toBe(true);
     expect(includesTpuv7Result(['h100_vllm', 'jalapeno_teacup'])).toBe(false);
+
+    expect(includesTrainium3Result(['b300_vllm', 'trn3_vllm'])).toBe(true);
+    expect(includesTrainium3Result(['trn3'])).toBe(true);
+    expect(includesTrainium3Result(['tpuv7_vllm', 'h100_vllm'])).toBe(false);
   });
 
   it('identifies TPU7x data as an official preview in both locales', () => {
@@ -62,6 +68,23 @@ describe('official preview notices', () => {
     localeState.pathname = '/zh/infx/inference';
     const zhNotice = renderNotice(<Tpuv7OfficialPreviewNotice />, 'tpuv7-official-preview-notice');
     expect(zhNotice?.textContent).toContain('TPU7x 结果为官方预览');
+  });
+
+  it('identifies Trainium3 data as an official preview in both locales', () => {
+    const notice = renderNotice(
+      <Trainium3OfficialPreviewNotice />,
+      'trainium3-official-preview-notice',
+    );
+    expect(notice?.getAttribute('role')).toBe('note');
+    expect(notice?.getAttribute('aria-label')).toBe('InferenceX Official Preview');
+    expect(notice?.textContent).toContain('Trainium3 results are an official preview');
+
+    localeState.pathname = '/zh/infx/inference';
+    const zhNotice = renderNotice(
+      <Trainium3OfficialPreviewNotice />,
+      'trainium3-official-preview-notice',
+    );
+    expect(zhNotice?.textContent).toContain('Trainium3 结果为官方预览');
   });
 
   it('identifies Jalapeño and Vera Rubin data as official previews in English', () => {

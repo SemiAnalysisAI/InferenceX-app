@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   BookOpen,
-  Cpu,
   Download,
   MessageSquareText,
   Palette,
@@ -14,26 +13,20 @@ import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants'
 import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import {
-  HUAWEI_UBENCHX_URL,
   LANDING_BANNER_ANALYTICS_EVENTS,
   LANDING_BANNER_EXPERIMENT,
   LANDING_BANNER_STORAGE_KEY,
-  OPERATORX_URL,
-  TPUV7_QWEN_3_5_AGENTX_URL,
+  TRAINIUM3_GLM_5_2_AGENTX_URL,
 } from '@/lib/nudges/landing-banner';
 import { GRADIENT_NUDGE_EVENT, NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
-import { GoogleIcon } from '@/components/ui/google-icon';
+import { AmazonIcon } from '@/components/ui/amazon-icon';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { Model } from '@/lib/catalog/data-mappings';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
 import type { NudgeDefinition } from './types';
-import {
-  AGENTX_ROUTE,
-  dashboardRouteForPathname,
-  getDashboardRoute,
-} from '@/lib/routing/dashboard-routes';
+import { AGENTX_ROUTE, dashboardRouteForPathname } from '@/lib/routing/dashboard-routes';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 
@@ -61,8 +54,7 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-export const TPUV7_LAUNCH_MODAL_STORAGE_KEY =
-  'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
+export const LAUNCH_MODAL_STORAGE_KEY = 'inferencex-trainium3-agentx-modal-dismissed';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
@@ -259,73 +251,41 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
 
   {
-    id: 'tpuv7-agentx-launch-modal',
+    id: 'trainium3-agentx-launch-modal',
     type: 'modal',
     trigger: { type: 'idle' },
     dismissal: { type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 },
-    storageKey: TPUV7_LAUNCH_MODAL_STORAGE_KEY,
+    storageKey: LAUNCH_MODAL_STORAGE_KEY,
     priority: 50,
     scope: 'landing',
     content: {
-      icon: GoogleIcon,
-      title: 'TPUv7 Preliminary Results Across Multiple Models',
-      titleZh: 'TPUv7 多模型初步结果',
-      description: 'AgentX Preview Submissions',
-      descriptionZh: 'AgentX 预览版提交结果',
+      icon: AmazonIcon,
+      title: 'Amazon Trainium3 Preliminary Results',
+      titleZh: 'Amazon Trainium3 初步结果',
+      description: 'GLM 5.2 AgentX Preview Submission',
+      descriptionZh: 'GLM 5.2 AgentX 预览版提交结果',
       testId: 'launch-modal',
       centered: true,
       badge: 'New',
       badgeZh: '最新',
       hideDismissButton: true,
       primaryAction: {
-        label: 'Qwen3.5',
-        labelZh: 'Qwen3.5',
-        icon: <ModelLogo model={Model.Qwen3_5} />,
+        label: 'GLM 5.2',
+        labelZh: 'GLM 5.2',
+        icon: <ModelLogo model={Model.GLM_5_2} />,
         onClick: () => {
-          window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
+          window.location.href = localizedNudgeHref(TRAINIUM3_GLM_5_2_AGENTX_URL);
         },
       },
-      secondaryAction: {
-        label: 'Kimi K3',
-        labelZh: 'Kimi K3',
-        icon: <ModelLogo model={Model.Kimi_K3} />,
-        onClick: () => {
-          window.location.href = localizedNudgeHref(
-            `${getDashboardRoute('inference').path}/kimi-k3`,
-          );
-        },
-      },
-      additionalActions: [
-        {
-          label: 'GLM5.3',
-          labelZh: 'GLM5.3',
-          icon: <ModelLogo model={Model.GLM_5_2} />,
-          onClick: () => {
-            window.location.href = localizedNudgeHref(
-              `${getDashboardRoute('inference').path}/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
-            );
-          },
-        },
-        {
-          label: 'Muse Spark 1.3/Open',
-          labelZh: 'Muse Spark 1.3/Open',
-          icon: <ModelLogo model={Model.Muse_Spark_Open} />,
-          onClick: () => {
-            window.location.href = localizedNudgeHref(
-              `${getDashboardRoute('inference').path}/muse-spark-open`,
-            );
-          },
-        },
-      ],
     },
     analytics: {
-      shown: 'inference_tpuv7_agentx_modal_shown',
-      dismissed: 'inference_tpuv7_agentx_modal_dismissed',
-      action: 'inference_tpuv7_agentx_modal_clicked',
+      shown: 'inference_trainium3_agentx_modal_shown',
+      dismissed: 'inference_trainium3_agentx_modal_dismissed',
+      action: 'inference_trainium3_agentx_modal_clicked',
     },
   },
   {
-    id: 'huawei-ascend-950pr-ubenchx-banner',
+    id: 'trainium3-glm-5-2-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -335,33 +295,33 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     renderOnInitialLoad: true,
     variant: 'ubenchx',
     content: {
-      icon: Cpu,
-      title: 'Huawei Ascend 950PR Microbenchmarks',
-      titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: 'Cycle-Level Core memory-access microbenchmarks (Beta)',
-      descriptionZh: '周期级核心访存微基准测试（Beta）',
+      icon: AmazonIcon,
+      title: 'Amazon Trainium3 Results',
+      titleZh: 'Amazon Trainium3 结果',
+      description: 'GLM 5.2 AgentX Preview Results',
+      descriptionZh: 'GLM 5.2 AgentX 预览结果',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: HUAWEI_UBENCHX_URL,
+      href: TRAINIUM3_GLM_5_2_AGENTX_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(HUAWEI_UBENCHX_URL);
+        window.location.href = localizedNudgeHref(TRAINIUM3_GLM_5_2_AGENTX_URL);
       },
     },
     analytics: {
       ...LANDING_BANNER_ANALYTICS_EVENTS,
       properties: {
-        banner_id: 'huawei-ascend-950pr-ubenchx',
-        destination: 'ubenchx',
+        banner_id: 'trainium3-glm-5-2',
+        destination: 'trainium3-glm-5-2',
         experiment: LANDING_BANNER_EXPERIMENT,
         variant: 'ubenchx',
       },
     },
   },
   {
-    id: 'operatorx-banner',
+    id: 'trainium3-glm-5-2-banner-b',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -371,26 +331,26 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     renderOnInitialLoad: true,
     variant: 'operatorx',
     content: {
-      icon: Cpu,
-      title: 'Huawei Ascend 950PR Microbenchmarks',
-      titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: '950PR GEMM FLOPs and Max FLOPS utilization',
-      descriptionZh: '950PR GEMM FLOPs 与最大 FLOPS 利用率',
+      icon: AmazonIcon,
+      title: 'Amazon Trainium3 Results',
+      titleZh: 'Amazon Trainium3 结果',
+      description: 'GLM 5.2 AgentX Preview Results',
+      descriptionZh: 'GLM 5.2 AgentX 预览结果',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: OPERATORX_URL,
+      href: TRAINIUM3_GLM_5_2_AGENTX_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(OPERATORX_URL);
+        window.location.href = localizedNudgeHref(TRAINIUM3_GLM_5_2_AGENTX_URL);
       },
     },
     analytics: {
       ...LANDING_BANNER_ANALYTICS_EVENTS,
       properties: {
-        banner_id: 'operatorx',
-        destination: 'operatorx',
+        banner_id: 'trainium3-glm-5-2',
+        destination: 'trainium3-glm-5-2',
         experiment: LANDING_BANNER_EXPERIMENT,
         variant: 'operatorx',
       },

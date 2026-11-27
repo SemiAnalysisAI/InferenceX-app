@@ -13,9 +13,11 @@ import {
 import {
   includesJalapenoResult,
   includesTpuv7Result,
+  includesTrainium3Result,
   includesVeraRubinResult,
   JalapenoOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
+  Trainium3OfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 import { Card } from '@/components/ui/card';
@@ -497,6 +499,7 @@ function CacheReuseInner() {
   const showsJalapenoPreview = includesJalapenoResult(legendHwKeys);
   const showsVeraRubinPreview = includesVeraRubinResult(legendHwKeys);
   const showsTpuv7Preview = includesTpuv7Result(legendHwKeys);
+  const showsTrainium3Preview = includesTrainium3Result(legendHwKeys);
 
   const caption = (
     <>
@@ -513,6 +516,7 @@ function CacheReuseInner() {
       {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
       {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
       {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
+      {showsTrainium3Preview && <Trainium3OfficialPreviewNotice />}
     </>
   );
 

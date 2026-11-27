@@ -42,7 +42,7 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
-import { ModelSelector } from '@/components/ui/chart-selectors';
+import { ModelSelector, PrecisionSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
@@ -90,6 +90,12 @@ import {
 } from '@/lib/catalog/data-mappings';
 import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
+import {
+  getProfitHardwareSeed,
+  recordProfitPick,
+  seededHardwareVisibility,
+  setProfitHardwareSeed,
+} from '@/lib/routing/cross-tab-selection';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
@@ -507,6 +513,7 @@ export default function ProfitEstimatorDisplay({
         <GlobalFilterProvider
           initialModel={urlSeed.model}
           initialSequence={Sequence.AgenticTraces}
+          initialPrecisions={urlSeed.precisions}
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
         >
@@ -573,9 +580,10 @@ function ProfitEstimatorInner({
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availableModels, availability, availabilitySettled } = useGlobalFilterAvailability();
+  const { availableModels, availablePrecisions, availability, availabilitySettled } =
+    useGlobalFilterAvailability();
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(
     () => profitAgenticModels(PROFIT_BASIS_TAB[basis], availableModels, availability?.lines),
@@ -1036,9 +1044,23 @@ function ProfitEstimatorInner({
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...legendHwKeys].toSorted().join(',')}`;
 
+  // Hardware the reader picked on the inference chart, or on the other profit estimator.
+  const [hardwareSeed, setHardwareSeed] = useState(getProfitHardwareSeed);
   const visibleHwKeys = useMemo(
-    () => resolveCalculatorVisibility(visibilityIntent, selectionKey, legendHwKeys),
-    [visibilityIntent, selectionKey, legendHwKeys],
+    () =>
+      (visibilityIntent === null &&
+        seededHardwareVisibility(hardwareSeed, selectedModel, legendHwKeys)) ||
+      resolveCalculatorVisibility(visibilityIntent, selectionKey, legendHwKeys),
+    [visibilityIntent, hardwareSeed, selectedModel, selectionKey, legendHwKeys],
+  );
+  const pickHardware = useCallback(
+    (visible: Set<string>) => {
+      const all = legendHwKeys.every((key) => visible.has(key));
+      const keys = all ? [] : legendHwKeys.filter((key) => visible.has(key));
+      recordProfitPick('i_active', keys.join(','));
+      setProfitHardwareSeed({ model: selectedModel, keys });
+    },
+    [legendHwKeys, selectedModel],
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const [highContrast, setHighContrast] = useState(false);
@@ -1082,10 +1104,25 @@ function ProfitEstimatorInner({
   const handleModelChange = useCallback(
     (value: string) => {
       setVisibilityIntent(null);
+      setHardwareSeed(null);
+      setProfitHardwareSeed(null);
+      recordProfitPick('g_model', value);
       setSelectedModel(value as Model);
       track('profit_model_selected', { model: value });
     },
     [setSelectedModel],
+  );
+
+  const handlePrecisionChange = useCallback(
+    (value: string[]) => {
+      setVisibilityIntent(null);
+      setHardwareSeed(null);
+      setProfitHardwareSeed(null);
+      recordProfitPick('i_prec', value.join(','));
+      setSelectedPrecisions(value);
+      track('profit_precision_selected', { precision: value.join(',') });
+    },
+    [setSelectedPrecisions],
   );
 
   const handleBasisChange = useCallback(
@@ -1120,9 +1157,10 @@ function ProfitEstimatorInner({
         visible: next,
         known: new Set(legendHwKeys),
       });
+      pickHardware(next);
       track('profit_gpu_toggled', { gpu: hwKey });
     },
-    [legendHwKeys, visibleHwKeys, selectionKey],
+    [legendHwKeys, visibleHwKeys, selectionKey, pickHardware],
   );
 
   const handleResetGpus = useCallback(() => {
@@ -1131,8 +1169,9 @@ function ProfitEstimatorInner({
       visible: new Set(legendHwKeys),
       known: new Set(legendHwKeys),
     });
+    pickHardware(new Set(legendHwKeys));
     track('profit_gpu_reset', { gpu_count: legendHwKeys.length });
-  }, [legendHwKeys, selectionKey]);
+  }, [legendHwKeys, selectionKey, pickHardware]);
 
   const legendItems = useMemo(
     () =>
@@ -1786,8 +1825,8 @@ function ProfitEstimatorInner({
                           label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
                           tooltip={
                             locale === 'zh'
-                              ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                              : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
+                              ? '外部客户价格或内部持有成本；目前仅影响 TPUv7 和 Trainium3。'
+                              : 'External customer pricing or internal owner cost; currently affects only TPUv7 and Trainium3.'
                           }
                         />
                         <TcoBasisToggle source="profit" className="md:h-9" />
@@ -1798,8 +1837,18 @@ function ProfitEstimatorInner({
                     <ControlPanel
                       legend={t.chartGroup}
                       data-testid="profit-chart-panel"
-                      className="xl:w-fit xl:shrink-0"
+                      className="grid-cols-1 gap-x-4 sm:grid-cols-[minmax(10rem,auto)_auto] xl:w-fit xl:shrink-0"
                     >
+                      <PrecisionSelector
+                        id="profit-precision"
+                        data-testid="profit-precision-selector"
+                        value={selectedPrecisions}
+                        onChange={handlePrecisionChange}
+                        open={openDropdown === 'precision'}
+                        onOpenChange={handleDropdownOpenChange('precision')}
+                        onOptionIntent={(precisions) => warmThroughputChange({ precisions })}
+                        availablePrecisions={availablePrecisions}
+                      />
                       <div className="flex min-w-0 flex-col space-y-1.5">
                         <LabelWithTooltip label={t.basisLabel} tooltip={t.basisTooltip} />
                         <SegmentedToggle<ProfitBasis>

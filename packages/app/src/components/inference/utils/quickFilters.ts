@@ -13,7 +13,7 @@ import { pointTopologyKey } from './topology-filter';
 
 export type { AvailableQuickFilters, DeploymentMode, PowerTier, QuickFilters, SpecMode };
 
-export const VENDOR_ORDER: readonly string[] = ['NVIDIA', 'AMD', 'OpenAI', 'Google'];
+export const VENDOR_ORDER: readonly string[] = ['NVIDIA', 'AMD', 'OpenAI', 'Google', 'AWS'];
 
 export const EMPTY_QUICK_FILTERS: QuickFilters = {
   vendors: [],

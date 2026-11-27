@@ -392,8 +392,9 @@ describe('history projection version', () => {
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
       // approved under a receipt without one must be projected again. The walk skips type-only
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
-      // uncalled helpers left bundle.ts and metrics.ts; entries are unchanged.
-      sources: '0d41f1f276a75a2420c7e7bad06657d6d47cc1a3e84a0207418751a4f514b01f',
+      // A100's unpublished power and rental rate became null and the Trn3 label became Trainium3 PDS
+      // in gpu-keys; no video entry reads either, so entries are unchanged.
+      sources: '8c79123b7bb760e16dab14d904b76351e5187ea4b49c172b2e959d55f6326ac0',
     });
   });
 });

@@ -1,14 +1,21 @@
 import { readFileSync } from 'node:fs';
 
+import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
+
 import { isMonochromeLogo } from './model-logos';
 import { describe, expect, it } from 'bun:test';
 
 import {
   VENDOR_LOGO_ICONS,
+  VENDOR_MARK_HREFS,
   getAxisVendorIcon,
   getLineLabelVendorIcon,
+  getHwVendorDarkLogo,
   getHwVendorLogo,
+  vendorMarkVariants,
 } from './vendor-logos';
+
+const pathsOf = (svg: string) => [...svg.matchAll(/ d="(?<d>[^"]+)"/gu)].map((m) => m.groups?.d);
 
 describe('vendor logo icons', () => {
   it('maps NVIDIA hardware keys to the full-color NVIDIA mark', () => {
@@ -44,6 +51,41 @@ describe('vendor logo icons', () => {
       ['#000000', '#000000', '#000000', '#000000'],
     );
     expect(getAxisVendorIcon('tpuv7')?.href).toBe(`data:image/svg+xml,${encodeURIComponent(svg)}`);
+  });
+
+  it('gives Trainium3 the official AWS logo, Squid Ink in light mode and white in dark', () => {
+    const light = readFileSync('public/logos/aws.svg', 'utf8').trim();
+    const dark = readFileSync('public/logos/aws-dark.svg', 'utf8').trim();
+    expect(light).toContain('fill="#161D26"');
+    expect(dark).toBe(light.replace('#161D26', '#FFFFFF'));
+    expect(getHwVendorLogo('AWS')).toBe('aws.svg');
+    expect(getHwVendorDarkLogo('AWS')).toBe('aws-dark.svg');
+    expect(getHwVendorDarkLogo('NVIDIA')).toBeUndefined();
+
+    const axis = getAxisVendorIcon('trn3_vllm');
+    expect(axis?.href).toBe('/logos/amazon.svg');
+    expect(vendorMarkVariants(axis!)).toEqual([
+      { href: '/logos/amazon.svg', className: 'dark:invert dark:hue-rotate-180' },
+    ]);
+    expect(getLineLabelVendorIcon('trn3')).toBe(VENDOR_LOGO_ICONS.AWS);
+    expect(pathsOf(decodeURIComponent(VENDOR_MARK_HREFS.AWS ?? ''))).toEqual(pathsOf(light));
+  });
+
+  it('keeps one image per mark for vendors without a dark variant', () => {
+    expect(vendorMarkVariants(getAxisVendorIcon('mi355x')!)).toEqual([
+      { href: getAxisVendorIcon('mi355x')!.href, className: 'dark:invert' },
+    ]);
+    expect(vendorMarkVariants(getAxisVendorIcon('b200')!)[0]?.className).toBe('');
+  });
+
+  it('has a mark for every vendor in the hardware registry', () => {
+    for (const vendor of new Set(Object.values(GPU_VENDORS))) {
+      // Jalapeño (OpenAI) only ever appears as a line label, never as a chip or bar.
+      if (vendor === 'OpenAI') continue;
+      expect(getHwVendorLogo(vendor), vendor).toBeDefined();
+      expect(VENDOR_MARK_HREFS[vendor], vendor).toBeDefined();
+      expect(VENDOR_LOGO_ICONS[vendor], vendor).toBeDefined();
+    }
   });
 
   it('returns no icon for unknown hardware', () => {

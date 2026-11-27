@@ -55,6 +55,7 @@ const HIGH_CONTRAST_COLORS: Record<string, string> = {
 };
 
 let frames: FrameRequestCallback[] = [];
+let chartWidth = 1000;
 let container: HTMLDivElement;
 let root: Root;
 
@@ -80,7 +81,7 @@ beforeEach(() => {
       }
       observe(target: Element) {
         observe?.(
-          [{ target, contentRect: DOMRect.fromRect({ width: 1000, height: 500 }) } as never],
+          [{ target, contentRect: DOMRect.fromRect({ width: chartWidth, height: 500 }) } as never],
           this as never,
         );
       }
@@ -90,8 +91,8 @@ beforeEach(() => {
   );
   stubGlobal('requestAnimationFrame', (frame: FrameRequestCallback) => frames.push(frame));
   stubGlobal('cancelAnimationFrame', () => {});
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
-    DOMRect.fromRect({ width: 1000, height: 500 }),
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() =>
+    DOMRect.fromRect({ width: chartWidth, height: 500 }),
   );
   container = document.createElement('div');
   document.body.append(container);
@@ -103,13 +104,14 @@ afterEach(() => {
   container.remove();
   vi.restoreAllMocks();
   unstubAllGlobals();
+  chartWidth = 1000;
 });
 
-function draw(colors: Record<string, string>) {
+function draw(colors: Record<string, string>, rows: ProfitEstimatorRow[] = ROWS) {
   act(() =>
     root.render(
       createElement(ProfitEstimatorChart, {
-        rows: ROWS,
+        rows,
         hardwareConfig: {} as HardwareConfig,
         // A new resolver per palette, as the display builds one per `useThemeColors` result.
         colorResolver: (row: ProfitEstimatorRow) => colors[row.hwKey]!,
@@ -135,5 +137,47 @@ describe('ProfitEstimatorChart palette changes', () => {
 
     draw(DEFAULT_COLORS);
     expect(tcoFills()).toEqual(['#2e7d32', '#c62828']);
+  });
+});
+
+const isAws = (mark: SVGImageElement) => mark.getAttribute('href') === '/logos/amazon.svg';
+
+function expectAwsMark(marks: SVGImageElement[]) {
+  const aws = marks.filter(isAws);
+  expect(aws).toHaveLength(1);
+  expect(aws[0]!.getAttribute('class')).toContain('dark:invert dark:hue-rotate-180');
+}
+
+describe('ProfitEstimatorChart vendor marks', () => {
+  const trn3: ProfitEstimatorRow = { ...ROWS[0]!, hwKey: 'trn3_vllm', resultKey: 'trn3_vllm' };
+  it('puts each vendor mark before the chip name on phone rows, with the Amazon logo', () => {
+    chartWidth = 393;
+    draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
+    expect(container.querySelectorAll('image.bar-vendor-mark')).toHaveLength(0);
+    const marks = [...container.querySelectorAll<SVGImageElement>('image.row-vendor-mark')];
+    expect(marks).toHaveLength(3);
+    for (const mark of marks) {
+      expect(Number(mark.getAttribute('x')) + Number(mark.getAttribute('width'))).toBeLessThan(0);
+    }
+    expectAwsMark(marks);
+  });
+
+  it('tops every vendor bar, Trainium3 included, with the Amazon logo', () => {
+    draw({ ...DEFAULT_COLORS, trn3_vllm: '#ff9900' }, [...ROWS, trn3]);
+    const marks = [...container.querySelectorAll<SVGImageElement>('image.bar-vendor-mark')];
+    expect(marks).toHaveLength(3);
+    expectAwsMark(marks);
+    expect(Number(marks.find(isAws)?.getAttribute('width'))).toBeGreaterThan(0);
+  });
+});
+
+describe('ProfitEstimatorChart column labels', () => {
+  it('sets the label size inline so the global 12px tick rule cannot clip slanted labels', () => {
+    draw(DEFAULT_COLORS);
+    const labels = [...container.querySelectorAll<SVGTextElement>('g.tick text')].filter(
+      (label) => label.style.fill === 'var(--foreground)',
+    );
+    expect(labels).toHaveLength(ROWS.length);
+    for (const label of labels) expect(label.style.fontSize).toBe('10px');
   });
 });

@@ -164,7 +164,7 @@ describe('First-load navigation', () => {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.removeItem('inferencex-trainium3-glm-5-2-banner-dismissed');
         win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
       },
     });
@@ -213,54 +213,30 @@ describe('First-load navigation', () => {
   });
 });
 
-describe('Huawei uBenchX launch banner', { testIsolation: true }, () => {
-  it('opens Huawei core-memory profiles from /zh landing page', () => {
-    cy.visit('/zh', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
-        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
-        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
-        win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="launch-banner"]:visible')
-      .should('have.attr', 'href', '/zh/ubx/core-memory-profiles')
-      .and('contain.text', 'Huawei Ascend 950PR 微基准测试')
-      .and('contain.text', '周期级核心访存微基准测试（Beta）')
-      .click();
-    cy.location('pathname').should('eq', '/zh/ubx/core-memory-profiles');
-    cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
-  });
-});
-
-describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
+describe('Trainium3 launch banner', { testIsolation: true }, () => {
   for (const locale of ['', '/zh']) {
-    it(`opens OperatorX from ${locale || '/'} landing page`, () => {
-      cy.visit(locale || '/', {
-        onBeforeLoad(win) {
-          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
-          win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
+    for (const variant of ['ubenchx', 'operatorx']) {
+      it(`opens Trainium3 GLM 5.2 results from ${locale || '/'} on the ${variant} arm`, () => {
+        cy.visit(locale || '/', {
+          onBeforeLoad(win) {
+            win.localStorage.removeItem('inferencex-trainium3-glm-5-2-banner-dismissed');
+            win.localStorage.setItem('inferencex-landing-banner-variant', variant);
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
+        });
+        cy.get('[data-testid="launch-banner"]:visible')
+          .should('have.length', 1)
+          .and('have.attr', 'href', `${locale}/infx/inference/glm-5-3`)
+          .and('contain.text', locale ? 'Amazon Trainium3 结果' : 'Amazon Trainium3 Results')
+          .and(
+            'contain.text',
+            locale ? 'GLM 5.2 AgentX 预览结果' : 'GLM 5.2 AgentX Preview Results',
+          )
+          .click();
+        cy.location('pathname').should('eq', `${locale}/infx/inference/glm-5-3`);
+        cy.location('search').should('eq', '');
       });
-      cy.get('[data-testid="launch-banner"]:visible')
-        .should('have.length', 1)
-        .and('have.attr', 'href', `${locale}/opx`)
-        .and(
-          'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
-        )
-        .and(
-          'contain.text',
-          locale
-            ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
-            : '950PR GEMM FLOPs and Max FLOPS utilization',
-        )
-        .click();
-      cy.location('pathname').should('eq', `${locale}/opx`);
-      cy.get('[data-testid="operatorx-page"]').should('be.visible');
-    });
+    }
   }
 
   it('assigns a sticky arm on first visit and shows only that arm', () => {
@@ -280,7 +256,7 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
           .should('eq', variant);
         cy.get('[data-testid="launch-banner"]:visible')
           .should('have.length', 1)
-          .and('have.attr', 'href', variant === 'operatorx' ? '/opx' : '/ubx/core-memory-profiles');
+          .and('have.attr', 'href', '/infx/inference/glm-5-3');
         cy.reload();
         cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
       });
@@ -289,7 +265,7 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
   it('shares dismissal across arms', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-trainium3-glm-5-2-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },

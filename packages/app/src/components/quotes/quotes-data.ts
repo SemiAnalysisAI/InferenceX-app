@@ -318,6 +318,16 @@ export const QUOTES: Quote[] = [
     link: 'https://www.tilert.ai/',
   },
   {
+    text: "We build Trainium to serve every ML workload and to lead on LLM performance per TCO, but customers shouldn't have to take our word for it. We appreciate open, reproducible benchmarks like InferenceX that let customers judge tokens per dollar for themselves across Trainium and other accelerators, and we're glad to see Trainium in the mix.",
+    textZh:
+      '我们打造 Trainium，是为了服务所有机器学习工作负载，并在 LLM 每 TCO 性能上保持领先，但客户不应只听我们一面之词。我们赞赏 InferenceX 这样开放、可复现的基准测试，让客户能够自行评判 Trainium 以及其他加速器的每美元 token 产出，我们也很高兴看到 Trainium 加入其中。',
+    name: 'Nafea Bshara',
+    title: 'VP & Distinguished Engineer, Amazon; Co-founder, Annapurna Labs',
+    titleZh: 'Amazon 副总裁兼杰出工程师；Annapurna Labs 联合创始人',
+    org: 'Amazon',
+    logo: 'amazon.svg',
+  },
+  {
     text: 'Open collaboration is driving the next era of AI innovation. The open-source InferenceMAX benchmark gives the community transparent, nightly results that inspire trust and accelerate progress. It highlights the competitive TCO performance of our AMD Instinct MI300, MI325X, and MI355X GPUs across diverse workloads, underscoring the strength of our platform and our commitment to giving developers real-time visibility into our software progress.',
     textZh:
       '开放协作正在推动 AI 创新的下一个时代。开源的 InferenceMAX 基准测试为社区提供透明的每晚结果，激发信任并加速进步。它突出了我们 AMD Instinct MI300、MI325X 和 MI355X GPU 在多样化工作负载中极具竞争力的 TCO 表现，彰显了我们平台的实力以及我们致力于让开发者实时了解软件进展的承诺。',
@@ -628,6 +638,7 @@ export const CAROUSEL_ORGS = [
   'Alibaba Qwen',
   'Zhipu GLM',
   'OpenAI',
+  'Amazon',
   'AMD',
   'NVIDIA',
   'Microsoft',

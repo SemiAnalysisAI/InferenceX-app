@@ -579,50 +579,70 @@ describe('pills keep clear of other series', () => {
   });
 });
 
-describe('exported charts with few series name every curve', () => {
-  const fewCurves = Array.from({ length: 8 }, (_, index) =>
-    placement(`hw${index}`, 40 + index * 40, 150, `HW${index}`),
+const curves = (count: number) =>
+  Array.from({ length: count }, (_, index) =>
+    placement(`hw${index}`, 30 + index * 30, 150, `HW${index}`),
   );
 
-  it('places a pill over another series rather than hide it', () => {
+describe('labelEverySeries names every curve', () => {
+  it('shows a pill for each of many crowded curves, inside the plot', () => {
+    const labels = curves(10);
     const { zoomGroup } = renderChart();
-    renderLineLabels(zoomGroup, fewCurves, {
+    renderLineLabels(zoomGroup, labels, {
       seriesAttribute: 'data-hw-key',
       occluders: stripes(0, 300),
       labelEverySeries: true,
     });
 
     const nodes = zoomGroup.selectAll<SVGGElement, unknown>('.line-label').nodes();
-    expect(nodes).toHaveLength(8);
+    expect(nodes).toHaveLength(10);
     for (const node of nodes) {
       expect(node.style.opacity).not.toBe('0');
       expect(Object.hasOwn(node.dataset, 'placementHidden')).toBe(false);
     }
-    const boxes = fewCurves.map(({ key }) => pillBox(zoomGroup, key));
-    for (const [index, box] of boxes.entries()) {
-      expectInsidePlot(box);
-      for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
-    }
+    for (const { key } of labels) expectInsidePlot(pillBox(zoomGroup, key));
   });
 
-  it('keeps hiding blocked pills on screen and with many series', () => {
-    const many = [...fewCurves, placement('hw8', 360, 150, 'HW8')];
-    for (const [labels, labelEverySeries] of [
-      [fewCurves, false],
-      [many, true],
-    ] as const) {
-      const { zoomGroup } = renderChart();
-      renderLineLabels(zoomGroup, labels, {
-        seriesAttribute: 'data-hw-key',
-        occluders: stripes(0, 300),
-        labelEverySeries,
-      });
-      const hidden = zoomGroup
-        .selectAll<SVGGElement, unknown>('.line-label')
-        .nodes()
-        .filter((node) => node.style.opacity === '0');
-      expect(hidden).toHaveLength(labels.length);
-    }
+  it('keeps every pill after a zoom update', () => {
+    const labels = curves(10);
+    const { zoomGroup } = renderChart();
+    const options = {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(0, 300),
+      labelEverySeries: true,
+    };
+    renderLineLabels(zoomGroup, labels, options);
+    updateRenderedLineLabels(zoomGroup, labels, options);
+    const hidden = zoomGroup
+      .selectAll<SVGGElement, unknown>('.line-label')
+      .nodes()
+      .filter((node) => node.style.opacity === '0');
+    expect(hidden).toHaveLength(0);
+  });
+
+  it('leaves a curve anchored outside the plot unlabeled', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('offscreen', 600, 150, 'Off')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(0, 300),
+      labelEverySeries: true,
+    });
+    const node = zoomGroup.select<SVGGElement>('.line-label').node()!;
+    expect(node.style.opacity).toBe('0');
+  });
+
+  it('still hides blocked pills without the option', () => {
+    const labels = curves(8);
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, labels, {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(0, 300),
+    });
+    const hidden = zoomGroup
+      .selectAll<SVGGElement, unknown>('.line-label')
+      .nodes()
+      .filter((node) => node.style.opacity === '0');
+    expect(hidden).toHaveLength(labels.length);
   });
 });
 

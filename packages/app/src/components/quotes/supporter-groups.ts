@@ -34,6 +34,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     label: { en: 'AI Accelerators', zh: 'AI 加速器' },
     logos: [
       { label: 'Google', logo: 'google-color.svg' },
+      { label: 'Amazon', logo: 'amazon.svg', quoteOrg: 'Amazon' },
       { label: 'AMD', logo: 'amd.svg', quoteOrg: 'AMD' },
       { label: 'NVIDIA', logo: 'nvidia-color.svg', quoteOrg: 'NVIDIA' },
       { label: 'OpenAI Jalapeño', logo: 'openai.svg', quoteOrg: 'OpenAI' },
@@ -73,6 +74,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     desktopColumns: PROVIDER_COLUMNS,
     logos: [
       { label: 'Microsoft', logo: 'microsoft.svg', quoteOrg: 'Microsoft' },
+      { label: 'Amazon', logo: 'amazon.svg', quoteOrg: 'Amazon' },
       { label: 'Google Cloud', logo: 'google-color.svg' },
       { label: 'Oracle', logo: 'oracle.svg', quoteOrg: 'Oracle' },
       { label: 'CoreWeave', logo: 'coreweave.svg', quoteOrg: 'CoreWeave' },

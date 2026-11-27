@@ -119,7 +119,8 @@ describe('tooltip parallelism — standard (ep field present)', () => {
   it('shows TP, EP and DP attention for non-multinode data', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4, ep: 8, dp_attention: false }) }));
     expect(html).toContain('Single-node aggregate · 4 chips · EP8 · conc 64');
-    expect(html).toContain('TP ? · EP 8 · DP ? · DPA off · PP ? · DCP ? · PCP ? · DWDP 1');
+    expect(html).toContain('EP 8 · DPA off · DWDP 1');
+    expect(html).not.toMatch(/(?:TP|DP|PP|DCP|PCP) \?/);
   });
 
   it('shows dp_attention as True when enabled', () => {
@@ -140,7 +141,8 @@ describe('tooltip parallelism — standard (ep field present)', () => {
         tooltipConfig({ data: pt({ tp: 8, ep: 1, pp, dp_attention: false }) }),
       );
       expect(html).toContain('8 chips · TP8 · conc 64');
-      expect(html).toContain(`PP ${pp ?? '?'} ·`);
+      if (pp === undefined) expect(html).not.toContain('PP ');
+      else expect(html).toContain(`PP ${pp} ·`);
     }
   });
 
@@ -186,7 +188,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     (d as any).prefill_ep = 2;
     const html = detailsText(tooltipConfig({ data: d }));
     expect(html).toContain('4 chips · TP4 · conc 64');
-    expect(html).toContain('EP ? ·');
+    expect(html).not.toContain('EP ?');
   });
 });
 

@@ -150,4 +150,19 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         expect(new URL(String(value)).search).to.equal('');
       });
   });
+
+  it('filters the chart by precision and keeps the choice in the route', () => {
+    const base = '/infx/profit-estimator/deepseek-v4/target/24';
+    cy.visit(base, { onBeforeLoad: suppressNudges });
+    cy.get('[data-testid="profit-estimator-chart"]').should('contain.text', 'H200');
+    cy.get('[data-testid="profit-precision-selector"]').should('contain.text', 'FP8').click();
+    cy.contains('[role="option"]', /^FP8$/u).click();
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="profit-estimator-chart"]').should('not.contain.text', 'H200');
+    cy.get('[data-testid="profit-estimator-chart"]').should('contain.text', 'B200');
+    cy.location('pathname').should('eq', `${base}/precision/fp4`);
+    cy.reload();
+    cy.get('[data-testid="profit-precision-selector"]').should('not.contain.text', 'FP8');
+    cy.get('[data-testid="profit-estimator-chart"]').should('not.contain.text', 'H200');
+  });
 });
