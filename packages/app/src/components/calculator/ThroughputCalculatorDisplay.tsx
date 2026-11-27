@@ -587,10 +587,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const barResults = useMemo(
     () =>
-      [...results, ...overlayResults].filter(
-        (result) => barMetric !== 'power' || getGpuSpecs(result.hwKey).power > 0,
-      ),
-    [results, overlayResults, barMetric],
+      [...results, ...overlayResults].filter((result) => {
+        if (barMetric === 'power') return getGpuSpecs(result.hwKey).power > 0;
+        if (barMetric === 'cost') return getGpuSpecs(result.hwKey, tcoBasis)[costProvider] > 0;
+        return true;
+      }),
+    [results, overlayResults, barMetric, costProvider, tcoBasis],
   );
   const showsJalapenoPreview = useMemo(
     () => includesJalapenoResult(results.map((result) => result.hwKey)),

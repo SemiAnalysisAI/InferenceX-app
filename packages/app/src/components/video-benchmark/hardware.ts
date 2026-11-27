@@ -41,7 +41,7 @@ export function costPerGpuHour(key: string, tier: CostTier): number | null {
   const entry = HW_REGISTRY[key];
   if (!entry) return null;
   const value = tier === 'h' ? entry.costh : entry.costr;
-  return Number.isFinite(value) && value > 0 ? value : null;
+  return value !== null && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 export interface VideoHardwareRosterEntry {

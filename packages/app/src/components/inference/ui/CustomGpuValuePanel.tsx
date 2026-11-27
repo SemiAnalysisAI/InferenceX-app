@@ -72,7 +72,7 @@ const PANEL_CONFIG: Record<
     inputIdPrefix: 'cost-input',
     resetEvent: 'inference_custom_powers_reset',
     calculatedEvent: 'inference_custom_powers_calculated',
-    getDefaultValue: (specs) => specs.power,
+    getDefaultValue: (specs) => specs.power ?? 0,
   },
 };
 

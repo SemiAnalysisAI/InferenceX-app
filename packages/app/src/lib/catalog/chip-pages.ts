@@ -1,4 +1,8 @@
-import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
+import {
+  HW_REGISTRY,
+  isPublishedHwEntry,
+  type PublishedHwEntry,
+} from '@semianalysisai/inferencex-constants';
 
 import { GPU_SPECS, type GpuSpec } from '@/lib/catalog/gpu-specs';
 
@@ -362,9 +366,12 @@ export function getChipSpec(entry: ChipPageEntry): GpuSpec {
   return spec;
 }
 
-export function getChipHw(entry: ChipPageEntry): HwEntry {
+export function getChipHw(entry: ChipPageEntry): PublishedHwEntry {
   const hw = HW_REGISTRY[entry.hwKey];
   if (!hw) throw new Error(`No HW_REGISTRY entry for ${entry.hwKey}`);
+  if (!isPublishedHwEntry(hw)) {
+    throw new Error(`Chip page ${entry.hwKey} needs published power and cost rates`);
+  }
   return hw;
 }
 

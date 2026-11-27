@@ -1301,8 +1301,9 @@ export default function PowerTimeline({
           pools: pool?.roles,
         });
       }
-      if (showUtility && specs.power > 0) {
-        const watts = pool ? Math.round(specs.power * 1000) * size : specs.power * 1000;
+      const allInKw = specs.power;
+      if (showUtility && allInKw !== null && allInKw > 0) {
+        const watts = pool ? Math.round(allInKw * 1000) * size : allInKw * 1000;
         lines.push({
           id: `utility:${id}`,
           watts,

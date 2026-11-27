@@ -125,7 +125,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 **`packages/constants/src/gpu-keys.ts`** (single source of truth):
 
-- Add one entry to `HW_REGISTRY` with all fields: `vendor`, `arch`, `label`, `sort`, `tdp`, `power`, `costh`, `costr`. **If power/cost are unknown, use `9.99` as an obvious placeholder** — the test suite requires `power > 0`.
+- Add one entry to `HW_REGISTRY` with all fields: `vendor`, `arch`, `label`, `sort`, `tdp`, `power`, `costh`, `costr`. **If all-in power or a cost tier is unpublished, set it to `null`**; never use a placeholder number. Dashboards then omit that cost or energy value instead of plotting a made-up one.
 - If this is a **new vendor** (one without zones in `VENDOR_OKLCH_ZONES` yet), also add color zones to `VENDOR_OKLCH_ZONES` and `VENDOR_HSL_ZONES` in the same file, and extend the `Vendor` type and `getVendor()` in `src/lib/charts/dynamic-colors.ts`.
 
 **`packages/db/src/etl/normalizers.ts`** (usually no change):

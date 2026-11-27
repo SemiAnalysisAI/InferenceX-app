@@ -13,6 +13,7 @@ export const TABLEAU_10 = [
   '#bab0ab',
 ] as const;
 
+/** Unpublished power or cost reads as 0, the same as unregistered hardware. */
 export interface GpuSpecs {
   tdp: number;
   power: number;
@@ -42,9 +43,9 @@ export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS):
   const internalCost = INTERNAL_OWNER_COST[base];
   return {
     tdp: entry.tdp,
-    power: entry.power,
-    costh: basis === 'internal' ? (internalCost ?? entry.costh) : entry.costh,
-    costr: entry.costr,
+    power: entry.power ?? 0,
+    costh: basis === 'internal' ? (internalCost ?? entry.costh ?? 0) : (entry.costh ?? 0),
+    costr: entry.costr ?? 0,
   };
 }
 

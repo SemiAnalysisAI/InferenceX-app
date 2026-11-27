@@ -231,52 +231,52 @@ export function writeThroughputChartFields(
     );
   }
 
-  if (all || request.costh) {
+  if (specs.costh > 0 && (all || request.costh)) {
     fields.costh = chartMetric(millionTokensPerHour ? specs.costh / millionTokensPerHour : 0);
   }
-  if (all || request.costr) {
+  if (specs.costr > 0 && (all || request.costr)) {
     fields.costr = chartMetric(millionTokensPerHour ? specs.costr / millionTokensPerHour : 0);
   }
-  if (all || request.costhOutput) {
+  if (specs.costh > 0 && (all || request.costhOutput)) {
     fields.costhOutput = chartMetric(
       millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
     );
   }
-  if (all || request.costrOutput) {
+  if (specs.costr > 0 && (all || request.costrOutput)) {
     fields.costrOutput = chartMetric(
       millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
     );
   }
-  if (all || request.costhi) {
+  if (specs.costh > 0 && (all || request.costhi)) {
     fields.costhi = chartMetric(
       millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
     );
   }
-  if (all || request.costri) {
+  if (specs.costr > 0 && (all || request.costri)) {
     fields.costri = chartMetric(
       millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
     );
   }
-  if (all || request.tokensPerDollarH) {
+  if (specs.costh > 0 && (all || request.tokensPerDollarH)) {
     fields.tokensPerDollarH = chartMetric(specs.costh ? tokensPerHour / specs.costh : 0);
   }
-  if (all || request.tokensPerDollarR) {
+  if (specs.costr > 0 && (all || request.tokensPerDollarR)) {
     fields.tokensPerDollarR = chartMetric(specs.costr ? tokensPerHour / specs.costr : 0);
   }
-  if (all || request.outputTokensPerDollarH) {
+  if (specs.costh > 0 && (all || request.outputTokensPerDollarH)) {
     fields.outputTokensPerDollarH = chartMetric(
       specs.costh ? outputTokensPerHour / specs.costh : 0,
     );
   }
-  if (all || request.outputTokensPerDollarR) {
+  if (specs.costr > 0 && (all || request.outputTokensPerDollarR)) {
     fields.outputTokensPerDollarR = chartMetric(
       specs.costr ? outputTokensPerHour / specs.costr : 0,
     );
   }
-  if (all || request.inputTokensPerDollarH) {
+  if (specs.costh > 0 && (all || request.inputTokensPerDollarH)) {
     fields.inputTokensPerDollarH = chartMetric(specs.costh ? inputTokensPerHour / specs.costh : 0);
   }
-  if (all || request.inputTokensPerDollarR) {
+  if (specs.costr > 0 && (all || request.inputTokensPerDollarR)) {
     fields.inputTokensPerDollarR = chartMetric(specs.costr ? inputTokensPerHour / specs.costr : 0);
   }
 

@@ -86,6 +86,9 @@ const hardwareTdp = (hardware: LadderHardware): number => HW_REGISTRY[hardware].
 
 /** Runs the pinned power model in its agentic state with the Grace socket modeled. */
 export function buildLadder(hardware: LadderHardware, gpuWatts: number): Ladder | null {
+  const allInKw = HW_REGISTRY[hardware].power;
+  if (allInKw === null) return null;
+  const allInWatts = allInKw * 1000;
   const gpuCount = systemUnitGpuCount(hardware);
   const unit = isRackPowerHardware(hardware)
     ? estimateRackPower(hardware, gpuWatts, null, AGENTIC)
@@ -127,7 +130,7 @@ export function buildLadder(hardware: LadderHardware, gpuWatts: number): Ladder 
     facilityWatts: perGpu(unit.facilityWatts),
     pue: unit.pue,
     tdpWatts: hardwareTdp(hardware),
-    allInWatts: HW_REGISTRY[hardware].power * 1000,
+    allInWatts,
     gpusPerMw: gpusPerMegawatt(itWatts) ?? Number.POSITIVE_INFINITY,
     percentOfTdp: (gpuWatts / hardwareTdp(hardware)) * 100,
   };

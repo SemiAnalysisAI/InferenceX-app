@@ -12,10 +12,10 @@ on `/api/v1/views/inference` to inspect the A100 overlay. The shared hardware re
 normalizes both `cluster:a100-cw` benchmark rows and `CLUSTER:A100-CW` evaluation rows
 to `a100`; `/api/v1/views/options` exposes the same hardware and hourly assumptions
 used by the dashboard. Ownership (`h`) uses the requested $0.78 per GPU-hour.
-This is an assumed rate, not a market quote. Rental (`r=9.99`) and modeled all-in
-power (`9.99` kW) are unverified placeholders required by the entity-registration
-policy; do not use them for rental or modeled-energy comparisons. Measured GPU
-power from the artifacts is independent of that all-in-power placeholder.
+This is an assumed rate, not a market quote. A100 has no published rental rate
+or modeled all-in power yet, so rental is `r=null` and the dashboard shows no
+rental cost or modeled-energy values for it. Measured GPU power from the artifacts
+is still available.
 
 The Chip reliability dashboard page has been retired in English and Chinese.
 Use `/api/v1/views/reliability` for aggregated run success rates or
