@@ -22,9 +22,12 @@ import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
 import { EngineComparisonConflictNotice } from '@/components/inference/ui/engine-comparison-conflict-notice';
 import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { Button } from '@/components/ui/button';
-import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
+import {
+  OFFICIAL_PREVIEW_SERIES,
+  selectPreviewSeries,
+} from '@/components/ui/official-preview-notice';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
-import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { getHardwareConfig } from '@/lib/catalog/constants';
 import { getInferenceHardwareConfig, getOverlayLineLabel } from '@/lib/benchmarks/inference-labels';
 import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -492,12 +495,10 @@ const GPUGraph = React.memo(
         };
       });
       for (const previewConfig of OFFICIAL_PREVIEW_SERIES) {
-        const previewPoints = officialPoints.filter((point) =>
-          hardwareKeyMatchesAnyBase(String(point.hwKey), previewConfig.baseGpuKeys),
-        );
-        if (previewPoints.length === 0) continue;
+        const previewSeries = selectPreviewSeries(officialPoints, previewConfig.baseGpuKeys);
+        if (previewSeries === null) continue;
 
-        const hwKey = String(previewPoints[0]!.hwKey);
+        const { hwKey, points: previewPoints } = previewSeries;
         const colorEntry = allGraphs.find(
           (entry) => entry.hwKey === hwKey && activeDates.has(entry.id),
         );
