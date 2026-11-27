@@ -249,6 +249,28 @@ describe('computePerfRulerLabelLayouts', () => {
     expect(second!.arrowPath).not.toBe(first!.arrowPath);
   });
 
+  it('moves the multiplier clear of a series pill and updates the arrow and delete control', () => {
+    const obstacle = { left: 145, right: 420, top: 32, bottom: 62 };
+    const [layout] = computePerfRulerLabelLayouts([GEOMETRY], { ...OPTS, obstacles: [obstacle] });
+    const preferred = computePerfRulerLabelLayout(GEOMETRY, OPTS);
+
+    expect(layout!.side).toBe(1);
+    expect(layout!.labelY - DEFAULT_LABEL_FONT_SIZE / 2).toBeGreaterThan(obstacle.bottom);
+    expect(layout!.arrowPath).not.toBe(preferred.arrowPath);
+    expect(layout!.arrowHeadPath).toBe(preferred.arrowHeadPath);
+    expect(layout!.deleteY).toBe(layout!.labelY);
+  });
+
+  it('switches sides when a series pill blocks the full height on the preferred side', () => {
+    const geometry = { ...GEOMETRY, x: 400 };
+    const obstacle = { left: 440, right: 790, top: 0, bottom: 400 };
+    const [layout] = computePerfRulerLabelLayouts([geometry], { ...OPTS, obstacles: [obstacle] });
+
+    expect(layout!.side).toBe(-1);
+    expect(layout!.labelX).toBeLessThan(geometry.x);
+    expect(layout!.labelY).toBe(computePerfRulerLabelLayout(geometry, OPTS).labelY);
+  });
+
   it('keeps the below-midpoint collision fallback inside a short chart', () => {
     const geometry = { x: 100, y1: 40, y2: 80, ratioLabel: '2.03x' };
     const fontSize = DEFAULT_LABEL_FONT_SIZE;
@@ -263,7 +285,7 @@ describe('computePerfRulerLabelLayouts', () => {
     }
   });
 
-  it('clamps downward nudges at the chart bottom, accepting residual overlap', () => {
+  it('uses space on both sides of the preferred height in a short plot', () => {
     const geometry = { x: 100, y1: 10, y2: 50, ratioLabel: '2.03x' };
     const fontSize = DEFAULT_LABEL_FONT_SIZE;
     const chartHeight = 140;
@@ -276,8 +298,10 @@ describe('computePerfRulerLabelLayouts', () => {
       expect(layout!.labelY - fontSize / 2).toBeGreaterThanOrEqual(4);
       expect(layout!.deleteY).toBe(layout!.labelY);
     }
-    expect(layouts[1]!.labelY).toBeGreaterThan(layouts[0]!.labelY);
-    expect(layouts[2]!.labelY).toBe(chartHeight - 4 - fontSize / 2);
+    const positions = layouts.map((layout) => layout!.labelY).toSorted((a, b) => a - b);
+    expect(positions[1]).toBe(layouts[0]!.labelY);
+    expect(positions[1] - positions[0]).toBeGreaterThan(fontSize);
+    expect(positions[2] - positions[1]).toBeGreaterThan(fontSize);
   });
 });
 

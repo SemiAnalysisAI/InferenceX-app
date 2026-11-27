@@ -259,12 +259,20 @@ const ARROW_TIP_GAP = 5;
 const ARROW_HEAD_LENGTH = 9;
 const ARROW_HEAD_HALF_WIDTH = 4.5;
 const DELETE_GAP = 18;
-const LABEL_COLLISION_NUDGE_TRIES = 4;
+const LABEL_CLEARANCE = 8;
+
+interface LabelBounds {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
 
 export interface PerfRulerLabelLayoutOptions {
   chartWidth?: number;
   chartHeight?: number;
   fontSize?: number;
+  obstacles?: readonly LabelBounds[];
 }
 
 export interface PerfRulerLabelLayout {
@@ -345,15 +353,14 @@ function clampLabelY(y: number, fontSize: number, chartHeight?: number): number 
   return Math.max(Math.min(y, max), min);
 }
 
-function labelSpan(
-  layout: PerfRulerLabelLayout,
-  label: string,
-  fontSize: number,
-): { x0: number; x1: number } {
+function labelBounds(layout: PerfRulerLabelLayout, label: string, fontSize: number): LabelBounds {
   const width = estimateLabelWidth(label, fontSize);
-  return layout.textAnchor === 'start'
-    ? { x0: layout.labelX, x1: layout.labelX + width }
-    : { x0: layout.labelX - width, x1: layout.labelX };
+  return {
+    left: layout.textAnchor === 'start' ? layout.labelX : layout.labelX - width,
+    right: layout.textAnchor === 'start' ? layout.labelX + width : layout.labelX,
+    top: layout.labelY - fontSize / 2,
+    bottom: layout.labelY + fontSize / 2,
+  };
 }
 
 export function computePerfRulerLabelLayouts(
@@ -361,32 +368,39 @@ export function computePerfRulerLabelLayouts(
   opts?: PerfRulerLabelLayoutOptions,
 ): (PerfRulerLabelLayout | null)[] {
   const fontSize = opts?.fontSize ?? DEFAULT_LABEL_FONT_SIZE;
-  const placed: { x0: number; x1: number; y: number }[] = [];
+  const occupied = [...(opts?.obstacles ?? [])];
   return geometries.map((geometry) => {
     if (!geometry) return null;
-    let layout = computePerfRulerLabelLayout(geometry, opts);
-    const midY = (geometry.y1 + geometry.y2) / 2;
-    const overlapsPlaced = (candidate: PerfRulerLabelLayout): boolean => {
-      const span = labelSpan(candidate, geometry.ratioLabel, fontSize);
-      return placed.some(
-        (box) =>
-          span.x0 < box.x1 && box.x0 < span.x1 && Math.abs(candidate.labelY - box.y) < fontSize + 8,
-      );
-    };
-    for (
-      let attempt = 0;
-      attempt < LABEL_COLLISION_NUDGE_TRIES && overlapsPlaced(layout);
-      attempt++
-    ) {
-      const direction = layout.labelY < midY ? -1 : 1;
-      let nudgedY = layout.labelY + direction * (fontSize + 10);
-      if (direction === -1 && nudgedY - fontSize / 2 < 4) nudgedY = midY + LABEL_OFFSET_Y;
-      nudgedY = clampLabelY(nudgedY, fontSize, opts?.chartHeight);
-      if (nudgedY === layout.labelY) break;
-      layout = buildLabelLayout(geometry, layout.side, nudgedY, fontSize);
+    const preferred = computePerfRulerLabelLayout(geometry, opts);
+    let layout = preferred;
+    let closest = Infinity;
+
+    const oppositeSide = preferred.side === 1 ? -1 : 1;
+    for (const side of [preferred.side, oppositeSide] as const) {
+      const anchor = buildLabelLayout(geometry, side, preferred.labelY, fontSize);
+      const { left, right } = labelBounds(anchor, geometry.ratioLabel, fontSize);
+      if (left < LABEL_CLEARANCE || right > (opts?.chartWidth ?? Infinity) - LABEL_CLEARANCE)
+        continue;
+
+      // The closest clear center is either the preferred position or an edge of a blocked interval.
+      const blocked = occupied
+        .filter((box) => left < box.right + LABEL_CLEARANCE && right > box.left - LABEL_CLEARANCE)
+        .map((box) => ({
+          top: box.top - fontSize / 2 - LABEL_CLEARANCE,
+          bottom: box.bottom + fontSize / 2 + LABEL_CLEARANCE,
+        }));
+
+      for (const y of [preferred.labelY, ...blocked.flatMap(({ top, bottom }) => [top, bottom])]) {
+        const labelY = clampLabelY(y, fontSize, opts?.chartHeight);
+        if (blocked.some(({ top, bottom }) => labelY > top && labelY < bottom)) continue;
+        const distance = Math.hypot(anchor.labelX - preferred.labelX, labelY - preferred.labelY);
+        if (distance >= closest) continue;
+        closest = distance;
+        layout = buildLabelLayout(geometry, side, labelY, fontSize);
+      }
     }
-    const span = labelSpan(layout, geometry.ratioLabel, fontSize);
-    placed.push({ x0: span.x0, x1: span.x1, y: layout.labelY });
+
+    occupied.push(labelBounds(layout, geometry.ratioLabel, fontSize));
     return layout;
   });
 }
