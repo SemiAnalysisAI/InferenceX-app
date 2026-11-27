@@ -78,7 +78,7 @@ describe('attachOverlayXMarkerHandlers on touch', () => {
     resetTouchInputTrackingForTests();
     setHoverNone(false);
     document.body.innerHTML =
-      '<svg><g class="pts"></g></svg><div id="tt" style="display:none"></div>';
+      '<svg><g><g class="ruler-group"></g><g class="pts"></g></g></svg><div id="tt" style="display:none"></div>';
     tooltipEl = document.querySelector('#tt') as HTMLDivElement;
   });
 
@@ -86,14 +86,16 @@ describe('attachOverlayXMarkerHandlers on touch', () => {
     document.body.innerHTML = '';
   });
 
-  const setup = () => {
+  const setup = (shouldPinPoint?: () => boolean) => {
     const pinTooltip = vi.fn();
+    const onClick = vi.fn();
     const points = d3
       .select(document.querySelector('.pts') as SVGGElement)
       .selectAll<SVGGElement, { id: number }>('g.pt')
       .data([{ id: 1 }])
       .join('g')
-      .attr('class', 'pt');
+      .attr('class', 'pt')
+      .attr('transform', 'translate(10,20)');
     points.append('path').attr('class', 'marker');
     attachOverlayXMarkerHandlers(points as any, {
       markerSelector: '.marker',
@@ -101,10 +103,13 @@ describe('attachOverlayXMarkerHandlers on touch', () => {
       hoverPath: 'M1 1',
       tooltip: d3.select(tooltipEl),
       handle: { isPinned: () => false, pinTooltip },
+      shouldPinPoint,
+      onClick,
+      panel: shouldPinPoint !== undefined,
       content: (_d, pinned) => (pinned ? 'pinned' : 'hover'),
       position: () => ({ left: 0, top: 0 }),
     });
-    return { node: points.node() as SVGGElement, pinTooltip };
+    return { node: points.node() as SVGGElement, pinTooltip, onClick };
   };
 
   it('shows the hover tooltip for mouse hover', () => {
@@ -112,6 +117,22 @@ describe('attachOverlayXMarkerHandlers on touch', () => {
     node.dispatchEvent(new MouseEvent('mouseenter'));
     expect(tooltipEl.style.display).toBe('block');
     expect(tooltipEl.innerHTML).toBe('hover');
+  });
+
+  it('passes overlay ruler selections through without pinning the marker', () => {
+    let rulerEnabled = true;
+    const { node, pinTooltip, onClick } = setup(() => !rulerEnabled);
+    const click = () => node.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    click();
+    expect(onClick).toHaveBeenCalledWith({ id: 1 });
+    expect(pinTooltip).not.toHaveBeenCalled();
+    expect(document.querySelector('.pin-ring')).toBeNull();
+
+    rulerEnabled = false;
+    click();
+    expect(pinTooltip).toHaveBeenCalledWith({ id: 1 }, true);
+    expect(document.querySelector('.pin-ring')).not.toBeNull();
   });
 
   it('skips the hover tooltip for a tap and pins on the click', () => {

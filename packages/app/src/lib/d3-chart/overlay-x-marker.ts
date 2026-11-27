@@ -26,6 +26,7 @@ export interface OverlayXMarkerOptions<T> {
   content: (data: T, pinned: boolean) => string;
   position: (event: PointerEvent | MouseEvent) => { left: number; top: number };
   rulers?: OverlayRulerLifecycle<T>;
+  shouldPinPoint?: (data: T) => boolean;
   onClick?: (data: T) => void;
   panel?: boolean;
 }
@@ -88,6 +89,10 @@ export function attachOverlayXMarkerHandlers<T>(
     })
     .on('click', function (event, data) {
       event.stopPropagation();
+      if (options.shouldPinPoint?.(data) === false) {
+        options.onClick?.(data);
+        return;
+      }
       if (options.panel) {
         options.tooltip.style('opacity', 0).style('display', 'none');
         options.rulers?.hide();

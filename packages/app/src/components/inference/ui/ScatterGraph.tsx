@@ -2428,8 +2428,8 @@ const ScatterGraph = React.memo(
         onHoverEnd: () => {
           activePointRef.current?.(null);
         },
+        shouldPinPoint: () => !perfRulerRef.current.mode,
         onPointClick: (d: InferenceData) => {
-          activePointRef.current?.({ point: d, source: 'pinned' });
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
             track('latency_data_point_clicked', {
@@ -2441,6 +2441,7 @@ const ScatterGraph = React.memo(
             ruler.onPointClick(d, 'official');
             return;
           }
+          activePointRef.current?.({ point: d, source: 'pinned' });
           track('latency_data_point_clicked', { gpu: String(d.hwKey), x: d.x, y: d.y });
         },
         attachToLayer: 1,
@@ -3358,6 +3359,7 @@ const ScatterGraph = React.memo(
                   show: showRulers,
                   hide: () => zoomGroup.select('.ruler-group').style('display', 'none'),
                 },
+                shouldPinPoint: () => !perfRulerRef.current.mode,
                 onClick: (point) => {
                   const ruler = perfRulerRef.current;
                   if (ruler.mode) {

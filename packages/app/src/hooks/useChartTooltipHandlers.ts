@@ -44,6 +44,7 @@ export interface ChartTooltipConfig<TData> {
 
   onHoverEnd?: (selection: d3.Selection<any, TData, any, any>, data: TData) => void;
 
+  shouldPinPoint?: (data: TData) => boolean;
   onPointClick?: (data: TData) => void;
 
   panel?: boolean;
@@ -237,6 +238,11 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         target: Element | null,
       ) => {
         event.stopPropagation();
+
+        if (config.shouldPinPoint?.(d) === false) {
+          config.onPointClick?.(d);
+          return;
+        }
 
         if (config.panel) {
           // The details panel closes from its own button, Escape or an empty-plot click. A second
