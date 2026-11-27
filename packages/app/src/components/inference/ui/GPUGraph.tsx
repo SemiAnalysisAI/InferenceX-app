@@ -1293,6 +1293,7 @@ const GPUGraph = React.memo(
               },
               hide: () => zoomGroup.select('.ruler-group').style('display', 'none'),
             },
+            shouldPinPoint: () => !perfRulerRef.current.mode,
             onClick: (point) => {
               const ruler = perfRulerRef.current;
               if (ruler.mode) {
@@ -1578,6 +1579,7 @@ const GPUGraph = React.memo(
               sel.select('.visible-shape') as any,
               getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
+          shouldPinPoint: () => !perfRulerRef.current.mode,
           onPointClick: (d: InferenceData) => {
             const ruler = perfRulerRef.current;
             if (ruler.mode) {

@@ -698,6 +698,10 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               if (!d) return;
 
               event.stopPropagation();
+              if (tooltipConfig.shouldPinPoint?.(d) === false) {
+                tooltipConfig.onPointClick?.(d);
+                return;
+              }
               if (panel) {
                 tooltip.style('opacity', 0).style('display', 'none');
                 rulerGroup.style('display', 'none');
@@ -744,6 +748,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 getRulerY: tooltipConfig.getRulerY,
                 onHoverStart: tooltipConfig.onHoverStart,
                 onHoverEnd: tooltipConfig.onHoverEnd,
+                shouldPinPoint: tooltipConfig.shouldPinPoint,
                 onPointClick: tooltipConfig.onPointClick,
                 panel: Boolean(tooltipConfig.details),
               },
@@ -1088,6 +1093,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             getRulerY: tooltipConfig.getRulerY,
             onHoverStart: tooltipConfig.onHoverStart,
             onHoverEnd: tooltipConfig.onHoverEnd,
+            shouldPinPoint: tooltipConfig.shouldPinPoint,
             onPointClick: tooltipConfig.onPointClick,
             panel: Boolean(tooltipConfig.details),
           },

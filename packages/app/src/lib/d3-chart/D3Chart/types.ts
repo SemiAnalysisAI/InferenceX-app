@@ -158,6 +158,7 @@ export interface TooltipConfig<T = any> {
   ) => number;
   onHoverStart?: (sel: d3.Selection<any, T, any, any>, d: T) => void;
   onHoverEnd?: (sel: d3.Selection<any, T, any, any>, d: T) => void;
+  shouldPinPoint?: (d: T) => boolean;
   onPointClick?: (d: T) => void;
   attachToLayer?: number;
   proximityHover?: boolean;

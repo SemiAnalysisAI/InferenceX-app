@@ -204,6 +204,34 @@ const pinnedDot = () =>
   )!;
 
 describe('D3Chart pinned point', () => {
+  it('selects ruler points without pinning and resumes pinning when the ruler is disabled', () => {
+    installRecordingContext();
+    let rulerEnabled = true;
+    const onPointClick = vi.fn();
+    const props = chart(true);
+    draw({
+      ...props,
+      tooltip: {
+        ...props.tooltip!,
+        shouldPinPoint: () => !rulerEnabled,
+        onPointClick,
+      },
+    });
+    const first = canvasPoint('b');
+    const second = canvasPoint('d');
+
+    hitArea('click', first);
+    expect(pinMarks().ring).toBeNull();
+    hitArea('click', second);
+    expect(pinMarks().ring).toBeNull();
+    expect(onPointClick.mock.calls.map(([point]) => point.id)).toEqual(['b', 'd']);
+
+    rulerEnabled = false;
+    expect(pinMarks().ring).toBeNull();
+    hitArea('click', second);
+    expect(pinMarks().ring).toBe(`translate(${second.x},${second.y})`);
+  });
+
   it('keeps the rulers and the hover-size canvas dot on the pinned point through zoom and pan', async () => {
     const calls = installRecordingContext();
     draw(chart(true));
