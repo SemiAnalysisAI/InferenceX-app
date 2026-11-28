@@ -53,7 +53,7 @@ import {
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
-import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
+import { precisionTag, RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import QualityMethod from './QualityMethod';
 import { cost as dollarsOf, reading as figuresOf } from './format';
@@ -265,8 +265,12 @@ interface Selection {
   prompt: string | null;
 }
 
-/** "FirstBlockCache + Sol-Attn" for a lossy side, so it never reads as its lossless twin. */
-const lossyVariant = (p: VideoPoint) => (isLossy(p) ? (lossyLabel(optimizationsOf(p)) ?? '') : '');
+/**
+ * "FirstBlockCache + Sol-Attn" for a lossy side, so it never reads as its lossless twin, and
+ * "FP8" for a side that is not at the BF16 reference's precision.
+ */
+const variantLabel = (p: VideoPoint) =>
+  [precisionTag(p), isLossy(p) ? lossyLabel(optimizationsOf(p)) : null].filter(Boolean).join(' · ');
 
 /** A point's published clips; null when its run stored none. Throws when the read fails. */
 async function readSide(
@@ -633,7 +637,7 @@ export default function VideoResultsClips({
     };
   };
   const a: StageClip | null = point
-    ? pointSide(point, clip, subject.pending, lossyVariant(point))
+    ? pointSide(point, clip, subject.pending, variantLabel(point))
     : null;
   const b: StageClip =
     !option || option.kind === 'reference'
@@ -653,7 +657,9 @@ export default function VideoResultsClips({
             other,
             otherClip,
             otherSide === undefined,
-            option.kind === 'twin' ? s.lossless : lossyVariant(other),
+            option.kind === 'twin'
+              ? [precisionTag(other), s.lossless].filter(Boolean).join(' · ')
+              : variantLabel(other),
           )
         : {
             source: 'twin',
@@ -671,7 +677,7 @@ export default function VideoResultsClips({
   const configLabel = (p: VideoPoint) =>
     [
       hardwareLabel(p.hardwareKey ?? ''),
-      lossyVariant(p),
+      variantLabel(p),
       !diagnostic && unofficialRun !== undefined && p.runId === unofficialRun ? s.unofficial : '',
     ]
       .filter(Boolean)

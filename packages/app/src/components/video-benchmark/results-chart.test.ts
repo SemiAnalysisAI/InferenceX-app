@@ -199,6 +199,28 @@ describe('resultsChartSeries', () => {
     ).toBe('sglang:c1');
   });
 
+  it('ranks an engine on its points in every shown precision and draws one line per precision, as AgentX does', () => {
+    // SGLang leads BF16, but vLLM-Omni's FP8 point widens its frontier past SGLang's.
+    const points = [
+      b200Point('sglang', 'sglang', 30),
+      b200Point('vllm', 'vllm-omni', 40),
+      b200Point('vllm-fp8', 'vllm-omni', 10, {
+        results: { engine: 'vllm-omni', precision: 'fp8' } as ResultsEvidence,
+      }),
+    ];
+    const drawn = (precisions: string[]) =>
+      resultsChartSeries(cells(points, { precisions }), selection()).map((s) => [
+        s.engine,
+        s.precision,
+        ids(s.points),
+      ]);
+    expect(drawn([])).toEqual([['sglang', 'bf16', ['sglang:c1']]]);
+    expect(drawn(['bf16', 'fp8'])).toEqual([
+      ['vllm-omni', 'fp8', ['vllm-fp8:c1']],
+      ['vllm-omni', 'bf16', ['vllm:c1']],
+    ]);
+  });
+
   it('keeps the latency frontier and Best engine on the GPU axis', () => {
     // Ranked on GPU count, the 1-GPU vLLM-Omni deployment would win B200 and hide SGLang's 4-GPU one.
     const deployments = cells([

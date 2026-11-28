@@ -123,7 +123,7 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
         apiVersion: 'v1',
         ...projection,
         clipQuality,
-        params: { ...projection.state, view },
+        params: { ...projection.state, precisions: projection.precisions, view },
         coverage: {
           pagesRead,
           maxPages: VIDEO_HISTORY_MAX_PAGES,

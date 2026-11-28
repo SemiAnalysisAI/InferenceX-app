@@ -33,7 +33,8 @@ function precisionRank(p: string): number {
   return i === -1 ? PRECISION_OPTIONS.length : i;
 }
 
-function byRank(a: string, b: string): number {
+/** Display order of precisions: FP4 first, then the catalog's order. */
+export function comparePrecisions(a: string, b: string): number {
   return precisionRank(a) - precisionRank(b);
 }
 
@@ -44,7 +45,7 @@ export function pickDefaultPrecisions(
   const precisions = Object.keys(counts);
   if (precisions.length === 0) return [];
   const someSparse = precisions.some((p) => counts[p] < minCurves);
-  if (someSparse) return precisions.toSorted(byRank);
+  if (someSparse) return precisions.toSorted(comparePrecisions);
   const densest = precisions.reduce((best, p) => {
     if (counts[p] > counts[best]) return p;
     if (counts[p] === counts[best] && precisionRank(p) < precisionRank(best)) return p;
@@ -76,7 +77,7 @@ export function resolveEffectivePrecisions(opts: {
     modelDefaults.length > 0 ? modelDefaults : pickDefaultPrecisions(curveCounts, opts.minCurves);
   const merged = [...new Set([...base, ...(opts.unofficialPrecisions ?? [])])]
     .filter((p) => available.has(p))
-    .toSorted(byRank);
+    .toSorted(comparePrecisions);
   if (merged.length > 0) return merged;
   return availablePrecisions.length > 0 ? [availablePrecisions[0]] : selectedPrecisions;
 }

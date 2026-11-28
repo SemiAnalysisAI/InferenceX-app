@@ -18,7 +18,7 @@ import { detailLinks } from './detail-links';
 import { runtimeLabel } from './optimizations';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { TIER_LABELS } from './metrics';
-import type { ResultCell, ResultsState } from './results';
+import { precisionTag, type ResultCell, type ResultsState } from './results';
 import { COST_BASES, resultsPointKey } from './results-chart';
 import { usePowerTrace } from './use-power-trace';
 import { ScrollFade } from './use-scroll-fade';
@@ -268,7 +268,10 @@ export default function VideoDeploymentDetail({
   const s = STRINGS[locale];
   const { point, evidence } = cell;
   const hardware = hardwareLabel(point.hardwareKey ?? '');
-  const engine = runtimeLabel(cell.metadata.engine, cell.metadata.optimizations) ?? s.notRecorded;
+  const engine =
+    [runtimeLabel(cell.metadata.engine, cell.metadata.optimizations), precisionTag(cell.point)]
+      .filter(Boolean)
+      .join(' · ') || s.notRecorded;
   const powerEvidence =
     evidence?.powerValid === true
       ? s.validPower

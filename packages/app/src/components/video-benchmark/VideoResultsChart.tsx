@@ -28,7 +28,9 @@ import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
-import type { ShapeKey } from '@/lib/charts/chart-rendering';
+import { getShapeKeyForPrecision, type ShapeKey } from '@/lib/charts/chart-rendering';
+import { comparePrecisions } from '@/lib/benchmarks/default-precisions';
+import { getPrecisionLabel, type Precision } from '@/lib/catalog/data-mappings';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { logDomain, zeroAnchoredDomain } from './chart-domain';
 import {
@@ -50,6 +52,7 @@ import { serverSplit } from './deployment';
 import { engineLabel, engineShape, engineSort } from './engines';
 import { figures, kilojoules, reading, usd } from './format';
 import { isLossy, lossyLabel, runtimeLabel } from './optimizations';
+import { REFERENCE_PRECISION } from './precision';
 import { hardwareLabel, hardwareSort } from './hardware';
 import type { ResultCell, ResultsState } from './results';
 import {
@@ -115,6 +118,7 @@ const STRINGS = {
     runLink: 'GitHub Actions Run',
     viewTelemetry: 'View telemetry',
     engines: 'Engines',
+    precisions: 'Precisions',
     engineNotRecorded: 'Engine not recorded',
     lossy: 'Lossy optimizations',
     lossyHelp:
@@ -172,6 +176,7 @@ const STRINGS = {
     runLink: 'GitHub Actions 运行记录',
     viewTelemetry: '查看遥测',
     engines: '引擎',
+    precisions: '精度',
     engineNotRecorded: '未记录引擎',
     lossy: '有损优化',
     lossyHelp:
@@ -189,8 +194,8 @@ const STRINGS = {
 };
 
 interface PlotPoint extends ResultsChartPoint {
-  /** Required by the shared scatter layer; the engine, not a precision, sets the shape. */
-  precision: '';
+  /** Its series' weight precision, which sets the shape unless engines are compared. */
+  precision: string;
   hardwareKey: string;
   engine: string | null;
   overlay: boolean;
@@ -525,9 +530,20 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
   badgeLayer?.raise();
 }
 
+/** As AgentX's line labels: a precision is named once two are shown, or when the one shown is not BF16. */
+const namedPrecision = (precision: string, shown: readonly string[]): string | null =>
+  shown.length > 1 || precision !== REFERENCE_PRECISION
+    ? getPrecisionLabel(precision as Precision)
+    : null;
+
 /** "B200 (SGLang)" for a lossless line, "B200 · FirstBlockCache" for a lossy one, as the legend names them. */
-function pillText(item: ResultsChartSeries, s: Strings, history: boolean): string {
-  const hardware = hardwareLabel(item.hardwareKey);
+function pillText(
+  item: ResultsChartSeries,
+  s: Strings,
+  history: boolean,
+  precision: string | null,
+): string {
+  const hardware = [hardwareLabel(item.hardwareKey), precision].filter(Boolean).join(' ');
   const lossy = item.lossy ? lossyLabel(item.optimizations) : null;
   const name = lossy
     ? `${hardware} · ${lossy}`
@@ -732,12 +748,18 @@ export default function VideoResultsChart({
   );
   // Engine shapes appear only once two engines share a GPU, which the dashboard confirms first.
   const byEngine = comparesEngines(series);
+  // As AgentX: each shown precision takes the next point shape. Hidden hardware still counts, so
+  // toggling a GPU never reshapes the others.
+  const precisions = useMemo(
+    () => [...new Set(ranked.map((item) => item.precision))].toSorted(comparePrecisions),
+    [ranked],
+  );
   const plotted = useMemo<PlotPoint[]>(
     () =>
       series.flatMap((item) =>
         item.points.map((point) => ({
           ...point,
-          precision: '',
+          precision: item.precision,
           hardwareKey: item.hardwareKey,
           engine: item.engine,
           overlay: item.overlay,
@@ -758,7 +780,8 @@ export default function VideoResultsChart({
             (best, point) => (!best || better * (point.y - best.y) > 0 ? point : best),
             undefined,
           );
-        const text = pillText(item, s, history !== null);
+        const precision = namedPrecision(item.precision, precisions);
+        const text = pillText(item, s, history !== null, precision);
         return end
           ? [
               {
@@ -768,7 +791,7 @@ export default function VideoResultsChart({
                 short:
                   byEngine || item.lossy || item.overlay || history
                     ? text
-                    : hardwareLabel(item.hardwareKey),
+                    : [hardwareLabel(item.hardwareKey), precision].filter(Boolean).join(' '),
                 color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
                 lossy: item.lossy,
                 overlay: item.overlay,
@@ -778,7 +801,7 @@ export default function VideoResultsChart({
             ]
           : [];
       }),
-    [series, s, history, colorFor, better, byEngine],
+    [series, s, history, colorFor, better, byEngine, precisions],
   );
   // A touch screen opens a point in a sheet (`r_sheet`); a mouse keeps the pinned panel.
   const touch = useIsCoarsePointer();
@@ -904,7 +927,10 @@ export default function VideoResultsChart({
         keyFn: (point) => point.key,
         config: {
           getColor: (point) => point.color,
-          getShapeKey: (point) => (byEngine ? engineShape(point.engine) : 'circle'),
+          getShapeKey: (point) =>
+            byEngine
+              ? engineShape(point.engine)
+              : getShapeKeyForPrecision(point.precision, precisions),
           getOpacity: (point) => (point.optimal ? 1 : 0.35),
           getLabelText: (point) =>
             history ? (point.cell.metadata.date ?? '') : s.gpus(point.cell.point.participating),
@@ -933,7 +959,18 @@ export default function VideoResultsChart({
         },
       },
     ],
-    [lines, lineColors, lineDashes, plotted, labels, s, history, byEngine, labelsRepeatX],
+    [
+      lines,
+      lineColors,
+      lineDashes,
+      plotted,
+      labels,
+      s,
+      history,
+      byEngine,
+      precisions,
+      labelsRepeatX,
+    ],
   );
   const playing = clipLink?.playing ?? null,
     baseline = clipLink?.baseline ?? null,
@@ -999,7 +1036,13 @@ export default function VideoResultsChart({
       const { point } = cell;
       return {
         title: hardwareLabel(point.hardwareKey ?? ''),
-        subtitle: runtimeLabel(cell.metadata.engine, cell.metadata.optimizations) ?? undefined,
+        subtitle:
+          [
+            namedPrecision(cell.metadata.precision, precisions),
+            runtimeLabel(cell.metadata.engine, cell.metadata.optimizations),
+          ]
+            .filter(Boolean)
+            .join(' · ') || undefined,
         date: point.observedAt?.slice(0, 10) ?? '—',
         strategy: serverSplit(point),
         replicas: point.replicas === null ? null : s.replicas(point.replicas),
@@ -1224,7 +1267,7 @@ export default function VideoResultsChart({
       },
     };
     return { tooltip: config, panel: { describe, links, sections } };
-  }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen, redraw]);
+  }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen, redraw, precisions]);
 
   const hidden = new Set(state.hidden);
   const measured = new Set(cells.map((cell) => cell.point.hardwareKey));
@@ -1312,6 +1355,8 @@ export default function VideoResultsChart({
         (a, b) => engineSort(a) - engineSort(b),
       )
     : [];
+  // Engine shapes take over while engines are compared, so precisions then go unshaped.
+  const shapedPrecisions = byEngine ? [] : precisions;
 
   let sheet: ReactNode = null;
   if (sheetPoint) {
@@ -1524,8 +1569,32 @@ export default function VideoResultsChart({
                 : []),
             ]}
             keyIndicators={
-              engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
+              engines.length > 1 ||
+              shapedPrecisions.length > 1 ||
+              lossySeries.length > 0 ||
+              state.unofficialRun ? (
                 <>
+                  {shapedPrecisions.length > 1 && (
+                    <ul
+                      className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                      aria-label={s.precisions}
+                      data-testid="results-precision-key"
+                    >
+                      {shapedPrecisions.map((precision) => (
+                        <li
+                          key={precision}
+                          className="flex items-center gap-2"
+                          data-precision={precision}
+                        >
+                          <SeriesSwatch
+                            shape={getShapeKeyForPrecision(precision, shapedPrecisions)}
+                            dashed={false}
+                          />
+                          {getPrecisionLabel(precision as Precision)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {engines.length > 1 && (
                     <ul
                       className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
@@ -1560,11 +1629,15 @@ export default function VideoResultsChart({
                           }}
                         >
                           <SeriesSwatch
-                            shape={byEngine ? engineShape(item.engine) : 'circle'}
+                            shape={
+                              byEngine
+                                ? engineShape(item.engine)
+                                : getShapeKeyForPrecision(item.precision, precisions)
+                            }
                             dashed
                           />
                           <span className="text-muted-foreground">
-                            {`${hardwareLabel(item.hardwareKey)} (${runtimeLabel(item.engine, item.optimizations)})`}
+                            {`${[hardwareLabel(item.hardwareKey), namedPrecision(item.precision, precisions)].filter(Boolean).join(' ')} (${runtimeLabel(item.engine, item.optimizations)})`}
                           </span>
                         </li>
                       ))}

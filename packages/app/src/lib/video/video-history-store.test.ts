@@ -388,13 +388,13 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 7,
+      projection: 8,
       // Projection 7: a receipt approves only when it names a merge run, so an entry recorded as
       // approved under a receipt without one must be projected again. The walk skips type-only
       // imports, so the pin covers only the video sources that run plus gpu-keys. Re-pinned after
       // A100's unpublished power and rental rate became null and the Trn3 label became Trainium3 PDS
       // in gpu-keys; no video entry reads either, so entries are unchanged.
-      sources: '8c79123b7bb760e16dab14d904b76351e5187ea4b49c172b2e959d55f6326ac0',
+      sources: 'd2f919119c53080bfc3707d4ddf0ce45607feea2e94d8b9b01fcdf4fcb8c58c2',
     });
   });
 });

@@ -5,7 +5,14 @@ import { chipConfigKey, compareDeployments } from './deployment';
 import { engineSort } from './engines';
 import { optimizationsOf } from './optimizations';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
+import { precisionOf, REFERENCE_PRECISION } from './precision';
 import type { ResultsEvidence } from './results-evidence';
+import {
+  comparePrecisions,
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
+import { getPrecisionLabel, PRECISION_OPTIONS, type Precision } from '@/lib/catalog/data-mappings';
 import {
   isResultsXMetric,
   isResultsYMetric,
@@ -46,6 +53,11 @@ export interface ResultsState {
   engine: string | null;
   /** Also plot lossy-optimization series; they never compete for a hardware's default line. */
   lossy: boolean;
+  /**
+   * Weight precisions the reader picked, as AgentX's `i_prec`. Empty is the default: BF16 plus
+   * the named run's precisions, resolved by AgentX's `resolveEffectivePrecisions`.
+   */
+  precisions: string[];
   /** As-of execution date: each deployment's latest run measured on or before it. */
   date: string | null;
   /** Run on the selected date to view as of; null is that date's last run. */
@@ -75,6 +87,7 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   gpuCount: null,
   engine: null,
   lossy: false,
+  precisions: [],
   date: null,
   run: null,
   configs: [],
@@ -101,6 +114,7 @@ export const RESULTS_QUERY_PARAMS = [
   'r_steps',
   'r_gpus',
   'r_engine',
+  'r_prec',
   // Retired engine comparison: accepted so old links and API calls still work, then ignored.
   'r_compare',
   'r_lossy',
@@ -155,6 +169,14 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     gpuCount: null,
     engine: s.get('r_engine') || null,
     lossy: s.get('r_lossy') === '1',
+    precisions: [
+      ...new Set(
+        (s.get('r_prec') ?? '')
+          .split(',')
+          .map((precision) => precision.trim().toLowerCase())
+          .filter((precision) => (PRECISION_OPTIONS as readonly string[]).includes(precision)),
+      ),
+    ],
     date: s.get('r_date') || null,
     run: /^[1-9]\d*$/u.test(s.get('r_run') ?? '') ? s.get('r_run') : null,
     configs: [...new Set((s.get('r_configs') ?? '').split(',').filter(Boolean))].slice(
@@ -189,6 +211,7 @@ export function resultsSearch(state: ResultsState): string {
     r_steps: state.steps,
     r_engine: state.engine,
     r_lossy: state.lossy ? 1 : null,
+    r_prec: state.precisions.join(',') || null,
     r_date: state.date,
     r_run: state.run,
     r_configs: state.configs.join(',') || null,
@@ -263,9 +286,17 @@ export function resultMetadata(point: VideoPoint) {
     mode: point.results?.mode ?? (text(at(generation, 'mode')) || text(at(plan, 'mode')) || null),
     engine: point.results?.engine ?? null,
     optimizations: optimizationsOf(point),
+    precision: precisionOf(point),
     date: point.observedAt?.slice(0, 10) ?? null,
   };
 }
+
+/** "FP8" beside a cell served in another precision than the BF16 reference; null for BF16. */
+export function precisionTag(point: Pick<VideoPoint, 'results'>): string | null {
+  const precision = precisionOf(point);
+  return precision === REFERENCE_PRECISION ? null : getPrecisionLabel(precision as Precision);
+}
+
 /** The selected workload in one line: model, resolution, duration, fps, steps and mode. */
 export function workloadSummary(point: VideoPoint, stepsUnit: string): string {
   const metadata = resultMetadata(point);
@@ -474,8 +505,29 @@ export function resultProjection(
       ? preferred
       : (available.find((point) => point.id === state.workload)?.workloadKey ??
         slugged(state.workload));
+  // Precision narrows the workload's cells as AgentX's selector does, never which workload is
+  // selected: BF16 unless the reader picks, plus a named run's own precisions so it still shows.
+  const workloadCells = available.filter((p) => p.workloadKey === workloadKey);
+  const availablePrecisions = values(workloadCells.map(precisionOf)).toSorted(comparePrecisions);
+  const precisions = resolveEffectivePrecisions({
+    selectedPrecisions: state.precisions,
+    availablePrecisions,
+    curveCounts: countCurvesByPrecision(
+      workloadCells.map((p) => ({
+        precision: precisionOf(p),
+        hardware: p.hardwareKey ?? '',
+        framework: resultMetadata(p).engine ?? '',
+        spec_method: '',
+        disagg: false,
+      })),
+    ),
+    unofficialPrecisions: named.filter((p) => p.workloadKey === workloadKey).map(precisionOf),
+    explicit: state.precisions.length > 0,
+    modelDefaultPrecisions: [REFERENCE_PRECISION],
+  });
+  const matchesPrecision = (p: VideoPoint) => precisions.includes(precisionOf(p));
   const official = matches.filter(
-    (p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun,
+    (p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun && matchesPrecision(p),
   );
   const runs = workloadRuns(official);
   const chipConfigs = [...new Map(official.map((p) => [chipConfigKey(p), p]))]
@@ -498,7 +550,10 @@ export function resultProjection(
     ...[...comparedRuns.values()].flatMap(latest),
     ...latest(
       namedMatches.filter(
-        (p) => p.workloadKey === workloadKey && configs.includes(chipConfigKey(p)),
+        (p) =>
+          p.workloadKey === workloadKey &&
+          configs.includes(chipConfigKey(p)) &&
+          matchesPrecision(p),
       ),
     ),
   ].map((p) => resultCell(p, state));
@@ -512,6 +567,7 @@ export function resultProjection(
   const common = matches.filter(
     (p) =>
       p.workloadKey === workloadKey &&
+      matchesPrecision(p) &&
       !state.hidden.includes(p.hardwareKey ?? '') &&
       (p.runId === state.unofficialRun || shownRuns.has(p.runId)),
   );
@@ -523,7 +579,10 @@ export function resultProjection(
   );
   const overlayDeploymentCells = latest(
     namedMatches.filter(
-      (p) => p.workloadKey === workloadKey && !state.hidden.includes(p.hardwareKey ?? ''),
+      (p) =>
+        p.workloadKey === workloadKey &&
+        matchesPrecision(p) &&
+        !state.hidden.includes(p.hardwareKey ?? ''),
     ),
   ).map((p) => resultCell(p, state));
   const overlayCells = overlayDeploymentCells.filter(
@@ -535,6 +594,7 @@ export function resultProjection(
       return (
         (!state.model || m.model === state.model) &&
         (!state.engine || m.engine === state.engine) &&
+        matchesPrecision(point) &&
         (point.workloadKey === workloadKey
           ? shownRuns.has(point.runId)
           : state.date === null || day === null || (m.date !== null && m.date <= day)) &&
@@ -557,6 +617,8 @@ export function resultProjection(
     allCells: deploymentCells,
     workloadMix,
     workloadKey,
+    /** The precisions shown: the reader's valid picks, else the resolved default. */
+    precisions,
     runs,
     run,
     chipConfigs,
@@ -573,6 +635,7 @@ export function resultProjection(
       engines: values(
         available.filter((p) => p.workloadKey === workloadKey).map((p) => resultMetadata(p).engine),
       ).toSorted((a, b) => engineSort(a) - engineSort(b)),
+      precisions: availablePrecisions,
       dates: values(runs.map((r) => r.date)),
       workloads: [...workloads]
         .filter(([, w]) => !state.model || w.model === state.model)

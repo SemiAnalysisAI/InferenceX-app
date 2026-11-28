@@ -350,6 +350,8 @@ describe('published VideoGenX dashboard projection', () => {
       gpuCount: null,
       xMetric: 'p50',
       costBasis: 'participating',
+      // The resolved default, as the inference view returns its precisions.
+      precisions: ['bf16'],
     });
     const defaults = resultProjection(
       videoPoints([history]),

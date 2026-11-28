@@ -2,6 +2,7 @@ import { mayHaveClips, SUBJECT_ORDER, type StageCandidate } from './clip-stage';
 import { leadCell, losslessTwin } from './deployment';
 import type { MetricOptions, VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
+import { precisionOf, REFERENCE_PRECISION } from './precision';
 import { resultsClipGroups, resultsClipReference } from './results-clips';
 
 /** One lossless clip's PSNR against the Diffusers reference. */
@@ -19,14 +20,21 @@ export interface ReferencePsnrScores {
 }
 
 /**
- * Each lead's lossless clips scored against the Diffusers reference, in lead order. A lossy
- * lead, the matched-noise rerun, and an identical, incompatible or unscored pair carry no finite
- * score of a lossless CI clip, so none counts; a lead without one is left out.
+ * A lead whose gap to the BF16 reference comes only from its engine and layout: lossless, and
+ * served at the reference's precision. An FP8 lead's gap also holds its quantization.
+ */
+const referenceExact = (point: VideoPoint) =>
+  !isLossy(point) && precisionOf(point) === REFERENCE_PRECISION;
+
+/**
+ * Each lead's lossless clips scored against the Diffusers reference, in lead order. A lossy or
+ * FP8 lead, the matched-noise rerun, and an identical, incompatible or unscored pair carry no
+ * finite score of a lossless CI clip, so none counts; a lead without one is left out.
  */
 export function referencePsnrScores(leads: readonly StageCandidate[]): ReferencePsnrScores[] {
   const scored: ReferencePsnrScores[] = [];
   for (const { point, side } of leads) {
-    if (!side || isLossy(point)) continue;
+    if (!side || !referenceExact(point)) continue;
     const scores: ReferencePsnrScore[] = [];
     for (const group of resultsClipGroups([side])) {
       if (group.scope) continue;
@@ -66,7 +74,7 @@ export function referencePsnrRange(leads: readonly StageCandidate[]): ReferenceP
 /**
  * The lead "Show me" plays against its Diffusers reference: the first, in stage order, whose
  * loaded clips have a playable reference pair, trying the named run's leads before the official
- * ones as the stage does. A lossy lead is no lossless example.
+ * ones as the stage does. A lossy or FP8 lead is no lossless example.
  */
 export function showMeTarget(
   leads: readonly StageCandidate[],
@@ -77,7 +85,7 @@ export function showMeTarget(
   );
   const named = ordered.filter(({ point }) => point.runId === namedRun);
   for (const lead of [...named, ...ordered.filter((item) => !named.includes(item))]) {
-    if (!lead.side || isLossy(lead.point)) continue;
+    if (!lead.side || !referenceExact(lead.point)) continue;
     const groups = resultsClipGroups([lead.side]).filter((group) => !group.scope);
     if (groups.some((group) => resultsClipReference(group, new Set()) !== null)) return lead.point;
   }
