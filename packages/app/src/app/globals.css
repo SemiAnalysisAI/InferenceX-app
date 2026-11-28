@@ -546,6 +546,53 @@ html[data-inferencex-embed] .autumn-leaves {
   --radius: 0.5rem;
 }
 
+/* lego theme tokens: begin */
+.lego {
+  color-scheme: light;
+  --background: #eef0f2;
+  --foreground: #181716;
+  --card: #ffffff;
+  --card-foreground: #181716;
+  --popover: #ffffff;
+  --popover-foreground: #181716;
+  --primary: #e3000b;
+  --primary-foreground: #ffffff;
+  --secondary: #006db7;
+  --secondary-foreground: #ffffff;
+  --brand: #c4000a;
+  --brand-fill: #006db7;
+  --muted: #fff6b8;
+  --muted-foreground: #4a4841;
+  --accent: #ffed00;
+  --accent-foreground: #181716;
+  --destructive: #c4000a;
+  --border: #181716;
+  --border-alt: #6c6e68;
+  --chart-grid: #b9bec4;
+  --input: #181716;
+  --ring: #006db7;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #181716;
+  --sidebar-primary: #e3000b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ffed00;
+  --sidebar-accent-foreground: #181716;
+  --sidebar-border: #181716;
+  --sidebar-ring: #006db7;
+  --radius: 0.25rem;
+  /* Run overlays in brick colours: red, dark turquoise, orange, dark purple, green,
+     magenta, blue, reddish brown. All dark enough to read on a white plate. */
+  --overlay-run-0: #c4000a;
+  --overlay-run-1: #008f9b;
+  --overlay-run-2: #d6690b;
+  --overlay-run-3: #4b2f92;
+  --overlay-run-4: #00852b;
+  --overlay-run-5: #a82a7c;
+  --overlay-run-6: #006db7;
+  --overlay-run-7: #7a4a1e;
+}
+/* lego theme tokens: end */
+
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,

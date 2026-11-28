@@ -1,0 +1,5417 @@
+/*
+ * LEGO theme. Loaded only with the lazy lego-theme chunk; every rule is scoped under `.lego`
+ * (the theme class on <html>) except the embed hides at the top.
+ */
+
+html[data-inferencex-embed] [data-testid='lego-theme-banner'],
+html[data-inferencex-embed] .lego-scene,
+html[data-inferencex-embed] .lego-foot-brick {
+  display: none;
+}
+
+@font-face {
+  font-family: 'LegoBrick';
+  src: url('../../app/fonts/Lego-TitanOne.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LegoBody';
+  src: url('../../app/fonts/Lego-Fredoka.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------------ palette */
+
+.lego {
+  --lego-red: #e3000b;
+  --lego-red-dark: #a80008;
+  --lego-yellow: #ffed00;
+  --lego-yellow-dark: #d6b900;
+  --lego-blue: #006db7;
+  --lego-blue-dark: #004f86;
+  --lego-green: #00852b;
+  --lego-green-dark: #00631f;
+  --lego-orange: #f47b20;
+  --lego-ink: #181716;
+  --lego-plate: #eef0f2;
+  --lego-grey: #c9ced3;
+  --lego-display: 'LegoBrick', 'LegoBody', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --lego-text: 'LegoBody', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --lego-stud: var(--lego-red);
+  --lego-stud-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='15.5' r='8' fill='%23005f1f'/%3E%3Ccircle cx='14' cy='13.5' r='8' fill='%2300963a'/%3E%3Cpath d='M8.6 11.2a6.4 6.4 0 0 1 8.6-3.4' fill='none' stroke='%2352c878' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  --lego-plate-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14.8' r='7' fill='%23e1e4e8'/%3E%3Ccircle cx='14' cy='13.8' r='7' fill='%23f3f4f6'/%3E%3C/svg%3E");
+  --lego-c1: var(--lego-red);
+  --lego-c2: var(--lego-yellow);
+  --lego-c3: var(--lego-blue);
+  /* The table under the page, and the line of colour around the plates that lie on it. */
+  --lego-mat: var(--lego-green);
+  --lego-mat-dark: var(--lego-green-dark);
+  --lego-mat-tile: var(--lego-stud-tile);
+  --lego-mat-size: 28px 28px;
+  --lego-trim: rgb(0 0 0 / 0.18);
+  /* Generated brick art (cylindrical stud tile, stepped corner builds, corner towers). The
+     masks carry the silhouette and the shades carry outline, bevel and highlight, so one
+     drawing serves every colour. */
+  --lego-stud-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12' viewBox='0 0 24 12' preserveAspectRatio='none'%3E%3Cpath d='M3.5 12V3.4a8.5 3.4 0 0 1 17 0V12z'/%3E%3C/svg%3E");
+  --lego-stud-shade: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12' viewBox='0 0 24 12' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M3.5 12V3.4a8.5 3.4 0 0 1 17 0V12z' fill='url(%23g)'/%3E%3Cellipse cx='12.0' cy='3.4' rx='7.8' ry='2.91' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='1.05'/%3E%3Cpath d='M6.9 2.89a5.9 2.11 0 0 1 6.1 -1.97' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='1.12' stroke-linecap='round'/%3E%3Cpath d='M4.2 12V3.4a7.8 2.91 0 0 1 15.6 0V12' fill='none' stroke='%23181716' stroke-width='1.4'/%3E%3C/svg%3E");
+  --lego-corner-mask-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='66' height='67' viewBox='0 0 66 67'%3E%3Cg%3E%3Cpath d='M0 31h66v12H0z M47.5 31.5V27.0a7.5 3.0 0 0 1 15 0V31.5z M0 19h44v12H0z M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z M0 7h22v12H0z M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z M0 43h17v12H0z M0 55h9v12H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-shade-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='66' height='67' viewBox='0 0 66 67'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg%3E%3Crect x='0' y='31' width='66' height='12' fill='url(%23b)'/%3E%3Cpath d='M47.5 31.5V27.0a7.5 3.0 0 0 1 15 0V31.5z' fill='url(%23g)'/%3E%3Cellipse cx='55.0' cy='27.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M50.5 26.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M48.1 31.5V27.0a6.9 2.58 0 0 1 13.8 0V31.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Cpath d='M44 31v12' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='31' width='64.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='19' width='44' height='12' fill='url(%23b)'/%3E%3Cpath d='M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z' fill='url(%23g)'/%3E%3Cellipse cx='33.0' cy='15.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M28.5 14.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M26.1 19.5V15.0a6.9 2.58 0 0 1 13.8 0V19.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Cpath d='M22 19v12' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='19' width='42.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='7' width='22' height='12' fill='url(%23b)'/%3E%3Cpath d='M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z' fill='url(%23g)'/%3E%3Cellipse cx='11.0' cy='3.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M6.5 2.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M4.1 7.5V3.0a6.9 2.58 0 0 1 13.8 0V7.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Crect x='0.8' y='7' width='20.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='43' width='17' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='42.2' width='15.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='55' width='9' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='54.2' width='7.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-mask-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='66' height='67' viewBox='0 0 66 67'%3E%3Cg transform='translate(66 0) scale(-1 1)'%3E%3Cpath d='M0 31h66v12H0z M47.5 31.5V27.0a7.5 3.0 0 0 1 15 0V31.5z M0 19h44v12H0z M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z M0 7h22v12H0z M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z M0 43h17v12H0z M0 55h9v12H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-shade-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='66' height='67' viewBox='0 0 66 67'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(66 0) scale(-1 1)'%3E%3Crect x='0' y='31' width='66' height='12' fill='url(%23b)'/%3E%3Cpath d='M47.5 31.5V27.0a7.5 3.0 0 0 1 15 0V31.5z' fill='url(%23g)'/%3E%3Cellipse cx='55.0' cy='27.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M50.5 26.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M48.1 31.5V27.0a6.9 2.58 0 0 1 13.8 0V31.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Cpath d='M44 31v12' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='31' width='64.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='19' width='44' height='12' fill='url(%23b)'/%3E%3Cpath d='M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z' fill='url(%23g)'/%3E%3Cellipse cx='33.0' cy='15.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M28.5 14.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M26.1 19.5V15.0a6.9 2.58 0 0 1 13.8 0V19.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Cpath d='M22 19v12' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='19' width='42.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='7' width='22' height='12' fill='url(%23b)'/%3E%3Cpath d='M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z' fill='url(%23g)'/%3E%3Cellipse cx='11.0' cy='3.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M6.5 2.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M4.1 7.5V3.0a6.9 2.58 0 0 1 13.8 0V7.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Crect x='0.8' y='7' width='20.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='43' width='17' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='42.2' width='15.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='55' width='9' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='54.2' width='7.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-foot-mask-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='34' viewBox='0 0 44 34'%3E%3Cg%3E%3Cpath d='M0 0h9v12H0z M0 12h17v12H0z M0 24h44v10H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-foot-shade-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='34' viewBox='0 0 44 34'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg%3E%3Crect x='0' y='0' width='9' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='0.8' width='7.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='12' width='17' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='12.8' width='15.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='24' width='44' height='10' fill='url(%23b)'/%3E%3Cpath d='M22 24v10' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='24.8' width='42.4' height='8.4' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-foot-mask-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='34' viewBox='0 0 44 34'%3E%3Cg transform='translate(44 0) scale(-1 1)'%3E%3Cpath d='M0 0h9v12H0z M0 12h17v12H0z M0 24h44v10H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-foot-shade-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='34' viewBox='0 0 44 34'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(44 0) scale(-1 1)'%3E%3Crect x='0' y='0' width='9' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='0.8' width='7.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='12' width='17' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='12.8' width='15.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='24' width='44' height='10' fill='url(%23b)'/%3E%3Cpath d='M22 24v10' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='24.8' width='42.4' height='8.4' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-mask-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='43' viewBox='0 0 44 43'%3E%3Cg%3E%3Cpath d='M0 19h44v12H0z M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z M0 7h22v12H0z M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z M0 31h15v12H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-shade-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='43' viewBox='0 0 44 43'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg%3E%3Crect x='0' y='19' width='44' height='12' fill='url(%23b)'/%3E%3Cpath d='M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z' fill='url(%23g)'/%3E%3Cellipse cx='33.0' cy='15.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M28.5 14.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M26.1 19.5V15.0a6.9 2.58 0 0 1 13.8 0V19.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Crect x='0.8' y='19' width='42.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='7' width='22' height='12' fill='url(%23b)'/%3E%3Cpath d='M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z' fill='url(%23g)'/%3E%3Cellipse cx='11.0' cy='3.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M6.5 2.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M4.1 7.5V3.0a6.9 2.58 0 0 1 13.8 0V7.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Crect x='0.8' y='7' width='20.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='31' width='15' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='30.2' width='13.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-mask-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='43' viewBox='0 0 44 43'%3E%3Cg transform='translate(44 0) scale(-1 1)'%3E%3Cpath d='M0 19h44v12H0z M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z M0 7h22v12H0z M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z M0 31h15v12H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-shade-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='43' viewBox='0 0 44 43'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(44 0) scale(-1 1)'%3E%3Crect x='0' y='19' width='44' height='12' fill='url(%23b)'/%3E%3Cpath d='M25.5 19.5V15.0a7.5 3.0 0 0 1 15 0V19.5z' fill='url(%23g)'/%3E%3Cellipse cx='33.0' cy='15.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M28.5 14.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M26.1 19.5V15.0a6.9 2.58 0 0 1 13.8 0V19.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Crect x='0.8' y='19' width='42.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='7' width='22' height='12' fill='url(%23b)'/%3E%3Cpath d='M3.5 7.5V3.0a7.5 3.0 0 0 1 15 0V7.5z' fill='url(%23g)'/%3E%3Cellipse cx='11.0' cy='3.0' rx='6.9' ry='2.58' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.90'/%3E%3Cpath d='M6.5 2.55a5.2 1.86 0 0 1 5.4 -1.74' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='0.96' stroke-linecap='round'/%3E%3Cpath d='M4.1 7.5V3.0a6.9 2.58 0 0 1 13.8 0V7.5' fill='none' stroke='%23181716' stroke-width='1.2'/%3E%3Crect x='0.8' y='7' width='20.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='31' width='15' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='30.2' width='13.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-foot-mask-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='22' viewBox='0 0 30 22'%3E%3Cg%3E%3Cpath d='M0 0h15v12H0z M0 12h30v10H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-foot-shade-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='22' viewBox='0 0 30 22'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg%3E%3Crect x='0' y='0' width='15' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='0.8' width='13.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='12' width='30' height='10' fill='url(%23b)'/%3E%3Cpath d='M22 12v10' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='12.8' width='28.4' height='8.4' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-foot-mask-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='22' viewBox='0 0 30 22'%3E%3Cg transform='translate(30 0) scale(-1 1)'%3E%3Cpath d='M0 0h15v12H0z M0 12h30v10H0z'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-corner-s-foot-shade-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='22' viewBox='0 0 30 22'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(30 0) scale(-1 1)'%3E%3Crect x='0' y='0' width='15' height='12' fill='url(%23b)'/%3E%3Crect x='0.8' y='0.8' width='13.4' height='12' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3Crect x='0' y='12' width='30' height='10' fill='url(%23b)'/%3E%3Cpath d='M22 12v10' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0.8' y='12.8' width='28.4' height='8.4' fill='none' stroke='%23181716' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-tower-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='98' viewBox='0 0 60 98'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg%3E%3Crect x='0' y='83' width='60' height='15' fill='%23e3000b'/%3E%3Crect x='0' y='83' width='60' height='15' fill='url(%23b)'/%3E%3Cpath d='M40 83v15' stroke='%23181716' stroke-width='1.5'/%3E%3Crect x='1' y='83' width='58' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Cpath d='M43.5 68.5V62.6a6.5 2.6 0 0 1 13 0V68.5z' fill='%23ffed00'/%3E%3Cpath d='M43.5 68.5V62.6a6.5 2.6 0 0 1 13 0V68.5z' fill='url(%23g)'/%3E%3Cellipse cx='50.0' cy='62.6' rx='5.85' ry='2.15' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.98'/%3E%3Cpath d='M46.1 62.21a4.5 1.61 0 0 1 4.7 -1.51' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='1.04' stroke-linecap='round'/%3E%3Cpath d='M44.15 68.5V62.6a5.85 2.15 0 0 1 11.7 0V68.5' fill='none' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0' y='68' width='60' height='15' fill='%23ffed00'/%3E%3Crect x='0' y='68' width='60' height='15' fill='url(%23b)'/%3E%3Cpath d='M20 68v15' stroke='%23181716' stroke-width='1.5'/%3E%3Crect x='1' y='68' width='58' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Crect x='0' y='53' width='40' height='15' fill='%23006db7'/%3E%3Crect x='0' y='53' width='40' height='15' fill='url(%23b)'/%3E%3Crect x='1' y='53' width='38' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Cpath d='M23.5 38.5V32.6a6.5 2.6 0 0 1 13 0V38.5z' fill='%2300852b'/%3E%3Cpath d='M23.5 38.5V32.6a6.5 2.6 0 0 1 13 0V38.5z' fill='url(%23g)'/%3E%3Cellipse cx='30.0' cy='32.6' rx='5.85' ry='2.15' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.98'/%3E%3Cpath d='M26.1 32.21a4.5 1.61 0 0 1 4.7 -1.51' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='1.04' stroke-linecap='round'/%3E%3Cpath d='M24.15 38.5V32.6a5.85 2.15 0 0 1 11.7 0V38.5' fill='none' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0' y='38' width='40' height='15' fill='%2300852b'/%3E%3Crect x='0' y='38' width='40' height='15' fill='url(%23b)'/%3E%3Cpath d='M20 38v15' stroke='%23181716' stroke-width='1.5'/%3E%3Crect x='1' y='38' width='38' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Crect x='0' y='23' width='20' height='15' fill='%23f47b20'/%3E%3Crect x='0' y='23' width='20' height='15' fill='url(%23b)'/%3E%3Crect x='1' y='23' width='18' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Cpath d='M3.5 8.5V2.6a6.5 2.6 0 0 1 13 0V8.5z' fill='%23e3000b'/%3E%3Cpath d='M3.5 8.5V2.6a6.5 2.6 0 0 1 13 0V8.5z' fill='url(%23g)'/%3E%3Cellipse cx='10.0' cy='2.6' rx='5.85' ry='2.15' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.98'/%3E%3Cpath d='M6.1 2.21a4.5 1.61 0 0 1 4.7 -1.51' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='1.04' stroke-linecap='round'/%3E%3Cpath d='M4.15 8.5V2.6a5.85 2.15 0 0 1 11.7 0V8.5' fill='none' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0' y='8' width='20' height='15' fill='%23e3000b'/%3E%3Crect x='0' y='8' width='20' height='15' fill='url(%23b)'/%3E%3Crect x='1' y='8' width='18' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3C/g%3E%3C/svg%3E");
+  --lego-tower-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='98' viewBox='0 0 60 98'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.34'/%3E%3Cstop offset='.42' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.34'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.42'/%3E%3Cstop offset='.22' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='.7' stop-color='%23000' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(60 0) scale(-1 1)'%3E%3Crect x='0' y='83' width='60' height='15' fill='%23006db7'/%3E%3Crect x='0' y='83' width='60' height='15' fill='url(%23b)'/%3E%3Cpath d='M40 83v15' stroke='%23181716' stroke-width='1.5'/%3E%3Crect x='1' y='83' width='58' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Cpath d='M43.5 68.5V62.6a6.5 2.6 0 0 1 13 0V68.5z' fill='%23ffed00'/%3E%3Cpath d='M43.5 68.5V62.6a6.5 2.6 0 0 1 13 0V68.5z' fill='url(%23g)'/%3E%3Cellipse cx='50.0' cy='62.6' rx='5.85' ry='2.15' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.98'/%3E%3Cpath d='M46.1 62.21a4.5 1.61 0 0 1 4.7 -1.51' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='1.04' stroke-linecap='round'/%3E%3Cpath d='M44.15 68.5V62.6a5.85 2.15 0 0 1 11.7 0V68.5' fill='none' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0' y='68' width='60' height='15' fill='%23ffed00'/%3E%3Crect x='0' y='68' width='60' height='15' fill='url(%23b)'/%3E%3Cpath d='M20 68v15' stroke='%23181716' stroke-width='1.5'/%3E%3Crect x='1' y='68' width='58' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Crect x='0' y='53' width='40' height='15' fill='%23e3000b'/%3E%3Crect x='0' y='53' width='40' height='15' fill='url(%23b)'/%3E%3Crect x='1' y='53' width='38' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Cpath d='M23.5 38.5V32.6a6.5 2.6 0 0 1 13 0V38.5z' fill='%23ffffff'/%3E%3Cpath d='M23.5 38.5V32.6a6.5 2.6 0 0 1 13 0V38.5z' fill='url(%23g)'/%3E%3Cellipse cx='30.0' cy='32.6' rx='5.85' ry='2.15' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.98'/%3E%3Cpath d='M26.1 32.21a4.5 1.61 0 0 1 4.7 -1.51' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='1.04' stroke-linecap='round'/%3E%3Cpath d='M24.15 38.5V32.6a5.85 2.15 0 0 1 11.7 0V38.5' fill='none' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0' y='38' width='40' height='15' fill='%23ffffff'/%3E%3Crect x='0' y='38' width='40' height='15' fill='url(%23b)'/%3E%3Cpath d='M20 38v15' stroke='%23181716' stroke-width='1.5'/%3E%3Crect x='1' y='38' width='38' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Crect x='0' y='23' width='20' height='15' fill='%2300852b'/%3E%3Crect x='0' y='23' width='20' height='15' fill='url(%23b)'/%3E%3Crect x='1' y='23' width='18' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3Cpath d='M3.5 8.5V2.6a6.5 2.6 0 0 1 13 0V8.5z' fill='%23006db7'/%3E%3Cpath d='M3.5 8.5V2.6a6.5 2.6 0 0 1 13 0V8.5z' fill='url(%23g)'/%3E%3Cellipse cx='10.0' cy='2.6' rx='5.85' ry='2.15' fill='%23fff' fill-opacity='.3' stroke='%23181716' stroke-width='0.98'/%3E%3Cpath d='M6.1 2.21a4.5 1.61 0 0 1 4.7 -1.51' fill='none' stroke='%23fff' stroke-opacity='.9' stroke-width='1.04' stroke-linecap='round'/%3E%3Cpath d='M4.15 8.5V2.6a5.85 2.15 0 0 1 11.7 0V8.5' fill='none' stroke='%23181716' stroke-width='1.3'/%3E%3Crect x='0' y='8' width='20' height='15' fill='%23006db7'/%3E%3Crect x='0' y='8' width='20' height='15' fill='url(%23b)'/%3E%3Crect x='1' y='8' width='18' height='15' fill='none' stroke='%23181716' stroke-width='2'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* --------------------------------------------------------------- typography */
+
+.lego body {
+  --font-dm-sans: 'LegoBody', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: var(--lego-text);
+  /* The table mat, seen from above: a green baseplate unless another mat is picked. */
+  background-color: var(--lego-mat);
+  background-image: var(--lego-mat-tile);
+  background-size: var(--lego-mat-size);
+  background-attachment: fixed;
+}
+
+.lego h1,
+.lego h2,
+.lego h3,
+.lego [data-slot='card-title'],
+.lego [data-slot='control-panel'] > legend {
+  font-family: var(--lego-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.lego main h1 {
+  color: var(--lego-ink);
+  text-shadow: 2px 2px 0 var(--lego-yellow);
+}
+
+.lego ::selection {
+  background: var(--lego-yellow);
+  color: var(--lego-ink);
+}
+
+.lego :focus-visible {
+  outline: 3px solid var(--lego-blue);
+  outline-offset: 2px;
+}
+
+.lego .autumn-leaves {
+  display: none;
+}
+
+.lego {
+  scrollbar-color: var(--lego-red) var(--lego-mat-dark);
+}
+
+/* -------------------------------------------------------------- page plates */
+
+/* The page content sits on a light-grey plate so text never lands on the green studs. */
+.lego body > div.grow {
+  position: relative;
+  margin: 0 clamp(6px, 1.2vw, 20px);
+  padding-block: 18px 28px;
+  background-color: var(--lego-plate);
+  background-image: var(--lego-plate-tile);
+  background-size: 28px 28px;
+  border: 3px solid var(--lego-ink);
+  border-radius: 6px;
+  box-shadow:
+    0 8px 0 var(--lego-ink),
+    0 8px 0 3px var(--lego-trim);
+}
+
+/* ------------------------------------------------------------------- header */
+
+.lego header[data-testid='header'] {
+  background: var(--lego-yellow);
+  backdrop-filter: none;
+  border-bottom: 4px solid var(--lego-ink);
+  box-shadow:
+    inset 0 3px 0 rgb(255 255 255 / 0.6),
+    inset 0 -4px 0 var(--lego-yellow-dark),
+    0 5px 0 rgb(0 0 0 / 0.28);
+}
+
+.lego header[data-testid='header'] .text-muted-foreground {
+  color: #3a3830;
+}
+
+/* The two-tone SemiAnalysis mark sits on its own white tile so its yellow half stays visible.
+   The tile is drawn around the image with shadows, so the image keeps the box it was given. */
+.lego header[data-testid='header'] [data-testid='header-brand'] img {
+  margin: 0 5px;
+  background: #fff;
+  border-radius: 1px;
+  box-shadow:
+    0 0 0 4px #fff,
+    0 0 0 6px var(--lego-ink),
+    0 2px 0 6px var(--lego-ink);
+}
+
+.lego header[data-testid='header'] [data-testid='inferencex-wordmark'] {
+  padding-right: 0;
+  font-family: var(--lego-display);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* Nav links are plates pressed into the yellow brick; the current page is a studded brick. */
+.lego header[data-testid='header'] nav a {
+  font-family: var(--lego-text);
+  font-weight: 600;
+  color: var(--lego-ink);
+  background: rgb(24 23 22 / 0.07);
+  border: 2px solid rgb(24 23 22 / 0.28);
+  border-radius: 4px;
+  box-shadow: inset 0 2px 0 rgb(24 23 22 / 0.16);
+  transition:
+    transform 70ms ease-out,
+    box-shadow 70ms ease-out,
+    background-color 120ms;
+}
+
+.lego header[data-testid='header'] nav a:hover {
+  background: #fff;
+  border-color: var(--lego-ink);
+  box-shadow: 0 3px 0 var(--lego-ink);
+  transform: translateY(-2px);
+}
+
+.lego header[data-testid='header'] nav a:active {
+  box-shadow: 0 0 0 var(--lego-ink);
+  transform: translateY(1px);
+}
+
+.lego header[data-testid='header'] nav a[aria-current='page']::before {
+  left: 6px;
+  right: 6px;
+  top: -9px;
+  height: 8px;
+  background-size: 16px 100%;
+  -webkit-mask-size: 16px 100%;
+  mask-size: 16px 100%;
+}
+
+.lego header[data-testid='header'] nav a[aria-current='page'] {
+  position: relative;
+  background: var(--lego-red);
+  color: #fff;
+  border-color: var(--lego-ink);
+  box-shadow:
+    0 3px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(255 255 255 / 0.35),
+    inset 0 -3px 0 rgb(0 0 0 / 0.18);
+}
+
+.lego header[data-testid='header'] :is(a, button):not(nav a):hover {
+  background-color: rgb(255 255 255 / 0.7);
+}
+
+/* Stud counter in the header. */
+.lego .lego-stud-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px 0 6px;
+  align-self: center;
+  font-family: var(--lego-display);
+  font-size: 0.875rem;
+  line-height: 1;
+  color: #fff;
+  background: var(--lego-ink);
+  border: 2px solid var(--lego-ink);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 2px #3b3a37;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The player icon of the LEGO video games: a minifigure head in a ring, left of the studs. */
+.lego .lego-hud-face {
+  box-sizing: border-box;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-left: -4px;
+  border: 2px solid #2d8fd6;
+  border-radius: 50%;
+  background-color: #dff0fb;
+  background-repeat: no-repeat;
+  background-position: 50% -1px;
+  background-size: auto 62px;
+  box-shadow: 0 0 0 1.5px #fff;
+}
+
+/* Yoda is mostly ears: step back so they fit in the ring. */
+.lego .lego-hud-face[data-face='yoda'] {
+  background-position: 50% 1px;
+  background-size: auto 42px;
+}
+
+.lego .lego-stud-counter[data-complete='true'] {
+  background: var(--lego-blue);
+  box-shadow: inset 0 0 0 2px #2d8fd6;
+}
+
+.lego .lego-stud-icon,
+.lego .lego-fly-stud,
+.lego .lego-rain-stud {
+  --stud-face: #ffd21f;
+  --stud-rim: #b88a00;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 34%, var(--stud-rim) 35% 42%, transparent 43%),
+    radial-gradient(circle at 35% 30%, #fff 0 12%, transparent 13%), var(--stud-face);
+  border: 1.5px solid var(--lego-ink);
+  box-shadow: 0 1.5px 0 var(--lego-ink);
+}
+
+.lego [data-tier='silver'] {
+  --stud-face: #d5dade;
+  --stud-rim: #8d949b;
+}
+
+.lego [data-tier='blue'] {
+  --stud-face: #45a3e0;
+  --stud-rim: #00518a;
+}
+
+.lego [data-tier='purple'] {
+  --stud-face: #b06be0;
+  --stud-rim: #6a2a99;
+}
+
+.lego button.lego-stud-counter {
+  cursor: pointer;
+}
+
+.lego button.lego-stud-counter:hover {
+  background: #33312e;
+}
+
+.lego .lego-stud-count-short {
+  display: none;
+}
+
+.lego .lego-stud-found {
+  padding-left: 7px;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffe45c;
+  border-left: 2px solid #55534e;
+}
+
+.lego .lego-stud-count {
+  display: inline-block;
+  animation: lego-count-pop 260ms steps(3, end);
+}
+
+.lego .lego-toggle {
+  color: var(--lego-ink);
+}
+
+/* ------------------------------------------------------------- brick shapes */
+
+/* Studs seen from the side, along the top edge of a brick. */
+.lego main [data-slot='card']:not([data-slot='card'] [data-slot='card'])::before,
+.lego .lego-box::before,
+.lego .lego-dialog::before,
+.lego [data-slot='tabs-trigger'][data-state='active']::before,
+.lego
+  [data-slot='dashboard-navigation']
+  nav
+  a:is([aria-current='page'], [data-tab-active='true'])::before,
+.lego header[data-testid='header'] nav a[aria-current='page']::before,
+.lego .lego-toast::before,
+.lego footer[data-testid='footer'] > .container::before {
+  content: '';
+  position: absolute;
+  left: 30px;
+  right: 20px;
+  top: -14px;
+  height: 12px;
+  pointer-events: none;
+  /* Cylinders: the mask cuts the silhouette, the shade adds the top face, wall and glint. */
+  background: var(--lego-stud-shade), var(--lego-stud);
+  background-size: 24px 100%;
+  /* Whole studs only: the browser spreads them evenly instead of cutting the last one. */
+  background-repeat: space no-repeat;
+  -webkit-mask: var(--lego-stud-mask) 0 0 / 24px 100% space no-repeat;
+  mask: var(--lego-stud-mask) 0 0 / 24px 100% space no-repeat;
+}
+
+/* Cards are white bricks with a stepped, interlocking brick corner built onto every corner. */
+.lego [data-slot='card'] {
+  position: relative;
+  background: var(--card);
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow:
+    0 6px 0 var(--lego-ink),
+    inset 0 3px 0 #fff,
+    inset 0 -5px 0 rgb(24 23 22 / 0.07);
+}
+
+/* Cards that clip their content keep clipping it, with room left for the studs and corners. */
+.lego main [data-slot='card'].overflow-hidden {
+  overflow: clip;
+  overflow-clip-margin: 50px;
+}
+
+/* Where a clip margin is not supported the clip moves out to the same distance instead. */
+@supports not (overflow-clip-margin: 1px) {
+  .lego main [data-slot='card'].overflow-hidden {
+    overflow: visible;
+    clip-path: inset(-50px -12px -16px);
+  }
+}
+
+.lego [data-slot='card'] [data-slot='card'] {
+  border-width: 2px;
+  box-shadow: 0 3px 0 var(--lego-ink);
+}
+
+/* Room above every top-level card for its corner builds. */
+.lego main [data-slot='card']:not([data-slot='card'] [data-slot='card']) {
+  margin-top: 26px;
+}
+
+.lego main [data-slot='card']:not([data-slot='card'] [data-slot='card'])::before {
+  left: 70px;
+  right: 70px;
+}
+
+.lego main [data-slot='card']:not([data-slot='card'] [data-slot='card'])::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 0 rgb(24 23 22 / 0.35));
+  inset: -46px -8px -13px;
+  background:
+    var(--lego-corner-shade-l) left top / 66px 67px no-repeat,
+    var(--lego-corner-shade-r) right top / 66px 67px no-repeat,
+    var(--lego-corner-foot-shade-l) left bottom / 44px 34px no-repeat,
+    var(--lego-corner-foot-shade-r) right bottom / 44px 34px no-repeat,
+    linear-gradient(var(--lego-c3), var(--lego-c3)) left 0px top 55px / 9px 12px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px top 43px / 17px 12px no-repeat,
+    linear-gradient(var(--lego-c3), var(--lego-c3)) left 0px top 0px / 22px 19px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px top 12px / 44px 19px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) left 0px top 24px / 66px 19px no-repeat,
+    linear-gradient(var(--lego-c3), var(--lego-c3)) left 0px bottom 22px / 9px 12px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px bottom 10px / 17px 12px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) left 0px bottom 0px / 44px 10px no-repeat,
+    linear-gradient(var(--lego-c3), var(--lego-c3)) right 0px top 55px / 9px 12px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px top 43px / 17px 12px no-repeat,
+    linear-gradient(var(--lego-c3), var(--lego-c3)) right 0px top 0px / 22px 19px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px top 12px / 44px 19px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) right 0px top 24px / 66px 19px no-repeat,
+    linear-gradient(var(--lego-c3), var(--lego-c3)) right 0px bottom 22px / 9px 12px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px bottom 10px / 17px 12px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) right 0px bottom 0px / 44px 10px no-repeat;
+  -webkit-mask:
+    var(--lego-corner-mask-l) left top / 66px 67px no-repeat,
+    var(--lego-corner-mask-r) right top / 66px 67px no-repeat,
+    var(--lego-corner-foot-mask-l) left bottom / 44px 34px no-repeat,
+    var(--lego-corner-foot-mask-r) right bottom / 44px 34px no-repeat;
+  mask:
+    var(--lego-corner-mask-l) left top / 66px 67px no-repeat,
+    var(--lego-corner-mask-r) right top / 66px 67px no-repeat,
+    var(--lego-corner-foot-mask-l) left bottom / 44px 34px no-repeat,
+    var(--lego-corner-foot-mask-r) right bottom / 44px 34px no-repeat;
+}
+
+.lego
+  main
+  [data-slot='card'][data-lego-corner='small']:not([data-slot='card'] [data-slot='card'])::before {
+  left: 48px;
+  right: 48px;
+}
+
+.lego
+  main
+  [data-slot='card'][data-lego-corner='small']:not([data-slot='card'] [data-slot='card'])::after {
+  inset: -34px -8px -13px;
+  background:
+    var(--lego-corner-s-shade-l) left top / 44px 43px no-repeat,
+    var(--lego-corner-s-shade-r) right top / 44px 43px no-repeat,
+    var(--lego-corner-s-foot-shade-l) left bottom / 30px 22px no-repeat,
+    var(--lego-corner-s-foot-shade-r) right bottom / 30px 22px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px top 31px / 15px 12px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px top 0px / 22px 19px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) left 0px top 12px / 44px 19px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px bottom 10px / 15px 12px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) left 0px bottom 0px / 30px 10px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px top 31px / 15px 12px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px top 0px / 22px 19px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) right 0px top 12px / 44px 19px no-repeat,
+    linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px bottom 10px / 15px 12px no-repeat,
+    linear-gradient(var(--lego-c1), var(--lego-c1)) right 0px bottom 0px / 30px 10px no-repeat;
+  -webkit-mask:
+    var(--lego-corner-s-mask-l) left top / 44px 43px no-repeat,
+    var(--lego-corner-s-mask-r) right top / 44px 43px no-repeat,
+    var(--lego-corner-s-foot-mask-l) left bottom / 30px 22px no-repeat,
+    var(--lego-corner-s-foot-mask-r) right bottom / 30px 22px no-repeat;
+  mask:
+    var(--lego-corner-s-mask-l) left top / 44px 43px no-repeat,
+    var(--lego-corner-s-mask-r) right top / 44px 43px no-repeat,
+    var(--lego-corner-s-foot-mask-l) left bottom / 30px 22px no-repeat,
+    var(--lego-corner-s-foot-mask-r) right bottom / 30px 22px no-repeat;
+}
+
+.lego main [data-slot='card'][data-lego-color='1'] {
+  --lego-stud: var(--lego-yellow);
+  --lego-c1: var(--lego-yellow);
+  --lego-c2: var(--lego-blue);
+  --lego-c3: var(--lego-red);
+}
+
+.lego main [data-slot='card'][data-lego-color='2'] {
+  --lego-stud: var(--lego-blue);
+  --lego-c1: var(--lego-blue);
+  --lego-c2: var(--lego-green);
+  --lego-c3: var(--lego-yellow);
+}
+
+.lego main [data-slot='card'][data-lego-color='3'] {
+  --lego-stud: var(--lego-green);
+  --lego-c1: var(--lego-green);
+  --lego-c2: var(--lego-red);
+  --lego-c3: #fff;
+}
+
+.lego main :is(a, button)[data-slot='card'],
+.lego main a > [data-slot='card'] {
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+}
+
+.lego main :is(a, button)[data-slot='card']:hover,
+.lego main a:hover > [data-slot='card'] {
+  transform: translateY(-3px);
+  box-shadow:
+    0 9px 0 var(--lego-ink),
+    inset 0 3px 0 #fff,
+    inset 0 -5px 0 rgb(24 23 22 / 0.07);
+}
+
+.lego main :is(a, button)[data-slot='card']:active,
+.lego main a:active > [data-slot='card'] {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 var(--lego-ink),
+    inset 0 3px 0 #fff;
+}
+
+.lego [data-slot='control-panel'] {
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 5px 0 var(--lego-ink);
+}
+
+.lego [data-slot='control-panel'] > legend {
+  padding: 2px 10px;
+  color: var(--lego-ink);
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--lego-ink);
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.lego
+  [data-slot='button']:is(
+    [class~='bg-primary'],
+    [class~='bg-brand-fill'],
+    [class~='bg-secondary'],
+    [class~='bg-destructive'],
+    [class~='bg-card'],
+    [class~='border']
+  ),
+.lego .lego-tool,
+.lego .lego-game-button {
+  font-family: var(--lego-text);
+  font-weight: 600;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow:
+    0 3px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(255 255 255 / 0.5),
+    inset 0 -3px 0 rgb(0 0 0 / 0.14);
+  transition:
+    transform 70ms ease-out,
+    box-shadow 70ms ease-out,
+    background-color 120ms,
+    color 120ms;
+}
+
+.lego
+  [data-slot='button']:is(
+    [class~='bg-primary'],
+    [class~='bg-brand-fill'],
+    [class~='bg-secondary'],
+    [class~='bg-destructive'],
+    [class~='bg-card'],
+    [class~='border']
+  ):hover,
+.lego .lego-tool:hover,
+.lego .lego-game-button:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(255 255 255 / 0.5),
+    inset 0 -3px 0 rgb(0 0 0 / 0.14);
+}
+
+.lego
+  [data-slot='button']:is(
+    [class~='bg-primary'],
+    [class~='bg-brand-fill'],
+    [class~='bg-secondary'],
+    [class~='bg-destructive'],
+    [class~='bg-card'],
+    [class~='border']
+  ):active,
+.lego .lego-tool:active,
+.lego .lego-game-button:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 0 0 var(--lego-ink),
+    inset 0 2px 0 rgb(0 0 0 / 0.12);
+}
+
+.lego [data-slot='button'][class~='bg-primary']:not(:disabled) {
+  color: #fff;
+}
+
+/* Buttons with no brick body (ghost buttons, the legend's text buttons, and buttons a popover or
+   dialog trigger has renamed) become a flat tile under the pointer or the keyboard. */
+.lego
+  :where(
+    [data-slot='button']:not(
+      [class~='bg-primary'],
+      [class~='bg-brand-fill'],
+      [class~='bg-secondary'],
+      [class~='bg-destructive'],
+      [class~='bg-card'],
+      [class~='border'],
+      [class~='underline-offset-4']
+    ),
+    button:is(
+        [data-slot='popover-trigger'],
+        [data-slot='dialog-trigger'],
+        [data-slot='dropdown-menu-trigger']
+      )[class~='whitespace-nowrap'],
+    body > div.grow button:not([data-slot])[class*='hover:bg-muted']
+  ):is(:hover, :focus-visible):not(:disabled) {
+  color: var(--lego-ink);
+  background: #fff;
+  border-color: var(--lego-ink);
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 2px var(--lego-ink),
+    inset 0 -2px 0 rgb(0 0 0 / 0.1);
+}
+
+.lego [data-slot='button'][aria-pressed='true'] {
+  background: var(--lego-yellow);
+  color: var(--lego-ink);
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(0 0 0 / 0.1);
+}
+
+/* --------------------------------------------------------------------- tabs */
+
+.lego [data-slot='tabs-list'] {
+  gap: 6px;
+  padding-top: 10px;
+  border-bottom: 3px solid var(--lego-ink);
+}
+
+.lego [data-slot='tabs-trigger'] {
+  font-family: var(--lego-text);
+  font-weight: 600;
+  color: var(--lego-ink);
+  background: var(--lego-grey);
+  border: 2px solid var(--lego-ink);
+  border-bottom-width: 0;
+  border-radius: 4px 4px 0 0;
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.6),
+    inset 0 -3px 0 rgb(0 0 0 / 0.1);
+  transition:
+    transform 70ms ease-out,
+    background-color 120ms;
+}
+
+.lego [data-slot='tabs-trigger']:hover {
+  background: #fff;
+  transform: translateY(-2px);
+}
+
+.lego [data-slot='tabs-trigger'][data-state='active'] {
+  --lego-stud: var(--lego-red);
+  color: #fff;
+  background: var(--lego-red);
+  border-color: var(--lego-ink);
+  transform: translateY(-3px);
+  padding-bottom: calc(0.5rem + 3px);
+  margin-bottom: -3px;
+}
+
+.lego [data-slot='tabs-trigger'][data-state='active']::before {
+  left: 8px;
+  right: -2px;
+  top: -11px;
+}
+
+.lego header[data-testid='header'] nav a[aria-current='page'] {
+  position: relative;
+}
+
+.lego header[data-testid='header'] nav a[aria-current='page']::before {
+  left: 6px;
+  right: -4px;
+  top: -11px;
+}
+
+/* Dashboard tab strip: a row of bricks, the current one red and raised. */
+.lego [data-slot='dashboard-navigation'] > nav,
+.lego [data-slot='dashboard-navigation'] > div {
+  padding-top: 14px;
+  border-bottom: 3px solid var(--lego-ink);
+}
+
+.lego [data-slot='dashboard-navigation'] nav {
+  gap: 6px;
+}
+
+.lego [data-slot='dashboard-navigation'] .tab-indicator {
+  display: none;
+}
+
+.lego [data-slot='dashboard-navigation'] nav a {
+  padding-inline: 14px;
+  font-family: var(--lego-text);
+  font-weight: 600;
+  color: var(--lego-ink);
+  background: var(--lego-grey);
+  border: 2px solid var(--lego-ink);
+  border-bottom-width: 0;
+  border-radius: 4px 4px 0 0;
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.6),
+    inset 0 -3px 0 rgb(0 0 0 / 0.1);
+}
+
+.lego [data-slot='dashboard-navigation'] nav a:hover {
+  background: #fff;
+}
+
+.lego [data-slot='dashboard-navigation'] nav a:is([aria-current='page'], [data-tab-active='true']) {
+  --lego-stud: var(--lego-red);
+  color: #fff;
+  background: var(--lego-red);
+}
+
+.lego
+  [data-slot='dashboard-navigation']
+  nav
+  a:is([aria-current='page'], [data-tab-active='true'])::before {
+  left: 8px;
+  right: -2px;
+  top: -11px;
+}
+
+/* The notice shown on unofficial deployments sits on the baseplate, so give it a plate. */
+.lego [data-testid='unofficial-domain-notice'] > [role='note'] {
+  background: #fff;
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 4px 0 var(--lego-ink);
+}
+
+/* ------------------------------------------------------- inputs and popups */
+
+.lego [data-slot='input'],
+.lego [data-slot='select-trigger'],
+.lego [data-slot='input-group'],
+.lego main input[type='text'],
+.lego main input[type='search'],
+.lego main input[type='number'],
+.lego main textarea {
+  font-family: var(--lego-text);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: inset 0 3px 0 rgb(24 23 22 / 0.12);
+}
+
+.lego [data-slot='select-trigger']:hover {
+  background: #fffbd0;
+}
+
+.lego [data-slot='select-content'],
+.lego [data-slot='popover-content'],
+.lego [data-slot='dropdown-menu-content'],
+.lego [role='menu'],
+.lego [role='listbox'] {
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 5px 5px 0 var(--lego-ink);
+}
+
+.lego [data-slot='select-item']:is(:hover, [data-highlighted]),
+.lego [role='option']:is(:hover, [data-highlighted], [aria-selected='true']) {
+  background: var(--lego-yellow);
+  color: var(--lego-ink);
+}
+
+.lego [data-slot='select-chip'],
+.lego [data-slot='badge'] {
+  font-family: var(--lego-text);
+  font-weight: 600;
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--lego-ink);
+}
+
+.lego [data-slot='switch'] {
+  border: 2px solid var(--lego-ink);
+  background: var(--lego-grey);
+  box-shadow: inset 0 2px 0 rgb(0 0 0 / 0.15);
+}
+
+.lego [data-slot='switch'][data-state='checked'] {
+  background: var(--lego-green);
+}
+
+.lego [data-slot='switch-thumb'] {
+  background:
+    radial-gradient(circle, transparent 0 38%, rgb(24 23 22 / 0.35) 39% 46%, transparent 47%), #fff;
+  border: 1.5px solid var(--lego-ink);
+}
+
+.lego [data-slot='skeleton'] {
+  border-radius: 3px;
+  background-color: var(--lego-grey);
+  background-image: linear-gradient(
+    90deg,
+    var(--lego-red) 0 25%,
+    var(--lego-yellow) 25% 50%,
+    var(--lego-blue) 50% 75%,
+    var(--lego-green) 75%
+  );
+  background-size: 400% 100%;
+  opacity: 0.35;
+  animation: lego-skeleton 1.6s steps(4, end) infinite;
+}
+
+/* ------------------------------------------------------------------- charts */
+
+.lego svg[data-testid='d3-chart-svg'] text {
+  font-family: var(--lego-text);
+}
+
+/* Dense data text stays in the body face at full ink; the display face is for titles. */
+.lego svg[data-testid='d3-chart-svg'] .tick text {
+  fill: var(--lego-ink);
+  font-weight: 500;
+}
+
+.lego .legend-container label {
+  font-weight: 500;
+  color: var(--lego-ink);
+}
+
+/* Legend swatches are 1x1 tiles seen from above, in the series colour. */
+.lego .legend-container label > span:first-child > span.rounded-full {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 1.5px solid var(--lego-ink);
+  border-radius: 2.5px;
+  background-image:
+    radial-gradient(circle at 36% 32%, rgb(255 255 255 / 0.85) 0 1.1px, transparent 1.4px),
+    radial-gradient(
+      circle at 50% 50%,
+      rgb(255 255 255 / 0.22) 0 3px,
+      rgb(24 23 22 / 0.55) 3.2px 4px,
+      transparent 4.2px
+    );
+}
+
+/* Frontier lines are plates laid end to end; the global frontier is a Technic beam. */
+.lego svg[data-testid='d3-chart-svg'] :is(.roofline-path, .overlay-roofline-path) {
+  stroke-width: 3.5px;
+  stroke-linejoin: bevel;
+}
+
+.lego svg[data-testid='d3-chart-svg'] .global-pareto-frontier {
+  stroke: var(--lego-ink);
+  stroke-width: 4px;
+  stroke-dasharray: 11 5;
+  stroke-linecap: butt;
+}
+
+/* Gridlines become rows of baseplate studs. The canvas layer repaints them from these styles. */
+.lego svg[data-testid='d3-chart-svg'] :is(.grid, .grid-h, .grid-v) line {
+  stroke: rgb(24 23 22 / 0.2);
+  stroke-width: 3px;
+  stroke-dasharray: 0.1 10;
+  stroke-linecap: round;
+}
+
+.lego svg[data-testid='d3-chart-svg'] .domain {
+  stroke: var(--lego-ink);
+  stroke-width: 3px;
+  stroke-linecap: square;
+}
+
+.lego svg[data-testid='d3-chart-svg'] .tick line {
+  stroke: var(--lego-ink);
+  stroke-width: 2px;
+}
+
+.lego svg[data-testid='d3-chart-svg'] rect.bar {
+  stroke: var(--lego-ink);
+  stroke-width: 2px;
+  rx: 2px;
+}
+
+.lego svg[data-testid='d3-chart-svg'] .lego-bar-seams {
+  pointer-events: none;
+}
+
+.lego .canvas-point-surface {
+  /* Close the plot into a plate: the axes are the left and bottom edges. */
+  box-shadow:
+    3px 0 0 var(--lego-ink),
+    0 -3px 0 var(--lego-ink),
+    3px -3px 0 var(--lego-ink);
+}
+
+/* The native round markers stay underneath as the source of truth; studs are drawn on top. */
+.lego .lego-building {
+  animation: lego-chart-snap 420ms steps(5, end);
+}
+
+/* Tooltips read like a step in an instruction booklet. The panel keeps its own padding and
+   border width, so its content box is exactly as wide as in the light theme. */
+.lego [data-chart-tooltip] > div {
+  background: #fff !important;
+  border-color: var(--lego-ink) !important;
+  border-radius: 4px !important;
+  box-shadow:
+    0 0 0 2px var(--lego-ink),
+    6px 6px 0 2px var(--lego-ink) !important;
+  font-family: var(--lego-text);
+}
+
+/* The step tab hangs above the panel, outside the content. */
+.lego [data-chart-tooltip]:not([data-sheet])::before {
+  content: var(--lego-step, '');
+  position: absolute;
+  left: 8px;
+  bottom: calc(100% + 2px);
+  padding: 1px 8px 0;
+  font-family: var(--lego-display);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--lego-ink);
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+
+/* -------------------------------------------------------------------- footer */
+
+.lego footer[data-testid='footer'] {
+  position: relative;
+  width: auto;
+  margin: 34px clamp(6px, 1.2vw, 20px) 14px;
+  padding-top: 0;
+  background-color: var(--lego-plate);
+  background-image: var(--lego-plate-tile);
+  background-size: 28px 28px;
+  border: 3px solid var(--lego-ink);
+  border-radius: 6px;
+  box-shadow: 0 8px 0 var(--lego-ink);
+}
+
+.lego footer[data-testid='footer'] > .container {
+  position: relative;
+  border-top: 0;
+}
+
+/* A course of coloured 2x4 bricks along the top of the footer. */
+.lego footer[data-testid='footer']::before {
+  content: '';
+  display: block;
+  height: 18px;
+  background-image:
+    linear-gradient(90deg, var(--lego-ink) 0 2px, transparent 2px),
+    linear-gradient(
+      90deg,
+      var(--lego-red) 0 25%,
+      var(--lego-yellow) 25% 50%,
+      var(--lego-blue) 50% 75%,
+      var(--lego-green) 75%
+    );
+  background-size:
+    56px 100%,
+    224px 100%;
+  border-bottom: 3px solid var(--lego-ink);
+  box-shadow: inset 0 3px 0 rgb(255 255 255 / 0.45);
+}
+
+.lego footer[data-testid='footer'] > .container::before {
+  display: none;
+}
+
+/* A photograph of a real 2x4 brick (BrickLink part 3001), left where a foot will find it. */
+.lego .lego-foot-brick {
+  position: absolute;
+  right: 16px;
+  bottom: 8px;
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  cursor: pointer;
+  background: url('/decorative/lego/img/brick-2x4-red.webp') center / contain no-repeat;
+  border: 0;
+  border-radius: 2px;
+  filter: drop-shadow(0 2px 0 rgb(0 0 0 / 0.35));
+  transform: rotate(-7deg);
+}
+
+.lego .lego-foot-brick[data-ouch='true'] {
+  animation: lego-ouch 700ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+/* ------------------------------------------------------------------- banner */
+
+.lego [data-testid='lego-theme-banner'] {
+  margin-block: 14px 26px;
+}
+
+.lego .lego-box {
+  --lego-stud: var(--lego-yellow);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'logo title art'
+    'logo facts art'
+    'progress progress art'
+    'tools tools art';
+  column-gap: 16px;
+  row-gap: 10px;
+  align-items: center;
+  padding: 16px 18px;
+  color: #fff;
+  background-color: var(--lego-blue);
+  background-image:
+    radial-gradient(circle at 78% 40%, rgb(255 255 255 / 0.28), transparent 46%),
+    linear-gradient(180deg, #0a7fd0 0%, var(--lego-blue) 55%, var(--lego-blue-dark) 100%);
+  border: 3px solid var(--lego-ink);
+  border-radius: 5px;
+  box-shadow:
+    0 7px 0 var(--lego-ink),
+    inset 0 3px 0 rgb(255 255 255 / 0.3);
+}
+
+.lego .lego-box-logo {
+  grid-area: logo;
+  align-self: start;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: 0 4px 0 var(--lego-ink);
+  transition: transform 90ms ease-out;
+}
+
+.lego .lego-box-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.lego .lego-box-logo:active {
+  transform: translateY(3px) rotate(-4deg);
+  box-shadow: 0 1px 0 var(--lego-ink);
+}
+
+.lego .lego-box-logo[data-spin='2'] {
+  transform: rotate(-6deg);
+}
+
+.lego .lego-box-logo[data-spin='3'] {
+  transform: rotate(9deg);
+}
+
+.lego .lego-box-logo[data-spin='4'] {
+  transform: rotate(-14deg) scale(1.06);
+}
+
+.lego .lego-box-title {
+  grid-area: title;
+  min-width: 0;
+}
+
+.lego .lego-box-name {
+  margin: 0;
+  font-family: var(--lego-display);
+  font-size: clamp(1.25rem, 2.6vw, 2rem);
+  line-height: 1.1;
+  color: #fff;
+  text-shadow:
+    2px 2px 0 var(--lego-ink),
+    -1px -1px 0 var(--lego-ink),
+    1px -1px 0 var(--lego-ink),
+    -1px 1px 0 var(--lego-ink);
+}
+
+.lego .lego-box-splash {
+  display: inline-block;
+  margin: 6px 0 0;
+  padding: 2px 10px;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--lego-ink);
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--lego-ink);
+  transform: rotate(-1.2deg);
+  animation: lego-snap-in 320ms steps(4, end);
+}
+
+.lego .lego-box-facts {
+  grid-area: facts;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lego .lego-box-facts li {
+  padding: 2px 8px;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--lego-ink);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Booklets finished in Brick Studio: a yellow trophy tile once any is built, gold when all are. */
+.lego .lego-box-facts li[data-testid='lego-box-built'] {
+  background: var(--lego-yellow);
+}
+
+.lego .lego-box-facts li[data-testid='lego-box-built'][data-complete='true'] {
+  background: linear-gradient(180deg, #ffe680, #f5b700);
+  box-shadow: 0 2px 0 var(--lego-ink);
+}
+
+.lego .lego-box-progress {
+  grid-area: progress;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.lego .lego-meter {
+  position: relative;
+  flex: 1 1 220px;
+  max-width: 420px;
+  height: 22px;
+  overflow: hidden;
+  background: var(--lego-ink);
+  border: 2px solid var(--lego-ink);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 2px #3b3a37;
+}
+
+.lego .lego-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 0;
+  background-color: #ffd21f;
+  background-image: radial-gradient(
+    circle at 50% 50%,
+    #fff3a8 0 3px,
+    #d9a400 3.5px 5px,
+    transparent 5.5px
+  );
+  background-size: 18px 18px;
+  background-position: 0 center;
+  border-radius: 999px;
+  transition: width 400ms steps(8, end);
+}
+
+.lego .lego-box-secrets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* The tool buttons and the mat picker. On the full box they are one row; on the strip each
+   takes a cell of its own. */
+.lego .lego-box-bench {
+  grid-area: tools;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.lego .lego-box[data-compact='true'] .lego-box-bench {
+  display: contents;
+}
+
+.lego .lego-box-tools {
+  grid-area: tools;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lego .lego-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  color: var(--lego-ink);
+  cursor: pointer;
+  background: var(--lego-yellow);
+}
+
+.lego .lego-tool img {
+  width: 26px;
+  height: auto;
+}
+
+.lego .lego-tool[aria-pressed='true'] {
+  background: var(--lego-orange);
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(0 0 0 / 0.14);
+}
+
+.lego .lego-tool-quiet {
+  background: #fff;
+}
+
+/* A trophy tile on the Brick Studio button of the slim box: booklets built out of four. */
+.lego .lego-tool-count {
+  padding: 0 6px;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--lego-ink);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The full box already lists it among its facts. */
+.lego .lego-box[data-compact='false'] .lego-tool-count {
+  display: none;
+}
+
+.lego .lego-tool-count[data-complete='true'] {
+  background: linear-gradient(180deg, #ffe680, #f5b700);
+}
+
+.lego .lego-tool-brick {
+  position: relative;
+  width: 20px;
+  height: 11px;
+  margin-top: 4px;
+  background: var(--lego-red);
+  border: 2px solid var(--lego-ink);
+  border-radius: 1px;
+}
+
+.lego .lego-tool-brick::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: -6px;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--lego-ink) 0 2px,
+    var(--lego-red) 2px 5px,
+    var(--lego-ink) 5px 7px,
+    transparent 7px 9px,
+    var(--lego-ink) 9px 11px,
+    var(--lego-red) 11px 14px,
+    var(--lego-ink) 14px 16px
+  );
+  border-top: 2px solid var(--lego-ink);
+}
+
+.lego .lego-box-art {
+  grid-area: art;
+  align-self: end;
+  width: auto;
+  height: 150px;
+  margin: -8px 4px -16px 0;
+  filter: drop-shadow(3px 4px 0 rgb(0 0 0 / 0.35));
+  pointer-events: none;
+}
+
+/* The set itself, front and centre on the box. */
+.lego .lego-box-art-ship {
+  position: absolute;
+  grid-area: 1 / 1 / -1 / -1;
+  right: 270px;
+  bottom: 0;
+  max-width: none;
+  height: 196px;
+  margin: 0;
+  display: none;
+}
+
+@media (min-width: 1180px) {
+  .lego .lego-box[data-compact='false'] .lego-box-art-ship {
+    display: block;
+  }
+}
+
+.lego .lego-box-pocket {
+  display: none;
+}
+
+/* The place the page is set in, behind the box art. It fills the empty right of the box and
+   fades out before it reaches the title, the meter or a button. */
+.lego .lego-box {
+  isolation: isolate;
+}
+
+.lego .lego-box-place {
+  display: none;
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 52%;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 0 2px 2px 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 36%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 36%);
+}
+
+.lego .lego-box-place img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 42%;
+}
+
+.lego .lego-box-place figcaption {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 1px 8px;
+  font-family: var(--lego-text);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--lego-ink);
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--lego-ink);
+  white-space: nowrap;
+}
+
+@media (min-width: 1180px) {
+  .lego .lego-box .lego-box-place {
+    display: block;
+  }
+
+  /* On the compact strip the place takes the empty stretch between the title and the meter. */
+  .lego .lego-box.lego-box[data-compact='true'] {
+    grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr) auto auto auto;
+    grid-template-areas: 'logo title place progress tools mats';
+  }
+
+  .lego .lego-box.lego-box[data-compact='true'] .lego-box-place {
+    position: relative;
+    z-index: 0;
+    grid-area: place;
+    align-self: stretch;
+    width: auto;
+    min-width: 0;
+    margin: -8px 0;
+    border-radius: 0;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 78%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 78%, transparent 100%);
+  }
+
+  .lego .lego-box.lego-box[data-compact='true'] .lego-box-place img {
+    position: absolute;
+    inset: 0;
+  }
+
+  .lego .lego-box.lego-box[data-compact='true'] .lego-box-place figcaption {
+    top: 4px;
+    right: 22%;
+    box-shadow: none;
+  }
+}
+
+.lego .lego-box-art-benny {
+  position: absolute;
+  right: 150px;
+  top: 8px;
+  height: 96px;
+  margin: 0;
+  animation: lego-float 3.4s ease-in-out infinite;
+}
+
+/* Compact strip used on every page except the landing page. */
+.lego .lego-box[data-compact='true'] {
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: 'logo title progress tools mats';
+  padding: 8px 12px;
+  row-gap: 6px;
+}
+
+.lego .lego-box[data-compact='true'] .lego-box-logo {
+  width: 40px;
+  height: 40px;
+  align-self: center;
+  box-shadow: 0 3px 0 var(--lego-ink);
+}
+
+.lego .lego-box[data-compact='true'] .lego-box-name {
+  font-size: 1rem;
+}
+
+.lego .lego-box[data-compact='true'] .lego-box-splash {
+  margin-top: 3px;
+  padding: 0 8px;
+  font-size: 0.75rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.lego .lego-box[data-compact='true'] :is(.lego-box-facts, .lego-box-art, .lego-tool-quiet) {
+  display: none;
+}
+
+.lego .lego-box[data-compact='true'] .lego-box-progress {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: 190px;
+}
+
+.lego .lego-box[data-compact='true'] .lego-meter {
+  flex: none;
+  height: 18px;
+}
+
+.lego .lego-box[data-compact='true'] .lego-box-secrets {
+  justify-content: center;
+  font-size: 0.6875rem;
+}
+
+.lego .lego-box[data-compact='true'] .lego-box-studs {
+  display: none;
+}
+
+.lego .lego-box[data-compact='true'] .lego-tool {
+  min-height: 32px;
+  padding: 2px 10px;
+  font-size: 0.8125rem;
+}
+
+/* -------------------------------------------------------------------- scene */
+
+.lego .lego-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lego
+  .lego-scene[data-covered='true']
+  :is(
+    .lego-crew,
+    .lego-bubble,
+    .lego-spaceship,
+    .lego-cameo,
+    .lego-rain,
+    .lego-rescue,
+    .lego-rescue-ring
+  ) {
+  visibility: hidden;
+}
+
+/* While the page falls apart and rebuilds, its text moves under where the crew stood. */
+.lego:is([data-lego-fx='collapse'], [data-lego-fx='rebuild']) :is(.lego-crew, .lego-bubble) {
+  visibility: hidden;
+}
+
+.lego .lego-minifig {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  will-change: transform;
+}
+
+.lego .lego-minifig[hidden] {
+  display: none;
+}
+
+.lego .lego-minifig img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.45));
+  user-select: none;
+}
+
+/* Stop-motion waddle: two poses, no tweening. */
+.lego .lego-minifig[data-moving='true'] img {
+  animation: lego-waddle 440ms steps(1, end) infinite;
+}
+
+.lego .lego-minifig:is(:hover, :focus-visible) img {
+  animation: lego-hop 420ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.lego .lego-scene[data-hop='true'] .lego-minifig img {
+  animation: lego-hop 520ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.lego .lego-scene[data-busy='true'] .lego-minifig[data-mode='walk'] img {
+  animation: lego-waddle 200ms steps(1, end) infinite;
+}
+
+.lego .lego-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: min(240px, 70vw);
+  padding: 6px 10px;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--lego-ink);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 var(--lego-ink);
+}
+
+.lego .lego-bubble::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 6px);
+  bottom: -8px;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-right: 2px solid var(--lego-ink);
+  border-bottom: 2px solid var(--lego-ink);
+  transform: rotate(45deg);
+}
+
+.lego .lego-spaceship {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: auto;
+  height: 96px;
+  max-width: none;
+  /* Parked off screen until its flight path is set. */
+  transform: translate3d(-200vw, 0, 0);
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 6px 0 rgb(0 0 0 / 0.16));
+  will-change: transform;
+}
+
+.lego .lego-rain {
+  position: absolute;
+  inset: 0;
+}
+
+.lego .lego-rain-stud {
+  position: absolute;
+  top: var(--lego-top, 0);
+  left: var(--lego-x);
+  animation: lego-rain var(--lego-duration) var(--lego-delay) cubic-bezier(0.5, 0, 0.9, 0.6) both;
+}
+
+.lego .lego-fly-stud {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.lego .lego-fly-stud[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 18px;
+  top: -3px;
+  font-family: var(--lego-display);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow:
+    1px 1px 0 var(--lego-ink),
+    -1px -1px 0 var(--lego-ink),
+    1px -1px 0 var(--lego-ink),
+    -1px 1px 0 var(--lego-ink);
+}
+
+/* A cameo stands as a whole figure only where the page is empty (lego-lanes places it); where
+   it is not, the figure is the round portrait beside the caption. */
+.lego .lego-cameo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: auto;
+  height: min(176px, 28vh);
+  visibility: hidden;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(4px 0 0 rgb(0 0 0 / 0.3));
+  animation: lego-cameo 3.8s steps(1, end) both;
+}
+
+.lego .lego-scene[data-cameo='figure'] .lego-cameo {
+  visibility: visible;
+}
+
+.lego .lego-scene[data-cameo='figure'] .lego-portrait {
+  display: none;
+}
+
+/* The portrait ring of the LEGO Star Wars games' corner HUD. */
+.lego .lego-portrait {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #7fc8ff, #0a61b5);
+  border: 3px solid #f4f6f8;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px var(--lego-ink),
+    0 4px 0 1px var(--lego-ink);
+  animation: lego-snap-in 300ms steps(4, end);
+}
+
+.lego .lego-portrait img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 6%;
+  transform: scale(1.5);
+  transform-origin: 50% 12%;
+}
+
+.lego .lego-portrait[data-who='sus'] img {
+  object-fit: contain;
+  object-position: 50% 50%;
+  transform: scale(0.82);
+  transform-origin: 50% 50%;
+}
+
+.lego .lego-toasts[data-size='small'] .lego-portrait {
+  width: 34px;
+  height: 34px;
+  border-width: 2px;
+}
+
+/* LEGO Yoda falls apart the way he does in the game: a wobble, then flat on his back. */
+.lego .lego-cameo[data-who='yoda'] {
+  transform-origin: 50% 50%;
+  animation: lego-cameo-yoda 3.8s cubic-bezier(0.5, 0, 0.9, 0.6) both;
+}
+
+/* Piece 26047 is a part, not a figure: shown smaller. */
+.lego .lego-cameo[data-who='sus'] {
+  height: min(96px, 18vh);
+}
+
+/* --------------------------------------------------------- helicopter rescue */
+
+.lego .lego-rescue {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.lego .lego-rescue img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  filter: drop-shadow(0 5px 0 rgb(0 0 0 / 0.16));
+}
+
+/* The lifeline: a dashed two-pixel rope, so whatever it crosses still shows through the gaps. */
+.lego .lego-rescue-line {
+  position: absolute;
+  width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--lego-ink) 0 6px, transparent 6px 10px);
+  filter: drop-shadow(0 0 1px #fff);
+  transform-origin: 50% 0;
+}
+
+/* The life ring at the end of the lifeline. It stops in the clear just above the marker it
+   was lowered to (reachPoint), so the brick and everything else drawn in the plot stay whole. */
+.lego .lego-rescue-ring {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: repeating-conic-gradient(from 22.5deg, var(--lego-red) 0 45deg, #fff 45deg 90deg);
+  border: 1.5px solid var(--lego-ink);
+  border-radius: 50%;
+  mask: radial-gradient(circle, transparent 0 3.5px, #000 4px);
+}
+
+.lego .lego-sleeper {
+  position: absolute;
+  left: 16px;
+  bottom: 6px;
+  width: 78px;
+  height: 48px;
+  padding: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.lego .lego-sleeper img {
+  position: absolute;
+  left: 17px;
+  top: -13px;
+  width: 44px;
+  height: 74px;
+  object-fit: contain;
+  transform: rotate(-90deg);
+  filter: drop-shadow(-2px 0 0 rgb(0 0 0 / 0.4));
+}
+
+.lego .lego-zzz {
+  position: absolute;
+  left: 58px;
+  top: -18px;
+  font-family: var(--lego-display);
+  font-size: 0.875rem;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow:
+    1px 1px 0 var(--lego-ink),
+    -1px -1px 0 var(--lego-ink),
+    1px -1px 0 var(--lego-ink),
+    -1px 1px 0 var(--lego-ink);
+  animation: lego-zzz 2.4s ease-in-out infinite;
+}
+
+/* Captions sit in a free lane of the page (lego-lanes): the scene sets left, top and the
+   widest measure that fits. With no lane the caption is not drawn but stays in the live region. */
+.lego .lego-toasts {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 12px);
+}
+
+.lego .lego-toasts[data-lane='none'],
+.lego .lego-toasts[data-lane='measure'] {
+  opacity: 0;
+}
+
+/* The spaceship or the helicopter, parked beside the caption when it has no room to fly. */
+.lego .lego-ship-docked {
+  flex: none;
+  width: auto;
+  height: 46px;
+  max-width: none;
+  filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.2));
+}
+
+.lego .lego-toasts[data-size='small'] .lego-ship-docked {
+  height: 32px;
+}
+
+.lego .lego-toast {
+  --lego-stud: var(--lego-blue);
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 16px;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--lego-ink);
+  text-align: center;
+  background: #fff;
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 5px 0 var(--lego-ink);
+  animation: lego-snap-in 300ms steps(4, end);
+}
+
+.lego .lego-toast::before {
+  left: 14px;
+  right: 4px;
+}
+
+.lego .lego-toast[data-tone='shout'] {
+  --lego-stud: var(--lego-red);
+  font-family: var(--lego-display);
+  font-size: 1.25rem;
+  font-weight: 400;
+  background: var(--lego-yellow);
+}
+
+/* Small type for a narrow lane: the gap between two cards, a phone. */
+.lego .lego-toasts[data-size='small'] .lego-toast {
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  border-width: 2px;
+  box-shadow: 0 4px 0 var(--lego-ink);
+}
+
+.lego .lego-toasts[data-size='small'] .lego-toast[data-tone='shout'] {
+  font-size: 0.875rem;
+}
+
+/* --------------------------------------------------------------- easter eggs */
+
+.lego[data-lego-fx] body > div.grow {
+  overflow: clip;
+}
+
+.lego[data-lego-fx='collapse'] main [data-slot='card']:not([data-slot='card'] *),
+.lego[data-lego-fx='collapse']
+  main
+  :is([data-slot='control-panel'], h1, h2, p):not([data-slot='card'] *),
+.lego[data-lego-fx='collapse'] .lego-box {
+  --lego-fall-x: -40px;
+  --lego-fall-rot: -24deg;
+  animation: lego-collapse 1.7s cubic-bezier(0.6, 0, 0.9, 0.5) both;
+}
+
+.lego[data-lego-fx='collapse'] main [data-slot='card']:nth-child(2n) {
+  --lego-fall-x: 70px;
+  --lego-fall-rot: 31deg;
+  animation-delay: 120ms;
+}
+
+.lego[data-lego-fx='collapse'] main [data-slot='card']:nth-child(3n) {
+  --lego-fall-x: -110px;
+  --lego-fall-rot: -48deg;
+  animation-delay: 260ms;
+}
+
+.lego[data-lego-fx='collapse'] main [data-slot='card']:nth-child(5n) {
+  --lego-fall-x: 24px;
+  --lego-fall-rot: 62deg;
+  animation-delay: 380ms;
+}
+
+.lego[data-lego-fx='rebuild'] main [data-slot='card']:not([data-slot='card'] *),
+.lego[data-lego-fx='rebuild']
+  main
+  :is([data-slot='control-panel'], h1, h2, p):not([data-slot='card'] *),
+.lego[data-lego-fx='rebuild'] .lego-box {
+  animation: lego-rebuild 620ms steps(6, end) both;
+}
+
+.lego[data-lego-fx='rebuild'] main [data-slot='card']:nth-child(2n) {
+  animation-delay: 140ms;
+}
+
+.lego[data-lego-fx='rebuild'] main [data-slot='card']:nth-child(3n) {
+  animation-delay: 280ms;
+}
+
+.lego[data-lego-fx='rebuild'] main [data-slot='card']:nth-child(5n) {
+  animation-delay: 420ms;
+}
+
+/* The Kragle: everything is glued in place and goes glossy. */
+.lego[data-lego-fx='kragle'] body *:not(.lego-scene, .lego-scene *),
+.lego[data-lego-fx='kragle'] body *:not(.lego-scene, .lego-scene *)::before,
+.lego[data-lego-fx='kragle'] body *:not(.lego-scene, .lego-scene *)::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+/* Glue shows as a bead just inside each card's edge, in its padding. Nothing is laid over the
+   page and no colour inside a card changes, so a chart reads the same while it is glued. */
+.lego[data-lego-fx='kragle'] main [data-slot='card'],
+.lego[data-lego-fx='kragle'] .lego-box {
+  outline: 4px solid #9ee7ff;
+  outline-offset: -9px;
+}
+
+.lego[data-lego-fx='shake'] body > div.grow {
+  animation: lego-shake 420ms steps(6, end);
+}
+
+/* A pried piece tilts past the edge of the page. Clip it there, so a phone does not zoom out
+   to fit it and the page does not grow a sideways scrollbar. `clip` keeps sticky children. */
+.lego[data-lego-separator] body > :is(div.grow, footer) {
+  overflow-x: clip;
+}
+
+/* Brick separator in hand. */
+.lego[data-lego-separator]
+  main
+  :is([data-slot='card'], [data-slot='control-panel'], [data-slot='badge']),
+.lego[data-lego-separator] footer [data-testid='footer-brand'] {
+  cursor:
+    url('/decorative/lego/img/separator-cursor.png') 4 30,
+    crosshair;
+}
+
+.lego[data-lego-separator] main [data-slot='card']:hover {
+  outline: 3px dashed var(--lego-orange);
+  outline-offset: 4px;
+}
+
+.lego [data-lego-pried] {
+  z-index: 5;
+  transform: translateY(-16px) rotate(var(--lego-tilt, -4deg));
+  transform-origin: 0 100%;
+  transition: transform 260ms cubic-bezier(0.3, 1.7, 0.5, 1);
+  box-shadow:
+    0 6px 0 var(--lego-ink),
+    0 26px 18px rgb(0 0 0 / 0.3) !important;
+}
+
+/* Always-visible way to put the separator down, wherever the page is scrolled. */
+.lego .lego-putdown {
+  position: absolute;
+  right: 78px;
+  bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 14px 4px 8px;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--lego-ink);
+  cursor: pointer;
+  pointer-events: auto;
+  background: var(--lego-orange);
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow:
+    0 4px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(255 255 255 / 0.45);
+}
+
+.lego .lego-putdown:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--lego-ink);
+}
+
+.lego .lego-putdown img {
+  width: auto;
+  height: 28px;
+}
+
+/* Loose bricks from a chart that lost all its points. */
+.lego .lego-rubble {
+  --rb: var(--lego-red);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 14px;
+  background: var(--rb);
+  border: 2px solid var(--lego-ink);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.4),
+    inset 0 -2px 0 rgb(0 0 0 / 0.2);
+  will-change: transform;
+}
+
+.lego .lego-rubble::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 7px;
+  background: var(--lego-stud-shade), var(--rb);
+  background-size: 13px 100%;
+  -webkit-mask: var(--lego-stud-mask) 0 0 / 13px 100% repeat-x;
+  mask: var(--lego-stud-mask) 0 0 / 13px 100% repeat-x;
+}
+
+.lego .lego-rubble[data-size='small'] {
+  width: 17px;
+}
+
+.lego .lego-rubble[data-color='yellow'] {
+  --rb: var(--lego-yellow);
+}
+
+.lego .lego-rubble[data-color='blue'] {
+  --rb: var(--lego-blue);
+}
+
+.lego .lego-rubble[data-color='green'] {
+  --rb: var(--lego-green);
+}
+
+.lego .lego-rubble[data-color='white'] {
+  --rb: #fff;
+}
+
+.lego .lego-rubble[data-color='orange'] {
+  --rb: var(--lego-orange);
+}
+
+/* Stepped brick towers in the bottom corners of the window, on the wide baseplate margin. */
+.lego .lego-tower {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: none;
+  width: 60px;
+  height: 98px;
+  background: var(--lego-tower-l) no-repeat;
+  filter: drop-shadow(2px 0 0 rgb(0 0 0 / 0.28));
+  transition: transform 280ms steps(6, end);
+}
+
+.lego .lego-tower[data-side='right'] {
+  left: auto;
+  right: 0;
+  background-image: var(--lego-tower-r);
+  filter: drop-shadow(-2px 0 0 rgb(0 0 0 / 0.28));
+}
+
+.lego .lego-scene[data-grounded='true'] .lego-tower {
+  transform: translateY(105%);
+}
+
+@media (min-width: 1280px) {
+  .lego body > div.grow {
+    margin-inline: 30px;
+  }
+
+  .lego .lego-tower {
+    display: block;
+  }
+}
+
+/* ------------------------------------------------- tables: a plate over courses */
+.lego main table.w-full thead th {
+  font-weight: 700;
+  color: var(--lego-ink) !important;
+  background-color: var(--lego-yellow) !important;
+  border-bottom: 3px solid var(--lego-ink);
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.6);
+}
+
+.lego main table.w-full tbody tr {
+  border-bottom: 2px solid rgb(24 23 22 / 0.2) !important;
+}
+
+/* Every other course is light grey; cells the page colours on purpose keep their colour. */
+.lego main table.w-full tbody tr:nth-child(even) > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: #f1f3f5;
+}
+
+.lego main table.w-full tbody tr:hover > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: var(--muted);
+}
+
+/* ------------------------------------------------- 404: the missing piece */
+.lego div.items-center.justify-center.text-center > [data-slot='eyebrow'].tabular-nums:first-child {
+  margin-bottom: 14px;
+  padding: 2px 18px 6px;
+  font-family: var(--lego-display);
+  font-size: 4rem;
+  line-height: 1.1;
+  color: #fff;
+  background: var(--lego-red);
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 6px 0 var(--lego-ink);
+  text-shadow: 3px 3px 0 var(--lego-ink);
+  transform: rotate(-4deg);
+}
+
+/* A card that scrolls into view clicks down onto the plate. */
+.lego [data-lego-snap] {
+  animation: lego-card-snap 380ms cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+@keyframes lego-card-snap {
+  from {
+    transform: translateY(-16px);
+  }
+}
+
+/* Themed empty states: the model fell over. */
+.lego :is([data-slot='empty-state'], [data-testid='scatter-empty-state'])::before {
+  content: '';
+  flex: none;
+  display: block;
+  width: 60px;
+  height: 98px;
+  margin: -14px auto -22px;
+  background: var(--lego-tower-l) no-repeat;
+  transform: rotate(90deg) scale(0.7);
+}
+
+.lego :is([data-slot='empty-state'], [data-testid='scatter-empty-state']) {
+  font-family: var(--lego-text);
+  color: var(--lego-ink);
+}
+
+/* ------------------------------------------------------------------ mini-game */
+
+.lego .lego-dialog-overlay {
+  background-color: rgb(0 48 16 / 0.8);
+}
+
+.lego .lego-dialog {
+  --lego-stud: var(--lego-red);
+  gap: 10px;
+  width: min(420px, calc(100vw - 20px));
+  max-height: calc(100dvh - 24px);
+  padding: 16px;
+  overflow: visible;
+  background: var(--lego-yellow);
+  border: 3px solid var(--lego-ink);
+  border-radius: 5px;
+  box-shadow: 0 8px 0 var(--lego-ink);
+}
+
+.lego .lego-game-description {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: #3a3830;
+}
+
+.lego .lego-game-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 32px;
+}
+
+.lego .lego-game-title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--lego-display);
+  font-size: 1.375rem;
+  line-height: 1.1;
+  color: var(--lego-ink);
+}
+
+.lego .lego-game-stats {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.lego .lego-game-stats > div {
+  min-width: 58px;
+  padding: 2px 8px;
+  text-align: center;
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+}
+
+.lego .lego-game-stats dt {
+  font-family: var(--lego-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #55524a;
+}
+
+.lego .lego-game-stats dd {
+  margin: 0;
+  font-family: var(--lego-display);
+  font-size: 1rem;
+  line-height: 1.15;
+  color: var(--lego-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lego .lego-game-field {
+  position: relative;
+  margin-block: 10px;
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #bfe3f7;
+}
+
+/* The field keeps its 360:460 shape: on a short screen it gets narrower, never squashed. */
+.lego .lego-game-canvas {
+  display: block;
+  width: min(100%, max(120px, (100dvh - 300px) * 360 / 460));
+  height: auto;
+  margin-inline: auto;
+  aspect-ratio: 360 / 460;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.lego .lego-game-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  background: rgb(255 255 255 / 0.72);
+}
+
+/* The message stands on its own opaque plate, so nothing in the game shows through the words. */
+.lego .lego-game-plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 14px 18px 16px;
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 4px 0 var(--lego-ink);
+}
+
+.lego .lego-game-over {
+  margin: 0;
+  font-family: var(--lego-display);
+  font-size: 1.5rem;
+  line-height: 1.15;
+  color: var(--lego-red);
+  text-shadow: 2px 2px 0 var(--lego-ink);
+}
+
+.lego .lego-game-over-hint {
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lego-ink);
+}
+
+.lego .lego-game-perfect {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  margin: 0;
+  padding: 2px 12px;
+  font-family: var(--lego-display);
+  font-size: 1rem;
+  color: var(--lego-ink);
+  white-space: nowrap;
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  transform: translateX(-50%) rotate(-3deg);
+  animation: lego-snap-in 260ms steps(4, end);
+}
+
+.lego .lego-game-button {
+  min-height: 40px;
+  padding: 6px 18px;
+  font-size: 0.9375rem;
+  color: #fff;
+  cursor: pointer;
+  background: var(--lego-red);
+}
+
+.lego .lego-game-quiet {
+  min-height: 34px;
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+  color: var(--lego-ink);
+  background: #fff;
+}
+
+.lego .lego-game-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lego .lego-game-hint {
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3a3830;
+}
+
+/* --------------------------------------------------------------- brick studio */
+
+.lego .lego-game-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+}
+
+.lego .lego-dialog.lego-dialog-hub {
+  --lego-stud: var(--lego-blue);
+  width: min(780px, calc(100vw - 20px));
+  max-width: none;
+}
+
+.lego .lego-dialog.lego-dialog-studio {
+  --lego-stud: var(--lego-green);
+  grid-template-rows: minmax(0, 1fr);
+  width: min(1120px, calc(100vw - 16px));
+  max-width: none;
+  height: min(780px, calc(100dvh - 34px));
+  padding: 12px;
+}
+
+.lego .lego-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: calc(100dvh - 70px);
+}
+
+.lego .lego-hub-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 2px 4px 6px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.lego .lego-studio-label {
+  margin: 0;
+  font-family: var(--lego-display);
+  font-size: 0.875rem;
+  line-height: 1.2;
+  color: var(--lego-ink);
+}
+
+.lego .lego-hub-sets,
+.lego .lego-hub-more {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lego .lego-hub-more {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lego .lego-hub-set,
+.lego .lego-hub-card {
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 3px 0 var(--lego-ink);
+}
+
+.lego .lego-hub-set {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px 6px 6px;
+}
+
+.lego .lego-hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px;
+}
+
+.lego .lego-hub-card .lego-game-button {
+  margin-top: auto;
+}
+
+.lego .lego-hub-preview {
+  display: block;
+  width: 132px;
+  height: 112px;
+  background:
+    radial-gradient(circle at 50% 50%, rgb(255 255 255 / 0.9) 0 2px, transparent 2.5px) 0 0 / 12px
+      12px,
+    #bfe3f7;
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+}
+
+.lego .lego-hub-number,
+.lego .lego-hub-blurb,
+.lego .lego-hub-state {
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: #3a3830;
+}
+
+.lego .lego-hub-number {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #55524a;
+}
+
+.lego .lego-hub-state {
+  margin-top: 2px;
+  font-weight: 600;
+  color: var(--lego-ink);
+}
+
+.lego .lego-hub-name {
+  margin: 0;
+  font-family: var(--lego-display);
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  min-height: 0;
+}
+
+.lego .lego-studio-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding-right: 72px;
+}
+
+.lego .lego-studio-head .lego-game-stats {
+  margin-left: auto;
+}
+
+.lego .lego-studio-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 236px;
+  gap: 10px;
+  min-height: 0;
+}
+
+.lego .lego-studio-stage {
+  position: relative;
+  min-height: 180px;
+  overflow: hidden;
+  background: #cfe8f7;
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+}
+
+.lego .lego-studio-stage:focus-visible {
+  outline: 3px solid var(--lego-blue);
+  outline-offset: 2px;
+}
+
+.lego .lego-studio-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.lego .lego-studio-stage[data-separator] .lego-studio-canvas {
+  cursor: crosshair;
+}
+
+.lego .lego-studio-view {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, 34px);
+  gap: 4px;
+}
+
+.lego .lego-studio-view-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-family: system-ui, sans-serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--lego-ink);
+  cursor: pointer;
+  background: rgb(255 255 255 / 0.92);
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+}
+
+.lego .lego-studio-view-button:last-child {
+  grid-column: span 2;
+  width: 72px;
+}
+
+.lego .lego-studio-view-button:hover {
+  background: var(--lego-yellow);
+}
+
+.lego .lego-studio-view-button:focus-visible,
+.lego .lego-studio-part:focus-visible,
+.lego .lego-studio-swatch:focus-visible {
+  outline: 3px solid var(--lego-blue);
+  outline-offset: 1px;
+}
+
+.lego .lego-studio-done {
+  background: rgb(255 255 255 / 0.82);
+}
+
+.lego .lego-studio-done .lego-game-perfect {
+  position: static;
+  transform: rotate(-3deg);
+}
+
+.lego .lego-game-won {
+  color: var(--lego-green);
+}
+
+.lego .lego-studio-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.lego .lego-studio-code {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0;
+}
+
+.lego .lego-studio-code-box {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 8px;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--lego-ink);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: inset 0 2px 0 rgb(24 23 22 / 0.12);
+}
+
+.lego .lego-studio-code-box::placeholder {
+  color: #5d5a50;
+  opacity: 1;
+}
+
+.lego .lego-studio-code-box:focus-visible {
+  outline: 3px solid var(--lego-blue);
+  outline-offset: 2px;
+}
+
+.lego .lego-studio-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 2px 4px 4px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.lego .lego-studio-bin {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.lego .lego-studio-part {
+  display: grid;
+  place-items: center;
+  min-height: 50px;
+  padding: 2px;
+  cursor: pointer;
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+}
+
+.lego .lego-studio-part img {
+  display: block;
+  width: 56px;
+  height: 42px;
+  pointer-events: none;
+}
+
+.lego .lego-studio-part-text {
+  font-family: var(--lego-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-part:hover {
+  background: #fff8b0;
+}
+
+.lego .lego-studio-part[aria-pressed='true'] {
+  background: var(--lego-yellow);
+  box-shadow:
+    inset 0 0 0 2px var(--lego-ink),
+    0 2px 0 var(--lego-ink);
+}
+
+.lego .lego-studio-swatches {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.lego .lego-studio-swatch {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 26px;
+  padding: 0;
+  cursor: pointer;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.45);
+}
+
+.lego .lego-studio-swatch[data-clear] {
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.75) 0 35%, transparent 36%);
+}
+
+/* The chosen colour carries a stud, so the choice does not rest on colour alone. */
+.lego .lego-studio-swatch[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  background: inherit;
+  border: 2px solid var(--lego-ink);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.lego .lego-studio-hand,
+.lego .lego-studio-note {
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: #3a3830;
+}
+
+.lego .lego-studio-hand strong {
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-booklet {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lego .lego-studio-booklet .lego-studio-row {
+  justify-content: flex-start;
+}
+
+.lego .lego-studio-progress {
+  height: 12px;
+  overflow: hidden;
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+}
+
+.lego .lego-studio-progress > span {
+  display: block;
+  height: 100%;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 10px, rgb(0 0 0 / 0.22) 10px 12px),
+    var(--lego-green);
+  transition: width 160ms ease-out;
+}
+
+/* The stages of a long set, as the numbered bags it comes in. */
+.lego .lego-studio-stages {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lego .lego-studio-stage-stop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 4px;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #55524a;
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+}
+
+.lego .lego-studio-stage-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-family: var(--lego-display);
+  font-size: 0.75rem;
+  color: var(--lego-ink);
+  background: #e4e6ea;
+  border: 2px solid var(--lego-ink);
+  border-radius: 50%;
+}
+
+.lego .lego-studio-stage-stop[data-state='now'] {
+  color: var(--lego-ink);
+  background: var(--lego-yellow);
+  box-shadow: 0 2px 0 var(--lego-ink);
+}
+
+.lego .lego-studio-stage-stop[data-state='now'] .lego-studio-stage-number {
+  background: #fff;
+}
+
+.lego .lego-studio-stage-stop[data-state='built'] {
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-stage-stop[data-state='built'] .lego-studio-stage-number {
+  color: #fff;
+  background: var(--lego-green);
+}
+
+.lego .lego-hub-set[data-locked='true'] .lego-hub-preview {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+/* The parts box of a real instruction page: pale blue, with the step number beside it. */
+.lego .lego-studio-callout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 8px 8px 44px;
+  background: #d9effb;
+  border: 2px solid var(--lego-ink);
+  border-radius: 8px;
+}
+
+.lego .lego-studio-callout img {
+  display: block;
+  width: 112px;
+  height: 84px;
+}
+
+.lego .lego-studio-step-number {
+  position: absolute;
+  left: 8px;
+  top: 4px;
+  font-family: var(--lego-display);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-callout-name {
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-keys {
+  margin-top: auto;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #3a3830;
+}
+
+/* How the rack plaques are worked out. Unlike the key list it stays on a phone. */
+.lego .lego-studio-about {
+  margin-top: auto;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #3a3830;
+}
+
+.lego .lego-studio-about summary {
+  font-weight: 600;
+  color: var(--lego-ink);
+  cursor: pointer;
+}
+
+.lego .lego-studio-about p {
+  margin: 4px 0 0;
+}
+
+.lego .lego-studio-about .lego-studio-about-hot {
+  font-weight: 700;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-about + .lego-studio-keys {
+  margin-top: 0;
+}
+
+/* More compute than cooling: the throughput plaque turns warning orange. */
+.lego .lego-game-stats > div[data-rack='hot'] {
+  background: var(--lego-orange);
+}
+
+.lego .lego-game-stats > div[data-rack='hot'] dt {
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-keys summary {
+  font-weight: 600;
+  color: var(--lego-ink);
+  cursor: pointer;
+}
+
+.lego .lego-studio-keys ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  list-style: square;
+}
+
+.lego .lego-studio-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The Free Build baseplate in use. */
+.lego .lego-studio-side .lego-game-button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--lego-blue);
+}
+
+.lego .lego-studio-separator[aria-pressed='true'] {
+  color: var(--lego-ink);
+  background: #f47b20;
+}
+
+.lego .lego-studio-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-confirm .lego-game-button {
+  min-height: 34px;
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+}
+
+.lego .lego-studio-status {
+  min-height: 1.4em;
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 240px;
+  font-family: var(--lego-display);
+  font-size: 1.125rem;
+  color: var(--lego-ink);
+}
+
+.lego .lego-studio-loading-bricks {
+  display: flex;
+  gap: 6px;
+}
+
+.lego .lego-studio-loading-bricks i {
+  width: 28px;
+  height: 18px;
+  background: var(--lego-red);
+  border: 2px solid var(--lego-ink);
+  border-radius: 2px;
+  animation: lego-studio-hop 720ms ease-in-out infinite;
+}
+
+.lego .lego-studio-loading-bricks i:nth-child(2) {
+  background: var(--lego-blue);
+  animation-delay: 120ms;
+}
+
+.lego .lego-studio-loading-bricks i:nth-child(3) {
+  background: var(--lego-green);
+  animation-delay: 240ms;
+}
+
+@keyframes lego-studio-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-10px);
+  }
+}
+
+@media (max-width: 759px) {
+  .lego .lego-dialog.lego-dialog-studio {
+    height: calc(100dvh - 30px);
+    padding: 8px;
+  }
+
+  .lego .lego-studio {
+    gap: 6px;
+  }
+
+  .lego .lego-studio-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .lego .lego-studio-side {
+    max-height: 30dvh;
+  }
+
+  /* On a phone the stages are a row of numbered studs; only the one in hand keeps its name. */
+  .lego .lego-studio-stages {
+    display: flex;
+    gap: 4px;
+  }
+
+  .lego .lego-studio-stage-stop:not([data-state='now']) .lego-studio-stage-name {
+    display: none;
+  }
+
+  .lego .lego-studio-stage-stop[data-state='now'] {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* A sideways scroller may shrink to nothing in a column flexbox; keep the parts row its full height. */
+  .lego .lego-studio-bin {
+    flex-shrink: 0;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 62px;
+    padding-bottom: 4px;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+  }
+
+  .lego .lego-studio-swatches {
+    grid-template-columns: repeat(14, minmax(22px, 1fr));
+    gap: 3px;
+  }
+
+  .lego .lego-studio-swatch {
+    min-height: 22px;
+  }
+
+  .lego .lego-studio-callout {
+    flex-direction: row;
+    padding: 4px 8px 4px 40px;
+  }
+
+  .lego .lego-studio-callout img {
+    width: 64px;
+    height: 48px;
+  }
+
+  .lego .lego-studio-callout-name {
+    text-align: left;
+  }
+
+  .lego .lego-studio-keys {
+    display: none;
+  }
+
+  .lego .lego-studio-head .lego-game-title {
+    font-size: 1.0625rem;
+  }
+
+  /*
+   * Up to five plaques take their own row under the title, so they can use the width the close
+   * button reserves on the title row. They wrap as whole plaques, never mid-value.
+   */
+  .lego .lego-studio-head .lego-game-stats {
+    flex: 0 0 calc(100% + 68px);
+    margin-right: -68px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 3px;
+  }
+
+  .lego .lego-studio-head .lego-game-stats > div {
+    min-width: 42px;
+    padding: 1px 3px;
+    white-space: nowrap;
+  }
+
+  .lego .lego-studio-tools {
+    gap: 6px;
+  }
+
+  .lego .lego-studio-tools .lego-game-button {
+    min-height: 36px;
+    padding: 4px 9px;
+  }
+
+  .lego .lego-hub-more {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lego .lego-hub-set {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .lego .lego-hub-set .lego-game-button {
+    grid-column: 1 / -1;
+  }
+
+  .lego .lego-hub-preview {
+    width: 99px;
+    height: 84px;
+  }
+}
+
+/* ------------------------------------------------------------------- journal */
+
+.lego .lego-tool-book {
+  position: relative;
+  width: 18px;
+  height: 14px;
+  background: linear-gradient(90deg, #fff 0 8px, var(--lego-ink) 8px 10px, #fff 10px);
+  border: 2px solid var(--lego-ink);
+  border-radius: 2px;
+}
+
+.lego .lego-dialog.lego-journal {
+  --lego-stud: var(--lego-blue);
+  width: min(680px, calc(100vw - 20px));
+  max-width: none;
+  gap: 12px;
+  background: #fff;
+}
+
+.lego .lego-journal-head {
+  display: grid;
+  gap: 6px;
+}
+
+.lego .lego-journal-title {
+  margin: 0;
+  font-family: var(--lego-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--lego-ink);
+}
+
+.lego .lego-journal-description {
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #3a3830;
+}
+
+.lego .lego-journal-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  font-family: var(--lego-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--lego-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.lego .lego-journal-progress p {
+  margin: 0;
+}
+
+.lego .lego-journal-progress .lego-meter {
+  flex: 1 1 160px;
+  max-width: none;
+  height: 18px;
+}
+
+.lego .lego-journal-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+  max-height: min(52dvh, 460px);
+  margin: 0;
+  padding: 4px 6px 8px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.lego .lego-journal-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-areas:
+    'figure text'
+    'figure try';
+  gap: 4px 10px;
+  align-items: start;
+  padding: 8px 10px 8px 8px;
+  background: #bfe3f7;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+}
+
+.lego .lego-journal-item[data-found='true'] {
+  background: var(--lego-yellow);
+}
+
+.lego .lego-journal-step {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font-family: var(--lego-display);
+  font-size: 0.875rem;
+  line-height: 1;
+  color: var(--lego-ink);
+}
+
+.lego .lego-journal-figure {
+  grid-area: figure;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 78px;
+  padding-top: 10px;
+}
+
+.lego .lego-journal-figure img {
+  width: auto;
+  height: 66px;
+  filter: drop-shadow(2px 2px 0 rgb(0 0 0 / 0.3));
+}
+
+/* Not found yet: only the silhouette of the minifigure shows. */
+.lego .lego-journal-item[data-found='false'] .lego-journal-figure img {
+  filter: brightness(0) opacity(0.45);
+}
+
+.lego .lego-journal-text {
+  grid-area: text;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  font-family: var(--lego-text);
+  color: var(--lego-ink);
+}
+
+.lego .lego-journal-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.lego .lego-journal-who {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3a3830;
+}
+
+.lego .lego-journal-hint {
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.lego .lego-journal-try {
+  grid-area: try;
+  justify-self: start;
+  min-height: 36px;
+  padding: 2px 12px;
+  font-size: 0.8125rem;
+}
+
+.lego .lego-journal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.lego .lego-journal-switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lego-ink);
+  border: 0;
+}
+
+.lego .lego-journal-switches legend {
+  float: left;
+  margin-right: 12px;
+  padding: 0;
+  font-weight: 700;
+}
+
+.lego .lego-journal-switches label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+.lego .lego-journal-switches input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--lego-red);
+}
+
+.lego .lego-journal-actions,
+.lego .lego-journal-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lego .lego-journal-confirm p {
+  flex: 1 1 100%;
+  margin: 0;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lego-ink);
+}
+
+/* ---------------------------------------------------------------- keyframes */
+
+@keyframes lego-count-pop {
+  0% {
+    transform: translateY(-3px) scale(1.18);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes lego-skeleton {
+  to {
+    background-position: -400% 0;
+  }
+}
+
+@keyframes lego-chart-snap {
+  0% {
+    transform: translateY(-12px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes lego-snap-in {
+  0% {
+    opacity: 0;
+    translate: 0 -14px;
+  }
+  100% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes lego-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -8px;
+  }
+}
+
+@keyframes lego-waddle {
+  0% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+@keyframes lego-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-12px) rotate(-5deg);
+  }
+  70% {
+    transform: translateY(-3px) rotate(4deg);
+  }
+}
+
+@keyframes lego-rain {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--lego-fall, 60vh)) rotate(540deg);
+    opacity: 0;
+  }
+}
+
+/* A cameo pops up on the spot: it grows from its feet and never leaves its own box. */
+@keyframes lego-cameo {
+  0%,
+  96%,
+  100% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  3% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  6% {
+    transform: scale(0.9);
+    opacity: 1;
+  }
+  9%,
+  88% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  92% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+}
+
+@keyframes lego-zzz {
+  0%,
+  100% {
+    translate: 0 0;
+    opacity: 0.5;
+  }
+  50% {
+    translate: 6px -10px;
+    opacity: 1;
+  }
+}
+
+@keyframes lego-cameo-yoda {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  8%,
+  30% {
+    transform: rotate(0deg);
+    opacity: 1;
+  }
+  36% {
+    transform: rotate(-7deg);
+  }
+  42% {
+    transform: rotate(5deg);
+  }
+  56%,
+  88% {
+    transform: translateY(11%) rotate(-90deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(11%) rotate(-90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes lego-ouch {
+  0% {
+    transform: rotate(-7deg);
+  }
+  30% {
+    transform: translateY(-26px) rotate(160deg);
+  }
+  60% {
+    transform: translateY(-6px) rotate(330deg);
+  }
+  100% {
+    transform: rotate(353deg);
+  }
+}
+
+@keyframes lego-collapse {
+  0% {
+    transform: none;
+  }
+  12% {
+    transform: translateY(-8px) rotate(calc(var(--lego-fall-rot) * -0.08));
+  }
+  100% {
+    transform: translate(var(--lego-fall-x), 130vh) rotate(var(--lego-fall-rot));
+  }
+}
+
+@keyframes lego-rebuild {
+  0% {
+    transform: translateY(-90vh);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes lego-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(-5px, 3px);
+  }
+  40% {
+    transform: translate(5px, -3px);
+  }
+  60% {
+    transform: translate(-3px, -2px);
+  }
+  80% {
+    transform: translate(3px, 2px);
+  }
+}
+
+/* ------------------------------------------------------------------- mobile */
+
+@media (max-width: 767px) {
+  .lego .lego-box {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'logo title'
+      'facts facts'
+      'progress progress'
+      'tools tools';
+    padding: 12px;
+    column-gap: 10px;
+  }
+
+  .lego .lego-box-logo {
+    width: 52px;
+    height: 52px;
+  }
+
+  .lego .lego-box-art {
+    position: absolute;
+    right: 6px;
+    bottom: 0;
+    height: 84px;
+    margin: 0;
+  }
+
+  .lego .lego-box-art-benny {
+    display: none;
+  }
+
+  .lego .lego-box-bench {
+    padding-right: 64px;
+  }
+
+  .lego .lego-box[data-compact='true'] {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'logo title tools mats'
+      'progress progress progress progress';
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-box-tools {
+    padding-right: 0;
+    flex-wrap: nowrap;
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-tool > span:not(.lego-tool-brick, .lego-tool-count) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-tool {
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
+  }
+
+  /* No room beside the icon on a phone: the trophy tile sits on the corner of the button. */
+  .lego .lego-box[data-compact='true'] .lego-tool[data-lego-tool='game'] {
+    position: relative;
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-tool-count {
+    position: absolute;
+    top: -9px;
+    right: -7px;
+    padding: 0 4px;
+    font-size: 0.6875rem;
+    line-height: 1.35;
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-box-progress {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-meter {
+    flex: 1 1 120px;
+  }
+
+  /* Same content width as the light theme: the page plate runs edge to edge. */
+  .lego body > div.grow {
+    margin-inline: 0;
+    border-inline: 0;
+    border-radius: 0;
+  }
+
+  .lego main [data-slot='card']:not([data-slot='card'] [data-slot='card']) {
+    margin-inline: -1px;
+    border-width: 2px;
+  }
+
+  .lego main [data-slot='card']:not([data-slot='card'] [data-slot='card'])::before {
+    left: 48px;
+    right: 48px;
+  }
+
+  .lego main [data-slot='card']:not([data-slot='card'] [data-slot='card'])::after {
+    inset: -34px -8px -13px;
+    background:
+      var(--lego-corner-s-shade-l) left top / 44px 43px no-repeat,
+      var(--lego-corner-s-shade-r) right top / 44px 43px no-repeat,
+      var(--lego-corner-s-foot-shade-l) left bottom / 30px 22px no-repeat,
+      var(--lego-corner-s-foot-shade-r) right bottom / 30px 22px no-repeat,
+      linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px top 31px / 15px 12px no-repeat,
+      linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px top 0px / 22px 19px no-repeat,
+      linear-gradient(var(--lego-c1), var(--lego-c1)) left 0px top 12px / 44px 19px no-repeat,
+      linear-gradient(var(--lego-c2), var(--lego-c2)) left 0px bottom 10px / 15px 12px no-repeat,
+      linear-gradient(var(--lego-c1), var(--lego-c1)) left 0px bottom 0px / 30px 10px no-repeat,
+      linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px top 31px / 15px 12px no-repeat,
+      linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px top 0px / 22px 19px no-repeat,
+      linear-gradient(var(--lego-c1), var(--lego-c1)) right 0px top 12px / 44px 19px no-repeat,
+      linear-gradient(var(--lego-c2), var(--lego-c2)) right 0px bottom 10px / 15px 12px no-repeat,
+      linear-gradient(var(--lego-c1), var(--lego-c1)) right 0px bottom 0px / 30px 10px no-repeat;
+    -webkit-mask:
+      var(--lego-corner-s-mask-l) left top / 44px 43px no-repeat,
+      var(--lego-corner-s-mask-r) right top / 44px 43px no-repeat,
+      var(--lego-corner-s-foot-mask-l) left bottom / 30px 22px no-repeat,
+      var(--lego-corner-s-foot-mask-r) right bottom / 30px 22px no-repeat;
+    mask:
+      var(--lego-corner-s-mask-l) left top / 44px 43px no-repeat,
+      var(--lego-corner-s-mask-r) right top / 44px 43px no-repeat,
+      var(--lego-corner-s-foot-mask-l) left bottom / 30px 22px no-repeat,
+      var(--lego-corner-s-foot-mask-r) right bottom / 30px 22px no-repeat;
+  }
+
+  /* The banner line wraps instead of being cut. */
+  .lego .lego-box[data-compact='true'] .lego-box-splash {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  /* The banner line changes every few seconds and may take one line or two. Room for two is
+     kept, so the page under the box never moves when the line changes. */
+  .lego .lego-box-title {
+    display: grid;
+    grid-template-rows: auto minmax(calc(0.875rem * 2.7 + 14px), auto);
+    justify-items: start;
+    align-items: start;
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-box-title {
+    grid-template-rows: auto minmax(calc(0.75rem * 2.7 + 7px), auto);
+  }
+
+  .lego .lego-putdown {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .lego .lego-ship-docked {
+    height: 44px;
+  }
+
+  .lego .lego-stud-counter {
+    height: 28px;
+    padding: 0 8px 0 5px;
+    font-size: 0.75rem;
+  }
+
+  .lego .lego-journal-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Between a phone and a small laptop the header carries the stud pill and both sound switches as
+   well as the site's own controls. To keep the menu button on screen, the pill goes down to its
+   short count and the "by SemiAnalysis" mark steps aside, as it already does on a phone. */
+@media (min-width: 640px) and (max-width: 879px) {
+  .lego header[data-testid='header'] .container > .flex {
+    gap: 0.75rem;
+  }
+
+  .lego header[data-testid='header'] [data-testid='header-brand'] > span:has(> img),
+  .lego header[data-testid='header'] .lego-hud-face,
+  .lego header[data-testid='header'] .lego-stud-found,
+  .lego header[data-testid='header'] .lego-stud-count-full {
+    display: none;
+  }
+
+  .lego header[data-testid='header'] .lego-stud-count-short {
+    display: inline;
+  }
+}
+
+@media (max-width: 639px) {
+  /* The header has no room for the stud pill on a phone, so the box carries it. */
+  .lego .lego-box-pocket {
+    grid-area: pocket;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .lego .lego-box {
+    grid-template-areas:
+      'logo title'
+      'facts facts'
+      'progress progress'
+      'tools tools'
+      'pocket pocket';
+  }
+
+  /* The strip: the pocket and the mat picker share the second row, and the brick meter runs
+     under them as a thin bar. The pill in the pocket already carries the brick count, so the
+     meter drops its caption here. */
+  .lego .lego-box[data-compact='true'] {
+    grid-template-columns: 40px auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'logo title title tools'
+      'pocket pocket pocket mats'
+      'progress progress progress progress';
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-box-secrets {
+    display: none;
+  }
+
+  .lego .lego-box[data-compact='true'] .lego-meter {
+    flex: 1 1 auto;
+    max-width: none;
+    height: 10px;
+  }
+
+  .lego .lego-box-pocket .lego-toggle {
+    width: 40px;
+    height: 40px;
+    color: #fff;
+  }
+
+  /* Keep the box short on a phone: two tools on one row; the stud pill opens the instructions. */
+  .lego .lego-box-bench {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding-right: 0;
+  }
+
+  .lego .lego-box-tools {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  .lego .lego-box .lego-tool-quiet {
+    display: none;
+  }
+
+  .lego .lego-box[data-compact='false'] .lego-tool {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 4px 8px;
+    font-size: 0.8125rem;
+  }
+
+  .lego .lego-box[data-compact='false'] .lego-box-pocket {
+    padding-right: 48px;
+  }
+
+  /* Short enough to stand beside the pocket row without reaching up over the tool buttons. */
+  .lego .lego-box-art {
+    height: 50px;
+  }
+
+  .lego .lego-stud-count-full {
+    display: none;
+  }
+
+  .lego .lego-stud-count-short {
+    display: inline;
+  }
+
+  /* Display type steps down on a phone; long headings switch to the body face. */
+  .lego main h1 {
+    font-size: 1.5rem;
+    line-height: 1.15;
+    text-shadow: 1.5px 1.5px 0 var(--lego-yellow);
+  }
+
+  .lego main :is(h1, h2, h3)[data-lego-long] {
+    font-family: var(--lego-text);
+    font-weight: 700;
+    letter-spacing: 0;
+    text-shadow: none;
+  }
+
+  /* The phone menu is a tray of plates, like the desktop nav. */
+  .lego [data-testid='mobile-menu'] {
+    gap: 6px;
+    padding: 10px 8px 8px;
+    background: var(--lego-yellow);
+    border: 3px solid var(--lego-ink);
+    border-radius: 4px;
+    box-shadow:
+      0 6px 0 var(--lego-ink),
+      inset 0 3px 0 rgb(255 255 255 / 0.6);
+  }
+
+  .lego [data-testid='mobile-menu'] > a {
+    flex: none;
+    font-family: var(--lego-text);
+    font-weight: 600;
+    color: var(--lego-ink);
+    background: #fff;
+    border: 2px solid var(--lego-ink);
+    border-radius: 4px;
+    box-shadow:
+      0 3px 0 var(--lego-ink),
+      inset 0 -3px 0 rgb(24 23 22 / 0.08);
+  }
+
+  .lego [data-testid='mobile-menu'] > a[aria-current='page'] {
+    color: #fff;
+    background: var(--lego-red);
+    box-shadow:
+      0 3px 0 var(--lego-ink),
+      inset 0 2px 0 rgb(255 255 255 / 0.35),
+      inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  }
+
+  .lego [data-testid='mobile-menu'] > a:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 var(--lego-ink);
+  }
+
+  .lego [data-testid='mobile-menu'] [data-theme-toggles] {
+    border-top: 2px solid var(--lego-ink);
+  }
+
+  .lego [data-testid='mobile-menu-backdrop'] {
+    background-color: rgb(0 48 16 / 0.6);
+  }
+}
+
+/* ------------------------------------------------------ hanging minifigure */
+
+/* Emmet hangs off the side of the chart card by one hand. The box is his reach: its top left
+   corner is the hand, on the card's edge. */
+.lego .lego-hanger {
+  --lego-hang: 58px;
+  position: absolute;
+  left: 100%;
+  z-index: 4;
+  width: calc(var(--lego-hang) * 0.8);
+  height: calc(var(--lego-hang) * 1.35);
+  margin: -6px 0 0 -9px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lego .lego-hanger img {
+  position: absolute;
+  /* The gripping hand of emmet-run.webp sits at 90.3% / 31.7% of the picture (203 x 300). */
+  left: calc(9px - var(--lego-hang) * 0.903);
+  top: calc(6px - var(--lego-hang) * 0.4685);
+  width: var(--lego-hang);
+  height: auto;
+  max-width: none;
+  transform-origin: 90.3% 31.7%;
+  transform: rotate(24deg) scaleX(-1);
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.45));
+  pointer-events: none;
+  user-select: none;
+  animation: lego-hang 3.6s ease-in-out infinite;
+}
+
+.lego .lego-hanger:is(:hover, :focus-visible) img {
+  animation-duration: 1.1s;
+}
+
+.lego .lego-hanger[data-fallen='true'] {
+  pointer-events: none;
+}
+
+.lego .lego-hanger[data-fallen='true'] img {
+  animation: lego-hang-fall 2.3s cubic-bezier(0.5, 0, 0.9, 0.5) both;
+}
+
+@keyframes lego-hang {
+  0%,
+  100% {
+    transform: rotate(15deg) scaleX(-1);
+  }
+
+  50% {
+    transform: rotate(33deg) scaleX(-1);
+  }
+}
+
+/* Lets go, tumbles off the bottom of the window, then drops back in from above. */
+@keyframes lego-hang-fall {
+  0% {
+    transform: rotate(24deg) scaleX(-1);
+    opacity: 1;
+  }
+
+  7% {
+    transform: translateY(-9px) rotate(18deg) scaleX(-1);
+    animation-timing-function: cubic-bezier(0.5, 0, 1, 0.6);
+  }
+
+  52% {
+    transform: translateY(105vh) rotate(410deg) scaleX(-1);
+    opacity: 1;
+  }
+
+  53% {
+    transform: translateY(105vh) rotate(410deg) scaleX(-1);
+    opacity: 0;
+  }
+
+  70% {
+    transform: translateY(-64px) rotate(72deg) scaleX(-1);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.3, 1.5, 0.6, 1);
+  }
+
+  88% {
+    transform: rotate(58deg) scaleX(-1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: rotate(24deg) scaleX(-1);
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------- element-ID tiles */
+
+/* Inline code, keys and sample output are stamped like the element ID moulded into a part:
+   a flat light-grey tile with an ink edge and a low bevel. Code inside a block keeps the
+   block's own frame. */
+.lego :is(code, kbd, samp):not(pre *) {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  background-color: #f3f4f6;
+  border: 1.5px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 rgb(24 23 22 / 0.55);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.lego :is(code, kbd, samp):not(pre *, [class*=' p-'], [class^='p-'], [class*='px-']) {
+  padding: 0 0.3em;
+}
+
+.lego kbd:not(pre *) {
+  color: var(--lego-ink);
+  font-weight: 700;
+}
+
+/* Code blocks that carry a tinted panel become one long tile. */
+.lego pre[class*='bg-muted'] {
+  background-color: #f3f4f6;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 3px 0 rgb(24 23 22 / 0.55);
+}
+
+/* ------------------------------------------------------------ range sliders */
+
+/* A Technic beam for the track and a sliding 1x2 pin for the thumb. PowerX keeps its own. */
+.lego input[type='range']:not(.powerx-range) {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lego input[type='range']:not(.powerx-range)::-webkit-slider-runnable-track {
+  box-sizing: border-box;
+  height: 8px;
+  background: linear-gradient(
+    to right,
+    var(--lego-red) var(--range-progress, 0%),
+    #fff var(--range-progress, 0%)
+  );
+  border: 2px solid var(--lego-ink);
+  border-radius: 2px;
+}
+
+.lego input[type='range']:not(.powerx-range)::-moz-range-track {
+  box-sizing: border-box;
+  height: 8px;
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 2px;
+}
+
+.lego input[type='range']:not(.powerx-range)::-moz-range-progress {
+  box-sizing: border-box;
+  height: 8px;
+  background: var(--lego-red);
+  border: 2px solid var(--lego-ink);
+  border-radius: 2px;
+}
+
+.lego input[type='range']:not(.powerx-range)::-webkit-slider-thumb {
+  box-sizing: border-box;
+  appearance: none;
+  width: 22px;
+  height: 16px;
+  margin-top: -6px;
+  /* Two pin holes on a yellow 1x2. */
+  background:
+    radial-gradient(circle at 28% 50%, var(--lego-ink) 0 2px, transparent 2.6px),
+    radial-gradient(circle at 72% 50%, var(--lego-ink) 0 2px, transparent 2.6px), var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow:
+    0 2px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(255 255 255 / 0.5);
+}
+
+.lego input[type='range']:not(.powerx-range)::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 22px;
+  height: 16px;
+  background:
+    radial-gradient(circle at 28% 50%, var(--lego-ink) 0 2px, transparent 2.6px),
+    radial-gradient(circle at 72% 50%, var(--lego-ink) 0 2px, transparent 2.6px), var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow:
+    0 2px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(255 255 255 / 0.5);
+}
+
+.lego input[type='range']:not(.powerx-range):active::-webkit-slider-thumb {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.5);
+}
+
+.lego input[type='range']:not(.powerx-range):active::-moz-range-thumb {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.5);
+}
+
+.lego input[type='range']:not(.powerx-range):focus-visible {
+  outline: 3px solid var(--lego-blue);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------------------- table mats */
+
+/* The table itself, as a layer of its own so it can drift under the page (see LegoMat). It
+   repeats every 112px and is that much taller than the window at both ends. */
+.lego .lego-mat {
+  position: fixed;
+  inset: -112px 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--lego-mat);
+  background-image: var(--lego-mat-tile);
+  background-size: var(--lego-mat-size);
+  will-change: transform;
+}
+
+/* Space crate: Classic Space navy, light bluish grey plates, transparent-yellow trim. */
+.lego[data-lego-mat='space'] {
+  --lego-mat: #0b1d3a;
+  --lego-mat-dark: #050f22;
+  --lego-mat-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='15.5' r='8' fill='%23050f22'/%3E%3Ccircle cx='14' cy='13.5' r='8' fill='%23143463'/%3E%3Cpath d='M8.6 11.2a6.4 6.4 0 0 1 8.6-3.4' fill='none' stroke='%234673b8' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  --lego-trim: #f5e400;
+  --lego-plate: #e6eaf1;
+  scrollbar-color: #f5e400 var(--lego-mat-dark);
+}
+
+/* Blueprint: the pale cyan page of a building instruction, studs drawn in outline. */
+.lego[data-lego-mat='blueprint'] {
+  --lego-mat: #d8ecfa;
+  --lego-mat-dark: #b9d9f2;
+  --lego-mat-tile:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M0 .5H28M.5 0V28' stroke='%23a8cdec'/%3E%3Ccircle cx='14' cy='14' r='8' fill='%23e8f4fd' stroke='%234a90cf' stroke-width='1.2'/%3E%3Cpath d='M14 11v6M11 14h6' stroke='%234a90cf' stroke-width='.8'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='112' height='112'%3E%3Cpath d='M0 1H112M1 0V112' stroke='%235f9fd6' stroke-width='2'/%3E%3C/svg%3E");
+  --lego-mat-size: 28px 28px, 112px 112px;
+  --lego-trim: #1b5fa8;
+  --lego-plate: #f4f9fd;
+  scrollbar-color: #1b5fa8 var(--lego-mat-dark);
+}
+
+.lego[data-lego-mat='space'] body > div.grow,
+.lego[data-lego-mat='space'] footer[data-testid='footer'] {
+  box-shadow:
+    0 0 0 2px var(--lego-trim),
+    0 8px 0 2px var(--lego-ink),
+    0 6px 26px 6px rgb(245 228 0 / 0.3);
+}
+
+.lego[data-lego-mat='blueprint'] body > div.grow,
+.lego[data-lego-mat='blueprint'] footer[data-testid='footer'] {
+  box-shadow:
+    0 8px 0 var(--lego-ink),
+    0 8px 0 3px var(--lego-trim);
+}
+
+.lego[data-lego-mat='space'] .lego-box {
+  background-color: #0f2c58;
+  background-image:
+    radial-gradient(circle at 78% 40%, rgb(245 228 0 / 0.22), transparent 46%),
+    linear-gradient(180deg, #1a4788 0%, #0f2c58 55%, #0b1d3a 100%);
+  box-shadow:
+    0 0 0 2px var(--lego-trim),
+    0 7px 0 2px var(--lego-ink),
+    inset 0 3px 0 rgb(255 255 255 / 0.22);
+}
+
+.lego[data-lego-mat='blueprint'] .lego-box {
+  background-color: #1b5fa8;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.16) 1px, transparent 1px),
+    linear-gradient(180deg, #2a78c6 0%, #1b5fa8 60%, #134a86 100%);
+  background-size:
+    14px 14px,
+    14px 14px,
+    auto;
+}
+
+/* The bricks on the cards follow the mat: blue, grey and yellow in space; drafting blues on
+   the blueprint. Series colours and chart marks are not touched. */
+.lego[data-lego-mat='space'] main [data-slot='card'] {
+  --lego-stud: #0055bf;
+  --lego-c1: #0055bf;
+  --lego-c2: #a0a5a9;
+  --lego-c3: #f5cd2f;
+}
+
+.lego[data-lego-mat='space'] main [data-slot='card'][data-lego-color='1'] {
+  --lego-stud: #a0a5a9;
+  --lego-c1: #a0a5a9;
+  --lego-c2: #0055bf;
+  --lego-c3: #f5cd2f;
+}
+
+.lego[data-lego-mat='space'] main [data-slot='card'][data-lego-color='2'] {
+  --lego-stud: #f5cd2f;
+  --lego-c1: #f5cd2f;
+  --lego-c2: #0055bf;
+  --lego-c3: #a0a5a9;
+}
+
+.lego[data-lego-mat='space'] main [data-slot='card'][data-lego-color='3'] {
+  --lego-stud: #fff;
+  --lego-c1: #fff;
+  --lego-c2: #0055bf;
+  --lego-c3: #a0a5a9;
+}
+
+.lego[data-lego-mat='blueprint'] main [data-slot='card'] {
+  --lego-stud: #1b5fa8;
+  --lego-c1: #1b5fa8;
+  --lego-c2: #36aebf;
+  --lego-c3: #9cc8ea;
+}
+
+.lego[data-lego-mat='blueprint'] main [data-slot='card'][data-lego-color='1'] {
+  --lego-stud: #36aebf;
+  --lego-c1: #36aebf;
+  --lego-c2: #1b5fa8;
+  --lego-c3: #fff;
+}
+
+.lego[data-lego-mat='blueprint'] main [data-slot='card'][data-lego-color='2'] {
+  --lego-stud: #9cc8ea;
+  --lego-c1: #9cc8ea;
+  --lego-c2: #1b5fa8;
+  --lego-c3: #36aebf;
+}
+
+.lego[data-lego-mat='blueprint'] main [data-slot='card'][data-lego-color='3'] {
+  --lego-stud: #fff;
+  --lego-c1: #fff;
+  --lego-c2: #36aebf;
+  --lego-c3: #1b5fa8;
+}
+
+/* The picker on the box: three round studs, one per mat. */
+.lego .lego-mats {
+  grid-area: mats;
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.lego .lego-mat-swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+  border: 2px solid var(--lego-ink);
+  border-radius: 50%;
+  box-shadow:
+    0 2px 0 var(--lego-ink),
+    inset 0 2px 0 rgb(255 255 255 / 0.4);
+  transition: transform 80ms ease-out;
+}
+
+.lego .lego-mat-swatch[data-mat='classic'] {
+  background: var(--lego-green);
+}
+
+.lego .lego-mat-swatch[data-mat='space'] {
+  background: linear-gradient(135deg, #0b1d3a 0 62%, #f5e400 62%);
+}
+
+.lego .lego-mat-swatch[data-mat='blueprint'] {
+  background:
+    linear-gradient(#4a90cf, #4a90cf) center / 100% 1.5px no-repeat,
+    linear-gradient(#4a90cf, #4a90cf) center / 1.5px 100% no-repeat,
+    #d8ecfa;
+}
+
+.lego .lego-mat-swatch:hover {
+  transform: translateY(-1px);
+}
+
+.lego .lego-mat-swatch[aria-pressed='true'] {
+  transform: translateY(2px);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--lego-ink);
+}
+
+/* -------------------------------------------------------------- preferences */
+
+@media (prefers-reduced-motion: reduce) {
+  .lego .lego-hanger img,
+  .lego .lego-minifig img,
+  .lego .lego-box-art-benny,
+  .lego .lego-stud-count,
+  .lego .lego-box-splash,
+  .lego .lego-toast,
+  .lego .lego-zzz,
+  .lego .lego-building,
+  .lego .lego-foot-brick,
+  .lego .lego-game-perfect,
+  .lego .lego-studio-loading-bricks i,
+  .lego [data-slot='skeleton'] {
+    animation: none !important;
+  }
+
+  /* No tumble: he just lets go for a moment. */
+  .lego .lego-hanger[data-fallen='true'] img {
+    opacity: 0.25;
+  }
+
+  .lego .lego-studio-progress > span {
+    transition: none;
+  }
+
+  .lego[data-lego-fx] main [data-slot='card'],
+  .lego[data-lego-fx] main [data-slot='control-panel'],
+  .lego[data-lego-fx] .lego-box,
+  .lego[data-lego-fx] main :is(h1, h2),
+  .lego[data-lego-fx='shake'] body > div.grow {
+    animation: none !important;
+  }
+
+  .lego[data-lego-fx='collapse'] main [data-slot='card'] {
+    opacity: 0.35;
+  }
+
+  .lego .lego-spaceship,
+  .lego .lego-rain {
+    display: none;
+  }
+
+  .lego .lego-ship-docked {
+    animation: none;
+  }
+
+  .lego .lego-cameo,
+  .lego .lego-cameo[data-who='yoda'] {
+    animation: none;
+    transform: none;
+  }
+
+  /* A pried card stays exactly where it is and is marked instead of tilted. */
+  .lego [data-lego-snap] {
+    animation: none;
+  }
+
+  .lego [data-lego-pried] {
+    transform: none !important;
+    outline: 4px dashed var(--lego-orange);
+    outline-offset: 4px;
+  }
+
+  .lego .lego-tower {
+    transition: none;
+  }
+
+  .lego .lego-mat-swatch {
+    transition: none;
+  }
+
+  .lego [data-lego-pried],
+  .lego [data-slot='button'],
+  .lego [data-slot='tabs-trigger'],
+  .lego .lego-tool,
+  .lego header[data-testid='header'] nav a {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .lego .lego-mat {
+    display: none;
+  }
+
+  .lego body,
+  .lego body > div.grow,
+  .lego footer[data-testid='footer'] {
+    background-image: none;
+  }
+
+  .lego main [data-slot='card']::before,
+  .lego main [data-slot='card']::after {
+    display: none;
+  }
+
+  /* The dashed gradient is dropped in this mode: a solid system-colour rope instead. */
+  .lego .lego-rescue-line {
+    background: CanvasText;
+    filter: none;
+  }
+
+  .lego .lego-hud-face {
+    border-color: CanvasText;
+  }
+
+  /* Photographs and drawn rings give way to system colours. */
+  .lego .lego-box .lego-box-place {
+    display: none;
+  }
+
+  .lego .lego-rescue-ring {
+    background: Canvas;
+    border: 3px solid CanvasText;
+  }
+
+  .lego .lego-portrait {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+}
+
+@media print {
+  .lego .lego-mat,
+  .lego .lego-scene,
+  .lego [data-testid='lego-theme-banner'] {
+    display: none;
+  }
+
+  .lego body {
+    background: #fff;
+  }
+}
+
+/* One mute inside the game dialog, beside the close button. */
+.lego .lego-dialog .lego-game-mute {
+  position: absolute;
+  top: 12px;
+  right: 48px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--lego-ink);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.lego .lego-dialog .lego-game-mute[data-muted='true'] {
+  color: #fff;
+  background: var(--lego-ink);
+}
+
+.lego .lego-dialog .lego-game-mute:focus-visible {
+  outline: 3px solid var(--lego-blue, #0055bf);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .lego .lego-dialog .lego-game-mute {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+  }
+}
+
+/* Brick Stacker rack build: the parts fitted to this rack, the choice for the next one and
+   the session so far. */
+.lego .lego-game-config {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--lego-ink);
+}
+
+.lego .lego-game-upgrades {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+
+.lego .lego-game-upgrades > p,
+.lego .lego-game-runs > p {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--lego-ink);
+}
+
+.lego .lego-game-upgrade {
+  display: grid;
+  gap: 1px;
+  padding: 4px 8px;
+  text-align: left;
+  color: var(--lego-ink);
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 2px 0 var(--lego-ink);
+  cursor: pointer;
+}
+
+.lego .lego-game-upgrade b {
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.lego .lego-game-upgrade span {
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.lego .lego-game-upgrade:is(:hover, :focus-visible) {
+  background: #fff;
+  outline: 3px solid var(--lego-blue, #0055bf);
+  outline-offset: 1px;
+}
+
+.lego .lego-game-runs {
+  width: 100%;
+  text-align: left;
+}
+
+.lego .lego-game-runs ol {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lego .lego-game-runs li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--lego-ink);
+}
+
+.lego .lego-game-run-bar {
+  height: 8px;
+  background: #fff;
+  border: 1px solid var(--lego-ink);
+}
+
+.lego .lego-game-run-bar i {
+  display: block;
+  height: 100%;
+  background: var(--lego-red);
+}
+
+@media (forced-colors: active) {
+  .lego .lego-game-upgrade {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+  }
+
+  .lego .lego-game-run-bar i {
+    background: Highlight;
+  }
+}
+
+/* Room for the mute and close buttons beside a game title. */
+.lego .lego-dialog :is(.lego-hub, .lego-game-head) > .lego-game-title,
+.lego .lego-dialog .lego-hub > :first-child .lego-game-title {
+  padding-right: 72px;
+}
+
+/* ----------------------------------------------------------------- slim box */
+
+/* The box stays short so the page under it starts on the first screen: logo tile, set name,
+   the changing line, one row of controls and the minifigures. Set facts, the brick meter, the
+   brick separator and the phone's stud pill sit in a drawer behind one button. The repeated
+   class outranks the older per-breakpoint layouts above. */
+.lego [data-testid='lego-theme-banner'] {
+  margin-block: 8px 16px;
+}
+
+.lego body > div.grow {
+  padding-top: 6px;
+}
+
+.lego [data-slot='control-panel'] > legend {
+  padding-block: 0;
+}
+
+.lego .lego-box.lego-box.lego-box {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'logo title art'
+    'logo tools art'
+    'drawer drawer drawer';
+  column-gap: 14px;
+  row-gap: 0;
+  padding: 10px 14px;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-logo {
+  width: 64px;
+  height: 64px;
+  align-self: center;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-name {
+  max-width: 100%;
+  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-splash {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-bench {
+  grid-area: tools;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 6px;
+  padding-right: 0;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-tools {
+  flex: none;
+  flex-wrap: nowrap;
+  padding-right: 0;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-mats {
+  flex: none;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-tool-count {
+  display: inline-block;
+}
+
+/* The drawer button: the stud count, a word and a caret. */
+.lego .lego-box.lego-box.lego-box .lego-box-more {
+  flex: none;
+  gap: 6px;
+  background: #fff;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-more > span {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-more > .lego-more-stud {
+  width: 14px;
+  height: 14px;
+  background: radial-gradient(circle at 50% 50%, #fff3a8 0 3px, #d9a400 3.5px 5px, #ffd21f 5.5px);
+  border: 2px solid var(--lego-ink);
+  border-radius: 50%;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-more-count {
+  font-family: var(--lego-text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-more > .lego-more-caret {
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-right: 2px solid var(--lego-ink);
+  border-bottom: 2px solid var(--lego-ink);
+  transform: rotate(45deg);
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-more[aria-expanded='true'] > .lego-more-caret {
+  margin-top: 4px;
+  transform: rotate(-135deg);
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer {
+  grid-area: drawer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px dashed rgb(255 255 255 / 0.55);
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer[hidden] {
+  display: none;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-box-facts {
+  display: flex;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-box-progress {
+  flex: 1 1 260px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px 14px;
+  width: auto;
+  min-width: 0;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-meter {
+  flex: 1 1 160px;
+  height: 18px;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer :is(.lego-box-secrets, .lego-box-studs) {
+  display: flex;
+  font-size: 0.75rem;
+}
+
+/* The drawer sits on the place picture, so the two counts get a dark tile to stay legible. */
+.lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-box-secrets {
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: #101820;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-tool {
+  flex: none;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-tool > span {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-box-pocket {
+  padding-right: 0;
+}
+
+/* The home box: Emmet stands the full height of the box, Benny and his spaceship beside him. */
+.lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-art {
+  grid-area: 1 / 3 / 3 / 4;
+  align-self: end;
+  height: 118px;
+  margin: -6px 4px -10px 0;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='false'][data-more='true'] .lego-box-art {
+  margin-bottom: -4px;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-art-ship {
+  position: absolute;
+  top: 2px;
+  right: 218px;
+  bottom: auto;
+  height: 122px;
+  margin: 0;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-art-benny {
+  position: absolute;
+  top: 6px;
+  right: 128px;
+  height: 92px;
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] :is(.lego-box-title, .lego-box-bench) {
+    padding-right: 130px;
+  }
+}
+
+@media (min-width: 1180px) {
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] :is(.lego-box-title, .lego-box-bench) {
+    padding-right: 320px;
+  }
+
+  /* The place label stands clear of the spaceship and the minifigures. */
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-place figcaption {
+    right: 412px;
+  }
+}
+
+/* The strip on every other page: one row. */
+.lego .lego-box.lego-box.lego-box[data-compact='true'] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'logo title tools'
+    'drawer drawer drawer';
+  padding: 6px 12px;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-logo {
+  width: 34px;
+  height: 34px;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-title {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-name {
+  flex: none;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-splash {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0 8px;
+  font-size: 0.75rem;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-tool {
+  min-height: 34px;
+}
+
+.lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-bench {
+  margin-top: 0;
+}
+
+@media (min-width: 1180px) {
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] {
+    grid-template-columns: auto minmax(0, 1fr) minmax(220px, 30%) auto;
+    grid-template-areas:
+      'logo title place tools'
+      'drawer drawer drawer drawer';
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-place {
+    margin: -6px 0;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='true'][data-more='true'] .lego-box-place {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-splash {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .lego .lego-box.lego-box.lego-box .lego-more-label {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  /* Phone, home: logo and name, the line across two rows beside Emmet, then one row of
+     controls. */
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'logo name art'
+      'splash splash art'
+      'tools tools tools'
+      'drawer drawer drawer';
+    /* Room for a two-line message is kept, so the page under the box does not move. */
+    grid-template-rows: auto minmax(calc(0.8125rem * 2.7 + 14px), auto) auto auto;
+    column-gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-title {
+    display: contents;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-name {
+    grid-area: name;
+    font-size: 1.125rem;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-splash {
+    grid-area: splash;
+    display: -webkit-box;
+    margin-top: 6px;
+    align-self: start;
+    justify-self: start;
+    font-size: 0.8125rem;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-art {
+    position: static;
+    grid-area: 1 / 3 / 3 / 4;
+    height: 100px;
+    margin: 0 0 -2px;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-art-benny,
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-art-ship {
+    display: none;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-box-tools {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='false'] .lego-tool[data-lego-tool='game'] {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    padding-inline: 8px;
+    white-space: nowrap;
+  }
+
+  .lego
+    .lego-box.lego-box.lego-box[data-compact='false']
+    .lego-tool[data-lego-tool='game']
+    > :is(.lego-tool-brick, .lego-tool-count) {
+    display: none;
+  }
+
+  .lego .lego-box.lego-box.lego-box:is([data-compact='true'], [data-compact='false']) .lego-tool {
+    min-height: 44px;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-mats {
+    gap: 5px;
+    padding: 0;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-box-drawer .lego-box-progress {
+    flex-basis: 100%;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-mat-swatch {
+    width: 30px;
+    height: 30px;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-box-more {
+    min-width: 44px;
+    padding-inline: 8px;
+    justify-content: center;
+  }
+
+  /* Phone, every other page: logo and controls in one row; the set name is on the logo tile
+     and in the drawer button's label. */
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'logo tools'
+      'drawer drawer';
+    column-gap: 10px;
+    padding: 4px 10px;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-title {
+    display: none;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-box-bench {
+    justify-content: flex-end;
+    margin-top: 0;
+  }
+
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-tool[data-lego-tool='game'] {
+    min-width: 44px;
+  }
+}
+
+/* The set shelf opens under a strip of Dexter's Diner, the level-select hub of LEGO Star Wars:
+   the bottom of the picture, where the game's own lettering is. */
+.lego .lego-hub-diner {
+  position: relative;
+  flex: none;
+  height: 76px;
+  margin: 0;
+  overflow: hidden;
+  background: #2a3238;
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+}
+
+.lego .lego-hub-diner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 100%;
+}
+
+.lego .lego-hub-diner figcaption {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  padding: 1px 8px;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--lego-ink);
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+}
+
+@media (forced-colors: active) {
+  .lego .lego-hub-diner img {
+    display: none;
+  }
+
+  .lego .lego-hub-diner {
+    height: auto;
+    background: Canvas;
+  }
+
+  .lego .lego-hub-diner figcaption {
+    position: static;
+    display: inline-block;
+    margin: 4px;
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+}
+
+/* Postcards of the places in this set, in the drawer: the page's own place is ringed. */
+.lego .lego-box.lego-box.lego-box .lego-box-postcards {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-postcards li {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 3px 0 var(--lego-ink);
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-postcards li[data-here='true'] {
+  border-color: var(--lego-yellow);
+  box-shadow:
+    0 0 0 2px var(--lego-ink),
+    0 5px 0 var(--lego-ink);
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-postcards img {
+  display: block;
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-box-postcards span {
+  display: block;
+  padding: 2px 6px;
+  overflow: hidden;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--lego-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--lego-yellow);
+  border-top: 2px solid var(--lego-ink);
+}
+
+@media (max-width: 1023px) {
+  .lego .lego-box.lego-box.lego-box .lego-box-postcards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-box-postcards img {
+    height: 64px;
+  }
+}
+
+@media (forced-colors: active) {
+  .lego .lego-box.lego-box.lego-box .lego-box-more > .lego-more-stud {
+    background: ButtonText;
+    border-color: ButtonText;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-box-more > .lego-more-caret {
+    border-color: ButtonText;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-box-postcards img {
+    display: none;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-box-postcards :is(li, span) {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+
+  .lego .lego-box.lego-box.lego-box .lego-box-drawer {
+    border-top-color: CanvasText;
+  }
+}
+
+/* --------------------------------------------------------- round 5: chart states */
+
+/* A chart being rebuilt says which step of the booklet it is on, above the plot. */
+.lego .lego-building::after {
+  content: var(--lego-build, '');
+  position: absolute;
+  top: var(--lego-build-top, 2px);
+  left: var(--lego-build-left, 6px);
+  z-index: 3;
+  padding: 1px 8px;
+  font-family: var(--lego-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--lego-ink);
+  white-space: nowrap;
+  background: var(--lego-yellow);
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--lego-ink);
+  pointer-events: none;
+}
+
+/* The stand-in held by ?lego_hold=loading: the stock skeleton rule paints the stripes. */
+.lego .lego-hold {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.lego .lego-hold span {
+  padding: 4px 12px;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--lego-ink);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 3px;
+  box-shadow: 0 3px 0 var(--lego-ink);
+}
+
+/* The Kragle is a film still, not a figure: a framed card. */
+.lego .lego-cameo[data-who='glue'] {
+  height: min(132px, 22vh);
+  border: 3px solid var(--lego-ink);
+  border-radius: 4px;
+  box-shadow: 0 4px 0 var(--lego-ink);
+  filter: none;
+}
+
+.lego .lego-portrait[data-who='glue'] {
+  width: 96px;
+  height: 54px;
+  border-radius: 4px;
+}
+
+.lego .lego-portrait[data-who='glue'] img {
+  object-position: 20% 50%;
+  transform: none;
+}
+
+/* Giant hands hold the rescue helicopter for a moment, then let it fly. */
+.lego .lego-rescue .lego-rescue-hand {
+  inset: auto;
+  top: -12%;
+  width: 62%;
+  height: auto;
+  pointer-events: none;
+  /* Timed to the helicopter: in as it arrives, off once it hovers on its own. */
+  animation: lego-hand-left 2.4s ease-in-out 3s both;
+}
+
+.lego .lego-rescue .lego-rescue-hand[data-side='left'] {
+  left: -34%;
+}
+
+.lego .lego-rescue .lego-rescue-hand[data-side='right'] {
+  right: -34%;
+  scale: -1 1;
+  animation-name: lego-hand-right;
+}
+
+@keyframes lego-hand-left {
+  0% {
+    opacity: 0;
+    translate: -40% -60%;
+  }
+  18%,
+  70% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  100% {
+    opacity: 0;
+    translate: -60% -90%;
+  }
+}
+
+@keyframes lego-hand-right {
+  0% {
+    opacity: 0;
+    translate: 40% -60%;
+  }
+  18%,
+  70% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  100% {
+    opacity: 0;
+    translate: 60% -90%;
+  }
+}
+
+/* The clue chain: the banner line is a link on the pages that carry a clue. */
+.lego .lego-box.lego-box.lego-box .lego-clue {
+  display: inline-block;
+  color: var(--lego-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.lego .lego-box.lego-box.lego-box .lego-clue::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 9px;
+  margin-right: 6px;
+  background: var(--lego-red);
+  border: 1.5px solid var(--lego-ink);
+  border-radius: 1px;
+}
+
+/* Room for the whole clue on a wide table; it shortens with an ellipsis on a narrow one. */
+@media (min-width: 1280px) {
+  .lego .lego-box.lego-box.lego-box[data-compact='true'] .lego-clue {
+    flex-shrink: 0;
+  }
+}
+
+/* The index of lines heard, in the set instructions. */
+.lego .lego-journal-lines {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+}
+
+.lego .lego-journal-lines h3 {
+  margin: 0 0 6px;
+  font-family: var(--lego-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.lego .lego-journal-lines ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lego .lego-journal-lines li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.lego .lego-journal-lines li[data-heard='true'] span {
+  font-weight: 700;
+}
+
+.lego .lego-journal-lines li[data-heard='false'] span {
+  opacity: 0.6;
+}
+
+.lego .lego-journal-lines small {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.lego .lego-game-line {
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lego .lego-rescue .lego-rescue-hand {
+    animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .lego .lego-building::after,
+  .lego .lego-hold span {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+}
+
+/* Brick Studio on a slow device: a small note that the view dropped to low detail. */
+.lego .lego-studio-low {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  max-width: calc(100% - 16px);
+  margin: 0;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--lego-ink);
+  background: #fff;
+  border: 2px solid var(--lego-ink);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+@media (forced-colors: active) {
+  .lego .lego-studio-low {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+}
+
+/* The rebuild tag gives way where the stock zoom hint needs the same margin. */
+.lego .lego-building[data-lego-build-tag='off']::after {
+  display: none;
+}
+
+.lego .lego-game-canvas:focus {
+  outline: none;
+}
+
+/* Exported picture: the stock "Updated" and source row stays on one line, as on the page. */
+.lego [id$='-export'] div:has(> dl.contents) {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
