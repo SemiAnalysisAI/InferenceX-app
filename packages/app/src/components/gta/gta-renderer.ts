@@ -142,8 +142,29 @@ function hash(i: number) {
 
 export interface RendererOptions {
   base?: string;
-  quality?: 'high' | 'low';
+  /** 'lite' is the low-detail mode: a small render size, a short draw distance, no shadows,
+   *  no post-processing, no sky shader and fewer trees, props and parked cars. */
+  quality?: 'high' | 'low' | 'lite';
   post?: boolean;
+}
+
+/** Rendered height, in device pixels, of the low-detail mode. */
+const LITE_HEIGHT = 270;
+const LITE_FAR = 320;
+
+/** True when WebGL is drawn on the CPU (SwiftShader, llvmpipe and the like). There a frame of
+ *  the full city takes seconds, so the low-detail mode is chosen before the first frame. */
+function softwareGl(renderer: T.WebGLRenderer) {
+  try {
+    const gl = renderer.getContext();
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(
+      info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+    );
+    return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  } catch {
+    return false;
+  }
 }
 
 const scaleTo = (root: T.Object3D, height: number) => {
@@ -166,12 +187,14 @@ export async function createCityRenderer(
   const mobile =
     typeof window !== 'undefined' &&
     (window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 700);
-  const quality = options.quality ?? (mobile ? 'low' : 'high');
   const renderer = new T.WebGLRenderer({
     canvas,
     antialias: false,
     powerPreference: 'high-performance',
   });
+  let lite = options.quality === 'lite' || softwareGl(renderer);
+  const quality =
+    lite || options.quality === 'low' || (!options.quality && mobile) ? 'low' : 'high';
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === 'high' ? 1.5 : 1.25));
   renderer.outputColorSpace = T.SRGBColorSpace;
   renderer.toneMapping = T.ACESFilmicToneMapping;
@@ -300,7 +323,10 @@ export async function createCityRenderer(
     }),
   );
   city.add(terrain);
-  const water = new T.Mesh(new T.PlaneGeometry(60000, 60000), waterMaterial(tex));
+  const water: T.Mesh<T.PlaneGeometry, T.Material> = new T.Mesh(
+    new T.PlaneGeometry(60000, 60000),
+    waterMaterial(tex),
+  );
   water.rotation.x = -Math.PI / 2;
   water.position.set(-1400, 0.12, 1000);
   water.receiveShadow = true;
@@ -318,6 +344,7 @@ export async function createCityRenderer(
   const facade = buildingMaterial(tex);
   const buildings = buildBuildings(world, facade, landmarks.skip);
   city.add(buildings.group, landmarks.group);
+  let rooftops: T.InstancedMesh | null = null;
   if (buildings.units.length > 0) {
     const units = new T.InstancedMesh(
       new T.BoxGeometry(1, 1, 1),
@@ -329,6 +356,7 @@ export async function createCityRenderer(
     units.castShadow = units.receiveShadow;
     units.computeBoundingSphere();
     city.add(units);
+    rooftops = units;
   }
 
   const leafTex = tex.leaf;
@@ -350,6 +378,11 @@ export async function createCityRenderer(
     const t = prepareCar(models[`${n}-lod`], carTemplates[n]);
     return new InstancedSet(t.root, 500, t.paint, carTemplates[n].wheels, false);
   });
+  /** The simple car models, which traffic drives in the low-detail mode. */
+  const lodTemplates: Partial<Record<CarName, CarTemplate>> = {};
+  for (const n of LOD_MODELS)
+    if (!(PARKED_MODELS as readonly string[]).includes(n))
+      lodTemplates[n] = prepareCar(models[`${n}-lod`], carTemplates[n]);
   for (const set of [...treeSets, ...propSets, ...parkedNear, ...parkedFar])
     for (const m of set.meshes) city.add(m);
   const mtx = new T.Matrix4(),
@@ -367,7 +400,7 @@ export async function createCityRenderer(
       const x = tr[i],
         z = tr[i + 1];
       const d2 = (x - cx) ** 2 + (z - cz) ** 2;
-      if (d2 > 520 * 520) continue;
+      if (d2 > (lite ? 110 * 110 : 520 * 520)) continue;
       const kind = tr[i + 2];
       const h = hash(i);
       const park = world.ground(x, z) === GROUND.grass || world.ground(x, z) === GROUND.forest;
@@ -392,7 +425,7 @@ export async function createCityRenderer(
     for (let i = 0; i < pr.length; i += 4) {
       const x = pr[i + 1],
         z = pr[i + 2];
-      if ((x - cx) ** 2 + (z - cz) ** 2 > 260 * 260) continue;
+      if ((x - cx) ** 2 + (z - cz) ** 2 > (lite ? 60 * 60 : 260 * 260)) continue;
       const set = propSets[pr[i]];
       if (!set) continue;
       const lift = world.ground(x, z) === GROUND.sidewalk ? 0.2 : 0.02;
@@ -407,12 +440,13 @@ export async function createCityRenderer(
       const x = pk[i],
         z = pk[i + 1];
       const d2 = (x - cx) ** 2 + (z - cz) ** 2;
-      if (d2 > 300 * 300) continue;
+      if (d2 > (lite ? 100 * 100 : 300 * 300)) continue;
       const m = Math.floor(hash(i * 3) * PARKED_MODELS.length);
       col.setStyle(PAINTS[Math.floor(hash(i * 5) * PAINTS.length)], T.SRGBColorSpace);
       pos.set(x, world.surface(x, z) + 0.06, z);
       q.setFromAxisAngle(up, pk[i + 2] + Math.PI);
-      (d2 < 75 * 75 ? parkedNear : parkedFar)[m].add(mtx.compose(pos, q, scl), col);
+      // The low-detail mode parks the simple models only.
+      (!lite && d2 < 75 * 75 ? parkedNear : parkedFar)[m].add(mtx.compose(pos, q, scl), col);
     }
     for (const s of [...parkedNear, ...parkedFar]) s.end();
   }
@@ -451,7 +485,7 @@ export async function createCityRenderer(
   marker.add(beam, ring);
   city.add(marker);
 
-  const carObj = (model0: TrafficModel | CarName, paint: number) => {
+  const carObj = (model0: TrafficModel | CarName, paint: number, hero = false) => {
     const model = (model0 === 'primo' ? 'asea' : model0) as CarName;
     const colour =
       model === 'taxi'
@@ -459,7 +493,7 @@ export async function createCityRenderer(
         : model === 'bus' || model === 'police'
           ? undefined
           : new T.Color().setStyle(PAINTS[paint % PAINTS.length], T.SRGBColorSpace);
-    const c = instantiateCar(carTemplates[model], colour);
+    const c = instantiateCar((lite && !hero && lodTemplates[model]) || carTemplates[model], colour);
     city.add(c.root);
     return c;
   };
@@ -508,7 +542,53 @@ export async function createCityRenderer(
     to.y = Math.max(to.y, world.surface(to.x, to.z) + 0.7);
   }
 
+  const liteSky = new T.Color('#ccd3d7');
+  /** Switches to the low-detail mode. One way: the full mode is not returned to in a run. */
+  function applyLite() {
+    lite = true;
+    sun.castShadow = false;
+    renderer.shadowMap.enabled = false;
+    sky.visible = false;
+    scene.background = liteSky;
+    scene.environment = null;
+    camera.far = LITE_FAR;
+    camera.updateProjectionMatrix();
+    lastFill.set(1e9, 1e9);
+    // Lights that cost a pass over every pixel, and the rooftop boxes, are left out.
+    scene.remove(headlights, headTarget, ...sirens);
+    if (rooftops) rooftops.visible = false;
+    water.material = new T.MeshBasicMaterial({ color: '#35586a' });
+    // The ground keeps every fourth row and column of its grid and sits a little lower, so
+    // the coarser surface does not come up through the streets.
+    terrain.position.y = -0.5;
+    terrain.traverse((n) => {
+      const mesh = n as T.Mesh;
+      const grid = mesh.userData.grid as [number, number] | undefined;
+      if (!mesh.isMesh || !grid) return;
+      const [nx, nz] = grid;
+      const idx: number[] = [];
+      for (let j = 0; j < nz - 1; j += 4)
+        for (let i = 0; i < nx - 1; i += 4) {
+          const i2 = Math.min(i + 4, nx - 1),
+            j2 = Math.min(j + 4, nz - 1);
+          const a = j * nx + i,
+            b = j2 * nx + i,
+            c = j * nx + i2,
+            d = j2 * nx + i2;
+          idx.push(a, b, c, c, b, d);
+        }
+      mesh.geometry.setIndex(idx);
+    });
+    // Traffic is rebuilt from the simple models on the next frame.
+    for (const t of traffic) city.remove(t.car.root);
+    traffic.length = 0;
+  }
+  /** In the low-detail mode only what is near the camera is drawn. */
+  const near = (x: number, z: number, reach: number) =>
+    !lite || (x - camera.position.x) ** 2 + (z - camera.position.z) ** 2 < reach * reach;
+
   function updateEnv(el: number) {
+    if (lite) return;
     if (Math.abs(el - envSun) < 0.03) return;
     envSun = el;
     (envGround.material as T.MeshBasicMaterial).color.setScalar(0.06 + Math.max(0, el) * 0.25);
@@ -524,11 +604,18 @@ export async function createCityRenderer(
     const w = canvas.clientWidth,
       h = canvas.clientHeight;
     if (w < 1 || h < 1) return;
+    if (lite) {
+      // Half the CSS pixels at most, and never more than LITE_HEIGHT rows.
+      const small = Math.min(0.5, LITE_HEIGHT / h);
+      if (renderer.getPixelRatio() !== small) renderer.setPixelRatio(small);
+    }
     const ratio = renderer.getPixelRatio();
     if (canvas.width !== Math.floor(w * ratio) || canvas.height !== Math.floor(h * ratio)) {
       renderer.setSize(w, h, false);
-      composer.setSize(w, h);
-      composer.setPixelRatio(ratio);
+      if (!lite) {
+        composer.setSize(w, h);
+        composer.setPixelRatio(ratio);
+      }
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     }
@@ -547,14 +634,17 @@ export async function createCityRenderer(
     sun.intensity = day * 3.2 + (1 - day) * 0.12;
     sun.color.set(el < 0.25 ? '#ffc58f' : '#fff4e2');
     if (day < 0.05) sun.color.set('#9fb7ff');
-    hemi.intensity = 0.08 + day * 0.3;
+    // Without the sky's reflection the hemisphere light carries the ambient part.
+    hemi.intensity = lite ? 0.5 + day * 1.3 : 0.08 + day * 0.3;
     const fog = scene.fog as T.FogExp2;
-    fog.density = s.fog ? 0.0042 : 0.00022;
+    // In the low-detail mode the haze closes where the draw distance ends.
+    fog.density = lite ? 0.006 : s.fog ? 0.0042 : 0.00022;
     fog.color.set(s.fog ? '#b9c0c4' : day > 0.5 ? '#ccd3d7' : day > 0.05 ? '#d9b49a' : '#1a2233');
+    if (lite) liteSky.copy(fog.color);
     renderer.toneMappingExposure = s.fog ? 0.75 : 0.62 + day * 0.2 + (1 - day) * 0.4;
     if (playerCar.name !== s.vehicle || playerCar.paint !== s.paint) {
       if (playerCar.obj) city.remove(playerCar.obj.root);
-      playerCar.obj = carObj(s.vehicle, s.paint);
+      playerCar.obj = carObj(s.vehicle, s.paint, true);
       playerCar.name = s.vehicle;
       playerCar.paint = s.paint;
     }
@@ -578,7 +668,7 @@ export async function createCityRenderer(
         traffic[i] = { key, car: carObj(t.model, t.paint) };
       }
       const c = traffic[i].car;
-      c.root.visible = true;
+      c.root.visible = near(t.x, t.z, 160);
       c.root.position.set(t.x, t.y, t.z);
       c.root.rotation.set(0, t.angle + Math.PI, 0);
       c.update(t.spin, 0);
@@ -588,11 +678,11 @@ export async function createCityRenderer(
     s.police.forEach((p, i) => {
       if (!police[i]) police[i] = carObj('police', 0);
       const c = police[i];
-      c.root.visible = true;
+      c.root.visible = near(p.x, p.z, 220);
       c.root.position.set(p.x, p.y, p.z);
       c.root.rotation.set(0, p.angle + Math.PI, 0);
       c.update(p.spin, 0);
-      if (siren < 2) {
+      if (siren < 2 && !lite) {
         const flash = Math.sin(performance.now() / 70 + i) > 0;
         sirens[siren].position.set(p.x, p.y + 2, p.z);
         sirens[siren].intensity = flash === (siren === 0) ? 40 : 4;
@@ -610,7 +700,8 @@ export async function createCityRenderer(
         peds[i] = { model, rig };
       }
       const r = peds[i].rig;
-      r.root.visible = true;
+      r.root.visible = near(p.x, p.z, 70);
+      if (!r.root.visible) return;
       const lift = world.ground(p.x, p.z) === GROUND.sidewalk ? 0.2 : 0.06;
       r.root.position.set(p.x, p.y + lift, p.z);
       r.root.rotation.y = p.angle;
@@ -692,12 +783,12 @@ export async function createCityRenderer(
     sun.target.position.set(sx, fy, sz);
     sun.position.set(sx + light.x * 1200, fy + light.y * 1200, sz + light.z * 1200);
     sun.target.updateMatrixWorld();
-    headlights.intensity = !s.onFoot && day < 0.4 ? 120 : 0;
+    headlights.intensity = !lite && !s.onFoot && day < 0.4 ? 120 : 0;
     headlights.position.set(s.car.x + Math.sin(a) * 2, s.car.y + 0.9, s.car.z + Math.cos(a) * 2);
     headTarget.position.set(s.car.x + Math.sin(a) * 30, s.car.y, s.car.z + Math.cos(a) * 30);
     sky.position.set(camera.position.x, 0, camera.position.z);
     sky.updateMatrixWorld();
-    if (options.post === false) renderer.render(scene, camera);
+    if (options.post === false || lite) renderer.render(scene, camera);
     else composer.render();
   }
 
@@ -714,11 +805,18 @@ export async function createCityRenderer(
     renderer.render(atlas, camera);
   }
 
+  if (lite) applyLite();
   fillInstances(0, 0);
   return {
     world,
     render,
     debug: { scene, renderer, camera, sun },
+    /** Whether the low-detail mode is on. */
+    isLite: () => lite,
+    /** Turns the low-detail mode on; the game does it when frames take over 100 ms. */
+    goLite() {
+      if (!lite && !disposed) applyLite();
+    },
     vehicles: VEHICLES,
     async loadAtlas() {
       if (atlasLoaded) return;

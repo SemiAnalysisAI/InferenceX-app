@@ -12,6 +12,15 @@ import {
   type World,
   type TourId,
 } from './gta-world';
+import {
+  DEFAULT_LOADOUT,
+  dragOf,
+  jobPay,
+  nextBatch,
+  tuningOf,
+  type Loadout,
+  type Tuning,
+} from './gta-loadout';
 
 export interface Controls {
   forward: boolean;
@@ -55,6 +64,8 @@ export interface LaneAgent extends Actor {
   paint: number;
   cruise: number;
   spin: number;
+  /** Seconds a police car has been held up without moving. */
+  idle?: number;
 }
 export interface Ped extends Walker {
   lane: number;
@@ -102,6 +113,9 @@ export interface CityState {
   altitude: number;
   seed: number;
   tour: TourId | null;
+  /** The car's tune: batch size, precision and parts (see gta-loadout). */
+  loadout: Loadout;
+  tune: Tuning;
 }
 
 export const SPECS: Record<
@@ -162,7 +176,7 @@ export function nearestLane(world: World, p: Point, radius: number) {
 export const START_POINT: Point = { x: 470, z: 290 };
 export const SOUTH_POINT: Point = { x: -470, z: 6000 };
 
-export function newCity(world: World, seed = 1): CityState {
+export function newCity(world: World, seed = 1, loadout: Loadout = DEFAULT_LOADOUT): CityState {
   const start = nearestLane(world, START_POINT, 200);
   const p = start?.point || START_POINT;
   const angle = start ? start.point.angle : Math.PI;
@@ -194,6 +208,8 @@ export function newCity(world: World, seed = 1): CityState {
     altitude: 800,
     seed,
     tour: null,
+    loadout,
+    tune: tuningOf(loadout),
   };
   populate(world, s, true);
   return s;
@@ -277,7 +293,9 @@ export function interact(world: World, s: CityState) {
     s.message = 'repair';
     return true;
   }
-  s.cash += 1500 + s.job * 500;
+  s.cash += jobPay(s.job, s.tune);
+  // A warm KV cache: the delivery does not start from nothing, and the car is patched up.
+  s.health = Math.min(100, s.health + s.tune.repair);
   s.job++;
   s.message = 'pickup';
   if (s.job === JOB_IDS.length) {
@@ -291,6 +309,18 @@ export function interact(world: World, s: CityState) {
   return true;
 }
 
+/**
+ * Between jobs, with the car stopped, the driver may load a different batch size: a bigger
+ * batch pays more per job and pulls away more slowly. Returns false while moving.
+ */
+export function changeBatch(s: CityState) {
+  if (s.phase !== 'driving' || s.explorer || s.tour !== null || Math.abs(s.car.speed) > 2)
+    return false;
+  s.loadout = { ...s.loadout, batch: nextBatch(s.loadout) };
+  s.tune = tuningOf(s.loadout);
+  return true;
+}
+
 export function changeVehicle(s: CityState) {
   if (s.phase !== 'driving' || s.explorer || s.onFoot || Math.abs(s.car.speed) > 2) return false;
   s.vehicle = VEHICLES[(VEHICLES.indexOf(s.vehicle) + 1) % VEHICLES.length];
@@ -300,6 +330,8 @@ export function changeVehicle(s: CityState) {
 
 export function travel(world: World, s: CityState, to: 'city' | 'south') {
   if (s.phase !== 'driving' || s.explorer || Math.abs(s.player.speed) > 2) return false;
+  // No free way out of a chase: the police have to be lost on the road first.
+  if (s.heat > 0) return false;
   const goal = to === 'south' ? SOUTH_POINT : START_POINT;
   const lane = nearestLane(world, goal, 400);
   const p = lane?.point || goal;
@@ -489,7 +521,8 @@ function slide(world: World, a: Actor, dx: number, dz: number, radius: number) {
 
 function stepCar(world: World, s: CityState, c: Controls, dt: number) {
   const car = s.car,
-    spec = SPECS[s.vehicle];
+    base = SPECS[s.vehicle];
+  const spec = { ...base, top: base.top * s.tune.top, accel: base.accel * s.tune.accel };
   const throttle = Number(c.forward) - Number(c.reverse),
     turn = Number(c.right) - Number(c.left);
   const maxSteer = 0.62 / (1 + Math.abs(car.speed) / 14);
@@ -507,8 +540,7 @@ function stepCar(world: World, s: CityState, c: Controls, dt: number) {
       3;
     force -= 9.81 * Math.sin(Math.atan(grade));
     car.speed += force * dt;
-    const drag = 0.0009 * car.speed * Math.abs(car.speed) + 0.25 * Math.sign(car.speed);
-    car.speed -= drag * dt;
+    car.speed -= dragOf(car.speed) * dt;
     if (c.brake) car.speed *= Math.exp(-2.6 * dt);
     if (!throttle && Math.abs(car.speed) < 0.3 && Math.abs(grade) < 0.12) car.speed = 0;
     car.speed = Math.max(-14, Math.min(spec.top, car.speed));
@@ -527,7 +559,7 @@ function stepCar(world: World, s: CityState, c: Controls, dt: number) {
     car.speed *= moved ? 0.82 : -0.25;
     car.slip *= 0.3;
     if (before > 6 && s.immunity === 0) {
-      s.health = Math.max(0, s.health - Math.min(25, before * 0.6));
+      s.health = Math.max(0, s.health - Math.min(25, before * 0.6) * s.tune.damage);
       s.immunity = 0.6;
     }
   }
@@ -621,9 +653,11 @@ function stepAgents(world: World, s: CityState, dt: number) {
       !s.onFoot &&
       distance(t, s.car) < 3.2 &&
       Math.abs(s.car.speed - t.speed) > 6 &&
+      // A parked car is not to blame for what drives into it or past it.
+      Math.abs(s.car.speed) > 2 &&
       !s.immunity
     ) {
-      s.health = Math.max(0, s.health - 8);
+      s.health = Math.max(0, s.health - 8 * s.tune.damage);
       s.car.speed *= -0.3;
       s.immunity = 1;
       if (s.heat === 0) {
@@ -651,6 +685,8 @@ function stepAgents(world: World, s: CityState, dt: number) {
         cop.angle += 1.2 * dt * 6;
         cop.speed *= 0.5;
       }
+      // A patrol car held up behind a building for five seconds is replaced by one on the road.
+      cop.idle = !moved || cop.speed < 1 ? (cop.idle ?? 0) + dt : 0;
       cop.y = world.surface(cop.x, cop.z);
     } else {
       cop.speed += (cop.cruise - cop.speed) * dt;
@@ -664,10 +700,12 @@ function stepAgents(world: World, s: CityState, dt: number) {
     }
     cop.spin += (cop.speed * dt) / 0.34;
     if (d < 3 && !s.immunity) {
-      s.health = Math.max(0, s.health - 10);
+      s.health = Math.max(0, s.health - 10 * s.tune.damage);
       s.immunity = 1.4;
     }
   }
+  if (s.police.some((cop) => (cop.idle ?? 0) > 5 && distance(cop, s.player) > 12))
+    s.police = s.police.filter((cop) => !((cop.idle ?? 0) > 5 && distance(cop, s.player) > 12));
   for (const p of s.peds) {
     if (p.down > 0) {
       p.down = Math.max(0, p.down - dt);
@@ -768,6 +806,10 @@ export function cityText(world: World, s: CityState) {
     camera: s.camera,
     cash: s.cash,
     heat: s.heat,
+    batch: s.loadout.batch,
+    precision: s.loadout.precision,
+    parts: s.loadout.owned,
+    tune: s.tune,
     target: t,
     distanceToTarget: Math.round(distance(s.player, t)),
     street: world.street(s.player.x, s.player.z),

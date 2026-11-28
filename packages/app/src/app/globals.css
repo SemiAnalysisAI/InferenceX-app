@@ -430,7 +430,21 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-ring: #ffffff;
   --radius: 0.125rem;
   --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
-  --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
+  --gta-menu:
+    var(--font-chalet-comprime), 'ChaletComprime', 'PingFang SC', 'Microsoft YaHei', 'Arial Narrow',
+    sans-serif;
+  --destructive: #e03232;
+  --chart-grid: rgb(255 255 255 / 0.14);
+  /* Run overlays in radar blip colours: enemy red, friendly blue, mission yellow, purple,
+     green, pink, cyan, orange. All bright enough to read on the black map. */
+  --overlay-run-0: #e85050;
+  --overlay-run-1: #5db6e5;
+  --overlay-run-2: #f0c850;
+  --overlay-run-3: #a98bf0;
+  --overlay-run-4: #72cc72;
+  --overlay-run-5: #f078b4;
+  --overlay-run-6: #4fd6d0;
+  --overlay-run-7: #ffa357;
 }
 .halo {
   --font-industry: 'Industry';

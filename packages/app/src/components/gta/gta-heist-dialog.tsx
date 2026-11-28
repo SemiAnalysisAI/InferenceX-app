@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { GtaGame } from './gta-game';
+import { CITY_NAME } from './gta-world';
 
 export default function GtaHeistDialog({ onClose }: { onClose: () => void }) {
   const locale = useLocale();
@@ -22,7 +23,7 @@ export default function GtaHeistDialog({ onClose }: { onClose: () => void }) {
         }}
       >
         <DialogTitle className="sr-only">
-          {locale === 'zh' ? 'Los Santos 夜行' : 'Los Santos After Hours'}
+          {locale === 'zh' ? `${CITY_NAME.zh} 夜行` : `${CITY_NAME.en} After Hours`}
         </DialogTitle>
         <DialogDescription className="sr-only">
           {locale === 'zh'

@@ -77,6 +77,8 @@ export function buildTerrain(world: World, material: T.Material) {
     g.computeBoundingSphere();
     const mesh = new T.Mesh(g, material);
     mesh.receiveShadow = true;
+    // The size of the grid, for the renderer's low-detail mode to thin it.
+    mesh.userData.grid = [nx, nz];
     return mesh;
   };
   for (let cj = 0; cj < H - 1; cj += span)

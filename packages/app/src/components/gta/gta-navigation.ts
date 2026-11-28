@@ -10,6 +10,30 @@ interface Segment {
 }
 const graphs = new WeakMap<World, Map<string, Node>>();
 const segments = new WeakMap<World, Segment[]>();
+const penalties = new WeakMap<World, Map<string, number>>();
+
+/**
+ * Extra cost for a stretch of mapped road that the car cannot drive: every metre of it that
+ * sits inside a building, water or the map edge counts as forty. The GPS line then goes round
+ * such a stretch where another street exists and only uses it when nothing else connects.
+ */
+function penalty(world: World, a: Point, b: Point, id = '') {
+  let known = penalties.get(world);
+  if (!known) penalties.set(world, (known = new Map()));
+  let cost = id ? known.get(id) : undefined;
+  if (cost === undefined) {
+    const length = distance(a, b),
+      steps = Math.max(1, Math.ceil(length / 3));
+    let hits = 0;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      if (world.blocked({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, 1.15)) hits++;
+    }
+    cost = (hits / (steps + 1)) * length * 40;
+    if (id) known.set(id, cost);
+  }
+  return cost;
+}
 
 function project(p: Point, a: Point, b: Point) {
   const dx = b.x - a.x,
@@ -92,6 +116,8 @@ function graphFor(world: World) {
 
 export function streetRoute(world: World, from: Point, to: Point): Point[] {
   if (distance(from, to) < 18) return [];
+  // A stop that is close and in plain sight needs no tour of the one-way streets.
+  if (distance(from, to) < 220 && penalty(world, from, to) === 0) return [from, to];
   const graph = graphFor(world);
   const nearest = (p: Point) => {
     let snap: (Segment & { point: Point }) | null = null;
@@ -148,17 +174,30 @@ export function streetRoute(world: World, from: Point, to: Point): Point[] {
     }
     return root;
   };
-  push(start.b, distance(start.point, graph.get(start.b)!), '');
-  if (!start.oneway) push(start.a, distance(start.point, graph.get(start.a)!), '');
+  const lead = (node: Point) => distance(start.point, node) + penalty(world, start.point, node);
+  push(start.b, lead(graph.get(start.b)!), '');
+  if (!start.oneway) push(start.a, lead(graph.get(start.a)!), '');
   while (heap.length > 0) {
     const current = pop();
     if (current.cost !== dist.get(current.key)) continue;
     if (current.key === goal) break;
     if (current.key === end.a || (!end.oneway && current.key === end.b)) {
-      push(goal, current.cost + distance(graph.get(current.key)!, end.point), current.key);
+      const last = graph.get(current.key)!;
+      push(
+        goal,
+        current.cost + distance(last, end.point) + penalty(world, last, end.point),
+        current.key,
+      );
     }
-    for (const [key, cost] of graph.get(current.key)!.edges) {
-      push(key, current.cost + cost, current.key);
+    const here = graph.get(current.key)!;
+    for (const [key, cost] of here.edges) {
+      const blocked = penalty(
+        world,
+        here,
+        graph.get(key)!,
+        current.key < key ? `${current.key}|${key}` : `${key}|${current.key}`,
+      );
+      push(key, current.cost + cost + blocked, current.key);
     }
   }
   if (!dist.has(goal)) return [];
