@@ -1,0 +1,264 @@
+.south-park .sp-tv-room {
+  display: block;
+  width: min(670px, calc(100vw - 22px));
+  max-width: 670px;
+  max-height: 92dvh;
+  overflow: auto;
+  padding: 0;
+  border: 3px solid #162d48;
+  background: #fff6df;
+  color: #182b40;
+  border-radius: 5px;
+  font-family: SouthParkBody, system-ui, sans-serif;
+}
+.south-park .sp-tv-room > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 44px 12px 17px;
+  color: #fff7e3;
+  background: #193553;
+  border-bottom: 4px solid #ffa628;
+}
+.south-park .sp-tv-room > header img {
+  width: 100px;
+  height: auto;
+}
+.south-park .sp-tv-room > header h2 {
+  text-transform: uppercase;
+  font:
+    400 clamp(17px, 2.4vw, 24px)/1 SouthParkDisplay,
+    system-ui,
+    sans-serif;
+  margin: 0;
+}
+.south-park .sp-tv-room > header h2,
+.south-park .sp-tv-room .sp-chyron h3 {
+  font-family: SouthParkCutout, SouthParkDisplay, system-ui, sans-serif;
+}
+.south-park .sp-tv-room > header span {
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.south-park .sp-tv-room > [data-slot='dialog-close'],
+.south-park .sp-tv-room > button {
+  color: #fff9df;
+}
+.south-park .sp-tv-stage {
+  position: relative;
+  isolation: isolate;
+  height: clamp(168px, 30vw, 258px);
+  overflow: hidden;
+  background: #417699;
+}
+.south-park .sp-tv-back,
+.south-park .sp-tv-guest {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.south-park .sp-tv-back {
+  object-position: 50% 48%;
+}
+.south-park .sp-tv-evidence {
+  object-fit: contain;
+  background: #24364a;
+  object-position: 22% 50%;
+  height: calc(100% - 33px);
+}
+.south-park .sp-tv-guest {
+  width: 62%;
+  height: 76%;
+  top: auto;
+  bottom: 27px;
+  left: 12%;
+  object-fit: contain;
+  filter: drop-shadow(3px 3px 0 #182b4045);
+}
+.south-park .sp-tv-location {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 700;
+  background: #122f4d;
+  color: white;
+}
+.south-park .sp-tv-location b {
+  background: #a72529;
+  padding: 3px 7px;
+}
+.south-park .sp-tv-location span {
+  padding: 2px 8px;
+}
+.south-park .sp-tv-anchor {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  width: 24%;
+  max-width: 150px;
+  border: 2px solid #f7d375;
+  background: #233d60;
+  color: white;
+}
+.south-park .sp-tv-anchor img {
+  display: block;
+  width: 100%;
+}
+.south-park .sp-tv-anchor span {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 4px;
+  display: block;
+}
+.south-park .sp-chyron {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  background: #163351ed;
+  color: white;
+  border-bottom: 3px solid #ffa628;
+}
+.south-park .sp-chyron i {
+  align-self: stretch;
+  padding: 0 15px;
+  background: #a8222c;
+  color: white;
+  font:
+    400 36px/1.05 SouthParkDisplay,
+    sans-serif;
+}
+.south-park .sp-chyron h3 {
+  margin: 0;
+  padding: 2px 12px;
+  font:
+    400 22px/1 SouthParkDisplay,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-tv-desk {
+  padding: 15px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #8d998b;
+  min-height: 88px;
+}
+.south-park .sp-tv-desk p {
+  font-size: 16px;
+  line-height: 1.25;
+  margin: 0;
+}
+.south-park .sp-tv-desk strong {
+  display: block;
+  color: #83242c;
+  font-size: 13px;
+}
+.south-park .sp-tv-room button:focus-visible {
+  outline: 3px solid #c66d14;
+  outline-offset: 2px;
+}
+.south-park .sp-tv-desk button,
+.south-park .sp-tv-room nav button {
+  cursor: pointer;
+  border: 1px solid #465974;
+  border-radius: 3px;
+  font-weight: 700;
+  color: #172c47;
+  background: #fbf4de;
+  min-height: 37px;
+}
+.south-park .sp-tv-desk button {
+  flex: none;
+  padding: 6px 10px;
+  max-width: 42%;
+  background: #213e5b;
+  color: white;
+}
+.south-park .sp-tv-room nav {
+  padding: 8px 16px;
+}
+.south-park .sp-tv-room nav > b {
+  font:
+    400 17px SouthParkDisplay,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-tv-room nav > div {
+  margin-top: 5px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.south-park .sp-tv-room nav button {
+  padding: 4px 7px;
+  font-size: 13px;
+}
+.south-park .sp-tv-room nav small {
+  padding-right: 5px;
+  opacity: 0.8;
+}
+.south-park .sp-tv-room nav [aria-pressed='true'] {
+  background: #243d59;
+  color: white;
+  border-color: #102c49;
+}
+.south-park .sp-tv-room > p {
+  font-size: 12px;
+  margin: 0;
+  padding: 8px 16px;
+  background: #141414;
+  color: white;
+  font-family: ui-monospace, monospace;
+  text-transform: uppercase;
+}
+@media (max-width: 480px) {
+  .south-park .sp-tv-room > header img {
+    width: 73px;
+  }
+  .south-park .sp-tv-room > header {
+    gap: 6px;
+    padding-left: 10px;
+  }
+  .south-park .sp-tv-room > header span {
+    display: none;
+  }
+  .south-park .sp-tv-desk,
+  .south-park .sp-tv-room nav {
+    padding: 9px;
+  }
+  .south-park .sp-tv-room nav button {
+    min-height: 38px;
+  }
+}
+@media (forced-colors: active) {
+  .south-park .sp-tv-room nav [aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+  .south-park .sp-tv-stage img {
+    forced-color-adjust: none;
+  }
+  .south-park .sp-tv-location,
+  .south-park .sp-chyron {
+    color: CanvasText;
+    background: Canvas;
+  }
+}
+.south-park .sp-closed-captions {
+  display: block;
+  margin: 2px 0 4px;
+  color: #514931;
+  font:
+    500 13px/1.25 system-ui,
+    sans-serif;
+}

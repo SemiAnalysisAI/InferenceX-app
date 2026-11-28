@@ -546,6 +546,41 @@ html[data-inferencex-embed] .autumn-leaves {
   --radius: 0.5rem;
 }
 
+/* south-park theme tokens: begin */
+.south-park {
+  color-scheme: light;
+  --background: #e9e9da;
+  --foreground: #21382e;
+  --card: #fffdf2;
+  --card-foreground: #23392f;
+  --popover: #fffbee;
+  --popover-foreground: #263a30;
+  --primary: #245b46;
+  --primary-foreground: #fff9e6;
+  --secondary: #dfe9da;
+  --secondary-foreground: #234a37;
+  --brand: var(--primary);
+  --brand-fill: var(--brand);
+  --muted: #e5eadc;
+  --muted-foreground: #4e5c4d;
+  --accent: #efce76;
+  --accent-foreground: #2c382c;
+  --border: #86917d;
+  --border-alt: #415b48;
+  --input: #7c8876;
+  --ring: #a6402d;
+  --sidebar: #fffbea;
+  --sidebar-foreground: #23392f;
+  --sidebar-primary: #245b46;
+  --sidebar-primary-foreground: #fffbea;
+  --sidebar-accent: #f4d788;
+  --sidebar-accent-foreground: #26392e;
+  --sidebar-border: #677a66;
+  --sidebar-ring: #a6402d;
+  --radius: 0.2rem;
+}
+/* south-park theme tokens: end */
+
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,

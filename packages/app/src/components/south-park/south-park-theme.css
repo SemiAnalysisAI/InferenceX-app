@@ -1,0 +1,2972 @@
+@font-face {
+  font-family: SouthParkKuaiLe;
+  src: url('../../app/fonts/SouthPark-KuaiLe.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+3400-9FFF, U+F900-FAFF;
+}
+@font-face {
+  font-family: SouthParkCutout;
+  src: url('../../app/fonts/SouthPark-Cutout.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: SouthParkDisplay;
+  src: url('../../app/fonts/SouthPark-Display.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: SouthParkBody;
+  src: url('../../app/fonts/SouthPark-Body.woff2') format('woff2');
+  font-weight: 400 500;
+  font-display: swap;
+}
+.south-park body {
+  --font-dm-sans:
+    SouthParkBody, 'Arial Narrow', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui,
+    sans-serif;
+  --sp-ink: #283b32;
+  --sp-pine: #1d5949;
+  font-family: var(--font-dm-sans);
+  background-color: #e8e8d9;
+  background-image: repeating-linear-gradient(
+    104deg,
+    transparent 0 3px,
+    #777c5910 3px 4px,
+    transparent 4px 8px
+  );
+}
+.south-park [data-testid='autumn-leaves'] {
+  display: none;
+}
+.south-park [data-testid='header'] {
+  margin-bottom: 0;
+  background: #fffbed;
+  border-bottom: 3px solid var(--sp-ink);
+  box-shadow: 0 2px 0 #53664a40;
+}
+.south-park [data-testid='header'] nav a {
+  font-weight: 600;
+}
+.south-park [data-testid='header'] nav a[aria-current='page'],
+.south-park [role='tab'][aria-selected='true'] {
+  background: var(--sp-pine);
+  color: #fffbea;
+  border-radius: 3px;
+  box-shadow: 2px 2px 0 #142d2555;
+}
+.south-park :where(h1, h2, h3, [data-slot='card-title'], .x-axis-label, .y-axis-label) {
+  font-family: SouthParkDisplay, var(--font-dm-sans);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+.south-park [data-slot='card'] {
+  border: 1.5px solid #6d7869;
+  border-radius: 3px 5px 4px 2px;
+  background: #fffdf2;
+  box-shadow: 3px 3px 0 #62715d60;
+}
+.south-park [data-testid='compare-agentx-primary'] > [data-slot='card'] {
+  border: 2px solid var(--sp-ink);
+  box-shadow: 4px 4px 0 #61746175;
+}
+.south-park [data-testid='compare-agentx-primary'] h1 {
+  color: #213f34;
+}
+.south-park :where([data-slot='button'], [role='combobox'], input:not([type='range']), select) {
+  border-radius: 3px;
+}
+.south-park [data-slot='button']:not(:disabled):hover {
+  outline: 1px solid #345d4a;
+  outline-offset: -1px;
+}
+.south-park
+  :where(
+    [data-testid='compare-agentx-revenue-calculator-link'],
+    [data-testid='compare-agentx-dashboard-link']
+  ) {
+  border: 1.5px solid var(--sp-ink);
+  border-radius: 3px;
+  box-shadow: 2px 3px 0 #203c32;
+}
+.south-park :where([role='dialog'], [data-chart-tooltip]) {
+  background-color: #fffbe8;
+  border: 1.5px solid var(--sp-ink);
+  box-shadow: 3px 3px 0 #34574465;
+}
+.south-park .sp-radio {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  color: #284a3d;
+  background: #fffdf3;
+  border: 1px solid #7c8775;
+  border-radius: 3px;
+  box-shadow: 1px 2px 0 #839485;
+  cursor: pointer;
+}
+.south-park .sp-radio:hover {
+  background: #f3d988;
+}
+.south-park .sp-radio[aria-pressed='false'] {
+  color: #7b7467;
+  background: #efebde;
+}
+.south-park .sp-radio[aria-pressed='false']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 21%;
+  right: 21%;
+  height: 1.5px;
+  background: currentColor;
+  rotate: -45deg;
+}
+.south-park :where(.sp-radio, .sp-sign, .sp-actor):focus-visible {
+  outline: 3px solid #a33421;
+  outline-offset: 3px;
+}
+
+/* A county visitor postcard: the sign and character cutouts are studio art. */
+.south-park .sp-banner-wrap {
+  margin: 16px auto 20px;
+  padding-inline: clamp(16px, 2.22vw, 32px);
+  width: 100%;
+  max-width: 1536px;
+  position: relative;
+}
+.south-park .sp-postcard {
+  position: relative;
+  isolation: isolate;
+  height: clamp(208px, 16.9vw, 247px);
+  overflow: hidden;
+  border: 2px solid #2a4035;
+  border-radius: 4px 7px 3px 3px;
+  background: #9bd9de;
+  box-shadow: 4px 4px 0 #53654e82;
+}
+.south-park .sp-scenery {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url('/decorative/south-park/art/pass.svg') center / 100% 100% no-repeat;
+}
+.south-park .sp-county,
+.south-park .sp-log-cap,
+.south-park .sp-ticket-foot {
+  font-family: SouthParkBody, system-ui, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+.south-park .sp-county {
+  position: absolute;
+  top: 12px;
+  left: 18px;
+  padding: 4px 9px 4px 7px;
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  background: #184e40;
+  color: #fff8d9;
+  border-radius: 2px;
+  font-size: 11px;
+  line-height: 1.15;
+  box-shadow: 2px 2px 0 #527e71;
+}
+.south-park .sp-sign {
+  appearance: none;
+  color: #232719;
+  background: none;
+  border: 0;
+  width: clamp(135px, 15vw, 216px);
+  height: 77%;
+  left: 10%;
+  top: 10%;
+  position: absolute;
+  padding: 0;
+  filter: drop-shadow(3px 3px 0 #2f3f324a);
+  cursor: pointer;
+}
+.south-park .sp-sign img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.south-park .sp-sign > span {
+  position: absolute;
+  top: -7%;
+  left: 47%;
+  z-index: 1;
+  rotate: -6deg;
+  font:
+    600 clamp(11px, 1vw, 14px)/1 SouthParkBody,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 3px 7px;
+  color: #30362d;
+  background: #fdedaf;
+  border: 1px solid #8e875b;
+}
+.south-park .sp-lineup {
+  position: absolute;
+  left: 34%;
+  right: 29%;
+  bottom: 20.8%;
+  height: 1px;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+}
+.south-park .sp-home-mark {
+  width: 1px;
+  height: 1px;
+}
+.south-park .sp-log {
+  text-align: left;
+  cursor: pointer;
+  position: absolute;
+  top: 16%;
+  right: 4.5%;
+  width: clamp(174px, 17.5vw, 247px);
+  transform: rotate(1.8deg);
+  padding: 10px 14px 9px;
+  color: #293b31;
+  background: #fff2c8;
+  border: 1.5px solid #3c4c3d;
+  box-shadow: 4px 5px 0 #39503b5e;
+}
+.south-park .sp-log::before {
+  content: '';
+  position: absolute;
+  width: 56px;
+  height: 11px;
+  background: #e2d3a7dc;
+  border-left: 1px dashed #a39b7e;
+  border-right: 1px dashed #a39b7e;
+  left: 37%;
+  top: -7px;
+  transform: rotate(-5deg);
+}
+.south-park .sp-log-cap {
+  font-size: 11px;
+  line-height: 1.4;
+  padding-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b5335;
+  border-bottom: 1px solid #8f8462;
+}
+.south-park .sp-log-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  white-space: nowrap;
+  padding: 3px 0;
+}
+.south-park .sp-log-main span {
+  font:
+    400 clamp(15px, 1.35vw, 21px)/1 SouthParkDisplay,
+    var(--font-dm-sans);
+}
+.south-park .sp-log-main strong {
+  color: #a43a2e;
+  font:
+    400 clamp(26px, 3vw, 43px)/1.08 SouthParkDisplay,
+    var(--font-dm-sans);
+  font-variant-numeric: tabular-nums;
+}
+.south-park .sp-log-note {
+  line-height: 1.25;
+  font-size: 13px;
+  color: #65583d;
+  border-top: 1px dashed #a59770;
+  padding-top: 5px;
+}
+.south-park .sp-ticket-foot {
+  pointer-events: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  color: #fff8df;
+  padding: 3px 13px;
+  font-size: 9px;
+  line-height: 1;
+}
+.south-park .sp-ticket-foot span {
+  background: #455254;
+  padding-inline: 4px;
+}
+.south-park .sp-mobile-radio {
+  display: none;
+}
+.south-park [data-testid='footer'] {
+  padding-top: 120px;
+}
+.south-park [data-testid='footer']::before {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 12px 0 auto;
+  height: 98px;
+  background: #96d5de url('/decorative/south-park/art/town.webp') 50% 57% / cover no-repeat;
+  border-block: 2px solid #445b4f;
+  pointer-events: none;
+}
+.south-park [data-testid='footer'] > div {
+  background: #fffbed;
+}
+.south-park figure[data-testid='chart-figure'] {
+  border-top: 3px solid #2c604c;
+  background-color: #fffdf3;
+}
+.south-park [data-testid='d3-chart-svg'] {
+  background-color: transparent;
+  font-family: var(--font-dm-sans);
+}
+.south-park [data-testid='d3-chart-svg'] :is(.gridline, .grid-lines line, .grid line) {
+  stroke: #8b9f93;
+  stroke-dasharray: 3 4;
+}
+.south-park .dot-group circle:not(.dot-hit-area) {
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+
+.south-park .south-park-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+  overflow: hidden;
+  contain: layout paint;
+  --kid-size: clamp(67px, 6vw, 91px);
+}
+.south-park .south-park-scene:is([data-place='plot'], [data-place='card'], [data-place='footer']) {
+  --kid-size: 43px;
+}
+.south-park .sp-kid {
+  position: absolute;
+  width: 0;
+  height: 0;
+  top: 0;
+  left: 0;
+}
+.south-park .sp-kid[hidden] {
+  display: none;
+}
+.south-park .south-park-scene[data-place='curtain'] {
+  --kid-size: 42px;
+}
+.south-park .south-park-scene[data-place='curtain']::before {
+  content: '';
+  position: absolute;
+  right: 18px;
+  bottom: 13px;
+  width: 191px;
+  height: 11px;
+  background: #faf9e9;
+  border-bottom: 3px solid #55816b;
+  border-radius: 50%;
+}
+.south-park .sp-kid[data-edge='right'] .sp-balloon {
+  left: auto;
+  right: 0;
+  margin-left: 0;
+}
+.south-park .sp-kid[data-edge='right'] .sp-cameo {
+  left: auto;
+  right: 72%;
+}
+.south-park .sp-leap {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+.south-park .sp-feet {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+}
+.south-park .sp-actor {
+  pointer-events: auto;
+  cursor: pointer;
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  width: auto;
+  height: var(--kid-size);
+  outline-offset: 2px;
+}
+.south-park .sp-actor::before {
+  content: '';
+  position: absolute;
+  width: 92%;
+  left: 5%;
+  bottom: -1px;
+  background: #3853473b;
+  height: 5px;
+  border-radius: 50%;
+}
+.south-park .sp-cutout {
+  display: block;
+  max-width: none;
+  height: 100%;
+  width: auto;
+  filter: drop-shadow(1px 2px 0 #37473477);
+  transform-origin: center bottom;
+}
+.south-park .sp-actor:hover .sp-cutout {
+  filter: drop-shadow(1px 1px 0 #fff) drop-shadow(-1px -1px 0 #fff) drop-shadow(2px 2px 0 #486052);
+}
+/* The feet sit on benchmark coordinates. Keep that exact point available to chart clicks and tooltips. */
+.south-park .south-park-scene[data-place='plot'] .sp-actor {
+  pointer-events: none;
+}
+.south-park .south-park-scene[data-place='plot'] .sp-actor::after {
+  content: '';
+  position: absolute;
+  inset: 1% 7% 27%;
+  pointer-events: auto;
+}
+.south-park .sp-balloon {
+  position: absolute;
+  z-index: 3;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  width: max-content;
+  max-width: 145px;
+  margin-left: -50%;
+  border: 1.5px solid #25382e;
+  background: #fffae6;
+  color: #2c342c;
+  padding: 4px 8px;
+  border-radius: 5px 5px 5px 0;
+  box-shadow: 2px 2px 0 #35483d70;
+  font: 600 14px/1.12 var(--font-dm-sans);
+  transform: rotate(-2deg);
+}
+.south-park .sp-balloon::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  bottom: -5px;
+  width: 7px;
+  height: 7px;
+  background: #fffae6;
+  border: solid #25382e;
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
+.south-park .sp-cameo {
+  position: absolute;
+  left: 81%;
+  bottom: 0;
+  width: auto;
+  height: calc(var(--kid-size) * 0.84);
+  max-width: none;
+  filter: drop-shadow(2px 2px 0 #40533e66);
+  animation: sp-cameo 0.45s steps(6, end) both;
+}
+.south-park .sp-snow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.south-park .sp-snow i {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: #fffef0;
+  box-shadow: 1px 1px 0 #78978c48;
+  animation: sp-fall 11s linear infinite;
+  opacity: 0.64;
+}
+.south-park .sp-snow i:nth-child(3n) {
+  height: 6px;
+  width: 6px;
+}
+.south-park .sp-pellet {
+  position: absolute;
+  left: -4px;
+  bottom: calc(var(--kid-size) * 0.55);
+  width: 12px;
+  height: 11px;
+  border: 1px solid #47625f;
+  border-radius: 45% 56% 45% 51%;
+  background: #fff;
+  box-shadow: inset -2px -2px 0 #c1ddde;
+  animation: sp-toss 1350ms ease-in-out both;
+}
+.south-park .sp-puff {
+  background: #efa346;
+  border-color: #84421b;
+  box-shadow: inset -2px -2px 0 #d66b2f;
+}
+.south-park .sp-kid[data-hit] .sp-cutout {
+  animation: sp-flinch 0.44s steps(5, end) 1.03s;
+}
+.south-park .south-park-scene[data-snacks] .sp-snow i {
+  background: #ea8f34;
+  width: 8px;
+  height: 6px;
+  border-radius: 48%;
+  border: 1px solid #90512a;
+  opacity: 0.87;
+}
+.south-park .sp-prop {
+  position: absolute;
+  z-index: 2;
+  bottom: 0;
+  left: 50%;
+  margin-left: calc(var(--kid-size) * -0.52);
+  width: calc(var(--kid-size) * 1.04);
+  height: calc(var(--kid-size) * 1.04);
+  overflow: visible;
+  filter: drop-shadow(1px 2px 0 #474e3c70);
+}
+.south-park .sp-prop:is(.sp-prop-0, .sp-prop-7, .sp-prop-11) {
+  animation: sp-crush 2.05s steps(12, end) both;
+}
+.south-park .sp-prop-1 {
+  animation: sp-spike 1.95s steps(8, end) both;
+}
+.south-park .sp-prop-2 {
+  animation: sp-zap 1.7s steps(8, end) both;
+}
+.south-park .sp-prop-3 {
+  animation: sp-axis 1.7s steps(10, end) both;
+}
+.south-park .sp-prop:is(.sp-prop-4, .sp-prop-8) {
+  animation: sp-drive 1.7s steps(12, end) both;
+}
+.south-park .sp-prop-5 {
+  animation: sp-drift 1.85s steps(9, end) both;
+}
+.south-park .sp-prop-6 {
+  animation: sp-beam 2.2s steps(14, end) both;
+}
+.south-park .sp-prop-9 {
+  animation: sp-scatter 1.55s steps(11, end) both;
+}
+.south-park .sp-prop-10 {
+  animation: sp-whirl 2s ease-in-out both;
+}
+.south-park .sp-kid[data-case] .sp-cutout {
+  animation: sp-squash 4.9s steps(8, end) both;
+}
+.south-park .sp-kid:is([data-case='1'], [data-case='8'], [data-case='9']) .sp-cutout {
+  animation-name: sp-tumble;
+}
+.south-park .sp-kid:is([data-case='3'], [data-case='10']) .sp-cutout {
+  animation-name: sp-drop;
+}
+.south-park .sp-kid:is([data-case='2'], [data-case='11']) .sp-cutout {
+  animation-name: sp-char;
+}
+.south-park .sp-kid[data-case='6'] .sp-cutout {
+  animation-name: sp-lift;
+}
+
+@keyframes sp-cameo {
+  from {
+    transform: translateX(13px) scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes sp-flinch {
+  25% {
+    transform: rotate(12deg) translateY(-4px);
+  }
+  63% {
+    transform: rotate(-6deg);
+  }
+}
+@keyframes sp-fall {
+  from {
+    transform: translate(-10px, -15px) rotate(0);
+  }
+  to {
+    transform: translate(24px, 104vh) rotate(230deg);
+  }
+}
+@keyframes sp-toss {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  52% {
+    transform: translate(calc(var(--dx) * 0.5), calc(var(--dy) * 0.5 - 44px));
+  }
+  86% {
+    opacity: 1;
+  }
+  95%,
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(1.4);
+    opacity: 0;
+  }
+}
+@keyframes sp-crush {
+  0% {
+    transform: translateY(-155%) rotate(-12deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  38%,
+  72% {
+    transform: translateY(0) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) rotate(4deg);
+    opacity: 0;
+  }
+}
+@keyframes sp-spike {
+  0% {
+    transform: scaleY(0);
+    transform-origin: center bottom;
+    opacity: 0;
+  }
+  40%,
+  75% {
+    transform: scaleY(1.2);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes sp-zap {
+  0%,
+  22%,
+  68%,
+  100% {
+    opacity: 0;
+  }
+  17%,
+  45%,
+  79% {
+    transform: translateY(-16%) scale(1.15);
+    opacity: 1;
+  }
+}
+@keyframes sp-axis {
+  0% {
+    transform: rotate(-20deg) translateX(-65%);
+    opacity: 0;
+  }
+  30%,
+  80% {
+    transform: translateX(-35%);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes sp-drive {
+  0% {
+    transform: translateX(-230%) rotate(-6deg);
+    opacity: 0;
+  }
+  15%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(160%) rotate(3deg);
+    opacity: 0;
+  }
+}
+@keyframes sp-drift {
+  0% {
+    transform: translate(-110%, -75%) scale(0.5);
+    opacity: 0;
+  }
+  42%,
+  80% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes sp-beam {
+  0% {
+    transform: translate(100%, -90%);
+    opacity: 0;
+  }
+  26%,
+  65% {
+    transform: translate(0, -68%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-40%, -175%);
+    opacity: 0;
+  }
+}
+@keyframes sp-scatter {
+  0% {
+    transform: translate(-160%, -135%) scale(0.3);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  65% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(65%, -10%) scale(0.6);
+    opacity: 0;
+  }
+}
+@keyframes sp-whirl {
+  0% {
+    transform: scale(0.2) rotate(0);
+    opacity: 0;
+  }
+  42% {
+    transform: scale(1.35) rotate(240deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.1) rotate(690deg);
+    opacity: 0;
+  }
+}
+@keyframes sp-squash {
+  0%,
+  12% {
+    transform: scale(1);
+  }
+  22%,
+  74% {
+    transform: scale(1.45, 0.15) rotate(-3deg);
+    opacity: 1;
+  }
+  90%,
+  100% {
+    transform: scale(1.45, 0.1);
+    opacity: 0;
+  }
+}
+@keyframes sp-tumble {
+  0%,
+  12% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-38deg) translateY(-23%);
+  }
+  40%,
+  80% {
+    transform: rotate(76deg) scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotate(80deg);
+    opacity: 0;
+  }
+}
+@keyframes sp-drop {
+  0%,
+  13% {
+    transform: none;
+  }
+  40%,
+  100% {
+    transform: translateY(120%) rotate(160deg) scale(0.2);
+    opacity: 0;
+  }
+}
+@keyframes sp-char {
+  0%,
+  12% {
+    filter: none;
+  }
+  20%,
+  70% {
+    transform: rotate(9deg) scale(0.91);
+    filter: grayscale(1) brightness(0.4);
+  }
+  90%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes sp-lift {
+  0%,
+  13% {
+    transform: none;
+  }
+  46%,
+  100% {
+    transform: translateY(-110%) scale(0.14);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .south-park .sp-banner-wrap {
+    margin: 11px auto 16px;
+    padding-inline: 12px;
+  }
+  .south-park .sp-postcard {
+    height: 192px;
+  }
+  .south-park .sp-scenery {
+    inset: 0 0 32px;
+    background-size: 170% 100%;
+    background-position: 55% center;
+  }
+  .south-park .sp-county {
+    top: 7px;
+    left: 8px;
+    font-size: 8px;
+    gap: 4px;
+    padding: 3px 5px;
+  }
+  .south-park .sp-county svg {
+    width: 12px;
+    height: 12px;
+  }
+  .south-park .sp-sign {
+    left: 1.5%;
+    top: 20%;
+    width: 26%;
+    height: 48%;
+  }
+  .south-park .sp-sign > span {
+    left: 9%;
+    font-size: 8px;
+    padding: 2px 4px;
+  }
+  .south-park .sp-lineup {
+    left: 31%;
+    right: 5%;
+    bottom: 33%;
+  }
+  .south-park .sp-log {
+    transform: none;
+    inset: auto 0 0;
+    width: 100%;
+    height: 37px;
+    padding: 3px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 7px;
+    border: 0;
+    border-top: 2px solid #4c5c47;
+    box-shadow: none;
+  }
+  .south-park .sp-log::before,
+  .south-park .sp-log-note {
+    display: none;
+  }
+  .south-park .sp-log-cap {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    font-size: 8px;
+    letter-spacing: 0.09em;
+  }
+  .south-park .sp-log-note {
+    display: block;
+    position: absolute;
+    bottom: 4px;
+    left: 8px;
+    padding: 0;
+    border: 0;
+    font-size: 10px;
+    max-width: 48%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .south-park .sp-log-main {
+    gap: 6px;
+  }
+  .south-park .sp-log-main span {
+    font-size: 13px;
+  }
+  .south-park .sp-log-main strong {
+    font-size: 23px;
+  }
+  .south-park .sp-ticket-foot {
+    bottom: 39px;
+    font-size: 6px;
+    padding-inline: 4px;
+  }
+  .south-park .south-park-scene {
+    --kid-size: clamp(42px, 12.4vw, 70px);
+  }
+  .south-park
+    .south-park-scene:is([data-place='plot'], [data-place='card'], [data-place='footer']) {
+    --kid-size: 31px;
+  }
+  .south-park .sp-balloon {
+    font-size: 11px;
+    max-width: 92px;
+    padding: 3px 4px;
+  }
+}
+@media (max-width: 639px) {
+  .south-park .sp-mobile-radio {
+    display: flex;
+    gap: 5px;
+    position: absolute;
+    top: 5px;
+    right: 6px;
+  }
+  .south-park .sp-mobile-radio .sp-radio {
+    width: 32px;
+    height: 30px;
+    background: #fff8e9;
+  }
+}
+/* Interior routes carry a bus-ticket strip; the illustrated postcard belongs to the landing page. */
+.south-park .sp-banner-wrap[data-compact] {
+  margin-block: 8px 12px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-postcard {
+  height: 110px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-sign {
+  left: 20%;
+  top: 12%;
+  width: 94px;
+  height: 80%;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-sign > span {
+  left: 12%;
+  font-size: 9px;
+  padding: 2px 5px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-county {
+  top: 10px;
+  left: 12px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-lineup {
+  left: 35%;
+  right: 29%;
+  bottom: 20.8%;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log {
+  top: 9%;
+  right: 2%;
+  width: clamp(166px, 19vw, 235px);
+  padding: 3px 10px 4px;
+  transform: rotate(1deg);
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log-cap {
+  font-size: 9px;
+  padding-bottom: 1px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log-main {
+  padding-block: 1px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log-main strong {
+  font-size: 29px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log-note {
+  padding-top: 2px;
+  font-size: 11px;
+}
+.south-park .south-park-scene[data-compact][data-place='home'] {
+  --kid-size: 51px;
+}
+.south-park .south-park-scene[data-opening] .sp-balloon {
+  left: 50%;
+  margin: 0;
+  right: auto;
+  transform: translateX(-50%) rotate(-2deg);
+}
+.south-park .south-park-scene[data-opening='shallow'] {
+  --kid-size: 31px;
+}
+.south-park .south-park-scene[data-opening='shallow'] .sp-balloon {
+  left: calc(100% + 7px);
+  bottom: 46%;
+  transform: rotate(-2deg);
+}
+.south-park .south-park-scene[data-opening='shallow'] [data-actor='kenny'] .sp-balloon {
+  left: auto;
+  right: calc(100% + 7px);
+}
+@media (max-width: 700px) {
+  .south-park .sp-banner-wrap[data-compact] .sp-postcard {
+    height: 116px;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-scenery {
+    bottom: 25px;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-sign {
+    left: 3%;
+    top: 8%;
+    width: 21%;
+    height: 65%;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-county,
+  .south-park .sp-banner-wrap[data-compact] .sp-ticket-foot,
+  .south-park .sp-banner-wrap[data-compact] .sp-mobile-radio {
+    display: none;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-lineup {
+    left: 31%;
+    right: 2.5%;
+    bottom: 36.5%;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-log {
+    inset: auto 0 0;
+    width: 100%;
+    height: 27px;
+    padding: 2px 8px;
+    transform: none;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-log-note {
+    display: none;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-log-cap {
+    align-self: center;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-log-main strong {
+    font-size: 21px;
+  }
+  .south-park .south-park-scene[data-compact][data-place='home'] {
+    --kid-size: 39px;
+  }
+}
+/* The valley is behind the paper, never a foreground overlay over a benchmark. */
+.south-park body {
+  isolation: isolate;
+}
+.south-park .sp-valley {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+.south-park .sp-valley i {
+  position: absolute;
+  display: block;
+  inset: auto -2% -40px;
+  height: 36%;
+  opacity: 0.72;
+  background: #adc2b6;
+  clip-path: polygon(
+    0 52%,
+    9% 32%,
+    17% 47%,
+    24% 18%,
+    35% 56%,
+    45% 36%,
+    59% 69%,
+    72% 24%,
+    83% 50%,
+    94% 12%,
+    100% 39%,
+    100% 100%,
+    0 100%
+  );
+  transform: translateY(var(--sp-range, 0px));
+}
+.south-park .sp-valley i:nth-child(2) {
+  height: 18%;
+  background: #74988b;
+  clip-path: polygon(
+    0 35%,
+    5% 12%,
+    9% 39%,
+    12% 22%,
+    16% 44%,
+    19% 29%,
+    23% 48%,
+    29% 26%,
+    34% 61%,
+    39% 45%,
+    45% 61%,
+    52% 40%,
+    63% 65%,
+    69% 46%,
+    72% 62%,
+    80% 35%,
+    84% 52%,
+    90% 27%,
+    94% 42%,
+    98% 15%,
+    100% 32%,
+    100% 100%,
+    0 100%
+  );
+  transform: translateY(calc(var(--sp-range, 0px) * 0.48));
+}
+.south-park .sp-valley i:last-child {
+  height: 11%;
+  background: #fffcec;
+  clip-path: polygon(
+    0 46%,
+    14% 23%,
+    29% 48%,
+    47% 32%,
+    65% 64%,
+    79% 38%,
+    94% 51%,
+    100% 34%,
+    100% 100%,
+    0 100%
+  );
+  transform: none;
+}
+.south-park .sp-valley::after {
+  content: '';
+  position: absolute;
+  inset: auto -2% 3%;
+  height: clamp(34px, 6.5vh, 85px);
+  background-color: #416a57;
+  opacity: 0.74;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 55'%3E%3Cpath d='m0 52 11-14-6 2 9-13-4 1 7-13 8 14-4-1 9 14-6-2 10 13zm36 2 8-11-4 1 6-9-3 1 5-10 7 11-3-1 7 10-4-1 7 10zm64 1 13-18-6 2 10-16-5 2 9-17 10 18-5-2 11 16-6-1 14 16zm98 0 14-19-7 2 11-17-5 2 10-21 11 21-5-2 12 18-6-2 15 18z'/%3E%3C/svg%3E")
+    repeat-x bottom / auto 100%;
+  transform: translateY(calc(var(--sp-range, 0px) * 0.64));
+}
+.south-park {
+  --overlay-run-0: #c8372d;
+  --overlay-run-1: #2b8a3e;
+  --overlay-run-2: #2490a8;
+  --overlay-run-3: #e86a17;
+  --overlay-run-4: #d9a404;
+  --overlay-run-5: #7b4ca0;
+  --overlay-run-6: #1d5949;
+  --overlay-run-7: #264b82;
+  scrollbar-color: #597c67 #e5ead9;
+}
+.south-park ::selection {
+  background: #efc065;
+  color: #17382c;
+}
+.south-park :where([data-slot='button'], [data-slot='select-trigger'], [data-slot='checkbox']) {
+  border: 1px solid #7d8874;
+  border-radius: 2px 5px 3px 4px;
+  box-shadow: 2px 2px 0 #384b3f62;
+}
+.south-park [data-slot='button']:not(:disabled):active {
+  transform: translate(1px, 2px);
+  box-shadow: none;
+  transition: transform 90ms steps(2, end);
+}
+.south-park
+  :where([data-slot='tabs-list'], [data-slot='dashboard-navigation'], [data-slot='control-panel']) {
+  background-color: #efe4bf;
+  border: 1px solid #8a8a70;
+  border-top: 3px solid #957d4d;
+  border-radius: 2px 5px 3px 4px;
+  box-shadow: 2px 2px 0 #59654f33;
+}
+.south-park :where([data-slot='switch'], [role='switch']) {
+  border: 1px solid #536853;
+}
+.south-park :where([data-slot='switch-thumb'], [role='switch'] > [data-state]) {
+  background: #e98028;
+  border: 1px solid #884d29;
+}
+.south-park [data-slot='badge'] {
+  border-radius: 2px 5px 2px 1px;
+  border: 1px solid #8b886d;
+  box-shadow: 1px 2px 0 #50634a4d;
+}
+.south-park
+  :where(
+    [data-slot='popover-content'],
+    [data-slot='dropdown-menu-content'],
+    [role='listbox'],
+    [role='menu']
+  ) {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid #6e7865;
+  border-top: 3px solid #416a50;
+  border-radius: 3px;
+  box-shadow: 3px 4px 0 #334d3b40;
+}
+.south-park main table.w-full {
+  background: #fff9de;
+  border: 1px solid #7c8268;
+}
+.south-park main table.w-full thead {
+  background: #335a47;
+  color: #fff6d5;
+}
+.south-park main table.w-full tbody :where(td, th) {
+  border-bottom: 1px solid #cfcbb2;
+}
+.south-park main table.w-full tbody tr:nth-child(even) {
+  background: #f5eccd;
+}
+.south-park :where(code, kbd, samp) {
+  background: #345046;
+  color: #fff3ce;
+  box-shadow: 1px 1px 0 #849587;
+  border-radius: 2px;
+  padding: 0.05em 0.23em;
+  font-family: ui-monospace, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', monospace;
+}
+.south-park :where(.sp-sign, .sp-actor, .sp-log, .sp-ticket-actions button) {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='19' height='22' viewBox='0 0 19 22'%3E%3Cpath fill='%23cb5142' stroke='%23273d33' d='M5 12 4 5q0-4 3-3l1 5q5-3 7 1l1 5-4 6-7-2-4-5q-1-3 2-2z'/%3E%3C/svg%3E")
+      5 2,
+    pointer;
+}
+.south-park [data-testid='header-brand'] {
+  position: relative;
+}
+.south-park [data-testid='inferencex-wordmark'] {
+  box-sizing: content-box;
+  background: #eaf3db;
+  border: 2px solid #fffbea;
+  outline: 2px solid #184e40;
+  border-radius: 4px;
+  padding: 3px 7px;
+  box-shadow: 2px 3px 0 #54765f77;
+}
+.south-park [data-testid='header-brand']::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  top: 0;
+  left: 6%;
+  width: 26%;
+  height: 3px;
+  background: #fffdf2;
+  border-radius: 50%;
+}
+.south-park .sp-ticket-actions {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  top: 48px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: min(19%, 185px);
+}
+.south-park .sp-ticket-actions button,
+.south-park .sp-case-tools button {
+  background: #ffdf8d;
+  border: 1px solid #334a3a;
+  color: #293c31;
+  border-radius: 2px 5px 2px 4px;
+  padding: 4px 7px;
+  font: 700 12px/1.12 var(--font-dm-sans);
+  box-shadow: 1px 2px 0 #425b4a66;
+}
+.south-park .sp-ticket-actions button:nth-child(2) {
+  background: #f4f5e3;
+}
+.south-park .sp-ticket-actions button[aria-pressed='true'] {
+  color: #fff2d9;
+  background: #544363;
+}
+.south-park .sp-ticket-actions small {
+  margin-left: 4px;
+  border-left: 1px solid currentColor;
+  padding-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.south-park :is(.sp-ticket-actions button, .sp-log, .sp-case-tools button):focus-visible {
+  outline: 3px solid #a44620;
+  outline-offset: 2px;
+}
+.south-park .sp-banner-wrap:not([data-compact]) .sp-ticket-actions {
+  left: 36%;
+  top: 8%;
+  max-width: none;
+}
+.south-park .roofline-path {
+  stroke-linejoin: bevel;
+  stroke-linecap: round;
+}
+.south-park .roofline-path:not([stroke-dasharray]) {
+  stroke-dasharray: 11 2;
+}
+.south-park .visible-shape[data-canvas-underlay] + .sp-paper-mark {
+  visibility: hidden;
+}
+.south-park
+  [data-testid='chart-legend']
+  :is([class*='rounded-full'][style*='background'], [class*='rounded-sm'][style*='background']) {
+  clip-path: polygon(0 19%, 82% 0, 100% 72%, 24% 100%, 3% 85%);
+}
+.south-park [data-testid='scatter-empty-state']::before {
+  content: '';
+  display: block;
+  width: 64px;
+  height: 48px;
+  background:
+    linear-gradient(173deg, transparent 70%, #e6eee4 71%, #fafafa 93%),
+    url('/decorative/south-park/art/kenny.webp') center 3px/auto 54px no-repeat;
+  margin: 0 auto;
+}
+.south-park [data-testid='scatter-empty-state']::after {
+  content: '0 points survived. You bastards!';
+  font-family: SouthParkDisplay, var(--font-dm-sans);
+  color: #71482e;
+}
+.south-park:lang(zh) [data-testid='scatter-empty-state']::after {
+  content: '一个点都没活下来。你们这群混蛋！';
+}
+.south-park [data-testid$='chart-skeleton']::before {
+  content: '';
+  display: inline-block;
+  width: 21px;
+  height: 21px;
+  border: 3px dashed #55816b;
+  border-right-color: #e8b85b;
+  transform: rotate(-8deg);
+  animation: sp-ticket-turn 1.7s steps(6, end) infinite;
+}
+@keyframes sp-ticket-turn {
+  to {
+    transform: rotate(352deg);
+  }
+}
+.south-park
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child {
+  padding: 3px 13px;
+  color: #fff7dd;
+  background: #285844;
+  border: 2px solid #fbf3d7;
+  outline: 2px solid #3b5847;
+  border-radius: 4px;
+}
+.south-park
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child::after {
+  content: ' / They 404’d Kenny!';
+  font-family: SouthParkDisplay, var(--font-dm-sans);
+}
+.south-park:lang(zh)
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child::after {
+  content: ' / 肯尼失踪了！';
+}
+.south-park[data-sp-mode='mysterion'] {
+  --background: #302e43;
+  --card: #f3f0f6;
+  --foreground: #f6efdc;
+  --card-foreground: #302f46;
+  --primary: #504369;
+  --primary-foreground: #fff8dc;
+  --muted: #e0dde8;
+  --accent: #e4c46c;
+  --secondary: #dfdfec;
+  --border: #858095;
+  --popover: #f4eff8;
+  --ring: #65528a;
+}
+.south-park[data-sp-mode='mysterion'] body {
+  background-color: #302e43;
+  --sp-pine: #55476a;
+  --sp-ink: #373347;
+}
+.south-park[data-sp-mode='mysterion']
+  :where([data-slot='card'], figure[data-testid='chart-figure']) {
+  background-color: #f5f0f6;
+  border-color: #676277;
+}
+.south-park[data-sp-mode='mysterion'] .sp-scenery {
+  filter: brightness(0.62) saturate(0.68) hue-rotate(37deg);
+}
+.south-park[data-sp-mode='mysterion']
+  :is(
+    [data-testid='header'],
+    [data-testid='footer'],
+    [data-slot='card'],
+    figure,
+    [role='dialog'],
+    [data-slot='control-panel'],
+    [data-slot='dashboard-navigation'],
+    [role='menu'],
+    [data-slot='popover-content']
+  ) {
+  --background: #f2edf4;
+  --foreground: #302f46;
+  --muted: #e0dde8;
+  --card-foreground: #302f46;
+  --muted-foreground: #535263;
+  color: var(--foreground);
+}
+.south-park[data-sp-mode='mysterion'] [data-testid='header'] {
+  background: #ede8f1;
+}
+.south-park[data-sp-mode='mysterion'] .sp-valley i {
+  background: #a09cb5;
+}
+.south-park[data-sp-mode='mysterion'] .sp-valley i:nth-child(2) {
+  background: #77728e;
+}
+.south-park[data-sp-mode='mysterion'] .sp-valley i:last-child {
+  background: #e7e0ed;
+}
+.south-park [role='dialog'].sp-drawer {
+  max-height: 90dvh;
+  overflow: auto;
+  gap: 7px;
+  background: #fff5d6;
+  color: #293e32;
+}
+.south-park .sp-drawer > small,
+.south-park .sp-drawer li small {
+  font: 700 10px/1.2 var(--font-dm-sans);
+  letter-spacing: 0.12em;
+  color: #785738;
+}
+.south-park .sp-drawer ol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin: 4px 0;
+}
+.south-park .sp-drawer li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px;
+  border: 1px dashed #aaa58c;
+  font-size: 12px;
+  background: #faf6e8;
+}
+.south-park .sp-drawer li > span {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  --kid-size: 27px;
+}
+.south-park .sp-drawer li b {
+  display: block;
+}
+.south-park .sp-drawer .sp-prop {
+  animation: none;
+}
+.south-park .sp-drawer li[data-filed='false'] .sp-prop {
+  filter: grayscale(1);
+  opacity: 0.48;
+}
+.south-park .sp-case-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+@media (max-width: 700px) {
+  .south-park .sp-banner-wrap .sp-county {
+    display: none;
+  }
+  .south-park .sp-banner-wrap:is([data-compact], :not([data-compact])) .sp-ticket-actions {
+    top: 3px;
+    left: 5px;
+    max-width: calc(100% - 78px);
+    gap: 4px;
+  }
+  .south-park .sp-ticket-actions button {
+    font-size: 10px;
+    padding: 3px 5px;
+    min-height: 21px;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-sign {
+    top: 25%;
+    height: 47%;
+    width: 22%;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-mobile-radio {
+    display: flex;
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    gap: 3px;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-mobile-radio button {
+    width: 25px;
+    height: 22px;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-lineup {
+    bottom: 33%;
+  }
+}
+@media (forced-colors: active) {
+  .south-park *,
+  .south-park *::after,
+  .south-park *::before {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  .south-park body,
+  .south-park main table.w-full {
+    background: Canvas;
+    color: CanvasText;
+  }
+  .south-park :where(.sp-valley, .sp-snow, .sp-paper-mark, .sp-paper-cap) {
+    display: none;
+  }
+  .south-park
+    :where(.sp-postcard, .sp-log, .sp-drawer, .sp-ticket-actions button, [data-slot='button']) {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid ButtonText;
+  }
+  .south-park :where(button, [role='tab']):focus-visible {
+    outline: 2px solid Highlight !important;
+  }
+}
+@media print {
+  .south-park :where(.sp-valley, .sp-drawer, .sp-arcade) {
+    display: none !important;
+  }
+}
+html[data-inferencex-embed].south-park .sp-valley {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .south-park [data-testid$='chart-skeleton']::before {
+    animation: none;
+  }
+  .south-park .sp-snow,
+  .south-park .sp-prop,
+  .south-park .sp-pellet {
+    display: none;
+  }
+  .south-park .south-park-scene * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+html[data-inferencex-embed] [data-testid='south-park-theme-banner'],
+html[data-inferencex-embed] .south-park-scene {
+  display: none;
+}
+@media print {
+  .south-park :is(.south-park-scene, .sp-banner-wrap, .sp-radio) {
+    display: none;
+  }
+}
+.south-park [data-testid='chart-legend'] label span.rounded-full:has(> .sp-series-swatch) {
+  clip-path: none !important;
+  background: none !important;
+  width: 19px;
+  height: 19px;
+  display: inline-grid;
+  place-content: center;
+}
+.south-park [data-testid='chart-legend'] label span:has(> span > .sp-series-swatch) {
+  min-width: 19px;
+}
+.south-park .sp-banner-wrap .sp-postcard .sp-scenery {
+  background: url('/decorative/south-park/art/bus-stop.webp') center 88% / cover no-repeat;
+}
+.south-park[data-sp-mode='mysterion'] .sp-banner-wrap .sp-postcard .sp-scenery {
+  background-image: url('/decorative/south-park/art/main-street.webp');
+  filter: none;
+}
+.south-park .sp-station-link {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  border: 1px solid #1b344d;
+  border-top: 3px solid #d69337;
+  margin: 4px 0 0;
+  padding: 0 10px 0 0;
+  min-height: 32px;
+  color: #fff7da;
+  background: #203c59;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  font:
+    600 14px/1.1 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-station-link .sp-station-number {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  flex: none;
+  color: white;
+  background: #a22c34;
+  font:
+    400 25px/1 SouthParkDisplay,
+    sans-serif;
+}
+.south-park .sp-station-link img {
+  width: 27px;
+  height: 27px;
+  object-fit: cover;
+  object-position: 50% 0;
+}
+.south-park .sp-station-link b {
+  font:
+    400 16px/1.05 SouthParkDisplay,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-station-link strong {
+  margin-left: auto;
+  color: #ffda79;
+  white-space: nowrap;
+}
+.south-park .sp-chart-rail {
+  height: 79px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid #47604d;
+  border-top: 3px solid #294e48;
+  background: #b3d5d7 url('/decorative/south-park/art/bus-stop.webp') center 86%/cover;
+  pointer-events: none;
+}
+.south-park .sp-chart-rail > span {
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  padding: 2px 5px;
+  background: #193e40;
+  color: #fff8df;
+  font:
+    700 11px/1.1 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .south-park-scene[data-place='plot'] {
+  --kid-size: 39px;
+}
+@media (max-width: 570px) {
+  .south-park .sp-station-link > span:not(.sp-station-number) {
+    display: none;
+  }
+  .south-park .sp-station-link b {
+    font-size: 14px;
+  }
+  .south-park .sp-chart-rail {
+    height: 70px;
+  }
+  .south-park .south-park-scene[data-place='plot'] {
+    --kid-size: 31px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .south-park .sp-chart-rail {
+    height: 56px;
+  }
+}
+@media (forced-colors: active) {
+  .south-park .sp-chart-rail {
+    display: none;
+  }
+  .south-park .sp-station-link {
+    border: 1px solid ButtonText;
+  }
+  .south-park .sp-chart-rail > span {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+@media print {
+  .south-park .sp-chart-rail {
+    display: none;
+  }
+}
+
+/* Light card stock stays light in Night Watch; the surrounding town is dark. */
+.south-park[data-sp-mode='mysterion'] {
+  --muted-foreground: #e4dced;
+}
+.south-park[data-sp-mode='mysterion'] :is(.bg-card, .bg-muted, [id$='-export']) {
+  --foreground: #28253b;
+  --muted-foreground: #4c475c;
+  color: var(--foreground);
+}
+.south-park
+  div.items-center.justify-center.text-center:has(> [data-slot='eyebrow'].tabular-nums)
+  > a[data-slot='button'] {
+  color: #fdf8df;
+  background: #294c40;
+  border: 2px solid #e2bf6a;
+  box-shadow: 2px 3px 0 #182c28;
+}
+.south-park[data-sp-mode='mysterion'] :is(figure, [id$='-export']) {
+  --background: #f5f0f6;
+  --foreground: #28253b;
+  --muted-foreground: #4c475c;
+  color: #28253b;
+  background-color: #f5f0f6 !important;
+}
+.south-park
+  :is(figure, [id$='-export'])
+  :is(.tick text, .x-axis-label, .y-axis-label, .axis-label, [class$='axis-title']) {
+  fill: #393d43 !important;
+}
+.south-park [id$='-export'] :is(figcaption, figcaption h2, thead, tbody, tfoot, .legend-container) {
+  color: #2b3440 !important;
+}
+.south-park .sp-export-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 10px;
+  height: 40px;
+  border-bottom: 3px solid #32504d;
+  background: #a5d7df url('/decorative/south-park/art/bus-stop.webp') center 48%/cover;
+}
+.south-park .sp-export-id img:first-child {
+  width: 95px;
+  height: auto;
+  padding: 2px;
+  background: #fff6d9;
+}
+.south-park .sp-export-id img:last-child {
+  width: auto;
+  height: 31px;
+}
+.south-park .sp-county-seal {
+  margin-left: auto;
+  margin-right: 14px;
+  padding: 3px 9px;
+  border: 3px double #7c3029;
+  color: #702d28;
+  background: #f8edca;
+  font:
+    800 12px/1.2 SouthParkBody,
+    system-ui,
+    sans-serif;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+}
+.south-park .sp-wire-desk {
+  position: relative;
+  contain: layout;
+  margin: 3px 0 6px;
+  background: #f6efd8;
+  color: #293c35;
+  border-block: 1px solid #8a8d70;
+  font:
+    600 12px/1.28 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-wire-strip {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 2px 7px;
+}
+.south-park .sp-wire-mast {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #245648;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.south-park .sp-wire-mast::before {
+  content: '';
+  display: block;
+  width: 38px;
+  height: 22px;
+  border-right: 1px dashed #85784b;
+  background: url('/decorative/south-park/art/school-bus.webp') left center / 32px auto no-repeat;
+}
+.south-park [data-chart-tooltip]::before {
+  content: 'Park County / Sample evidence';
+  display: block;
+  margin: 0 0 5px;
+  padding: 4px 7px 3px 26px;
+  border-bottom: 1px dashed #9c8463;
+  color: #493c2e;
+  background: #f8e8b8 url('/decorative/south-park/art/cop.webp') 5px 18% / 15px auto no-repeat;
+  font:
+    800 10px/1.15 SouthParkBody,
+    system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.south-park:lang(zh) [data-chart-tooltip]::before {
+  content: '南方公园县 / 样本物证';
+}
+.south-park .sp-wire-tools {
+  text-align: right;
+  min-width: 0;
+}
+.south-park .sp-wire-tools summary,
+.south-park .sp-line-file summary {
+  cursor: pointer;
+  min-height: 26px;
+  align-content: center;
+}
+.south-park .sp-wire-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+  padding: 3px 0;
+}
+.south-park .sp-wire-tools:not([open]) > .sp-wire-buttons {
+  display: none;
+}
+.south-park .sp-wire-buttons button,
+.south-park .sp-berry-transfer {
+  min-height: 28px;
+  padding: 3px 7px;
+  border: 1px solid #536b5a;
+  border-radius: 2px;
+  background: #fcf8e9;
+  color: #263f35;
+  font-weight: 700;
+}
+.south-park .sp-wire-buttons button:is(:hover, :focus-visible),
+.south-park .sp-berry-transfer:hover {
+  background: #dfebd3;
+}
+.south-park .sp-berry-transfer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  text-decoration: underline;
+}
+.south-park .sp-berry-transfer img {
+  width: 23px;
+  height: 22px;
+  object-fit: contain;
+}
+.south-park .sp-wire-note:not(:empty) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border-left: 4px solid #913b32;
+  background: #fff9df;
+  color: #203d38;
+  box-shadow: inset 0 1px #d8c9a1;
+  text-align: left;
+  font:
+    600 12px/1.3 SouthParkBody,
+    system-ui,
+    sans-serif;
+  pointer-events: none;
+}
+.south-park .sp-wire-note img {
+  width: 42px;
+  height: 44px;
+  object-fit: contain;
+  flex: none;
+}
+.south-park .sp-wire-copy {
+  display: grid;
+  gap: 1px;
+  overflow-wrap: anywhere;
+}
+.south-park .sp-wire-copy b {
+  color: #66352a;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+}
+.south-park .sp-wire-copy q {
+  color: #2b4534;
+  font-weight: 800;
+  quotes: none;
+}
+.south-park .sp-wire-copy small {
+  font: inherit;
+  font-weight: 600;
+}
+.south-park .sp-line-file {
+  border-block: 1px dashed #92744e;
+  padding: 4px 0;
+  font:
+    600 13px/1.35 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-line-file ul {
+  list-style: none;
+  padding: 0;
+  max-height: 150px;
+  overflow: auto;
+  margin: 4px 0;
+}
+.south-park .sp-line-file li {
+  display: block;
+  padding: 2px 3px;
+}
+.south-park .sp-line-file li b {
+  color: #76372b;
+}
+.south-park .sp-wire-flip {
+  display: block;
+  overflow: hidden;
+  padding: 4px 12px 4px 24px;
+  background: linear-gradient(125deg, #8a4c31 0 13px, #ebd598 13px 17px, #faefc9 17px);
+  border-bottom: 1px dashed #8f774e;
+  color: #493529;
+  font:
+    800 12px/1.25 SouthParkBody,
+    system-ui,
+    sans-serif;
+  transform-origin: left bottom;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .south-park .sp-wire-flip {
+    animation: sp-sheet-recut 1.85s ease-out both;
+  }
+  @keyframes sp-sheet-recut {
+    0% {
+      clip-path: polygon(0 0, 4% 5%, 2% 100%, 0 100%);
+      transform: skewX(-6deg);
+    }
+    55% {
+      clip-path: polygon(0 0, 88% 0, 85% 100%, 0 100%);
+    }
+    85%,
+    100% {
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+      transform: none;
+    }
+  }
+}
+.south-park .sp-loading-proof {
+  padding: 6px;
+  margin: 0 0 8px;
+  border: 1px dashed #736c52;
+  background: #f6efd8;
+  color: #324039;
+  font:
+    700 12px/1.4 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-loading-proof .sp-bus-loading {
+  height: 155px;
+}
+.south-park
+  :is(
+    .sp-bus-loading,
+    [data-testid='inference-chart-display'] [data-slot='skeleton'].w-full:last-child
+  ) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-block: 3px solid #49645d;
+  opacity: 1;
+  animation: none;
+  background: #d7e6dd url('/decorative/south-park/art/bus-stop.webp') center 65%/cover no-repeat;
+}
+.south-park
+  :is(
+    .sp-bus-loading,
+    [data-testid='inference-chart-display'] [data-slot='skeleton'].w-full:last-child
+  )::before {
+  content: '';
+  position: absolute;
+  bottom: 12%;
+  left: 12%;
+  width: 40%;
+  height: 55%;
+  background: url('/decorative/south-park/art/school-bus.webp') left bottom/contain no-repeat;
+}
+.south-park
+  :is(
+    .sp-bus-loading,
+    [data-testid='inference-chart-display'] [data-slot='skeleton'].w-full:last-child
+  )::after {
+  content: 'Park County Dispatch / Loading chart';
+  position: absolute;
+  left: 8px;
+  top: 7px;
+  background: #fff6d6;
+  color: #29423a;
+  padding: 5px 9px;
+  border-left: 5px solid #943e32;
+  font:
+    800 13px/1.2 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park:lang(zh)
+  :is(
+    .sp-bus-loading,
+    [data-testid='inference-chart-display'] [data-slot='skeleton'].w-full:last-child
+  )::after {
+  content: '南方公园县调度室 / 正在加载图表';
+}
+@media (prefers-reduced-motion: no-preference) {
+  .south-park
+    :is(
+      .sp-bus-loading,
+      [data-testid='inference-chart-display'] [data-slot='skeleton'].w-full:last-child
+    )::before {
+    animation: sp-bus-arrives 1.4s ease-out both;
+  }
+  @keyframes sp-bus-arrives {
+    from {
+      transform: translateX(-28%);
+    }
+    to {
+      transform: none;
+    }
+  }
+}
+@media (max-width: 570px) {
+  .south-park .sp-wire-strip {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1px 6px;
+  }
+  .south-park .sp-wire-mast {
+    font-size: 10px;
+  }
+  .south-park .sp-wire-tools[open] {
+    width: 100%;
+    text-align: left;
+  }
+  .south-park .sp-wire-buttons {
+    justify-content: flex-start;
+  }
+  .south-park .sp-wire-copy {
+    font-size: 11px;
+  }
+}
+@media (forced-colors: active) {
+  .south-park
+    :is(
+      .sp-wire-desk,
+      .sp-wire-note:not(:empty),
+      .sp-county-seal,
+      .sp-wire-flip,
+      .sp-loading-proof
+    ) {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .south-park :is(.sp-wire-desk, .sp-wire-note) :is(img, .sp-wire-flip) {
+    display: none;
+  }
+}
+.south-park .sp-parked-bus {
+  position: absolute;
+  width: clamp(110px, 17vw, 245px);
+  left: 22%;
+  bottom: 25%;
+  cursor: pointer;
+  display: block;
+}
+.south-park .sp-parked-bus img {
+  width: 100%;
+  height: auto;
+}
+.south-park .sp-parked-bus:focus-visible {
+  outline: 3px solid #a43125;
+  outline-offset: 2px;
+}
+.south-park .sp-transfer-slip {
+  position: absolute;
+  right: 26%;
+  bottom: 13%;
+  padding: 3px 6px;
+  background: #fff4cb;
+  border: 1px dashed #523e33;
+  color: #362e28;
+  font:
+    600 12px/1.1 system-ui,
+    sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.south-park .sp-transfer-slip img {
+  height: 27px;
+  width: auto;
+}
+.south-park .sp-subtitle {
+  display: block;
+  font-size: 0.84em;
+  line-height: 1.15;
+}
+.south-park .sp-banner-wrap[data-set='school'] .sp-postcard .sp-scenery {
+  background-image: url('/decorative/south-park/art/elementary.webp');
+  background-position: center 52%;
+}
+.south-park .sp-banner-wrap[data-set='street'] .sp-postcard .sp-scenery {
+  background-image: url('/decorative/south-park/art/main-street.webp');
+  background-position: center 57%;
+}
+.south-park .sp-banner-wrap[data-fort] .sp-postcard .sp-scenery {
+  background-image: url('/decorative/south-park/art/fort.webp');
+  background-position: center 43%;
+}
+.south-park .south-park-scene:not([data-compact])[data-place='home'] {
+  --kid-size: clamp(64px, 8.1vw, 116px);
+}
+.south-park .sp-chart-rail {
+  height: 119px;
+  border-radius: 5px 5px 0 0;
+  background:
+    url('/decorative/south-park/art/crabtree.webp') 97% 86%/auto 65% no-repeat,
+    url('/decorative/south-park/art/school-bus.webp') 98% 76%/auto 69% no-repeat,
+    url('/decorative/south-park/art/bus-stop.webp') center 75%/cover;
+}
+.south-park .sp-chart-rail > i:not([hidden]) {
+  position: absolute;
+  width: 19px;
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #51637079;
+  box-shadow: 0 1px 0 #fff9e6;
+}
+.south-park .south-park-scene[data-place='plot'] {
+  --kid-size: 82px;
+}
+.south-park .south-park-scene[data-place='plot'] .sp-actor {
+  pointer-events: auto;
+}
+.south-park .south-park-scene[data-place='plot'] .sp-balloon {
+  left: 65%;
+  bottom: 67%;
+  margin: 0;
+  transform: none;
+}
+.south-park .south-park-scene[data-place='plot'] [data-edge='right'] .sp-balloon {
+  left: auto;
+  right: 60%;
+}
+.south-park .sp-scene-evidence {
+  position: absolute;
+  pointer-events: none;
+  bottom: -2px;
+  right: 45%;
+  height: calc(var(--kid-size) * 0.75);
+  width: auto;
+  max-width: none;
+}
+.south-park .sp-scene-evidence[data-evidence='rats'] {
+  height: calc(var(--kid-size) * 0.48);
+  right: 20%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .south-park .sp-scene-evidence[data-evidence='rats'] {
+    animation: sp-rat-run 1.55s steps(10, end) both;
+  }
+  @keyframes sp-rat-run {
+    from {
+      transform: translateX(-70%);
+    }
+    65% {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(30%);
+    }
+  }
+  .south-park [data-testid='chart-legend'] label:active .sp-series-swatch {
+    transform: translateY(-2px) rotate(-9deg);
+  }
+}
+@media (max-width: 700px) {
+  .south-park .sp-parked-bus {
+    left: 3%;
+    bottom: 15%;
+    width: 23%;
+  }
+  .south-park .south-park-scene:not([data-compact])[data-place='home'] {
+    --kid-size: clamp(42px, 14vw, 66px);
+  }
+  .south-park .sp-chart-rail {
+    height: 100px;
+    background-size:
+      auto 47%,
+      auto 44%,
+      cover;
+    background-position:
+      98% 38%,
+      97% 34%,
+      center 75%;
+  }
+  .south-park .south-park-scene[data-place='plot'] {
+    --kid-size: 56px;
+  }
+  .south-park .south-park-scene[data-place='plot'] .sp-balloon {
+    max-width: 118px;
+    font-size: 11px;
+    bottom: 48%;
+    padding: 2px 4px;
+  }
+}
+@media (forced-colors: active) {
+  .south-park .sp-parked-bus {
+    display: none;
+  }
+}
+.south-park[data-sp-mode='casa'] {
+  --background: #f4ded0;
+  --foreground: #442d32;
+  --card: #fff1dd;
+  --card-foreground: #442d32;
+  --popover: #fff2de;
+  --popover-foreground: #442d32;
+  --muted: #e4c8c0;
+  --muted-foreground: #62444a;
+  --primary: #743d47;
+  --primary-foreground: #fff7dc;
+  --secondary: #e8ceae;
+  --secondary-foreground: #4a3432;
+  --accent: #f3c580;
+  --accent-foreground: #452f29;
+  --border: #a47e75;
+  --input: #9b756d;
+  --ring: #814754;
+}
+.south-park[data-sp-mode='casa'] body {
+  --sp-ink: #593940;
+  --sp-pine: #733e47;
+  background-color: #e9c8bb;
+}
+.south-park[data-sp-mode='casa']
+  :is([data-testid='header'], [data-testid='footer'], figure, [data-slot='card'], [id$='-export']) {
+  background-color: #fff1dd;
+  color: #442d32;
+}
+.south-park[data-sp-mode='casa'] .sp-banner-wrap:not([data-fort]) .sp-postcard .sp-scenery {
+  background-image: url('/decorative/south-park/art/casa.webp');
+  background-position: center 56%;
+}
+.south-park[data-sp-mode='casa'] .sp-valley i {
+  background: #c59196;
+}
+.south-park[data-sp-mode='casa'] .sp-valley i:nth-child(2) {
+  background: #af7e75;
+}
+.south-park[data-sp-mode='casa'] .sp-valley i:last-child {
+  background: #ead1b4;
+}
+.south-park .sp-log-main strong,
+.south-park .sp-dispatch-meta {
+  font-variant-numeric: tabular-nums;
+}
+.south-park .sp-radio:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+.south-park .sp-chart-rail [data-sp-stunt] {
+  position: absolute;
+  top: 3px;
+  right: 7px;
+  pointer-events: auto;
+  font:
+    700 12px/1.1 SouthParkBody,
+    system-ui,
+    sans-serif;
+  color: #fff8df;
+  background: #71372d;
+  border: 1px solid #422b24;
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.south-park .sp-chart-rail [data-sp-stunt]:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+.south-park .sp-plot-stunt {
+  position: fixed;
+  z-index: 38;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+.south-park .sp-plot-stunt * {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  pointer-events: none !important;
+  transform-origin: 50% 100%;
+  object-fit: contain;
+  max-width: none;
+}
+.south-park .sp-plot-stunt [data-stunt-part='hazard'] svg {
+  width: 100%;
+  height: 100%;
+}
+.south-park .sp-plot-stunt .sp-stunt-snowball {
+  border: 1px solid #526a75;
+  border-radius: 50%;
+  background: #fff;
+}
+.south-park .south-park-scene[data-plot-stunt] [data-actor='kenny'] .sp-actor img {
+  opacity: 0.28;
+}
+@media (forced-colors: active) {
+  .south-park .sp-plot-stunt {
+    display: none !important;
+  }
+}
+.south-park
+  .south-park-scene[data-plot-stunt]
+  [data-actor='kenny']
+  :is(.sp-cutout, .sp-prop, .sp-scene-evidence) {
+  visibility: hidden;
+}
+.south-park:is([data-sp-mode='mysterion'], [data-sp-mode='casa'])
+  :is(button, a).bg-primary:not(:disabled),
+.south-park:is([data-sp-mode='mysterion'], [data-sp-mode='casa'])
+  figure
+  [role='tab'][aria-selected='true'] {
+  color: var(--primary-foreground);
+}
+@media (pointer: coarse) {
+  .south-park .sp-chart-rail [data-sp-stunt] {
+    min-height: 26px;
+    padding-inline: 6px;
+  }
+}
+
+.south-park .sp-film-slate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: #f5edcf;
+  color: #233e32;
+  padding: 4px 12px;
+  border: 1px solid #53664b;
+  font:
+    700 12px/1.18 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-film-slate > span {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-right: 4px;
+}
+.south-park .sp-film-slate > small {
+  margin-left: auto;
+  font-size: 12px;
+  color: #435246;
+}
+.south-park .sp-film-slate button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  border: 1px solid #61705e;
+  border-radius: 3px 5px 2px 3px;
+  padding: 3px 8px;
+  background: #fffbea;
+  color: #263b31;
+}
+.south-park .sp-film-slate button[aria-pressed='true'] {
+  background: #214b40;
+  color: #fff8da;
+  border-color: #15372b;
+  box-shadow: 1px 2px #b5ae93;
+}
+.south-park .sp-film-slate i {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #314232;
+  transform: rotate(-8deg);
+  background: #b6e0df;
+}
+.south-park .sp-film-slate [data-sp-palette='mysterion'] i {
+  background: #8d73a7;
+}
+.south-park .sp-film-slate [data-sp-palette='casa'] i {
+  background: #ea8a8e;
+}
+.south-park .sp-film-slate [data-sp-palette='school'] i {
+  background: #e6b861;
+}
+.south-park .sp-film-slate [data-sp-palette='pond'] i {
+  background: #5caaa0;
+}
+.south-park[data-sp-mode='school'] {
+  --background: #f4eaca;
+  --foreground: #3a321e;
+  --card: #fff7d6;
+  --card-foreground: #3a321e;
+  --muted: #ead9ac;
+  --muted-foreground: #5b4826;
+  --primary: #704828;
+  --primary-foreground: #fff9df;
+  --popover: #fff7d6;
+  --popover-foreground: #3a321e;
+  --accent: #efd29d;
+  --accent-foreground: #382a1c;
+  --sp-set-img: url('/decorative/south-park/art/elementary.webp');
+}
+.south-park[data-sp-mode='pond'] {
+  --background: #d3e7de;
+  --foreground: #203b35;
+  --card: #f0f7df;
+  --card-foreground: #203b35;
+  --muted: #c7decd;
+  --muted-foreground: #375344;
+  --primary: #215a4e;
+  --primary-foreground: #faffdf;
+  --popover: #f0f7df;
+  --popover-foreground: #203b35;
+  --accent: #b9d6bd;
+  --accent-foreground: #263f31;
+  --sp-set-img: url('/decorative/south-park/art/pond.webp');
+}
+.south-park:is([data-sp-mode='school'], [data-sp-mode='pond']) body {
+  background-color: var(--background);
+}
+.south-park:is([data-sp-mode='school'], [data-sp-mode='pond'])
+  :is([data-testid='header'], [data-testid='footer'], figure, [data-slot='card'], [id$='-export']) {
+  background-color: var(--card);
+  color: var(--card-foreground);
+}
+.south-park:is([data-sp-mode='school'], [data-sp-mode='pond'])
+  .sp-banner-wrap:not([data-fort])
+  .sp-postcard
+  .sp-scenery {
+  background-image: var(--sp-set-img);
+  background-position: center 55%;
+}
+.south-park:is([data-sp-mode='school'], [data-sp-mode='pond']) .sp-chart-rail {
+  background-image: url('/decorative/south-park/art/school-bus.webp'), var(--sp-set-img);
+  background-size:
+    auto 65%,
+    cover;
+  background-position:
+    98% 82%,
+    center 55%;
+  background-repeat: no-repeat;
+}
+.south-park .sp-film-slate button:focus-visible,
+.south-park .sp-colophon:focus-visible {
+  outline: 3px solid #ba561f;
+  outline-offset: 2px;
+}
+.south-park[data-sp-mode='casa'] .sp-chart-rail {
+  background-image:
+    url('/decorative/south-park/art/butters.webp'),
+    url('/decorative/south-park/art/school-bus.webp'), url('/decorative/south-park/art/casa.webp');
+  background-position:
+    97% 90%,
+    98% 85%,
+    center 65%;
+  border-color: #743d47;
+}
+.south-park[data-sp-mode='mysterion'] .sp-chart-rail {
+  background-image:
+    url('/decorative/south-park/art/the-coon.webp'),
+    url('/decorative/south-park/art/school-bus.webp'), linear-gradient(#2f294999, #2f294955),
+    url('/decorative/south-park/art/town.webp');
+  background-size:
+    auto 70%,
+    auto 65%,
+    cover,
+    cover;
+  background-position:
+    97% 88%,
+    98% 78%,
+    center,
+    center 65%;
+  background-repeat: no-repeat;
+}
+.south-park[data-sp-mode='casa']
+  :is(.sp-export-id, .sp-banner-wrap:not([data-compact]):not([data-fort]) .sp-scenery) {
+  background-image: url('/decorative/south-park/art/casa.webp');
+  background-position: center 62%;
+}
+.south-park[data-sp-mode='mysterion']
+  .sp-banner-wrap:not([data-compact]):not([data-fort])
+  .sp-scenery {
+  background-image: url('/decorative/south-park/art/town.webp');
+  background-position: center 43%;
+}
+.south-park .sp-patrol-reward,
+.south-park .sp-colophon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f6e9c9;
+  border: 1px solid #63533c;
+  color: #382f29;
+  padding: 6px 9px;
+}
+.south-park .sp-patrol-reward img {
+  height: 52px;
+  width: 56px;
+  object-fit: contain;
+}
+.south-park :is(.sp-colophon, .sp-patrol-reward) small {
+  display: block;
+}
+.south-park .sp-patrol-reward button {
+  background: #41374f;
+  color: #fff3cf;
+  padding: 5px 8px;
+  margin-left: auto;
+  border: 1px solid #292135;
+}
+.south-park [data-testid='footer'] {
+  position: relative;
+  padding-top: 188px;
+}
+.south-park [data-testid='footer']::before {
+  height: 166px;
+  background: #d1ded6 url('/decorative/south-park/art/pass.svg') center 65%/cover;
+}
+.south-park [data-testid='footer']::after {
+  content: '';
+  position: absolute;
+  inset: 15px auto auto 50%;
+  width: min(53%, 542px);
+  height: 158px;
+  transform: translateX(-50%) rotate(-0.5deg);
+  background: #dce8df url('/decorative/south-park/art/town.webp') center 83%/auto 305px no-repeat;
+  border: 3px solid #f8f1d9;
+  outline: 1px solid #6c725e;
+  box-shadow: 3px 3px 0 #465c486e;
+  pointer-events: none;
+}
+.south-park .sp-colophon {
+  position: absolute;
+  z-index: 1;
+  right: max(4%, 12px);
+  top: 66px;
+  max-width: 40%;
+  min-height: 55px;
+  text-align: left;
+  box-shadow: 3px 3px #364e3c75;
+  transform: rotate(-1deg);
+}
+.south-park .sp-colophon img {
+  width: 32px;
+  height: 48px;
+  object-fit: contain;
+}
+.south-park .sp-colophon b {
+  font-family: SouthParkDisplay, var(--font-dm-sans);
+  font-weight: 400;
+}
+.south-park :is(tbody, tfoot, [data-slot='slider'], .sp-hud, .sp-runline) {
+  font-variant-numeric: tabular-nums;
+}
+.south-park:lang(zh)
+  :is(.sp-film-slate, .sp-colophon, .sp-patrol-reward, .sp-quest-feed, .sp-balloon, .sp-arcade) {
+  font-family: SouthParkBody, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+}
+.south-park:lang(zh)
+  :is(
+    h1,
+    h2,
+    .sp-film-slate button,
+    .sp-station-link b,
+    .sp-keep h2,
+    .sp-patrol-reward b,
+    .sp-colophon b,
+    .sp-log-cap
+  ) {
+  font-family: SouthParkDisplay, SouthParkKuaiLe, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+.south-park :is([data-testid='chart-empty-state'], [data-testid='scatter-empty-state']) {
+  color: #34493c;
+  background: #f7f3de;
+  border: 1px dashed #8a9378;
+}
+.south-park [data-testid='chart-empty-state']::before {
+  content: '';
+  display: block;
+  width: 72px;
+  height: 54px;
+  background: url('/decorative/south-park/art/kenny.webp') center/contain no-repeat;
+}
+.south-park [data-slot='skeleton'] {
+  background-color: #e0dac1;
+  background-image: repeating-linear-gradient(120deg, transparent 0 12px, #53674915 12px 18px);
+}
+.south-park button:focus-visible:where(:not([disabled])),
+.south-park :is(input, select, summary):focus-visible {
+  outline: 3px solid #ab4d19;
+  outline-offset: 2px;
+}
+.south-park [data-testid='chart-legend'] input:not(:checked) ~ label > span:last-child {
+  opacity: 0.83;
+}
+@media (max-width: 700px) {
+  .south-park .sp-film-slate {
+    padding: 3px 5px;
+    gap: 4px;
+  }
+  .south-park .sp-film-slate > span,
+  .south-park .sp-film-slate > small {
+    display: none;
+  }
+  .south-park .sp-film-slate button {
+    flex: 1;
+    justify-content: center;
+    min-height: 32px;
+    padding: 3px;
+    gap: 2px;
+    font-size: 11px;
+  }
+  .south-park .sp-film-slate i {
+    width: 6px;
+    height: 8px;
+    flex-shrink: 0;
+  }
+  .south-park .sp-colophon {
+    right: 8px;
+    max-width: 43%;
+    font-size: 11px;
+  }
+  .south-park [data-testid='footer']::after {
+    width: calc(100% - 16px);
+  }
+  .south-park[data-sp-mode='mysterion'] .sp-chart-rail {
+    background-size:
+      auto 42%,
+      auto 46%,
+      cover,
+      cover;
+  }
+  .south-park[data-sp-mode='casa'] .sp-chart-rail {
+    background-image:
+      url('/decorative/south-park/art/school-bus.webp'), url('/decorative/south-park/art/casa.webp');
+    background-size:
+      auto 32%,
+      cover;
+    background-position:
+      2% 97%,
+      center 63%;
+    background-repeat: no-repeat;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .south-park [data-slot='skeleton'] {
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .south-park .sp-film-slate button[aria-pressed='true'],
+  .south-park .sp-patrol-reward button[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+  .south-park [data-testid='footer'] {
+    padding-top: 86px;
+  }
+  .south-park [data-testid='footer']::before,
+  .south-park [data-testid='footer']::after {
+    display: none;
+  }
+  .south-park .sp-colophon {
+    top: 8px;
+    max-width: 90%;
+    color: ButtonText;
+    background: ButtonFace;
+  }
+}
+
+/* The landing postcard is a picture, not a second page header. Its controls
+   get their own seats instead of floating over the bus or the wooden sign. */
+.south-park .sp-banner-wrap {
+  margin-block: 6px 10px;
+}
+.south-park .sp-banner-wrap:not([data-compact]) .sp-postcard {
+  height: 143px;
+}
+.south-park .sp-film-slate > .sp-place-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.south-park .sp-banner-wrap:not([data-compact]) .sp-sign {
+  inset: 12% auto auto 5%;
+  width: 16%;
+  height: 82%;
+}
+.south-park .sp-banner-wrap:not([data-compact]) .sp-lineup {
+  left: 24%;
+  right: 29%;
+  bottom: 9%;
+}
+.south-park .sp-banner-wrap:not([data-compact]) .sp-log {
+  top: 11%;
+}
+.south-park[data-sp-mode='mysterion']
+  .sp-banner-wrap:not([data-compact]):not([data-fort])
+  .sp-scenery {
+  background-image:
+    linear-gradient(#23213e86, #31304c40), url('/decorative/south-park/art/main-street.webp');
+}
+.south-park .sp-station-row {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  background: #1d3442;
+  border: 1px solid #263f37;
+  color: #fff8e3;
+}
+.south-park .sp-station-row > * {
+  margin: 0;
+  min-height: 34px;
+  min-width: 0;
+}
+.south-park .sp-bus-transfer,
+.south-park .sp-depot-ticket {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-right: 1px solid #4c604f;
+  padding: 3px 10px;
+  background: #f4e8bb;
+  color: #243f34;
+  font:
+    700 13px/1.1 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-bus-transfer img {
+  width: 70px;
+  height: 26px;
+  object-fit: contain;
+}
+.south-park .sp-depot-ticket {
+  background: #ffdc81;
+}
+.south-park .sp-station-row > .sp-station-link {
+  flex: 1;
+  width: auto;
+  border: 0;
+}
+.south-park .sp-banner-wrap[data-compact] {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr) minmax(220px, auto);
+  margin-block: 4px 6px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-film-slate > :is(span, small),
+.south-park .sp-banner-wrap[data-compact] .sp-log-note,
+.south-park .sp-banner-wrap[data-compact] .sp-log-cap,
+.south-park .sp-banner-wrap[data-compact] .sp-sign,
+.south-park .sp-banner-wrap[data-compact] .sp-log::before,
+.south-park
+  .sp-banner-wrap[data-compact]
+  .sp-station-link
+  > :is(strong, span:not(.sp-station-number)) {
+  display: none;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-postcard {
+  height: 52px;
+  border-radius: 0;
+  box-shadow: none;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-lineup {
+  inset: auto 122px 4px 4px;
+}
+.south-park .south-park-scene[data-compact][data-place='home'] {
+  --kid-size: 42px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log {
+  inset: 7px 6px auto auto;
+  width: auto;
+  height: 34px;
+  padding: 3px 5px;
+  transform: none;
+  box-shadow: none;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log-main {
+  gap: 6px;
+  align-items: center;
+  padding: 0;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log-main span {
+  font-size: 13px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-log-main strong {
+  font-size: 22px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-station-link {
+  gap: 5px;
+}
+.south-park .sp-banner-wrap[data-compact] .sp-station-link b {
+  font-size: 13px;
+}
+.south-park .sp-chart-rail {
+  height: 98px;
+}
+.south-park .south-park-scene[data-place='plot'] {
+  --kid-size: 67px;
+}
+.south-park :is(.sp-station-row > *, .sp-chart-rail button, .sp-film-slate button):focus-visible {
+  outline: 3px solid #bb451a;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 5px #fffbea;
+}
+@media (max-width: 1020px) {
+  .south-park .sp-banner-wrap[data-compact] {
+    grid-template-columns: minmax(95px, 1fr) minmax(195px, 1fr);
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-film-slate {
+    grid-column: 1 / -1;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-film-slate button {
+    flex: 1;
+    justify-content: center;
+  }
+}
+@media (max-width: 700px) {
+  .south-park .sp-film-slate > .sp-place-name {
+    display: none;
+  }
+  .south-park .sp-banner-wrap:not([data-compact]) .sp-postcard {
+    height: 151px;
+  }
+  .south-park .sp-banner-wrap:not([data-compact]) .sp-sign {
+    inset: 9px auto auto 1%;
+    width: 22%;
+    height: 60%;
+  }
+  .south-park .sp-banner-wrap:not([data-compact]) .sp-lineup {
+    left: 24%;
+    right: 2%;
+    bottom: 31%;
+  }
+  .south-park .sp-banner-wrap:not([data-compact]) .sp-log {
+    top: auto;
+  }
+  .south-park .sp-mobile-radio {
+    top: 3px;
+  }
+  .south-park .sp-bus-transfer {
+    padding-inline: 4px;
+  }
+  .south-park .sp-bus-transfer img {
+    width: 48px;
+  }
+  .south-park .sp-bus-transfer span,
+  .south-park .sp-station-link > :is(strong, span:not(.sp-station-number)) {
+    display: none;
+  }
+  .south-park .sp-station-link {
+    gap: 4px;
+  }
+  .south-park .sp-station-link b {
+    font-size: 13px;
+  }
+  .south-park .sp-depot-ticket {
+    padding-inline: 6px;
+    font-size: 12px;
+  }
+  .south-park .sp-banner-wrap[data-compact] {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-postcard {
+    height: auto;
+    display: flex;
+    align-items: stretch;
+    overflow: visible;
+    border: 0;
+  }
+  .south-park
+    .sp-banner-wrap[data-compact]
+    .sp-postcard
+    > :is(.sp-lineup, .sp-scenery, .sp-transfer-slip) {
+    display: none;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-log {
+    position: static;
+    width: auto;
+    min-height: 34px;
+    height: auto;
+    padding-inline: 5px;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-log-main span {
+    font:
+      700 11px/1.1 SouthParkBody,
+      sans-serif;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-log-main strong {
+    font-size: 16px;
+  }
+  .south-park .sp-station-link .sp-station-number {
+    width: 20px;
+    font-size: 19px;
+  }
+  .south-park .sp-banner-wrap[data-compact] .sp-station-link img {
+    width: 20px;
+    height: 25px;
+  }
+  .south-park .sp-chart-rail {
+    height: 83px;
+  }
+  .south-park .south-park-scene[data-place='plot'] {
+    --kid-size: 46px;
+  }
+}
+.south-park [id$='-export'] dl:has([data-testid='result-context-scenario']) {
+  height: auto;
+  min-height: 2em;
+  row-gap: 5px;
+  margin-block-end: 6px;
+}
+.south-park [id$='-export'] div:has(> dd[data-testid='result-context-scenario']) {
+  display: inline-flex;
+  flex: none;
+  flex-flow: row nowrap;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.south-park [id$='-export'] [data-export-table] {
+  margin-block-start: 5px;
+}

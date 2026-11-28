@@ -1,0 +1,178 @@
+.south-park .sp-keep {
+  display: block;
+  max-width: 505px;
+  max-height: 92dvh;
+  overflow: auto;
+  padding: 0;
+  border: 3px solid #4a3322;
+  border-radius: 5px 9px 6px 3px;
+  background: #ffefd4;
+  color: #34271e;
+  font:
+    16px/1.25 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-keep header {
+  padding: 11px 40px 10px 14px;
+  background: #43304e;
+  color: #fff3c4;
+  border-bottom: 4px solid #dcac5b;
+}
+.south-park .sp-keep h2 {
+  font:
+    400 30px/1.1 SouthParkCutout,
+    SouthParkDisplay,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-fort {
+  position: relative;
+  height: clamp(123px, 30vw, 183px);
+  overflow: hidden;
+  background: #70442e;
+}
+.south-park .sp-fort img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 51%;
+}
+.south-park .sp-fort b {
+  position: absolute;
+  bottom: 6px;
+  right: 7px;
+  padding: 2px 8px;
+  border: 1px solid #fff1b1;
+  color: #fff1b1;
+  background: #3e304b;
+}
+.south-park .sp-keep > p,
+.south-park .sp-quest-feed,
+.south-park .sp-keep footer {
+  padding: 9px 12px;
+  margin: 0;
+}
+.south-park .sp-pair,
+.south-park .sp-quest-moves,
+.south-park .sp-keep footer {
+  display: flex;
+  gap: 5px;
+}
+.south-park .sp-keep footer {
+  flex-wrap: wrap;
+}
+.south-park .sp-party-title {
+  margin: 10px 12px 0;
+  color: #43304e;
+  font:
+    600 19px/1.2 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-pair,
+.south-park .sp-quest-moves {
+  margin: 0 10px;
+}
+.south-park .sp-pair > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #e3dab3;
+  border: 1px solid #5d513c;
+  flex: 1;
+  padding: 4px;
+  min-width: 0;
+}
+.south-park .sp-pair img {
+  width: clamp(37px, 7vw, 54px);
+  height: 50px;
+  object-fit: contain;
+}
+.south-park .sp-pair small,
+.south-park .sp-quest-moves small {
+  display: block;
+}
+.south-park .sp-keep header {
+  position: relative;
+  padding-right: 104px;
+}
+.south-park .sp-keep header .sp-radio {
+  position: absolute;
+  right: 44px;
+  top: 10px;
+}
+.south-park .sp-keep header .sp-radio:first-of-type {
+  right: 76px;
+}
+.south-park .sp-quest-cc {
+  display: block;
+  font-size: 12px;
+  line-height: 1.33;
+  color: #574657;
+  margin: 0 0 5px;
+}
+.south-park .sp-pair[data-impact='hit'] > div:last-child,
+.south-park .sp-pair[data-impact='guard'] > div:first-child {
+  outline: 2px dashed #864c29;
+  outline-offset: -3px;
+  background: #f6e0a0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .south-park .sp-pair[data-impact='hit'] > div:last-child img {
+    animation: sp-paper-hit 320ms steps(4, end) both;
+  }
+  @keyframes sp-paper-hit {
+    0%,
+    26% {
+      transform: translateX(0) rotate(0);
+    }
+    38% {
+      transform: translateX(4px) rotate(7deg);
+    }
+    70% {
+      transform: translateX(-1px) rotate(-3deg);
+    }
+    100% {
+      transform: none;
+    }
+  }
+}
+.south-park .sp-quest-feed strong {
+  font-size: 14px;
+  color: #65324e;
+}
+.south-park .sp-quest-feed p {
+  margin: 0 0 4px;
+}
+.south-park .sp-keep :is(footer button, .sp-quest-moves button) {
+  border: 1px solid #4f394e;
+  background: #49354e;
+  color: #fff6cc;
+  border-radius: 4px;
+  min-height: 42px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.south-park .sp-quest-moves button {
+  flex: 1;
+}
+.south-park .sp-keep button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.south-park .sp-keep button:focus-visible {
+  outline: 3px solid #c67916;
+  outline-offset: 2px;
+}
+.south-park .sp-keep > button {
+  color: white;
+}
+@media (forced-colors: active) {
+  .south-park .sp-keep img {
+    forced-color-adjust: none;
+  }
+  .south-park .sp-keep button:focus-visible {
+    outline-color: Highlight;
+  }
+}
