@@ -127,7 +127,7 @@ export default function QualityMethod({
         <p className="max-w-measure">{s.today}</p>
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{s.paired}</span>
-          <span className="rounded-full border border-border/30 px-2 py-0.5 text-2xs text-muted-foreground">
+          <span className="pill pill-px-2 pill-py-0.5 border border-border/30 text-2xs text-muted-foreground">
             {s.planned}
           </span>
         </div>

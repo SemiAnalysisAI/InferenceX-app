@@ -177,7 +177,7 @@ export function TradeoffWidget({ locale, alt }: WidgetProps) {
         />
         <span
           data-testid="video-quality-guide-illustrative"
-          className="rounded-full border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground"
+          className="pill pill-px-2.5 pill-py-0.5 border border-dashed border-border text-xs text-muted-foreground"
         >
           {t.illustrative}
         </span>

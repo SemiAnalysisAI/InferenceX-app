@@ -444,17 +444,18 @@ export default function FrontierView({
                 aria-pressed={on}
                 data-testid={`frontier-series-${key}`}
                 onClick={() => toggleSelected(key)}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                className={`pill pill-px-2.5 pill-py-1 flex items-center border text-xs transition-colors ${
                   on
                     ? 'border-border bg-muted font-medium text-foreground dark:bg-input'
                     : 'border-border text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <span
-                  aria-hidden
-                  className="size-2.5 rounded-full"
-                  style={{ background: on ? style.color : 'var(--muted)' }}
-                />
+                <span aria-hidden className="pill-icon">
+                  <span
+                    className="size-2.5 rounded-full"
+                    style={{ background: on ? style.color : 'var(--muted)' }}
+                  />
+                </span>
                 {style.label}
               </button>
             );
