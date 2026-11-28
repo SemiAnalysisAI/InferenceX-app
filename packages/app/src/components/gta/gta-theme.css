@@ -17,41 +17,1113 @@
   font-display: swap;
 }
 
-.gta-scene {
-  position: fixed;
-  inset: 0;
-  z-index: -10;
+/* ------------------------------------------------------------------ palette */
+/* Each protagonist is a sub-palette: Franklin green, Michael blue, Trevor orange. The HUD
+   colours (cash green, wanted red, mission yellow) stay fixed in every one of them. */
+html.gta {
+  --gta-accent: #72cc72;
+  --gta-accent-soft: #abedab;
+  --gta-accent-ink: #06150a;
+  --gta-sky-top: #0b1410;
+  --gta-sky-mid: #1b3a2a;
+  --gta-sky-low: #d98a4a;
+  --gta-hud-red: #e03232;
+  --gta-hud-blue: #5db6e5;
+  --gta-hud-yellow: #f0c850;
+  --gta-hud-green: #72cc72;
+  --gta-hud-purple: #8466e2;
+  --gta-panel: rgb(0 0 0 / 0.78);
+  --gta-panel-solid: #0b0c0d;
+  --gta-row: rgb(255 255 255 / 0.06);
+  --gta-line: rgb(255 255 255 / 0.16);
+  --primary: var(--gta-accent);
+  --sidebar-primary: var(--gta-accent);
+  --brand: var(--gta-accent);
+  --brand-fill: var(--gta-accent);
+  scrollbar-color: var(--gta-accent) #050505;
+  /* next-themes writes an inline light scheme for themes it does not know as dark. */
+  color-scheme: dark !important;
+}
+
+html.gta[data-gta-char='michael'] {
+  --gta-accent: #65b4d4;
+  --gta-accent-soft: #a9dcf0;
+  --gta-accent-ink: #04121a;
+  --gta-sky-top: #070d1c;
+  --gta-sky-mid: #1b2f5c;
+  --gta-sky-low: #c7628a;
+  --secondary: #f0c850;
+}
+
+html.gta[data-gta-char='trevor'] {
+  --gta-accent: #ffa357;
+  --gta-accent-soft: #ffd0a3;
+  --gta-accent-ink: #1c0d02;
+  --gta-sky-top: #160c08;
+  --gta-sky-mid: #5a2a14;
+  --gta-sky-low: #f0b24a;
+  --secondary: #e03232;
+}
+
+/* The pause-menu pointer: a white arrow with a black rim, and a hand for anything clickable.
+   Both are inline SVG, so no cursor file is fetched. */
+html.gta {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 2l16 9-7 2-3 7z' fill='%23fff' stroke='%23000' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E")
+      3 2,
+    auto;
+}
+
+.gta
+  :is(
+    a[href],
+    button:not(:disabled),
+    [role='button'],
+    [role='tab'],
+    [role='option'],
+    [role='switch'],
+    [role='combobox'],
+    summary,
+    label[for],
+    select
+  ) {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 2l16 9-7 2-3 7z' fill='%2372cc72' stroke='%23000' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='17' cy='18' r='3' fill='%23f0c850' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E")
+      3 2,
+    pointer;
+}
+
+.gta ::selection {
+  background: var(--gta-accent);
+  color: var(--gta-accent-ink);
+}
+
+/* --------------------------------------------------------------- typography */
+/* The pause-menu face carries every piece of interface text, the chart text and (through the
+   body font variable the PNG export probes) exported charts. Pricedown is for titles only. */
+.gta body {
+  --font-dm-sans:
+    'ChaletComprime', 'PingFang SC', 'Microsoft YaHei', 'Arial Narrow', system-ui, sans-serif;
+  --font-mono:
+    'ChaletComprime', ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'PingFang SC', monospace;
+  font-family: var(--font-dm-sans);
+  font-size-adjust: 0.53;
+  letter-spacing: 0.012em;
+  font-variant-numeric: tabular-nums;
+}
+
+.gta :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.gta main h1 {
+  font-family: var(--gta-display);
+  font-weight: 700;
+  font-size-adjust: none;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: #fff;
+  -webkit-text-stroke: 5px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #000;
+}
+
+.gta :is(h2, [data-slot='card-title']) {
+  color: #fff;
+}
+
+.gta main h2:not(:has(*))::before {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-right: 0.45em;
+  vertical-align: 0.08em;
+  background: var(--gta-accent);
+  border: 2px solid #000;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.5);
+}
+
+.gta [data-slot='eyebrow'] {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--gta-accent);
+}
+
+.gta :is(code, kbd, pre, samp) {
+  font-family: var(--font-mono);
+  font-size-adjust: 0.53;
+}
+
+.gta :is(kbd, :not(pre) > code) {
+  padding: 0.05em 0.4em;
+  color: var(--gta-hud-yellow);
+  background: #000;
+  border: 1px solid var(--gta-line);
+  border-radius: 2px;
+}
+
+.gta main a:not([data-slot='button'], [class*='bg-']) {
+  text-decoration-color: var(--gta-accent);
+  text-underline-offset: 0.18em;
+}
+
+.gta main a:not([data-slot='button'], [class*='bg-']):hover {
+  color: var(--gta-accent-soft);
+}
+
+.gta .splash-text {
+  font-family: var(--gta-display) !important;
+  font-size: 1.15rem;
+  font-size-adjust: none;
+  color: var(--gta-hud-yellow);
+  -webkit-text-stroke: 3px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #000;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------------- header */
+.gta header {
+  background: #000000eb;
+  border-bottom: 3px solid var(--gta-accent);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.55);
+}
+
+.gta header nav a,
+.gta [data-testid='mobile-menu'] a {
+  font-family: var(--gta-menu);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+  transition:
+    background-color 90ms,
+    color 90ms;
+}
+
+.gta header nav a:hover,
+.gta [data-testid='mobile-menu'] a:hover {
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
+}
+
+.gta header nav a[aria-current='page'],
+.gta [data-testid='mobile-menu'] a[aria-current='page'] {
+  background: #f5f5f5;
+  color: #000;
+  box-shadow: inset 0 3px 0 var(--gta-accent);
+}
+
+.gta [data-testid='inferencex-wordmark'] {
+  font-family: var(--gta-display);
+  font-size-adjust: none;
+  letter-spacing: 0.02em;
+}
+
+.gta header :is([data-testid='theme-toggle'], .gta-toggle) {
+  border-radius: 0;
+}
+
+.gta header :is([data-testid='theme-toggle'], .gta-toggle):hover {
+  background: #f5f5f5;
+  color: #000;
+}
+
+/* Header toggles: the cash counter opens the phone, the radio and the interface sounds. */
+.gta-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color 90ms,
+    color 90ms;
+}
+
+.gta-toggle[aria-pressed='true'] {
+  color: var(--gta-accent);
+}
+
+.gta-toggle[data-off]::after {
+  content: '';
+  position: absolute;
+  inset: 50% 0.55rem auto;
+  height: 2px;
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
+.gta-cash-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.1rem 0.7rem;
+  font-family: var(--gta-display);
+  font-size: 1.25rem;
+  font-size-adjust: none;
+  line-height: 1;
+  color: var(--gta-hud-green);
+  background: #000;
+  border: 1px solid var(--gta-line);
+  cursor: pointer;
+  -webkit-text-stroke: 3px #000;
+  paint-order: stroke fill;
+  transition:
+    border-color 90ms,
+    transform 70ms;
+}
+
+.gta-cash-pill:hover {
+  border-color: var(--gta-hud-green);
+}
+
+.gta-cash-pill:active {
+  transform: translateY(1px);
+}
+
+.gta-cash-value {
+  display: inline-block;
+  animation: gta-cash-tick 380ms ease-out;
+}
+
+.gta-cash-short {
+  display: none;
+}
+
+.gta-cash-found {
+  font-family: var(--gta-menu);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 0;
+  opacity: 0.75;
+}
+
+/* -------------------------------------------------------------- page panels */
+.gta :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
+  border-radius: var(--radius);
+}
+
+/* Cards are pause-menu panels: flat black glass with a character-coloured top edge. */
+.gta [data-slot='card'] {
+  background-color: #07090ad6;
+  border-color: #ffffff14;
+  box-shadow:
+    inset 0 3px 0 var(--gta-accent),
+    0 14px 30px rgb(0 0 0 / 0.45);
+}
+
+.gta [data-slot='card'] [data-slot='card'] {
+  background-color: rgb(255 255 255 / 0.04);
+  box-shadow: inset 3px 0 0 var(--gta-accent);
+}
+
+.gta [data-slot='control-panel'] {
+  background: var(--gta-panel);
+  border-color: var(--gta-line);
+  border-radius: 0;
+}
+
+.gta [data-slot='stat'] {
+  border-left: 3px solid var(--gta-accent);
+  padding-left: 0.6rem;
+}
+
+.gta hr,
+.gta [data-orientation][role='separator'] {
+  border-color: var(--gta-line);
+}
+
+/* ------------------------------------------------------------------ buttons */
+/* Menu rows: black glass at rest, the white selected row on hover, the character colour
+   while pressed. Filled buttons start in the character colour. */
+.gta
+  [data-slot='button']:is(
+    [class~='bg-primary'],
+    [class~='bg-brand-fill'],
+    [class~='bg-secondary'],
+    [class~='bg-destructive'],
+    [class~='bg-card'],
+    [class~='border']
+  ),
+.gta .gta-phone-action {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid var(--gta-line);
+  border-radius: 0;
+  background-color: rgb(0 0 0 / 0.72);
+  color: #f5f5f5;
+  box-shadow: inset 3px 0 0 transparent;
+  transition:
+    background-color 90ms,
+    color 90ms,
+    box-shadow 90ms,
+    transform 70ms;
+}
+
+.gta
+  [data-slot='button']:is(
+    [class~='bg-primary'],
+    [class~='bg-brand-fill'],
+    [class~='bg-secondary']
+  ) {
+  background-color: var(--gta-accent);
+  border-color: #000;
+  color: var(--gta-accent-ink);
+}
+
+.gta [data-slot='button'][class~='bg-destructive'] {
+  background-color: var(--gta-hud-red);
+  border-color: #000;
+  color: #fff;
+}
+
+.gta
+  [data-slot='button']:is(
+    [class~='bg-primary'],
+    [class~='bg-brand-fill'],
+    [class~='bg-secondary'],
+    [class~='bg-destructive'],
+    [class~='bg-card'],
+    [class~='border']
+  ):hover,
+.gta .gta-phone-action:hover {
+  background-color: #f5f5f5;
+  border-color: #f5f5f5;
+  color: #000;
+  box-shadow: inset 3px 0 0 var(--gta-accent);
+}
+
+.gta
+  [data-slot='button']:is(
+    [class~='bg-primary'],
+    [class~='bg-brand-fill'],
+    [class~='bg-secondary'],
+    [class~='bg-destructive'],
+    [class~='bg-card'],
+    [class~='border']
+  ):is(:active, [aria-pressed='true'], [data-state='on'], [data-state='open']),
+.gta .gta-phone-action:active {
+  background-color: var(--gta-accent);
+  border-color: var(--gta-accent);
+  color: var(--gta-accent-ink);
+  transform: translateY(1px);
+}
+
+.gta [data-slot='button']:is(:disabled, [aria-disabled='true']),
+.gta .gta-phone-action:disabled {
+  opacity: 0.45;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+
+/* Ghost and icon buttons get the selected-row treatment on hover only. */
+.gta [data-slot='button']:not([class~='border'], [class*='bg-']):hover {
+  background-color: rgb(255 255 255 / 0.14);
+  color: #fff;
+}
+
+.gta
+  :is(
+    button,
+    [role='button'],
+    [role='combobox'],
+    [role='tab'],
+    input,
+    textarea,
+    a,
+    select
+  ):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------- tabs */
+.gta [data-slot='dashboard-navigation'] {
+  border-radius: 0;
+  background: #000000d9;
+  border-bottom: 1px solid var(--gta-line);
+}
+
+.gta [data-slot='dashboard-navigation'] nav :is(a, button) {
+  font-family: var(--gta-menu);
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+  color: #fff;
+  border-radius: 0;
+  transition:
+    background-color 90ms,
+    color 90ms;
+}
+
+.gta [data-slot='dashboard-navigation'] nav :is(a, button):hover {
+  background: rgb(255 255 255 / 0.16);
+}
+
+.gta [data-slot='dashboard-navigation'] nav [data-tab-active='true'] {
+  background: #f5f5f5;
+  color: #000;
+  box-shadow: inset 0 4px 0 var(--gta-accent);
+}
+
+.gta [data-slot='tabs-list'] {
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border-bottom: 2px solid var(--gta-line);
+}
+
+.gta [data-slot='tabs-trigger'] {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #d8d8d8;
+  background: rgb(0 0 0 / 0.72);
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset 0 3px 0 transparent;
+  transition:
+    background-color 90ms,
+    color 90ms,
+    box-shadow 90ms;
+}
+
+.gta [data-slot='tabs-trigger']:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 0.18);
+}
+
+.gta [data-slot='tabs-trigger'][data-state='active'] {
+  color: #000;
+  background: #f5f5f5;
+  box-shadow: inset 0 3px 0 var(--gta-accent);
+}
+
+.gta [data-slot='tabs-trigger']:active {
+  background: var(--gta-accent);
+  color: var(--gta-accent-ink);
+}
+
+/* ------------------------------------------------------- inputs and popups */
+.gta [data-slot='input'],
+.gta [data-slot='textarea'],
+.gta [data-slot='select-trigger'],
+.gta [data-slot='input-group'],
+.gta main input[type='text'],
+.gta main input[type='search'],
+.gta main input[type='number'],
+.gta main textarea {
+  font-family: var(--font-dm-sans);
+  color: #f5f5f5;
+  background-color: rgb(0 0 0 / 0.72);
+  border: 1px solid var(--gta-line);
+  border-radius: 0;
+  box-shadow: inset 0 -2px 0 rgb(255 255 255 / 0.18);
+  transition:
+    background-color 90ms,
+    box-shadow 90ms,
+    border-color 90ms;
+}
+
+.gta :is([data-slot='input'], [data-slot='textarea'], main input, main textarea)::placeholder {
+  color: #9a9aa0;
+}
+
+.gta [data-slot='select-trigger']:hover,
+.gta [data-slot='input-group']:hover {
+  background-color: rgb(255 255 255 / 0.12);
+  border-color: rgb(255 255 255 / 0.4);
+}
+
+.gta
+  :is([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger']):is(
+    :focus,
+    :focus-visible,
+    [data-state='open']
+  ),
+.gta [data-slot='input-group']:focus-within {
+  border-color: var(--gta-accent);
+  box-shadow: inset 0 -2px 0 var(--gta-accent);
+}
+
+.gta [data-slot='select-content'],
+.gta [data-slot='popover-content'],
+.gta [data-slot='dropdown-menu-content'],
+.gta [role='menu'],
+.gta [role='listbox'] {
+  background-color: #000000f2;
+  border: 1px solid var(--gta-line);
+  border-top: 3px solid var(--gta-accent);
+  border-radius: 0;
+  box-shadow: 0 18px 40px rgb(0 0 0 / 0.7);
+}
+
+.gta [data-slot='select-label'] {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gta-accent);
+}
+
+/* The highlighted row of a list is the white selected row of the pause menu. */
+.gta [data-slot='select-item']:is(:hover, [data-highlighted]),
+.gta [role='option']:is(:hover, [data-highlighted]),
+.gta [role='menuitem']:is(:hover, [data-highlighted]) {
+  background: #f5f5f5;
+  color: #000;
+  border-radius: 0;
+}
+
+.gta [role='option'][aria-selected='true']:not(:hover, [data-highlighted]),
+.gta [data-slot='select-item'][data-state='checked']:not(:hover, [data-highlighted]) {
+  background: rgb(255 255 255 / 0.1);
+  box-shadow: inset 3px 0 0 var(--gta-accent);
+}
+
+/* Chips and badges are HUD tags: black with a coloured edge. */
+.gta [data-slot='select-chip'],
+.gta [data-slot='badge'] {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--gta-line);
+  border-radius: 0;
+  box-shadow: inset 3px 0 0 var(--gta-accent);
+}
+
+.gta [data-slot='select-chip'] {
+  background-color: #000;
+  color: #f5f5f5;
+}
+
+.gta [data-slot='switch'] {
+  border: 1px solid rgb(255 255 255 / 0.4);
+  border-radius: 0;
+  background: rgb(0 0 0 / 0.8);
+  transition: background-color 120ms;
+}
+
+.gta [data-slot='switch']:hover {
+  border-color: #fff;
+}
+
+.gta [data-slot='switch'][data-state='checked'] {
+  background: var(--gta-accent);
+  border-color: var(--gta-accent);
+}
+
+.gta [data-slot='switch-thumb'] {
+  border-radius: 0;
+  background: #f5f5f5;
+  box-shadow: 0 0 0 1px #000;
+}
+
+.gta :is(input[type='checkbox'], input[type='radio'], input[type='range'], progress) {
+  accent-color: var(--gta-accent);
+}
+
+.gta [role='checkbox'] {
+  border-radius: 0;
+  border-color: rgb(255 255 255 / 0.5);
+}
+
+.gta [role='checkbox'][data-state='checked'] {
+  background: var(--gta-accent);
+  border-color: var(--gta-accent);
+  color: var(--gta-accent-ink);
+}
+
+/* Help text boxes, as in the top-left corner of the game. */
+.gta :is([role='tooltip'], [data-slot='tooltip-content']) {
+  font-family: var(--font-dm-sans);
+  color: #f5f5f5;
+  background: #000000e6;
+  border: 1px solid var(--gta-line);
+  border-radius: 0;
+}
+
+.gta [role='dialog']:not(.heist-dialog, .gta-dialog) {
+  background: #050506f7;
+  border: 1px solid var(--gta-line);
+  border-top: 4px solid var(--gta-accent);
+  border-radius: 0;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.8);
+}
+
+.gta [data-slot='skeleton'] {
+  border-radius: 0;
+  background-color: rgb(255 255 255 / 0.07);
+  background-image: linear-gradient(
+    100deg,
+    transparent 0 35%,
+    color-mix(in srgb, var(--gta-accent) 55%, transparent) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  animation: gta-loading 1.5s linear infinite;
+}
+
+/* Chart-sized placeholders are the loading screen: the caption sits bottom right with a
+   spinner, as it does while story mode loads. */
+.gta
+  [data-slot='skeleton']:is(
+    [class~='h-64'],
+    [class~='h-100'],
+    [class~='h-125'],
+    [class~='h-154'],
+    [class~='h-200'],
+    [class~='h-[360px]'],
+    [class~='h-[430px]'],
+    [class~='h-[600px]'],
+    [class~='aspect-video']
+  ) {
+  position: relative;
+  opacity: 1;
+}
+
+.gta
+  [data-slot='skeleton']:is(
+    [class~='h-64'],
+    [class~='h-100'],
+    [class~='h-125'],
+    [class~='h-154'],
+    [class~='h-200'],
+    [class~='h-[360px]'],
+    [class~='h-[430px]'],
+    [class~='h-[600px]'],
+    [class~='aspect-video']
+  )::after {
+  content: var(--gta-loading, 'Loading');
+  position: absolute;
+  right: 1rem;
+  bottom: 0.8rem;
+  padding-right: 1.7rem;
+  font-family: var(--gta-menu);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f5f5f5;
+  background: conic-gradient(from 0deg, var(--gta-accent) 0 70%, transparent 0) right center /
+    1.1rem 1.1rem no-repeat;
+}
+
+/* ------------------------------------------------------------------- charts */
+/* Charts read as the pause-menu map: street-grey grid, blips for points, the GPS route for
+   the frontier, stat bars for bars. Series colour and point shape are never changed. */
+.gta svg[data-testid='d3-chart-svg'] text {
+  font-family: var(--font-dm-sans);
+  letter-spacing: 0.02em;
+}
+
+.gta svg[data-testid='d3-chart-svg'] .tick text {
+  fill: #e4e4e6;
+  font-weight: 700;
+}
+
+.gta svg[data-testid='d3-chart-svg'] :is(.x-axis-label, .y-axis-label) {
+  fill: #fff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gta svg[data-testid='d3-chart-svg'] :is(.grid, .grid-h, .grid-v) line {
+  stroke: rgb(255 255 255 / 0.2);
+  stroke-width: 1px;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+}
+
+.gta svg[data-testid='d3-chart-svg'] .domain {
+  stroke: rgb(255 255 255 / 0.7);
+  stroke-width: 2px;
+  stroke-linecap: square;
+}
+
+.gta svg[data-testid='d3-chart-svg'] .tick line {
+  stroke: rgb(255 255 255 / 0.7);
+  stroke-width: 1.5px;
+}
+
+/* Frontier lines are GPS routes in the series colour; the global frontier is the mission
+   route in yellow. */
+.gta svg[data-testid='d3-chart-svg'] :is(.roofline-path, .overlay-roofline-path) {
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.gta svg[data-testid='d3-chart-svg'] .global-pareto-frontier {
+  stroke: var(--gta-hud-yellow);
+  stroke-width: 4px;
+  stroke-dasharray: 1 8;
+  stroke-linecap: round;
+}
+
+.gta svg[data-testid='d3-chart-svg'] rect.bar {
+  stroke: #000;
+  stroke-width: 1.5px;
+}
+
+.gta svg[data-testid='d3-chart-svg'] :is(.gta-bar-segments, .gta-blip-marker) {
   pointer-events: none;
-  overflow: hidden;
-  background: #0a0a0b;
 }
 
-.gta-scene-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 65% center;
+.gta .legend-container label {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f0f0f0;
 }
 
-.gta-scene-shade {
+/* Legend swatches are the lettered mission marker the points use: series colour, black rim,
+   white keyline and the initial of the character in play. */
+.gta .legend-container label > span:first-child > span.rounded-full {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 2px solid #000;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.55);
+}
+
+.gta .legend-container label > span:first-child > span.rounded-full::after {
+  content: var(--gta-mission-letter, 'F');
+  font-family: var(--gta-menu);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  color: #000;
+}
+
+html[data-gta-char='michael'] {
+  --gta-mission-letter: 'M';
+}
+
+html[data-gta-char='trevor'] {
+  --gta-mission-letter: 'T';
+}
+
+/* The plot is framed like the radar: a keyline along the top and right edges. */
+.gta .canvas-point-surface {
+  box-shadow:
+    2px 0 0 rgb(255 255 255 / 0.34),
+    0 -2px 0 rgb(255 255 255 / 0.34),
+    2px -2px 0 rgb(255 255 255 / 0.34);
+}
+
+.gta .gta-sweeping .canvas-point-surface {
+  animation: gta-radar-ping 900ms ease-out;
+}
+
+/* The radar sweep of a chart that just loaded or changed subject: a line crossing the plot
+   once with a fading trail, and the number of blips it found in a tab on the top edge. */
+.gta .gta-sweep-line {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.gta .gta-sweep-line > i {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, #05070999, #050709c9 65%, #050709eb);
+  overflow: hidden;
 }
 
+.gta .gta-sweep-line > i::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 22%;
+  border-right: 2px solid #fff;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--gta-accent) 34%, transparent)
+  );
+  transform: translateX(-100%);
+  animation: gta-sweep-line var(--gta-sweep-ms, 900ms) linear forwards;
+}
+
+.gta .gta-sweep-line > span {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  padding: 0.05rem 0.5rem 0.1rem;
+  border-left: 4px solid var(--gta-hud-yellow);
+  font-family: var(--gta-menu);
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gta-hud-yellow);
+  background: #000000d9;
+}
+
+@keyframes gta-sweep-line {
+  to {
+    transform: translateX(455%);
+  }
+}
+
+@media (forced-colors: active) {
+  .gta .gta-sweep-line > i::before {
+    border-right-color: CanvasText;
+    background: none;
+  }
+
+  .gta .gta-sweep-line > span {
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+}
+
+/* Tooltips are blip info cards. The panel keeps its own padding and border width. */
+.gta [data-chart-tooltip] > div {
+  background: #000000f0 !important;
+  border-color: rgb(255 255 255 / 0.28) !important;
+  border-radius: 0 !important;
+  box-shadow:
+    inset 4px 0 0 var(--gta-accent),
+    0 14px 34px rgb(0 0 0 / 0.75) !important;
+  font-family: var(--font-dm-sans);
+  color: #f5f5f5;
+}
+
+.gta [data-chart-tooltip]:not([data-sheet])::before {
+  content: var(--gta-blip-label, '');
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  padding: 2px 9px 0;
+  font-family: var(--gta-menu);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #000;
+  background: var(--gta-hud-yellow);
+  border: 1px solid #000;
+  border-bottom: 0;
+}
+
+/* ------------------------------------------------------------------- tables */
+/* Tables are the stats page: a black header in the character colour, striped rows and a
+   selected row that lights up. Cells the page colours on purpose keep their colour. */
+.gta main table.w-full thead th {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gta-accent) !important;
+  background-color: #000 !important;
+  border-bottom: 2px solid var(--gta-accent);
+}
+
+.gta main table.w-full tbody tr {
+  border-bottom: 1px solid rgb(255 255 255 / 0.08) !important;
+}
+
+.gta main table.w-full tbody tr:nth-child(even) > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: rgb(255 255 255 / 0.045);
+}
+
+.gta main table.w-full tbody tr:hover > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: rgb(255 255 255 / 0.14);
+}
+
+.gta main table.w-full tbody tr:hover > :is(td, th):first-child {
+  box-shadow: inset 3px 0 0 var(--gta-accent);
+}
+
+/* ------------------------------------------------- 404, empty and loading states */
+/* 404 is the death screen: the number in red display type with WASTED under it. */
+.gta div.items-center.justify-center.text-center > [data-slot='eyebrow'].tabular-nums:first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.4rem 3rem 0.6rem;
+  font-family: var(--gta-display);
+  font-size: 4.5rem;
+  font-size-adjust: none;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--gta-hud-red);
+  background: linear-gradient(90deg, transparent, #000000d9 18% 82%, transparent);
+  -webkit-text-stroke: 6px #000;
+  paint-order: stroke fill;
+  animation: gta-wasted 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.gta
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child::after {
+  content: var(--gta-404, 'Wasted');
+  font-size: 0.42em;
+  letter-spacing: 0.06em;
+  color: #f5f5f5;
+  -webkit-text-stroke: 4px #000;
+}
+
+/* Empty states fail the mission. */
+.gta :is([data-slot='empty-state'], [data-testid='scatter-empty-state']) {
+  font-family: var(--font-dm-sans);
+  color: #e8e8ea;
+}
+
+.gta :is([data-slot='empty-state'], [data-testid='scatter-empty-state'])::before {
+  content: var(--gta-empty-title, 'Mission Failed');
+  flex: none;
+  display: block;
+  width: 100%;
+  margin: 0 auto 0.35rem;
+  padding: 0.25rem 1rem 0.4rem;
+  font-family: var(--gta-display);
+  font-size: 2rem;
+  font-size-adjust: none;
+  line-height: 1.05;
+  text-align: center;
+  color: var(--gta-hud-red);
+  background: linear-gradient(90deg, transparent, #000000cc 20% 80%, transparent);
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+}
+
+.gta :is([data-slot='empty-state'], [data-testid='scatter-empty-state'])::after {
+  content: var(--gta-empty-sub, '');
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  font-family: var(--gta-menu);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--gta-hud-yellow);
+}
+
+/* The wanted level of an empty chart, above the stock message: one star when the matching
+   series are only hidden, two when a quick filter removed them, three when they lie outside
+   the chart limits and five when the selection has nothing to plot. */
+.gta [data-testid='scatter-empty-state'] > div:first-of-type::before {
+  content: '★★★★★';
+  display: block;
+  width: fit-content;
+  margin: 0 auto 0.35rem;
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  color: transparent;
+  background: linear-gradient(90deg, #fff 0 var(--gta-empty-stars, 100%), #ffffff38 0);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.gta [data-testid='scatter-empty-state'][data-reason='hidden'] {
+  --gta-empty-stars: 20%;
+}
+
+.gta [data-testid='scatter-empty-state'][data-reason='filtered'] {
+  --gta-empty-stars: 40%;
+}
+
+.gta [data-testid='scatter-empty-state'][data-reason='clipped'] {
+  --gta-empty-stars: 60%;
+}
+
+@media (forced-colors: active) {
+  .gta [data-testid='scatter-empty-state'] > div:first-of-type::before {
+    color: CanvasText;
+    background: none;
+  }
+}
+
+/* The chart-sized loading placeholder is a loading screen: character art on the left over
+   the dark card, under the stock shimmer and the caption. */
+.gta [data-slot='skeleton'][class~='h-[600px]']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0 14%, #0b0d0ff2 37%),
+    url('/decorative/gta/art/franklin.webp') 4% 100% / auto 94% no-repeat;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.gta[data-gta-char='michael'] [data-slot='skeleton'][class~='h-[600px]']::before {
+  background-image:
+    linear-gradient(90deg, transparent 0 14%, #0b0d0ff2 37%),
+    url('/decorative/gta/art/michael.webp');
+}
+
+.gta[data-gta-char='trevor'] [data-slot='skeleton'][class~='h-[600px]']::before {
+  background-image:
+    linear-gradient(90deg, transparent 0 14%, #0b0d0ff2 37%), url('/decorative/gta/art/trevor.webp');
+}
+
+@media (forced-colors: active) {
+  .gta [data-slot='skeleton'][class~='h-[600px]']::before {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------- footer */
+.gta footer {
+  background: linear-gradient(180deg, #000000e6, #00000099 55%, #00000040);
+  border-top: 3px solid var(--gta-accent);
+}
+
+.gta footer a:hover {
+  color: var(--gta-accent-soft);
+}
+
+/* ------------------------------------------------------------------- banner */
 .gta-theme-banner {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 17rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title hud'
+    'radar heist'
+    'switch switch';
+  align-items: start;
+  gap: 0.75rem 1.5rem;
+  min-height: 19rem;
   margin-block: 0.5rem 1.5rem;
-  padding: 1.5rem 2rem;
-  border-bottom: 4px solid var(--primary);
+  padding: 1.25rem 1.5rem 0;
+  border-bottom: 4px solid var(--gta-accent);
   background: #10110f;
+  font-family: var(--gta-menu);
+  box-shadow: 0 18px 40px rgb(0 0 0 / 0.5);
 }
 
 .gta-banner-art {
@@ -67,72 +1139,1782 @@
   object-position: center top;
 }
 
+/*
+ * The scene is one picture with Michael in it. When Franklin or Trevor is the character in
+ * play, his own artwork sits over that part of the scene as a cover-style panel, so the
+ * figure in the banner is the one the switch shows.
+ */
+html[data-gta-char='franklin'] .gta-banner-art::after,
+html[data-gta-char='trevor'] .gta-banner-art::after {
+  content: '';
+  position: absolute;
+  inset: 0 10% 0 42%;
+  border-inline: 4px solid #000;
+  background: #000 center 8% / cover no-repeat;
+}
+
+html[data-gta-char='franklin'] .gta-banner-art::after {
+  background-image: url('/decorative/gta/art/franklin.webp');
+}
+
+html[data-gta-char='trevor'] .gta-banner-art::after {
+  background-image: url('/decorative/gta/art/trevor.webp');
+}
+
+/* On inner pages the banner is short: the panel keeps the face clear of the cash and rank. */
+.gta-theme-banner[data-compact='true'] .gta-banner-art::after {
+  inset: 0 28% 0 40%;
+  background-position: center 6%;
+}
+
 .gta-banner-shade {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(90deg, #080a08 0%, #080a08eb 20%, #080a0840 47%, #080a0800 70%);
+  background:
+    linear-gradient(90deg, #080a08 0%, #080a08eb 20%, #080a0840 47%, #080a0800 70%),
+    linear-gradient(0deg, #080a08e6 0, #080a0800 38%),
+    linear-gradient(270deg, #080a08b3 0, #080a0800 26%);
+}
+
+.gta-banner-title {
+  grid-area: title;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .gta-wordmark {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  padding: 0;
   font-family: var(--gta-display);
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  font-size-adjust: none;
   font-weight: 700;
   line-height: 0.82;
+  text-align: left;
   color: #fff;
-  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  background: none;
+  border: 0;
+  cursor: pointer;
   -webkit-text-stroke: 4px #000;
   paint-order: stroke fill;
   text-shadow: 0 3px 0 #000;
+  transition: transform 120ms;
+}
+
+.gta-wordmark:hover {
+  transform: rotate(-1.5deg) scale(1.02);
+}
+
+.gta-wordmark:active {
+  transform: scale(0.97);
 }
 
 .gta-wordmark-big {
   font-size: 1.55em;
+  color: var(--gta-accent-soft);
 }
 
-.gta-wanted {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-shrink: 0;
-  gap: 0.15rem;
+/* The rotating line sits in a help-text box, as mission prompts do. */
+.gta-banner-splash {
+  max-width: 30rem;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
   color: #f5f5f5;
-  filter: drop-shadow(0 2px 2px #000);
+  background: #000000c7;
+  border-left: 3px solid var(--gta-hud-yellow);
+  animation: gta-help-in 420ms ease-out;
 }
 
-.gta-heist-launcher {
-  position: absolute;
-  right: 1.25rem;
-  bottom: 1.25rem;
+.gta-banner-hud {
+  grid-area: hud;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.5rem;
+  gap: 0.1rem;
 }
 
-.gta-heist-launcher span {
+.gta-wanted {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+  filter: drop-shadow(0 2px 2px #000);
+}
+
+.gta-wanted svg path {
+  fill: rgb(0 0 0 / 0.55);
+  stroke: rgb(255 255 255 / 0.4);
+  stroke-width: 1.4px;
+}
+
+.gta-wanted svg[data-lit='true'] path {
+  fill: #f5f5f5;
+  stroke: #000;
+  stroke-width: 1.8px;
+}
+
+.gta-wanted:not([data-wanted='0']) svg[data-lit='true'] {
+  animation: gta-star-flash 900ms steps(2, jump-none) infinite;
+}
+
+.gta-banner-cash {
+  padding: 0;
   font-family: var(--gta-display);
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  font-size-adjust: none;
+  line-height: 1.05;
+  color: var(--gta-hud-green);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-text-stroke: 5px #000;
+  paint-order: stroke fill;
+}
+
+.gta-banner-cash span {
+  display: inline-block;
+  animation: gta-cash-tick 380ms ease-out;
+}
+
+.gta-banner-cash:hover {
   color: #fff;
-  text-shadow: 2px 2px 2px #000;
+}
+
+.gta-banner-rank {
+  margin: 0;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #000000c7;
+}
+
+.gta-banner-rank span {
+  color: var(--gta-accent);
+}
+
+/* Radar and the three bars under it: page progress, secrets found, wanted heat. */
+.gta-banner-radar {
+  grid-area: radar;
+  align-self: end;
+  width: 11rem;
+}
+
+.gta-radar {
+  position: relative;
+  overflow: hidden;
+  height: 6.6rem;
+  border: 2px solid #000;
+  outline: 1px solid rgb(255 255 255 / 0.25);
+  /* The Los Santos map from San Andreas, darkened so the route and blips stay on top. */
+  background:
+    linear-gradient(rgb(8 18 12 / 0.38), rgb(8 18 12 / 0.38)),
+    #1c2226 url('/decorative/gta/art/map-los-santos.webp') 76% 72% / 30rem auto no-repeat;
+}
+
+.gta-radar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.gta-radar-route {
+  fill: none;
+  stroke: var(--gta-hud-purple);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gta-radar-blip {
+  stroke: #000;
+  stroke-width: 1.5;
+  fill: var(--gta-hud-yellow);
+}
+
+.gta-radar-blip[data-blip='b'] {
+  fill: var(--gta-hud-blue);
+}
+
+.gta-radar-blip[data-blip='c'] {
+  fill: var(--gta-hud-red);
+}
+
+.gta-radar-blip[data-blip='a'] {
+  animation: gta-blip-pulse 1.4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The player arrow walks the route as the page scrolls. */
+.gta-radar-player {
+  position: absolute;
+  left: calc(14% + var(--gta-progress, 0) * 56%);
+  top: calc(8% + var(--gta-progress, 0) * 58%);
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-top-width: 0;
+  border-bottom: 12px solid #fff;
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+  transform: translate(-50%, -50%) rotate(135deg);
+}
+
+.gta-radar-north,
+.gta-radar-count {
+  position: absolute;
+  top: 3px;
+  padding: 0 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+  background: #000000b3;
+}
+
+.gta-radar-north {
+  right: 3px;
+}
+
+.gta-radar-count {
+  left: 3px;
+  color: var(--gta-hud-yellow);
+}
+
+.gta-radar-bars {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 2px;
+  background: #000;
+}
+
+.gta-radar-bar {
+  height: 7px;
+  background: rgb(114 204 114 / 0.28);
+}
+
+.gta-radar-bar span {
+  display: block;
+  height: 100%;
+  background: var(--gta-hud-green);
+  transition: width 240ms;
+}
+
+.gta-radar-bar[data-bar='health'] span {
+  width: calc(var(--gta-progress, 0) * 100%);
+  min-width: 4%;
+  transition: none;
+}
+
+.gta-radar-bar[data-bar='armor'] {
+  background: rgb(93 182 229 / 0.28);
+}
+
+.gta-radar-bar[data-bar='armor'] span {
+  background: var(--gta-hud-blue);
+}
+
+.gta-radar-bar[data-bar='special'] {
+  background: rgb(240 200 80 / 0.28);
+}
+
+.gta-radar-bar[data-bar='special'] span {
+  background: var(--gta-hud-yellow);
+}
+
+/* The character switch: one chip per protagonist plus the phone. */
+.gta-switch {
+  grid-area: switch;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-inline: -1.5rem;
+  padding: 0 1.5rem;
+  background: #000000d9;
+}
+
+.gta-switch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.9rem;
+  font-family: var(--gta-menu);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #f5f5f5;
+  background: none;
+  border: 0;
+  box-shadow: inset 0 3px 0 transparent;
+  cursor: pointer;
+  transition:
+    background-color 90ms,
+    color 90ms,
+    box-shadow 90ms;
+}
+
+.gta-switch-chip:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+
+.gta-switch-chip:active {
+  background: var(--gta-accent);
+  color: var(--gta-accent-ink);
+}
+
+.gta-switch-chip[aria-pressed='true'] {
+  color: #000;
+  background: #f5f5f5;
+  box-shadow: inset 0 3px 0 var(--gta-accent);
+}
+
+/* The switch shows each character's portrait, ringed in his colour as on the switch wheel. */
+.gta-switch-dot,
+.gta-character-swatch {
+  flex: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 2px solid #000;
+  border-radius: 50%;
+  outline: 2px solid #72cc72;
+  background: #72cc72 url('/decorative/gta/art/franklin-face.webp') center / cover;
+}
+
+:is(.gta-switch-chip, .gta-character)[data-char='michael']
+  :is(.gta-switch-dot, .gta-character-swatch) {
+  outline-color: #65b4d4;
+  background-color: #65b4d4;
+  background-image: url('/decorative/gta/art/michael-face.webp');
+}
+
+:is(.gta-switch-chip, .gta-character)[data-char='trevor']
+  :is(.gta-switch-dot, .gta-character-swatch) {
+  outline-color: #ffa357;
+  background-color: #ffa357;
+  background-image: url('/decorative/gta/art/trevor-face.webp');
+}
+
+.gta-phone-button {
+  margin-left: auto;
+}
+
+.gta-phone-count {
+  padding: 0 0.4rem;
+  font-size: 0.8rem;
+  color: #000;
+  background: var(--gta-hud-yellow);
+}
+
+.gta-heist-launcher {
+  grid-area: heist;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.gta-heist-launcher > span:not(.gta-heist-poster) {
+  font-family: var(--gta-display);
   font-size: 1.5rem;
+  font-size-adjust: none;
+  color: #fff;
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+}
+
+/* The game's poster is the box art: the black-bordered panel grid with the helicopter. It
+   stands to the left of the launcher, over banner artwork only. */
+.gta-heist-poster {
+  position: absolute;
+  right: calc(100% + 0.9rem);
+  bottom: 0;
+  width: 5.4rem;
+  aspect-ratio: 320 / 392;
+  border: 2px solid #000;
+  outline: 1px solid rgb(255 255 255 / 0.45);
+  background: #000 url('/decorative/gta/art/boxart-v.webp') center / cover no-repeat;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.6);
+}
+
+.gta-heist-record {
+  margin: 0;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #f5f5f5;
+  background: #000000c7;
 }
 
 .gta-heist-launcher button {
   min-height: 44px;
   padding: 0.5rem 1rem;
-  border: 1px solid #c9e69d;
-  background: #b6db84;
-  color: #14200d;
+  font-family: var(--gta-menu);
+  font-size: 1.1rem;
   font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gta-accent-ink);
+  background: var(--gta-accent);
+  border: 1px solid #000;
   cursor: pointer;
+  transition:
+    background-color 90ms,
+    transform 70ms;
+}
+
+.gta-heist-launcher button:hover {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.gta-heist-launcher button:active {
+  transform: translateY(1px);
+}
+
+/* Interior pages get one row: wordmark, prompt, HUD and the heist button. */
+.gta-theme-banner[data-compact='true'] {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'title title hud heist'
+    'switch switch switch switch';
+  align-items: center;
+  min-height: 0;
+  padding-top: 0.75rem;
+}
+
+.gta-theme-banner[data-compact='true'] .gta-banner-title {
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+}
+
+.gta-theme-banner[data-compact='true'] .gta-banner-art img {
+  object-position: center 14%;
+}
+
+.gta-theme-banner[data-compact='true'] .gta-wordmark {
+  font-size: 1.15rem;
+  flex: none;
+}
+
+.gta-theme-banner[data-compact='true'] .gta-banner-cash {
+  font-size: 1.5rem;
+}
+
+.gta-theme-banner[data-compact='true']
+  :is(.gta-banner-radar, .gta-heist-record, .gta-heist-launcher > span) {
+  display: none;
+}
+
+.gta-theme-banner[data-compact='true'] .gta-heist-launcher {
+  align-self: center;
+}
+
+.gta-theme-banner[data-compact='true'] .gta-switch-chip {
+  min-height: 2.25rem;
+  font-size: 0.95rem;
+}
+
+/* -------------------------------------------------------------------- scene */
+/* Fixed behind the page. Sky, sun, the key art, searchlights, two skyline planes, palms, a
+   blimp, weather and the wanted heat: every plane moves at its own rate with the scroll. */
+.gta-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  overflow: hidden;
+  background: #0a0a0b;
+}
+
+.gta-scene > * {
+  position: absolute;
+}
+
+.gta-scene-sky {
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    var(--gta-sky-top) 0%,
+    var(--gta-sky-mid) 48%,
+    var(--gta-sky-low) 100%
+  );
+  transition: opacity 600ms;
+}
+
+.gta-scene-sun {
+  left: 68%;
+  bottom: 12%;
+  width: 22rem;
+  height: 22rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--gta-sky-low) 0 18%, transparent 68%);
+  opacity: 0.55;
+  transform: translateY(calc(var(--gta-scroll, 0) * 0.05px));
+}
+
+.gta-scene picture {
+  inset: 0;
+}
+
+.gta-scene-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 65% center;
+  opacity: 0.5;
+  mix-blend-mode: luminosity;
+  transform: scale(1.06) translateY(calc(var(--gta-scroll, 0) * -0.012px));
+}
+
+.gta-scene-shade {
+  inset: 0;
+  background: linear-gradient(180deg, #05070999, #050709c9 65%, #050709eb);
+}
+
+.gta-scene-beams {
+  inset: 0;
+  opacity: 0;
+  transition: opacity 500ms;
+}
+
+.gta-scene-beams span {
+  position: absolute;
+  bottom: 8%;
+  left: 22%;
+  width: 7rem;
+  height: 120vh;
+  transform-origin: 50% 100%;
+  background: linear-gradient(0deg, rgb(255 255 255 / 0.3), transparent 85%);
+  clip-path: polygon(46% 100%, 54% 100%, 100% 0, 0 0);
+  animation: gta-beam 7s ease-in-out infinite alternate;
+}
+
+.gta-scene-beams span + span {
+  left: 70%;
+  animation-duration: 9s;
+  animation-direction: alternate-reverse;
+}
+
+.gta-scene-skyline {
+  left: 0;
+  bottom: 48px;
+  width: 100%;
+  height: clamp(9rem, 26vh, 16rem);
+}
+
+.gta-skyline-far {
+  fill: #0d1418;
+  opacity: 0.8;
+  transform: translateY(calc(var(--gta-scroll, 0) * 0.018px));
+}
+
+.gta-skyline-near {
+  fill: #040607;
+  transform: translateY(calc(var(--gta-scroll, 0) * 0.04px));
+}
+
+.gta-skyline-windows {
+  fill: var(--gta-hud-yellow);
+  opacity: 0.75;
+  transform: translateY(calc(var(--gta-scroll, 0) * 0.04px));
+  animation: gta-windows 6s steps(3, jump-none) infinite;
+}
+
+.gta-scene-palms {
+  bottom: -1rem;
+  left: -1.5rem;
+  width: clamp(7rem, 13vw, 13rem);
+  height: auto;
+  fill: #020303;
+  transform-origin: 40% 100%;
+  transform: translateY(calc(var(--gta-scroll, 0) * 0.07px));
+  animation: gta-palm 8s ease-in-out infinite alternate;
+}
+
+.gta-scene-palms[data-side='right'] {
+  left: auto;
+  right: -1rem;
+  width: clamp(5.5rem, 10vw, 10rem);
+  scale: -1 1;
+  animation-duration: 10s;
+}
+
+.gta-scene-traffic {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.gta-scene-blimp {
+  top: 16%;
+  left: -12rem;
+  fill: #101619;
+  opacity: 0.85;
+  animation: gta-blimp 90s linear infinite;
+}
+
+.gta-scene-blimp svg path:first-child {
+  stroke: rgb(255 255 255 / 0.18);
+  stroke-width: 1.5px;
+}
+
+.gta-scene-weather {
+  inset: -20% 0 0;
+  opacity: 0;
+  transition: opacity 600ms;
+}
+
+html[data-gta-weather='rain'] .gta-scene-weather {
+  opacity: 0.55;
+  background-image:
+    repeating-linear-gradient(
+      104deg,
+      transparent 0 9px,
+      rgb(190 215 235 / 0.5) 9px 10px,
+      transparent 10px 23px
+    ),
+    repeating-linear-gradient(
+      104deg,
+      transparent 0 17px,
+      rgb(190 215 235 / 0.28) 17px 18px,
+      transparent 18px 41px
+    );
+  background-size:
+    120px 180px,
+    210px 260px;
+  mask-image: linear-gradient(180deg, #000 0 80%, transparent);
+  animation: gta-rain 620ms linear infinite;
+}
+
+html[data-gta-weather='rain'] .gta-scene-sun,
+html[data-gta-weather='smog'] .gta-scene-sun {
+  opacity: 0.2;
+}
+
+html[data-gta-weather='smog'] .gta-scene-weather {
+  opacity: 1;
+  background:
+    radial-gradient(60% 40% at 30% 70%, rgb(196 170 120 / 0.34), transparent),
+    radial-gradient(70% 50% at 75% 60%, rgb(170 150 110 / 0.3), transparent),
+    linear-gradient(0deg, rgb(150 130 96 / 0.32), transparent 70%);
+  animation: gta-smog 24s ease-in-out infinite alternate;
+}
+
+/* Wanted heat: searchlights from two stars, red and blue light along the edges from three. */
+html[data-gta-wanted]:not([data-gta-wanted='0'], [data-gta-wanted='1']) .gta-scene-beams {
+  opacity: 1;
+}
+
+.gta-scene-heat {
+  inset: 0;
+  opacity: 0;
+  background:
+    linear-gradient(90deg, rgb(224 50 50 / 0.5), transparent 22%),
+    linear-gradient(270deg, rgb(93 182 229 / 0.5), transparent 22%);
+  transition: opacity 400ms;
+}
+
+html[data-gta-wanted]:is([data-gta-wanted='3'], [data-gta-wanted='4'], [data-gta-wanted='5'])
+  .gta-scene-heat {
+  opacity: 1;
+  animation: gta-heat 1.1s steps(2, jump-none) infinite;
+}
+
+.gta-scene-vignette {
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgb(0 0 0 / 0.62));
+}
+
+/* ------------------------------------------------------------- the HUD lane */
+/* Everything that comes and goes (the feed, the titles, the quoted lines, the district name,
+   the Buzzard) plays inside one bar that sits in the page flow above the page content and
+   scrolls with it. It has room of its own, so it is never drawn over a chart, a table, a
+   heading or a control; a long line makes the bar taller and moves the page down. */
+.gta-site-hud {
+  position: relative;
+  margin-bottom: 1rem;
+  pointer-events: none;
+  font-family: var(--gta-menu);
+}
+
+.gta-lane-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.9rem;
+  min-height: 3.5rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  overflow: hidden;
+  color: #f5f5f5;
+  background: #000;
+  border-bottom: 3px solid var(--gta-accent);
+  box-shadow: none;
+}
+
+.gta-lane-bar:has(.gta-title-card:is([data-kind='wasted'], [data-kind='busted'])) {
+  border-bottom-color: var(--gta-hud-red);
+}
+
+/* The district the page is in, with its scene, as the game names one on arrival. */
+.gta-zone {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.gta-zone-art {
+  flex: none;
+  width: 6.875rem;
+  height: 3rem;
+  object-fit: cover;
+  border: 2px solid #000;
+  outline: 1px solid rgb(255 255 255 / 0.4);
+}
+
+.gta-zone-name {
+  font-family: var(--gta-display);
+  font-size: 1.35rem;
+  font-size-adjust: none;
+  line-height: 1.05;
+  color: #f5f5f5;
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+  animation: gta-feed-in 420ms ease-out both;
+}
+
+.gta-lane-live {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem 1rem;
+  min-width: 0;
+}
+
+.gta-feed {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.3rem 1rem;
+  min-width: 0;
+}
+
+.gta-feed-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.6rem;
+  min-width: 0;
+  padding: 0.1rem 0 0.1rem 0.6rem;
+  border-left: 4px solid var(--gta-hud-blue);
+  animation: gta-feed-in 260ms ease-out;
+}
+
+.gta-feed-item[data-tone='cash'] {
+  border-left-color: var(--gta-hud-green);
+}
+
+.gta-feed-item[data-tone='wanted'] {
+  border-left-color: var(--gta-hud-red);
+}
+
+.gta-feed-icon {
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid #000;
+  outline: 1px solid rgb(255 255 255 / 0.5);
+  border-radius: 50%;
+  background: var(--gta-hud-blue);
+}
+
+.gta-feed-item[data-tone='cash'] .gta-feed-icon {
+  background: var(--gta-hud-green);
+}
+
+.gta-feed-item[data-tone='wanted'] .gta-feed-icon {
+  border-radius: 0;
+  background: var(--gta-hud-red);
+}
+
+.gta-feed-face {
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: cover;
+  object-position: 50% 18%;
+  border: 2px solid #000;
+  outline: 1px solid rgb(255 255 255 / 0.5);
+}
+
+.gta-feed-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gta-hud-yellow);
+}
+
+.gta-feed-body {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* "Mission passed!" the San Andreas way: gold title, white "Respect +" beside it. */
+.gta-title-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.1rem 0.9rem;
+  min-width: 0;
+  margin-right: auto;
+  padding-left: 0.5rem;
+}
+
+.gta-title-card-main {
+  margin: 0;
+  font-family: var(--gta-display);
+  font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+  font-size-adjust: none;
+  line-height: 1;
+  color: var(--gta-hud-yellow);
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+  animation: gta-card-pop 520ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+.gta-title-card:is([data-kind='busted'], [data-kind='wasted']) .gta-title-card-main {
+  color: var(--gta-hud-red);
+}
+
+.gta-title-card[data-kind='passed'] .gta-title-card-main {
+  color: #e9a02a;
+}
+
+.gta-title-card-respect {
+  margin: 0;
+  font-family: var(--gta-display);
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+  font-size-adjust: none;
+  line-height: 1;
+  color: #f5f5f5;
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+  animation: gta-card-pop 520ms 260ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+.gta-title-card-sub {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f5f5f5;
+}
+
+/* "Wasted": the scene behind the page drains to grey under the red title, then comes back. */
+html[data-gta-fx='wasted'] .gta-scene {
+  filter: grayscale(1) contrast(1.08) brightness(0.82);
+  transition: filter 500ms ease-out;
+}
+
+/* A quoted line: who is speaking, the line as it is said in the game, its translation where
+   the page is not in English, and the remix. */
+.gta-cutscene {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  margin-right: auto;
+  animation: gta-feed-in 260ms ease-out;
+}
+
+.gta-cut-art {
+  flex: none;
+  width: 4rem;
+  height: 3rem;
+  object-fit: cover;
+  object-position: 50% 18%;
+  border: 2px solid #000;
+  outline: 1px solid rgb(255 255 255 / 0.4);
+}
+
+.gta-cut-text {
+  min-width: 0;
+}
+
+.gta-cut-speaker {
+  margin-right: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gta-hud-yellow);
+}
+
+.gta-cut-quote {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.gta-cut-gloss {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  color: #d6d6d6;
+}
+
+.gta-cut-remix {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--gta-hud-blue);
+}
+
+/* A title or a line takes the middle of the bar; the district keeps its scene and gives up
+   its name, and the feed waits at the side where there is room. */
+.gta-site-hud:is([data-busy='title'], [data-busy='line']) .gta-zone-name {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .gta-feed[data-slot-side='true'] {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
+  .gta-lane-bar {
+    column-gap: 0.6rem;
+    min-height: 3.25rem;
+  }
+
+  .gta-zone-art {
+    width: 4.5rem;
+    height: 2.6rem;
+  }
+
+  .gta-zone-name {
+    font-size: 1.15rem;
+  }
+
+  .gta-site-hud[data-busy='feed'] .gta-zone-name {
+    display: none;
+  }
+
+  .gta-cut-art {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  .gta-lane-live,
+  .gta-feed {
+    justify-content: flex-start;
+  }
+}
+
+/* The two covers head the legend panel beside a chart, as a pause-menu header does: a strip of
+   the panel's own, above its toolbar, never inside the plot. Wide layouts only, and not in the
+   copy of a chart that is rendered for PNG export. */
+@media (min-width: 1024px) {
+  .gta .sidebar-legend:not([id$='-export'] *)::before {
+    content: '';
+    flex: none;
+    height: 5.75rem;
+    margin: -0.25rem 0 0.5rem;
+    background: #000 url('/decorative/gta/art/covers.webp') center / contain no-repeat;
+    border-bottom: 3px solid var(--gta-accent);
+  }
+}
+
+.gta-buzzard {
+  position: absolute;
+  top: 50%;
+  left: -7rem;
+  translate: 0 -50%;
+  animation: gta-buzzard 6.5s linear both;
+}
+
+.gta-buzzard svg {
+  fill: none;
+  stroke: #000;
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.5));
+}
+
+.gta-buzzard-body {
+  fill: #0b0d0e;
+}
+
+.gta-buzzard-glass {
+  fill: var(--gta-hud-blue);
+  stroke-width: 1.5;
+}
+
+.gta-buzzard-rotor {
+  transform-origin: 54px 6px;
+  animation: gta-rotor 90ms linear infinite;
+}
+
+/* The character switch washes the bar in the new colour for a moment. */
+html[data-gta-fx='switch'] .gta-lane-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gta-accent);
+  animation: gta-switch-flash 700ms ease-out both;
+}
+
+html[data-gta-fx='slowmo'] .gta-scene {
+  filter: sepia(0.55) saturate(1.5) contrast(1.08);
+}
+
+html[data-gta-fx='slowmo'] .gta-scene * {
+  animation-duration: 40s !important;
+}
+
+html[data-gta-fx='drunk'] main {
+  animation: gta-drunk 5.2s ease-in-out both;
+}
+
+html[data-gta-fx='drunk'] .gta-scene {
+  filter: blur(3px) saturate(1.6);
+}
+
+html[data-gta-fx='skyfall'] .gta-scene-sky {
+  animation: gta-skyfall 1.4s ease-out both;
+}
+
+html[data-gta-fx='vinewood'] .gta-wordmark span {
+  animation: gta-vinewood 2.6s steps(2, jump-none) both;
+}
+
+html[data-gta-fx='vinewood'] .gta-wordmark span:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+html[data-gta-fx='vinewood'] .gta-wordmark span:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+/* -------------------------------------------------------------------- phone */
+.gta-dialog-overlay {
+  background: rgb(0 0 0 / 0.66);
+}
+
+.gta-dialog.gta-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(24rem, calc(100vw - 1.5rem));
+  max-width: none;
+  height: min(42rem, calc(100dvh - 1.5rem));
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--gta-menu);
+  color: #f5f5f5;
+  background: #0a0b0c;
+  border: 3px solid #1d1f22;
+  border-radius: 1.6rem;
+  box-shadow:
+    0 0 0 2px #000,
+    0 30px 80px rgb(0 0 0 / 0.85);
+}
+
+.gta-dialog.gta-phone > button:last-child {
+  top: 0.55rem;
+  right: 0.7rem;
+  color: #fff;
+  border-radius: 0;
+}
+
+.gta-phone-head {
+  padding: 0.6rem 3rem 0.7rem 1rem;
+  background: var(--gta-accent);
+  color: var(--gta-accent-ink);
+}
+
+.gta-phone-clock {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.gta-phone-title {
+  font-family: var(--gta-menu);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+.gta-phone-description {
+  margin-top: 0.15rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.gta-phone-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  background: #000;
+}
+
+.gta-phone-tab {
+  min-height: 2.75rem;
+  padding: 0.3rem 0.2rem;
+  font-family: var(--gta-menu);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #e4e4e6;
+  background: #17191b;
+  border: 0;
+  box-shadow: inset 0 3px 0 transparent;
+  cursor: pointer;
+  transition:
+    background-color 90ms,
+    color 90ms;
+}
+
+.gta-phone-tab:hover {
+  background: #2c2f33;
+  color: #fff;
+}
+
+.gta-phone-tab[aria-selected='true'] {
+  color: #000;
+  background: #f5f5f5;
+  box-shadow: inset 0 3px 0 var(--gta-accent);
+}
+
+.gta-phone-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.8rem 0.9rem 1rem;
+  scrollbar-width: thin;
+}
+
+.gta-phone-note {
+  margin: 0 0 0.7rem;
+  font-size: 0.92rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: #c9c9ce;
+}
+
+.gta-cheat-list,
+.gta-station-list,
+.gta-character-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 0.8rem;
+  padding: 0;
+  list-style: none;
+}
+
+.gta-cheat {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--gta-row);
+}
+
+.gta-cheat-mark {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid rgb(255 255 255 / 0.4);
+}
+
+.gta-cheat[data-found='true'] .gta-cheat-mark {
+  background: var(--gta-hud-green);
+  border-color: #000;
+  outline: 1px solid var(--gta-hud-green);
+}
+
+.gta-cheat-name {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.gta-cheat[data-found='false'] .gta-cheat-name {
+  color: #c9c9ce;
+}
+
+.gta-cheat-hint {
+  margin: 0.1rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.25;
+  color: #b4b4ba;
+}
+
+.gta .gta-phone-action {
+  min-height: 2.75rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.gta-phone-switches {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 0.8rem;
+}
+
+.gta-phone-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--gta-menu);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: left;
+  color: #f5f5f5;
+  background: var(--gta-row);
+  border: 0;
+  cursor: pointer;
+}
+
+.gta-phone-switch:hover {
+  background: rgb(255 255 255 / 0.14);
+}
+
+.gta-phone-switch-track {
+  position: relative;
+  flex: none;
+  width: 2.4rem;
+  height: 1.2rem;
+  background: #000;
+  border: 1px solid rgb(255 255 255 / 0.45);
+}
+
+.gta-phone-switch-track::after {
+  content: '';
+  position: absolute;
+  inset: 2px auto 2px 2px;
+  width: 0.9rem;
+  background: #9a9aa0;
+  transition:
+    translate 120ms,
+    background-color 120ms;
+}
+
+.gta-phone-switch[aria-checked='true'] .gta-phone-switch-track {
+  border-color: var(--gta-accent);
+}
+
+.gta-phone-switch[aria-checked='true'] .gta-phone-switch-track::after {
+  translate: 1.1rem 0;
+  background: var(--gta-accent);
+}
+
+:is(.gta-station, .gta-character) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.7rem;
+  width: 100%;
+  min-height: 3.4rem;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--gta-menu);
+  text-align: left;
+  color: #f5f5f5;
+  background: var(--gta-row);
+  border: 0;
+  cursor: pointer;
+  transition:
+    background-color 90ms,
+    color 90ms;
+}
+
+:is(.gta-station, .gta-character):hover {
+  background: rgb(255 255 255 / 0.16);
+}
+
+:is(.gta-station, .gta-character)[aria-pressed='true'] {
+  color: #000;
+  background: #f5f5f5;
+  box-shadow: inset 4px 0 0 var(--gta-accent);
+}
+
+.gta-station-logo,
+.gta-character-swatch {
+  grid-row: 1 / span 2;
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.gta-character-swatch {
+  width: 2.6rem;
+  height: 2.6rem;
+}
+
+/* The two recorded stations wear the logo of the game their theme opens. */
+.gta-station[data-station='theme'] .gta-station-logo {
+  border-radius: 4px;
+  background: #0b0b0b url('/decorative/gta/art/logo-sa.webp') center / 86% no-repeat;
+}
+
+.gta-station[data-station='welcome'] .gta-station-logo {
+  border-radius: 4px;
+  background: #0b0b0b url('/decorative/gta/art/logo-v.webp') center / 86% no-repeat;
+}
+
+/* Station logos are drawn here: a sun disc, a neon bar stack and a desert badge. */
+.gta-station-logo {
+  border: 2px solid #000;
+  border-radius: 50%;
+  outline: 1px solid rgb(255 255 255 / 0.5);
+  background:
+    linear-gradient(0deg, #1c1208 0 34%, transparent 34%),
+    radial-gradient(circle at 50% 62%, #ffe08a 0 24%, #ff8f3d 25% 46%, #c2337a 47% 70%, #3b1560 71%);
+}
+
+.gta-station[data-station='nonstop'] .gta-station-logo {
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 7px),
+    linear-gradient(0deg, #29d3ff, #b04bff 55%, #ff3d9a);
+}
+
+.gta-station[data-station='blaine'] .gta-station-logo {
+  border-radius: 2px;
+  background: conic-gradient(
+    from 45deg at 50% 50%,
+    #5a2a14 0 25%,
+    #f0b24a 0 50%,
+    #5a2a14 0 75%,
+    #f0b24a 0
+  );
+  rotate: 45deg;
+  scale: 0.8;
+}
+
+:is(.gta-station-name, .gta-character-name) {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+:is(.gta-station-genre, .gta-character-mood) {
+  font-size: 0.9rem;
+  line-height: 1.2;
+  opacity: 0.8;
+}
+
+/* The Jobs page: two squares of the flat city map and the five jobs under them. */
+.gta-jobs-maps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.gta-jobs-maps figure {
+  margin: 0;
+}
+
+.gta-jobs-maps canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: #1d3b53;
+  border: 2px solid #000;
+  outline: 1px solid rgb(255 255 255 / 0.4);
+}
+
+.gta-jobs-maps figcaption {
+  margin-top: 0.3rem;
+  font-family: var(--gta-display);
+  font-size: 1.05rem;
+  font-size-adjust: none;
+  line-height: 1.1;
+  color: #f5f5f5;
+}
+
+.gta-jobs-status {
+  min-height: 1.2rem;
+  margin: 0.3rem 0;
+  font-size: 0.875rem;
+  color: #d6d6d6;
+}
+
+.gta-jobs-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gta-jobs-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  line-height: 1.2;
+  color: #f5f5f5;
+  background: var(--gta-row);
+}
+
+.gta-jobs-number {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  color: #000;
+  background: #d6d6d6;
+  border: 2px solid #000;
+  border-radius: 50%;
+}
+
+.gta-jobs-list li[data-state='next'] .gta-jobs-number {
+  background: var(--gta-hud-yellow);
+}
+
+.gta-jobs-list li[data-state='done'] .gta-jobs-number {
+  background: var(--gta-hud-green);
+}
+
+.gta-jobs-district {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d6d6d6;
+}
+
+.gta-jobs-state {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gta-hud-yellow);
+}
+
+.gta-jobs-list li[data-state='done'] .gta-jobs-state {
+  color: var(--gta-hud-green);
+}
+
+.gta-jobs-list li[data-state='locked'] .gta-jobs-state {
+  color: #d6d6d6;
+}
+
+.gta-stats {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.gta-stats > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.6rem;
+  background: var(--gta-row);
+}
+
+.gta-stats dt {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #c9c9ce;
+}
+
+.gta-stats dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.gta-stats dd[data-stat='cash'] {
+  font-family: var(--gta-display);
+  font-size: 1.5rem;
+  font-size-adjust: none;
+  color: var(--gta-hud-green);
+}
+
+.gta-stat-meter {
+  display: block;
+  width: 9rem;
+  height: 7px;
+  margin-top: 0.25rem;
+  background: rgb(93 182 229 / 0.28);
+}
+
+.gta-stat-meter span {
+  display: block;
+  height: 100%;
+  background: var(--gta-hud-blue);
+}
+
+/* ---------------------------------------------------------------- keyframes */
+@keyframes gta-cash-tick {
+  from {
+    transform: translateY(-0.25em);
+    color: #fff;
+  }
+}
+
+@keyframes gta-help-in {
+  from {
+    opacity: 0.4;
+    transform: translateX(-0.6rem);
+  }
+}
+
+@keyframes gta-star-flash {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes gta-blip-pulse {
+  50% {
+    transform: scale(1.45);
+  }
+}
+
+@keyframes gta-loading {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes gta-radar-ping {
+  0% {
+    box-shadow:
+      2px 0 0 rgb(255 255 255 / 0.34),
+      0 -2px 0 rgb(255 255 255 / 0.34),
+      2px -2px 0 rgb(255 255 255 / 0.34),
+      inset 0 0 0 0 color-mix(in srgb, var(--gta-accent) 70%, transparent);
+  }
+  40% {
+    box-shadow:
+      2px 0 0 #fff,
+      0 -2px 0 #fff,
+      2px -2px 0 #fff,
+      inset 0 0 60px 0 color-mix(in srgb, var(--gta-accent) 30%, transparent);
+  }
+}
+
+@keyframes gta-wasted {
+  from {
+    opacity: 0;
+    transform: scale(1.5);
+    filter: blur(6px);
+  }
+}
+
+@keyframes gta-beam {
+  from {
+    transform: rotate(-24deg);
+  }
+  to {
+    transform: rotate(22deg);
+  }
+}
+
+@keyframes gta-windows {
+  33% {
+    opacity: 0.55;
+  }
+  66% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes gta-palm {
+  from {
+    rotate: -1.6deg;
+  }
+  to {
+    rotate: 1.8deg;
+  }
+}
+
+@keyframes gta-blimp {
+  to {
+    transform: translateX(calc(100vw + 24rem));
+  }
+}
+
+@keyframes gta-rain {
+  to {
+    background-position:
+      -52px 180px,
+      -76px 260px;
+  }
+}
+
+@keyframes gta-smog {
+  to {
+    transform: translateX(-4%) scale(1.08);
+  }
+}
+
+@keyframes gta-heat {
+  50% {
+    background:
+      linear-gradient(90deg, rgb(93 182 229 / 0.5), transparent 22%),
+      linear-gradient(270deg, rgb(224 50 50 / 0.5), transparent 22%);
+  }
+}
+
+@keyframes gta-feed-in {
+  from {
+    opacity: 0;
+    transform: translateX(-1rem);
+  }
+}
+
+@keyframes gta-card-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  12%,
+  82% {
+    opacity: 1;
+  }
+}
+
+@keyframes gta-card-pop {
+  from {
+    transform: scale(1.6);
+    letter-spacing: 0.2em;
+  }
+}
+
+@keyframes gta-buzzard {
+  to {
+    transform: translateX(calc(100vw + 14rem));
+  }
+}
+
+@keyframes gta-rotor {
+  50% {
+    transform: scaleX(0.15);
+  }
+}
+
+@keyframes gta-switch-flash {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes gta-drunk {
+  0%,
+  100% {
+    transform: none;
+    filter: none;
+  }
+  20% {
+    transform: rotate(0.6deg) translateX(6px);
+    filter: blur(0.6px);
+  }
+  45% {
+    transform: rotate(-0.7deg) translateX(-8px);
+    filter: blur(1px);
+  }
+  70% {
+    transform: rotate(0.4deg) translateX(5px);
+    filter: blur(0.5px);
+  }
+}
+
+@keyframes gta-skyfall {
+  from {
+    filter: brightness(2.6);
+    transform: translateY(-12%);
+  }
+}
+
+@keyframes gta-vinewood {
+  0%,
+  40%,
+  80% {
+    color: var(--gta-hud-yellow);
+    text-shadow:
+      0 0 14px var(--gta-hud-yellow),
+      0 3px 0 #000;
+  }
+}
+
+/* ------------------------------------------------------------------- mobile */
+@media (max-width: 640px) {
   .gta-theme-banner {
-    min-height: 14rem;
-    padding: 1rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title hud'
+      'radar heist'
+      'switch switch';
+    gap: 0.6rem 0.75rem;
+    min-height: 15rem;
+    padding: 0.9rem 0.9rem 0;
   }
 
   .gta-banner-art {
@@ -143,17 +2925,30 @@
     object-position: 65% top;
   }
 
+  /* The face sits in the gap between the wordmark and the cash, where Michael's is. */
+  html[data-gta-char] .gta-theme-banner .gta-banner-art::after {
+    inset: 0 22% 0 38%;
+    border-inline-width: 3px;
+    background-size: auto 170%;
+    background-position: 45% 0;
+  }
+
+  html[data-gta-char='franklin'] .gta-theme-banner .gta-banner-art::after {
+    background-position: 35% 0;
+  }
+
   .gta-banner-shade {
-    background: linear-gradient(90deg, #080a08e6, #080a0840 55%, #080a0800);
+    background:
+      linear-gradient(90deg, #080a08e6, #080a0866 55%, #080a0833),
+      linear-gradient(0deg, #080a08f2 0, #080a0800 45%);
   }
 
   .gta-wordmark {
     font-size: 1.4rem;
   }
 
-  .gta-wanted {
-    top: 0.5rem;
-    right: 0.5rem;
+  .gta-banner-splash {
+    font-size: 0.95rem;
   }
 
   .gta-wanted svg {
@@ -161,93 +2956,956 @@
     height: 18px;
   }
 
-  .gta-heist-launcher {
-    right: 0.75rem;
-    bottom: 0.75rem;
+  .gta-banner-cash {
+    font-size: 1.5rem;
   }
 
-  .gta-heist-launcher span {
-    font-size: 1rem;
+  .gta-banner-rank {
+    font-size: 0.8rem;
+  }
+
+  .gta-banner-radar {
+    width: 7.5rem;
+  }
+
+  .gta-radar {
+    height: 4.6rem;
+  }
+
+  .gta-heist-launcher > span {
+    font-size: 1.1rem;
+  }
+
+  .gta-heist-record {
+    max-width: 11rem;
+    font-size: 0.8rem;
+    text-align: right;
+  }
+
+  .gta-switch {
+    margin-inline: -0.9rem;
+    padding: 0 0.4rem;
+  }
+
+  .gta-switch-chip {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding-inline: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .gta-phone-button {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .gta-theme-banner[data-compact='true'] {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title hud'
+      'title heist'
+      'switch switch';
+  }
+
+  .gta-theme-banner[data-compact='true'] .gta-banner-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .gta-theme-banner[data-compact='true'] .gta-phone-button {
+    flex-basis: auto;
+  }
+
+  .gta-cash-pill {
+    font-size: 1.05rem;
+    padding-inline: 0.5rem;
+  }
+
+  .gta-cash-full {
+    display: none;
+  }
+
+  .gta-cash-short {
+    display: inline;
+  }
+
+  .gta-scene-sun {
+    width: 14rem;
+    height: 14rem;
+  }
+
+  .gta [data-slot='dashboard-navigation'] nav :is(a, button) {
+    font-size: 1.05rem;
+    padding: 0.5rem 0.6rem;
+  }
+
+  .gta
+    div.items-center.justify-center.text-center
+    > [data-slot='eyebrow'].tabular-nums:first-child {
+    padding-inline: 1.5rem;
+    font-size: 3.4rem;
   }
 }
 
-.gta header {
-  background: #000000eb;
-  border-bottom: 3px solid var(--primary);
-}
-
-.gta :is(h1, h2, h3, [data-slot='card-title']) {
+/* --------------------------------------------- phone: Lamar's text and the cover */
+.gta-phone-message {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.7rem;
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.6rem;
   font-family: var(--gta-menu);
+  color: #f5f5f5;
+  background: var(--gta-row);
+  border-left: 4px solid var(--gta-hud-green);
+}
+
+.gta-phone-message img {
+  grid-row: 1 / span 4;
+  width: 2.6rem;
+  height: 2.6rem;
+  object-fit: cover;
+  border: 2px solid #000;
+  border-radius: 50%;
+  outline: 1px solid rgb(255 255 255 / 0.5);
+}
+
+.gta-phone-message p {
+  margin: 0;
+  line-height: 1.25;
+}
+
+.gta-phone-message-from {
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gta-hud-yellow);
 }
 
-.gta header nav a,
-.gta [data-testid='mobile-menu'] a {
-  font-family: var(--gta-menu);
+.gta-phone-message-quote {
   font-size: 1rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-radius: 0;
 }
 
-.gta header nav a[aria-current='page'],
-.gta [data-testid='mobile-menu'] a[aria-current='page'] {
-  background: #f5f5f5;
-  color: #000;
+.gta-phone-message-gloss {
+  font-size: 0.9rem;
+  color: #d6d6d6;
 }
 
-.gta :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
-}
-
-.gta :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
-  border-radius: var(--radius);
-}
-
-.gta [data-slot='card'] {
-  background-color: #080a0aeb;
-  border-color: #ffffff14;
-}
-
-.gta [data-slot='dashboard-navigation'] {
-  border-radius: 0;
-  background: #000000d9;
-}
-
-.gta [data-slot='dashboard-navigation'] nav :is(a, button) {
-  font-family: var(--gta-menu);
-  font-size: 1.25rem;
+.gta-phone-message-remix {
+  font-size: 0.9rem;
   font-weight: 700;
-  padding: 0.5rem 0.75rem;
+  color: var(--gta-hud-blue);
+}
+
+/* The stats page opens on a cover in the panel layout of the game's box art: the three
+   leads, the logo, and two benchmark panels where the helicopter and the dog would be. */
+.gta-cover {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1fr;
+  grid-template-rows: 5.2rem 5.2rem;
+  gap: 3px;
+  margin-bottom: 0.6rem;
+  padding: 3px;
+  background: #000;
+}
+
+.gta-cover span {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0.3rem;
+  font-family: var(--gta-menu);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
   text-transform: uppercase;
-  color: #fff;
-}
-
-.gta [data-slot='dashboard-navigation'] nav [data-tab-active='true'] {
-  background: #f5f5f5;
   color: #000;
+  background: var(--gta-hud-yellow) center 12% / cover no-repeat;
 }
 
-.gta [data-slot='popover-content'] {
-  background-color: #000000eb;
-  border-color: #ffffff1f;
+.gta-cover [data-panel='franklin'] {
+  background-color: #72cc72;
+  background-image: url('/decorative/gta/art/franklin.webp');
 }
 
-.gta .splash-text {
-  font-family: var(--gta-display) !important;
-  font-size: 1.15rem;
-  color: #f0c850;
-  -webkit-text-stroke: 3px #000;
-  paint-order: stroke fill;
-  text-shadow: 0 2px 0 #000;
-  -webkit-font-smoothing: antialiased;
+.gta-cover [data-panel='michael'] {
+  background-color: #65b4d4;
+  background-image: url('/decorative/gta/art/michael.webp');
+}
+
+.gta-cover [data-panel='trevor'] {
+  background-color: #ffa357;
+  background-image: url('/decorative/gta/art/trevor.webp');
+}
+
+.gta-cover [data-panel='logo'] {
+  background: #0b0b0b url('/decorative/gta/art/logo-v.webp') center / 78% no-repeat;
+}
+
+.gta-cover [data-panel='frontier'] {
+  color: #f5f5f5;
+  background: #1d3b53;
+}
+
+@media (max-width: 1100px) {
+  /* No room beside the launcher once the banner narrows: the box art stays in the phone. */
+  .gta-heist-poster {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .gta-cover {
+    grid-template-rows: 4.4rem 4.4rem;
+  }
+}
+
+/* -------------------------------------------------------------- preferences */
+@media (prefers-reduced-motion: reduce) {
+  .gta-scene *,
+  .gta-site-hud *,
+  .gta-lane-bar::after,
+  .gta-theme-banner *,
+  .gta-cash-value,
+  .gta .gta-sweeping .canvas-point-surface,
+  .gta .gta-sweep-line > i::before,
+  .gta [data-slot='skeleton'],
+  .gta div.items-center.justify-center.text-center > [data-slot='eyebrow'],
+  html[data-gta-fx] main {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .gta-scene-blimp {
+    left: 12%;
+  }
+
+  .gta-buzzard,
+  html[data-gta-fx='switch'] .gta-lane-bar::after {
+    display: none;
+  }
+
+  html[data-gta-fx='wasted'] .gta-scene {
+    transition: none;
+  }
+
+  .gta-wordmark:hover {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .gta-scene,
+  .gta-banner-art,
+  .gta-banner-shade {
+    display: none;
+  }
+
+  html[data-gta-fx='wasted'] .gta-scene {
+    filter: none;
+  }
+
+  .gta .sidebar-legend:not([id$='-export'] *)::before {
+    display: none;
+  }
+
+  .gta-cover,
+  .gta-heist-poster {
+    display: none;
+  }
+
+  .gta-theme-banner,
+  .gta-dialog.gta-phone,
+  .gta-lane-bar,
+  .gta-phone-message,
+  .gta-radar {
+    border: 2px solid CanvasText;
+    background: Canvas;
+    forced-color-adjust: none;
+    color: CanvasText;
+  }
+
+  .gta-theme-banner :is(button, p, span),
+  .gta-dialog.gta-phone :is(button, p, span, dt, dd, h2) {
+    color: CanvasText;
+    background: Canvas;
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+  }
+
+  .gta-theme-banner button,
+  .gta-dialog.gta-phone button,
+  .gta-cash-pill,
+  .gta-toggle {
+    border: 1px solid ButtonText;
+    color: ButtonText;
+    background: ButtonFace;
+    forced-color-adjust: none;
+  }
+
+  :is(.gta-switch-chip, .gta-station, .gta-character, .gta-phone-tab):is(
+    [aria-pressed='true'],
+    [aria-selected='true']
+  ) {
+    color: HighlightText;
+    background: Highlight;
+  }
+
+  .gta-wanted svg[data-lit='true'] path {
+    fill: CanvasText;
+  }
+
+  .gta-title-card-main,
+  .gta-title-card-respect,
+  .gta-zone-name,
+  .gta main h1 {
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+    color: CanvasText;
+  }
+
+  :is(.gta-lane-bar, .gta-phone-message) :is(p, span, strong, b) {
+    color: CanvasText;
+  }
+
+  .gta-cash-pill,
+  .gta-cash-pill span {
+    -webkit-text-stroke: 0;
+    color: ButtonText;
+    opacity: 1;
+  }
+
+  /* SVG paint is not forced, so chart ink is handed back to the system colours here. Series
+     colours on points and lines are left alone. */
+  .gta svg[data-testid='d3-chart-svg'] :is(.tick text, .x-axis-label, .y-axis-label) {
+    fill: CanvasText;
+    stroke: none;
+    text-shadow: none;
+  }
+
+  .gta svg[data-testid='d3-chart-svg'] :is(.domain, .tick line) {
+    stroke: CanvasText;
+    filter: none;
+  }
+
+  .gta svg[data-testid='d3-chart-svg'] :is(.grid, .grid-h, .grid-v) line {
+    stroke: GrayText;
+  }
+
+  .gta [data-slot='skeleton']::after {
+    color: CanvasText;
+  }
+}
+
+@media print {
+  .gta-scene,
+  .gta-site-hud,
+  [data-testid='gta-theme-banner'] {
+    display: none !important;
+  }
 }
 
 .gta .autumn-leaves,
 html[data-inferencex-embed] .gta-scene,
+html[data-inferencex-embed] .gta-site-hud,
 html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
   display: none;
+}
+
+/* The garage on the phone's Jobs page: parts, the tune and what it does to the plan. */
+.gta-garage {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.25);
+}
+
+.gta-garage-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 0 0.3rem;
+  font-family: var(--gta-display);
+  font-size: 1.5rem;
+  font-size-adjust: none;
+  line-height: 1.1;
+  color: #f5f5f5;
+}
+
+.gta-garage-title span {
+  font-family: var(--gta-menu);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #7ddc6a;
+}
+
+.gta-garage-parts {
+  display: grid;
+  gap: 2px;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gta-garage-parts li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  background: rgb(0 0 0 / 0.55);
+  border-left: 3px solid transparent;
+}
+
+.gta-garage-parts li[data-owned='true'] {
+  border-left-color: #7ddc6a;
+}
+
+.gta-garage-part {
+  display: grid;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  color: #d6d6d6;
+}
+
+.gta-garage-part b {
+  color: #f5f5f5;
+}
+
+.gta .gta-garage-buy,
+.gta .gta-garage-picks button {
+  min-height: 2rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.gta-garage-receipt {
+  min-height: 1.2rem;
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: #ffd75e;
+}
+
+.gta-garage-picks {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.gta-garage-picks > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.gta-garage-picks > div > span {
+  flex: 1 1 6rem;
+  font-size: 0.875rem;
+  color: #f5f5f5;
+}
+
+.gta .gta-garage-picks button[aria-pressed='true'] {
+  background-color: var(--gta-accent);
+  border-color: var(--gta-accent);
+  color: var(--gta-accent-ink);
+}
+
+.gta-garage-plan {
+  width: 100%;
+  margin: 0.6rem 0 0.4rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: #f5f5f5;
+}
+
+.gta-garage-plan caption {
+  padding-bottom: 0.2rem;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gta-garage-plan th,
+.gta-garage-plan td {
+  padding: 0.2rem 0.4rem;
+  border-top: 1px solid rgb(255 255 255 / 0.18);
+  text-align: right;
+}
+
+.gta-garage-plan tbody th {
+  font-weight: 400;
+  text-align: left;
+  color: #d6d6d6;
+}
+
+.gta-garage-plan td[data-plan] {
+  font-weight: 700;
+  color: #ffd75e;
+}
+
+.gta-garage-owned {
+  padding: 0.25rem 0.6rem;
+  font-family: var(--gta-menu);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7ddc6a;
+}
+
+@media (forced-colors: active) {
+  .gta-garage-title,
+  .gta-garage-title span,
+  .gta-garage-part,
+  .gta-garage-part b,
+  .gta-garage-owned,
+  .gta-garage-receipt,
+  .gta-garage-picks > div > span,
+  .gta-garage-plan,
+  .gta-garage-plan tbody th,
+  .gta-garage-plan td[data-plan] {
+    color: CanvasText;
+  }
+
+  .gta-garage-parts li {
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  .gta-garage-parts li[data-owned='true'] {
+    border-left: 4px solid Highlight;
+  }
+
+  .gta-garage-plan th,
+  .gta-garage-plan td {
+    border-color: CanvasText;
+  }
+
+  .gta .gta-garage-picks button[aria-pressed='true'] {
+    background-color: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+}
+
+/* ------------------------------------------------------------ short banner */
+/* The banner is one short band on every page, so the page heading and the charts stay on the
+   first screen: title, radar, artwork, HUD and heist in one row, and under it one bar that
+   holds the three characters, the lane (district, feed, titles, lines) and the phone. */
+.gta-theme-banner {
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title radar heist . hud'
+    'switch switch switch switch switch';
+  align-items: center;
+  gap: 0.4rem 1.25rem;
+  min-height: 0;
+  margin-block: 0.25rem 0.75rem;
+  padding: 0.6rem 1.25rem 0;
+}
+
+.gta-theme-banner[data-compact='true'] {
+  padding-top: 0.5rem;
+}
+
+.gta-theme-banner .gta-banner-title {
+  gap: 0.35rem;
+}
+
+.gta-theme-banner[data-compact='false'] .gta-wordmark {
+  font-size: 1.5rem;
+}
+
+.gta-theme-banner .gta-banner-splash {
+  padding: 0.2rem 0.6rem;
+  font-size: 1rem;
+}
+
+.gta-theme-banner .gta-banner-art img {
+  object-position: center 14%;
+}
+
+.gta-theme-banner .gta-banner-art::after {
+  inset: 0 28% 0 40%;
+  background-position: center 6%;
+}
+
+.gta-theme-banner .gta-banner-radar {
+  align-self: center;
+  width: 9rem;
+}
+
+.gta-theme-banner .gta-radar {
+  height: 5rem;
+}
+
+.gta-theme-banner .gta-heist-launcher {
+  align-self: center;
+  gap: 0.2rem;
+}
+
+.gta-theme-banner .gta-heist-poster {
+  width: 4.4rem;
+}
+
+.gta-switch {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  margin-inline: -1.25rem;
+  padding: 0 1.25rem;
+}
+
+.gta-switch-chips {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.gta-banner-lane {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+}
+
+.gta-banner-lane .gta-site-hud {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.gta-banner-lane .gta-lane-bar {
+  min-height: 2.5rem;
+  padding: 0.1rem 0.75rem;
+  background: none;
+  border-bottom: 0;
+}
+
+.gta-banner-lane .gta-zone-art {
+  width: 5.5rem;
+  height: 2.25rem;
+}
+
+.gta-banner-lane .gta-zone-name {
+  font-size: 1.2rem;
+}
+
+/* The outline is cut for the display face; on Chinese glyphs at this size it fills them in. */
+.gta-banner-lane .gta-zone-name:lang(zh) {
+  font-weight: 700;
+  -webkit-text-stroke: 0;
+}
+
+.gta-banner-lane .gta-title-card {
+  gap: 0 0.7rem;
+  justify-content: flex-start;
+}
+
+.gta-banner-lane .gta-title-card-main {
+  font-size: 1.5rem;
+  transform-origin: left center;
+  animation-name: gta-lane-pop;
+}
+
+.gta-banner-lane .gta-title-card-respect {
+  font-size: 1.1rem;
+  transform-origin: left center;
+  animation-name: gta-lane-pop;
+}
+
+/* The title grows into place from the left, so no letter of it leaves the lane on the way. */
+@keyframes gta-lane-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
+.gta-banner-lane .gta-title-card-sub {
+  font-size: 0.8rem;
+}
+
+.gta-banner-lane .gta-cut-art {
+  width: 3rem;
+  height: 2.25rem;
+}
+
+.gta-switch .gta-phone-button {
+  flex: none;
+  margin-left: 0;
+}
+
+/* The district the page is in is the backdrop of the banner, across its whole width: Grove
+   Street on the home page, Downtown on the dashboard, Sandy Shores on the overview, Del Perro
+   Pier on the glossary and the alley on a page that is not there. The other pages keep the
+   Vinewood sign. The lane under it names the district. */
+.gta-theme-banner:has(
+    .gta-zone:is(
+      [data-zone='home'],
+      [data-zone='inference'],
+      [data-zone='rankings'],
+      [data-zone='overview'],
+      [data-zone='glossary'],
+      [data-zone='notFound']
+    )
+  )
+  .gta-banner-art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #10110f center 30% / cover no-repeat;
+}
+
+/* On the pages that keep the Vinewood picture the band is too short to reach the sign, so
+   the sign itself stands in the gap between the wordmark and the figure. */
+@media (min-width: 900px) {
+  .gta-theme-banner:has(.gta-zone:is([data-zone='quality'], [data-zone='about']))
+    .gta-banner-art::before {
+    content: '';
+    position: absolute;
+    inset: 0 60% 0 22%;
+    background: url('/decorative/gta/vinewood.webp') 8% 68% / 294% auto no-repeat;
+  }
+}
+
+.gta-theme-banner:has(.gta-zone[data-zone='home']) .gta-banner-art::before {
+  background-image: url('/decorative/gta/art/grove-street.webp');
+  background-position: center 34%;
+}
+
+.gta-theme-banner:has(.gta-zone:is([data-zone='inference'], [data-zone='rankings']))
+  .gta-banner-art::before {
+  /* The bridge side of the picture only: the three figures in it would stand behind the cash. */
+  inset: 0 60% 0 0;
+  background-image: url('/decorative/gta/trio.webp');
+  background-position: left 50%;
+  background-size: 250% auto;
+}
+
+.gta-theme-banner:has(.gta-zone[data-zone='overview']) .gta-banner-art::before {
+  background-image: url('/decorative/gta/art/scene-sandy.webp');
+  background-position: center 22%;
+}
+
+.gta-theme-banner:has(.gta-zone[data-zone='glossary']) .gta-banner-art::before {
+  background-image: url('/decorative/gta/art/scene-pier.webp');
+  background-position: center 88%;
+}
+
+.gta-theme-banner:has(.gta-zone[data-zone='notFound']) .gta-banner-art::before {
+  background-image: url('/decorative/gta/art/cj-alley.webp');
+  background-position: center 40%;
+}
+
+/* Michael is part of the Vinewood picture only, so over another district he has a panel of
+   his own, as the other two have. */
+html[data-gta-char='michael']
+  .gta-theme-banner:has(
+    .gta-zone:is(
+      [data-zone='home'],
+      [data-zone='inference'],
+      [data-zone='rankings'],
+      [data-zone='overview'],
+      [data-zone='glossary'],
+      [data-zone='notFound']
+    )
+  )
+  .gta-banner-art::after {
+  content: '';
+  position: absolute;
+  border-inline: 4px solid #000;
+  background: #000 url('/decorative/gta/art/michael.webp') center 6% / cover no-repeat;
+}
+
+/* Home, wide: room for the cover that stands to the left of the heist, and the character's
+   panel in the open stretch between the heist and the HUD, so the face is not behind either. */
+@media (min-width: 1101px) {
+  .gta-theme-banner[data-compact='false'] .gta-heist-launcher {
+    margin-left: 5rem;
+  }
+
+  .gta-theme-banner[data-compact='false'] .gta-banner-art::after {
+    inset: 0 21% 0 43%;
+  }
+}
+
+@media (max-width: 640px) {
+  .gta-theme-banner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title title hud'
+      'radar . heist'
+      'switch switch switch';
+    gap: 0.25rem 0.6rem;
+    margin-block: 0.25rem 0.5rem;
+    padding: 0.45rem 0.75rem 0;
+  }
+
+  /* Sub-routes on a phone: the wordmark on one line with the heist under it, beside the HUD.
+     The rotating line stays on the home banner and on wider screens. */
+  .gta-theme-banner[data-compact='true'] {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title hud'
+      'heist hud'
+      'switch switch';
+  }
+
+  .gta-theme-banner[data-compact='true'] .gta-wordmark {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.3rem;
+    font-size: 1rem;
+  }
+
+  .gta-theme-banner[data-compact='true'] .gta-banner-splash {
+    display: none;
+  }
+
+  .gta-theme-banner[data-compact='true'] .gta-heist-launcher {
+    justify-self: start;
+    align-items: flex-start;
+  }
+
+  .gta-theme-banner[data-compact='false'] .gta-wordmark {
+    font-size: 1.15rem;
+  }
+
+  /* The lane has the second row of the bar to itself, so a title or a line has the full width. */
+  .gta-banner-lane {
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .gta-banner-lane .gta-cut-quote,
+  .gta-banner-lane .gta-cut-gloss,
+  .gta-banner-lane .gta-cut-remix {
+    font-size: 0.8rem;
+    line-height: 1.2;
+  }
+
+  /* While a line is on, the speaker's picture stands where the district picture was, so the
+     words have the width and the bar stays short. The district comes back when the line ends. */
+  .gta-banner-lane .gta-site-hud[data-busy='line'] .gta-zone {
+    display: none;
+  }
+
+  .gta-theme-banner .gta-banner-splash {
+    font-size: 0.9rem;
+  }
+
+  .gta-theme-banner .gta-banner-radar {
+    align-self: end;
+    width: 6.5rem;
+  }
+
+  .gta-theme-banner .gta-radar {
+    height: 2.8rem;
+  }
+
+  .gta-theme-banner .gta-banner-title {
+    gap: 0.2rem;
+  }
+
+  .gta-theme-banner .gta-heist-record {
+    padding-block: 0;
+    font-size: 0.75rem;
+  }
+
+  .gta-banner-lane .gta-feed-title,
+  .gta-banner-lane .gta-feed-body {
+    font-size: 0.8rem;
+    line-height: 1.15;
+  }
+
+  .gta-banner-lane .gta-title-card-main {
+    font-size: 1.3rem;
+  }
+
+  .gta-theme-banner .gta-heist-launcher {
+    align-self: end;
+  }
+
+  .gta-theme-banner .gta-heist-launcher > span {
+    display: none;
+  }
+
+  html[data-gta-char] .gta-theme-banner .gta-banner-art::after {
+    inset: 0 22% 0 38%;
+  }
+
+  .gta-switch {
+    flex-wrap: wrap;
+    margin-inline: -0.75rem;
+    padding: 0 0.3rem;
+  }
+
+  .gta-switch-chips {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .gta-switch .gta-switch-chip {
+    gap: 0.25rem;
+    min-height: 2.5rem;
+    padding-inline: 0.25rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .gta-switch .gta-switch-dot {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .gta-switch .gta-phone-count {
+    padding-inline: 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .gta-theme-banner .gta-heist-launcher button {
+    min-height: 2.5rem;
+    padding-block: 0.3rem;
+  }
+
+  /* The phone button keeps its icon and the count; its name stays for assistive technology. */
+  .gta-phone-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .gta-banner-lane .gta-lane-bar {
+    padding-inline: 0.25rem;
+  }
+
+  .gta-banner-lane .gta-zone-art {
+    width: 5.5rem;
+    height: 2.25rem;
+  }
+
+  .gta-banner-lane .gta-zone-name {
+    font-size: 1.1rem;
+  }
+
+  .gta-switch .gta-phone-button {
+    order: 2;
+    flex: none;
+    min-height: 2.5rem;
+    padding-inline: 0.4rem;
+  }
 }

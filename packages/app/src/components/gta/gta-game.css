@@ -302,6 +302,18 @@
   padding: 0.7rem;
   font-size: 0.8rem;
 }
+.gta-notice button {
+  margin-left: 0.5rem;
+  border: 1px solid currentColor;
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  font-weight: 700;
+}
+.gta-lite-note {
+  border-left: 3px solid #f0c040;
+  padding-left: 0.6rem;
+  font-size: 0.8rem;
+}
 .gta-mobile-help {
   display: none;
 }
@@ -451,4 +463,12 @@
   height: auto;
   margin: 0.5rem 0;
   border: 1px solid #77877c;
+}
+.gta-telemetry .gta-tune {
+  max-width: 22rem;
+  line-height: 1.35;
+  color: #d8f3c4;
+}
+.gta-telemetry .gta-tune b {
+  color: #ffd75e;
 }

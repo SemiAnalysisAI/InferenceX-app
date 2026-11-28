@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
+  changeBatch,
+  SPECS,
   changeVehicle,
   beginTour,
   cityText,
@@ -19,6 +21,9 @@ import {
 import { drawCityMap, paintOverview, paintRadar } from './gta-minimap';
 import { streetRoute } from './gta-navigation';
 import { objectiveStatus } from './gta-hud';
+import { playGtaSfx } from './gta-audio';
+import { cruiseTop, launchSeconds, readLoadout, saveLoadout } from './gta-loadout';
+import { recordHeist } from './gta-store';
 import { createCityRenderer, LOAD_STEPS, type CityRenderer } from './gta-renderer';
 import {
   CITY_NAME,
@@ -52,6 +57,12 @@ const COPY = {
     back: 'Back',
     foot: 'Enter / exit',
     vehicle: 'Change car',
+    batch: 'Batch size',
+    tuneTake: 'take',
+    tuneLaunch: 'first token (0-100 km/h)',
+    tuneTop: 'top',
+    tuneDamage: 'crash damage',
+    tuneKv: 'KV cache: +30 health per delivery',
     night: 'Day / night',
     atlas: 'San Andreas flight',
     city: 'Return to city',
@@ -59,6 +70,16 @@ const COPY = {
     travelSouth: `${SOUTH_BAY_NAME.en} (South Bay)`,
     travelHelp: 'Quick travel (stop first)',
     fog: 'Karl the Fog',
+    lite: 'Low detail',
+    liteNote:
+      'Low detail is on: this browser is drawing the city without a GPU, or too slowly for the full scene.',
+    needsGpu:
+      'The heist needs a GPU. This browser draws it on the CPU, about {ms} ms a picture even in low detail, so driving will be choppy.',
+    playAnyway: 'Play anyway',
+    travelWanted: 'Lose the police before quick travel',
+    endCar: 'The car is wrecked.',
+    endTime: 'Out of time.',
+    endSummary: 'Jobs done {jobs} of {total} · take {cash} · {time} left on the clock',
     loading: 'Loading San Fierro',
     error: 'The 3D scene could not load. Check WebGL and your connection, then retry.',
     retry: 'Retry',
@@ -71,7 +92,7 @@ const COPY = {
     busted: 'Run ended',
     paused: 'Paused',
     controls:
-      'WASD / arrows drive · Space brake · F enter/exit · E collect · C camera · P pause · M map · Shift sprint / climb',
+      'WASD / arrows drive · Space brake · F enter/exit · E collect · B batch size (stopped) · C camera · P pause · M map · Shift sprint / climb',
     mobile: 'Hold arrows to drive or walk. Stop before entering, exiting or changing a car.',
     accelerate: 'Accelerate / walk',
     reverse: 'Reverse / back',
@@ -114,6 +135,12 @@ const COPY = {
     back: '返回',
     foot: '上车 / 下车',
     vehicle: '更换车辆',
+    batch: '批量大小',
+    tuneTake: '收益',
+    tuneLaunch: '首 token（0-100 公里/时）',
+    tuneTop: '极速',
+    tuneDamage: '碰撞损伤',
+    tuneKv: 'KV 缓存：每次交付 +30 生命',
     night: '白天 / 夜晚',
     atlas: 'San Andreas 飞行',
     city: '返回城市',
@@ -121,6 +148,15 @@ const COPY = {
     travelSouth: `${SOUTH_BAY_NAME.zh}（南湾）`,
     travelHelp: '快速前往（请先停车）',
     fog: '旧金山大雾',
+    lite: '低画质',
+    liteNote: '已开启低画质：此浏览器没有 GPU，或速度不足以绘制完整场景。',
+    needsGpu:
+      '这场劫案需要 GPU。此浏览器用 CPU 绘制，即使在低画质下每帧也要约 {ms} 毫秒，驾驶会卡顿。',
+    playAnyway: '仍然开始',
+    travelWanted: '先甩掉警察才能快速前往',
+    endCar: '车辆报废。',
+    endTime: '时间到。',
+    endSummary: '完成 {jobs} / {total} 站 · 收益 {cash} · 剩余 {time}',
     loading: '正在加载圣菲耶罗',
     error: '无法加载 3D 场景。请检查 WebGL 支持和网络连接后重试。',
     retry: '重试',
@@ -133,7 +169,7 @@ const COPY = {
     busted: '本次游戏结束',
     paused: '已暂停',
     controls:
-      'WASD / 方向键驾驶 · 空格 刹车 · F 上下车 · E 收集 · C 镜头 · P 暂停 · M 地图 · Shift 冲刺 / 上升',
+      'WASD / 方向键驾驶 · 空格 刹车 · F 上下车 · E 收集 · B 批量大小（停车时）· C 镜头 · P 暂停 · M 地图 · Shift 冲刺 / 上升',
     mobile: '按住方向按钮驾驶或步行。上下车或更换车辆前请先停车。',
     accelerate: '加速 / 前进',
     reverse: '倒车 / 后退',
@@ -162,6 +198,8 @@ type DebugWindow = Window & {
   render_game_to_text?: () => string;
   advanceTime?: (ms: number) => void;
   gta_state?: () => CityState;
+  gta_gfx?: () => CityRenderer['debug'] | undefined;
+  gta_gps?: () => { points: number; length: number; blocked: number } | null;
 };
 const KEYS: Record<string, keyof Controls> = {
   KeyW: 'forward',
@@ -196,6 +234,7 @@ export function GtaGame({
   const dirty = useRef(true),
     manual = useRef(false),
     map = useRef(false),
+    mapPaused = useRef(false),
     returnState = useRef<CityState | null>(null);
   const [view, setView] = useState<CityState | null>(null),
     [loaded, setLoaded] = useState(0),
@@ -203,7 +242,10 @@ export function GtaGame({
     [attempt, setAttempt] = useState(0),
     [atlasLoading, setAtlasLoading] = useState(false),
     [atlasError, setAtlasError] = useState(false),
-    [overview, setOverview] = useState(false);
+    [overview, setOverview] = useState(false),
+    [lite, setLite] = useState(false),
+    [needsGpu, setNeedsGpu] = useState(0),
+    [gpuOk, setGpuOk] = useState(false);
   const [destination, setDestination] = useState<string>('nvidia_endeavor');
   const [sound, setSound] = useState(false),
     audio = useRef<{ ctx: AudioContext; osc: OscillatorNode; gain: GainNode } | null>(null);
@@ -223,7 +265,7 @@ export function GtaGame({
       sync();
     }
   };
-  const fresh = () => newCity(world.current!);
+  const fresh = () => newCity(world.current!, 1, readLoadout());
   useEffect(() => {
     const ctrl = new AbortController();
     let handle: CityRenderer | null = null,
@@ -233,15 +275,33 @@ export function GtaGame({
       accumulator = 0;
     let routeKey = '';
     let route: Point[] = [];
+    let slow = 0,
+      drawnAt = 0,
+      drawCost = 0,
+      drawTimed = true,
+      pictures = 0;
+    setNeedsGpu(0);
     setView(null);
     setError(false);
     setLoaded(0);
     const el = canvas.current!;
     const loop = (now: number) => {
-      const dt = last ? Math.min((now - last) / 1000, 0.1) : 0;
+      const gap = last ? now - last : 0;
+      // A slow picture must not slow the city down: in the low-detail mode up to half a second
+      // of driving is stepped between two pictures.
+      const dt = Math.min(gap / 1000, handle?.isLite() ? 0.5 : 0.1);
       last = now;
       const s = state.current!,
         w = world.current!;
+      // Four frames in a row over 100 ms while driving: the machine cannot keep up with the
+      // full city, so the renderer drops to its low-detail mode for the rest of the run.
+      if (s.phase === 'driving' && handle && !handle.isLite()) {
+        slow = gap > 100 ? slow + 1 : 0;
+        if (slow >= 4) {
+          handle.goLite();
+          setLite(true);
+        }
+      }
       if (!manual.current) {
         accumulator += dt;
         while (accumulator >= 1 / 60) {
@@ -249,9 +309,30 @@ export function GtaGame({
           accumulator -= 1 / 60;
         }
       }
-      if (s.phase === 'driving' || dirty.current) {
+      // The frame after a drawn one tells what the drawing cost. Where it is slow even in the
+      // low-detail mode (a CPU renderer), the city is drawn less often than it is stepped, so
+      // the controls, the clock and the HUD keep their pace between pictures.
+      if (!drawTimed) {
+        const cost = now - drawnAt;
+        drawCost = Math.max(drawCost * 0.8, cost);
+        drawTimed = true;
+        // The third low-detail picture is past shader compilation, so its cost is what play
+        // will be like. Over half a second: say that the heist needs a GPU.
+        if (handle?.isLite() && ++pictures === 3) {
+          drawCost = cost;
+          if (cost > 500) setNeedsGpu(Math.round(cost));
+        }
+      }
+      if (handle?.isLite() && pictures < 3 && s.phase === 'ready') dirty.current = true;
+      const due =
+        !handle?.isLite() || drawCost < 80 || now - drawnAt >= Math.min(1500, drawCost * 2);
+      if ((s.phase === 'driving' || dirty.current) && due) {
         handle?.render(s, map.current);
         dirty.current = false;
+        // Some of the cost is paid inside the call and some before the next frame arrives.
+        drawCost = Math.max(drawCost * 0.8, performance.now() - now);
+        drawnAt = now;
+        drawTimed = false;
       }
       if (now - hud > 100) {
         hud = now;
@@ -288,10 +369,11 @@ export function GtaGame({
           return;
         }
         handle = r;
+        setLite(r.isLite());
         graphics.current = r;
         world.current = r.world;
         cityMap.current = drawCityMap(r.world);
-        state.current = newCity(r.world);
+        state.current = newCity(r.world, 1, readLoadout());
         dirty.current = true;
         setView({ ...state.current });
         frame = requestAnimationFrame(loop);
@@ -321,6 +403,27 @@ export function GtaGame({
     const text = () =>
         state.current && world.current ? cityText(world.current, state.current) : '{}',
       get = () => state.current!,
+      gfx = () => handle?.debug,
+      // Dev check of the GPS line: its length and how many metres of it the car cannot drive.
+      gps = () => {
+        const w = world.current,
+          s = state.current;
+        if (!w || !s) return null;
+        const points = streetRoute(w, s.player, target(w, s));
+        let length = 0,
+          blocked = 0;
+        for (let i = 1; i < points.length; i++) {
+          const a = points[i - 1],
+            b = points[i],
+            d = distance(a, b);
+          for (let m = 0; m < d; m++) {
+            const f = m / d;
+            if (w.blocked({ x: a.x + (b.x - a.x) * f, z: a.z + (b.z - a.z) * f }, 1.15)) blocked++;
+          }
+          length += d;
+        }
+        return { points: points.length, length: Math.round(length), blocked };
+      },
       advance = (ms: number) => {
         if (!Number.isFinite(ms) || ms < 0 || !state.current || !world.current) return;
         manual.current = true;
@@ -333,6 +436,8 @@ export function GtaGame({
       debug.render_game_to_text = text;
       debug.advanceTime = advance;
       debug.gta_state = get;
+      debug.gta_gfx = gfx;
+      debug.gta_gps = gps;
     }
     return () => {
       ctrl.abort();
@@ -347,6 +452,8 @@ export function GtaGame({
       if (debug.render_game_to_text === text) delete debug.render_game_to_text;
       if (debug.advanceTime === advance) delete debug.advanceTime;
       if (debug.gta_state === get) delete debug.gta_state;
+      if (debug.gta_gfx === gfx) delete debug.gta_gfx;
+      if (debug.gta_gps === gps) delete debug.gta_gps;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt]);
@@ -360,6 +467,32 @@ export function GtaGame({
     },
     [],
   );
+  // A passed heist is saved for the site banner: count, best time and biggest take.
+  const wonPhase = view?.phase === 'won';
+  useEffect(() => {
+    const s = state.current;
+    if (wonPhase && s) recordHeist(s.elapsed, s.cash);
+  }, [wonPhase]);
+  // With game sound on, the heist is scored by the theme's synthesized cues: a star for each
+  // wanted level, a sting when the cops are lost, cash for each job and the two endings.
+  const cue = useRef({ phase: 'ready', heat: 0, job: 0 });
+  const cuePhase = view?.phase ?? 'ready',
+    cueHeat = view?.heat ?? 0,
+    cueJob = view?.job ?? 0;
+  useEffect(() => {
+    const before = cue.current;
+    cue.current = { phase: cuePhase, heat: cueHeat, job: cueJob };
+    if (!sound) return;
+    if (cuePhase !== before.phase) {
+      if (cuePhase === 'won') playGtaSfx('passed');
+      else if (cuePhase === 'busted') playGtaSfx('busted');
+      else if (cuePhase === 'paused') playGtaSfx('back');
+      else if (cuePhase === 'driving') playGtaSfx('select');
+    }
+    if (cueHeat > before.heat) playGtaSfx('star');
+    else if (cueHeat === 0 && before.heat > 0 && cuePhase === 'driving') playGtaSfx('clear');
+    if (cueJob > before.job) playGtaSfx('cash');
+  }, [cuePhase, cueHeat, cueJob, sound]);
   useEffect(() => {
     if (!overview || !bigMap.current || !cityMap.current || !world.current || !state.current)
       return;
@@ -387,6 +520,8 @@ export function GtaGame({
     }
     state.current.phase = 'driving';
     map.current = false;
+    mapPaused.current = false;
+    if (needsGpu) setGpuOk(true);
     setOverview(false);
     clear();
     manual.current = false;
@@ -399,7 +534,11 @@ export function GtaGame({
     if (map.current) {
       map.current = false;
       setOverview(false);
+      // Closing the map gives the road back if it was the map that paused the run.
+      if (mapPaused.current && state.current.phase === 'paused') state.current.phase = 'driving';
+      mapPaused.current = false;
     } else {
+      mapPaused.current = state.current.phase === 'driving';
       pause();
       map.current = true;
       setOverview(true);
@@ -494,6 +633,7 @@ export function GtaGame({
     if (key === 'KeyF') enterExit(w, s);
     if (key === 'KeyE') interact(w, s);
     if (key === 'KeyC') s.camera = (s.camera + 1) % 3;
+    if (key === 'KeyB' && changeBatch(s)) s.loadout = saveLoadout(s.loadout);
     sync();
     focus();
   };
@@ -540,6 +680,8 @@ export function GtaGame({
   return (
     <section className="gta-game" data-testid="heist-game" data-phase={view?.phase ?? 'loading'}>
       <canvas
+        // A lost WebGL context cannot be used again: Retry mounts a new canvas.
+        key={attempt}
         ref={canvas}
         className="gta-canvas"
         data-testid="heist-canvas"
@@ -630,6 +772,7 @@ export function GtaGame({
             </strong>
             <span>
               {view.explorer ? 'SAN ANDREAS' : view.onFoot ? 'MICHAEL' : view.vehicle.toUpperCase()}
+              {lite && !view.explorer && <em data-testid="heist-lite"> · {t.lite}</em>}
             </span>
             <span>
               {t.health} {Math.ceil(view.health)}% ·{' '}
@@ -639,6 +782,29 @@ export function GtaGame({
                   : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}
               </b>
             </span>
+            {!view.explorer && !view.tour && (
+              <span className="gta-tune" data-testid="heist-tune">
+                <b>
+                  {t.batch} {view.loadout.batch}
+                </b>{' '}
+                · {t.tuneTake} ×{view.tune.take} · {t.tuneLaunch}{' '}
+                {launchSeconds(
+                  SPECS[view.vehicle].accel * view.tune.accel,
+                  SPECS[view.vehicle].top * view.tune.top,
+                ).toFixed(1)}{' '}
+                s
+                <br />
+                <b>{view.loadout.precision.toUpperCase()}</b> · {t.tuneTop}{' '}
+                {Math.round(
+                  cruiseTop(
+                    SPECS[view.vehicle].accel * view.tune.accel,
+                    SPECS[view.vehicle].top * view.tune.top,
+                  ) * 3.6,
+                )}{' '}
+                km/h · {t.tuneDamage} ×{view.tune.damage}
+                {view.tune.repair > 0 ? ` · ${t.tuneKv}` : ''}
+              </span>
+            )}
           </div>
         </aside>
       )}
@@ -679,6 +845,14 @@ export function GtaGame({
         </button>
         <button
           type="button"
+          data-testid="heist-batch"
+          onClick={() => action('KeyB')}
+          disabled={!active || view.explorer || view.tour !== null || Math.abs(view.car.speed) > 2}
+        >
+          {t.batch}
+        </button>
+        <button
+          type="button"
           onClick={() => {
             if (state.current) state.current.night = !state.current.night;
             sync();
@@ -704,7 +878,12 @@ export function GtaGame({
         <button type="button" onClick={() => action('KeyC')} disabled={!ready || view.explorer}>
           {t.camera}
         </button>
-        <button type="button" onClick={() => void flight()} disabled={!ready || atlasLoading}>
+        <button
+          type="button"
+          data-testid="heist-atlas"
+          onClick={() => void flight()}
+          disabled={!ready || atlasLoading}
+        >
           {view?.explorer ? t.city : t.atlas}
         </button>
         <button type="button" onClick={toggleSound} disabled={!ready}>
@@ -715,9 +894,9 @@ export function GtaGame({
             <button
               type="button"
               data-testid="heist-travel-city"
-              title={t.travelHelp}
+              title={view.heat > 0 ? t.travelWanted : t.travelHelp}
               aria-pressed={!w?.southBay(view.player)}
-              disabled={!active || !still}
+              disabled={!active || !still || view.heat > 0}
               onClick={() => go('city')}
             >
               {t.travelCity}
@@ -725,9 +904,9 @@ export function GtaGame({
             <button
               type="button"
               data-testid="heist-travel-south"
-              title={t.travelHelp}
+              title={view.heat > 0 ? t.travelWanted : t.travelHelp}
               aria-pressed={Boolean(w?.southBay(view.player))}
-              disabled={!active || !still}
+              disabled={!active || !still || view.heat > 0}
               onClick={() => go('south')}
             >
               {t.travelSouth}
@@ -735,6 +914,14 @@ export function GtaGame({
           </>
         )}
       </div>
+      {needsGpu > 0 && !gpuOk && active && (
+        <div role="status" className="gta-notice" data-testid="heist-gpu-notice">
+          {t.needsGpu.replace('{ms}', String(needsGpu))}{' '}
+          <button type="button" onClick={() => setGpuOk(true)}>
+            {t.playAnyway}
+          </button>
+        </div>
+      )}
       {atlasError && (
         <div role="alert" className="gta-notice">
           {t.failedAtlas}
@@ -812,7 +999,26 @@ export function GtaGame({
                         : t.title}
             </h3>
             {!ready && !error && <progress value={loaded} max={LOAD_STEPS} />}
-            {ready && !atlasLoading && <p>{t.brief}</p>}
+            {ready && !atlasLoading && view.phase === 'busted' ? (
+              <p data-testid="heist-ended">
+                <b>{view.health === 0 ? t.endCar : t.endTime}</b>{' '}
+                {t.endSummary
+                  .replace('{jobs}', String(view.job))
+                  .replace('{total}', String(JOB_IDS.length))
+                  .replace('{cash}', `$${view.cash.toLocaleString('en-US')}`)
+                  .replace(
+                    '{time}',
+                    `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
+                  )}
+              </p>
+            ) : (
+              ready && !atlasLoading && <p>{t.brief}</p>
+            )}
+            {ready && !atlasLoading && lite && (
+              <p className="gta-lite-note" data-testid="heist-lite-note" role="status">
+                {needsGpu ? t.needsGpu.replace('{ms}', String(needsGpu)) : t.liteNote}
+              </p>
+            )}
             {error ? (
               <button type="button" onClick={() => setAttempt((n) => n + 1)}>
                 {t.retry}
@@ -825,11 +1031,13 @@ export function GtaGame({
                   data-testid="heist-start"
                   onClick={() => start(view.phase === 'won' || view.phase === 'busted')}
                 >
-                  {view.phase === 'ready'
-                    ? t.start
-                    : view.phase === 'paused'
-                      ? t.resume
-                      : t.restart}
+                  {needsGpu && !gpuOk && view.phase !== 'won' && view.phase !== 'busted'
+                    ? t.playAnyway
+                    : view.phase === 'ready'
+                      ? t.start
+                      : view.phase === 'paused'
+                        ? t.resume
+                        : t.restart}
                 </button>
               )
             )}
