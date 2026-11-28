@@ -18,7 +18,7 @@ import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { CALCULATOR_PERCENTILE_VALUES } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
-import { getModelReleaseDate, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { getModelReleaseDate, scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
@@ -48,7 +48,7 @@ import {
   getCachedBenchmarkHistory,
 } from '@/lib/benchmarks/benchmark-query-cache.server';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
-import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario } from '@/lib/catalog/data-mappings';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 import { getDisplayLabel } from '@/lib/shared/utils';
 import { csvResponse } from '@/lib/views-api/csv';
@@ -70,13 +70,13 @@ const OUTPUT_PRICE_MULTIPLE = LIFECYCLE_DEFAULTS.outputPriceMultiple;
  * the calculator allowlist after the cache; agentic history has no ISL/OSL to
  * key on and no sequence to trim by, so it comes back whole.
  */
-async function fleetHistoryRows(modelKeys: string[], sequence: Sequence): Promise<BenchmarkRow[]> {
+async function fleetHistoryRows(modelKeys: string[], scenario: Scenario): Promise<BenchmarkRow[]> {
   if (FIXTURES_MODE) return loadFixture<BenchmarkRow[]>('benchmarks-history');
-  const islOsl = sequenceToIslOsl(sequence);
+  const islOsl = scenarioToIslOsl(scenario);
   if (!islOsl) return getCachedAgenticBenchmarkHistory(modelKeys);
   return toCalculatorBenchmarkRows(
     await getCachedBenchmarkHistory(modelKeys, islOsl.isl, islOsl.osl),
-    sequence,
+    scenario,
   );
 }
 
@@ -86,7 +86,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const search = request.nextUrl.searchParams;
 
     const model = resolveModelParam(search.get('model'));
-    const sequence = parseSequenceParam(search.get('sequence'), Sequence.EightK_OneK);
+    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
     const requestedPrecisions = parsePrecisionsParam(search.get('precisions'));
     const mwRaw = search.get('mw');
     if (mwRaw === null || mwRaw === '') {
@@ -149,9 +149,9 @@ export function GET(request: NextRequest): Promise<Response> {
     const costType = parseCostTypeParam(search.get('costType'));
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
 
-    const rows = await fleetHistoryRows([...model.dbModelKeys], sequence);
+    const rows = await fleetHistoryRows([...model.dbModelKeys], scenario);
 
-    const precisions = resolveRowPrecisions(rows, sequence, requestedPrecisions);
+    const precisions = resolveRowPrecisions(rows, scenario, requestedPrecisions);
 
     // Stage one/two of `useHistoricalBest`: per-(hwKey, date) frontiers, then each
     // hwKey's best-so-far staircase at the target. The rank accessor is
@@ -160,7 +160,7 @@ export function GET(request: NextRequest): Promise<Response> {
     // lives in a 'use client' d3 module.
     const groups = groupHistoryByHwKeyAndDate({
       rows,
-      sequence,
+      sequence: scenario,
       precisions,
       percentile,
       tokenType: costType,
@@ -188,7 +188,7 @@ export function GET(request: NextRequest): Promise<Response> {
 
     // A cached input token sells for a tenth of a fresh one; only agentic traces
     // measure a cached fraction for the discount to apply to.
-    const isAgentic = sequence === Sequence.AgenticTraces;
+    const isAgentic = scenario === Scenario.AgenticTraces;
     const cacheReadRatio = isAgentic ? Math.min(1, cache / 100) : 1;
 
     const fleets = chips.flatMap((chip) => {
@@ -317,7 +317,7 @@ export function GET(request: NextRequest): Promise<Response> {
 
     const resolvedParams = {
       model: model.displayName,
-      sequence,
+      sequence: scenario,
       precisions,
       mw,
       price: inputPrice,

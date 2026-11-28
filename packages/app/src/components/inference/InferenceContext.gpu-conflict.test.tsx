@@ -1,5 +1,5 @@
 // @test-environment jsdom
-import { DISPLAY_MODEL_TO_DB, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as NextNavigation from 'next/navigation';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -14,7 +14,7 @@ import type { InferenceActionsContextType } from '@/components/inference/types';
 import { EphemeralUrlStateContext } from '@/hooks/useUrlState';
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Precision, Scenario } from '@/lib/catalog/data-mappings';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -30,13 +30,13 @@ mock.module('next/navigation', () => ({
 }));
 mock.module('@/providers/unofficial-run-provider', () => ({
   ...actualUnofficialRun,
-  useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
+  useUnofficialRun: () => ({ availableModelsAndScenarios: [] }),
 }));
 
 // DeepSeek-V4-Pro runs vLLM and SGLang on B300 for 1k/1k, which shares a graph across engines,
 // and for 8k/1k, which keeps one engine family per SKU.
 const AVAILABILITY = compactAvailability(
-  [Sequence.OneK_OneK, Sequence.EightK_OneK].flatMap((sequence) =>
+  [Scenario.OneK_OneK, Scenario.EightK_OneK].flatMap((scenario) =>
     ['vllm', 'sglang'].map((framework): AvailabilityRow => ({
       model: DISPLAY_MODEL_TO_DB[Model.DeepSeek_V4_Pro]![0]!,
       precision: 'fp4',
@@ -45,7 +45,7 @@ const AVAILABILITY = compactAvailability(
       spec_method: 'none',
       disagg: false,
       date: '2026-06-12',
-      ...sequenceToIslOsl(sequence)!,
+      ...scenarioToIslOsl(scenario)!,
       benchmark_type: 'fixed',
     })),
   ),
@@ -63,13 +63,13 @@ const fetchMock = vi.fn((input: string) => {
 });
 
 let actions: InferenceActionsContextType | null = null;
-let setSequence: ((sequence: Sequence) => void) | null = null;
-let sequence: Sequence | null = null;
+let setScenario: ((scenario: Scenario) => void) | null = null;
+let scenario: Scenario | null = null;
 
 function Probe() {
   actions = useInferenceActions();
-  setSequence = useGlobalFilterActions().setSelectedSequence;
-  sequence = useGlobalFilterSelection().effectiveSequence;
+  setScenario = useGlobalFilterActions().setSelectedScenario;
+  scenario = useGlobalFilterSelection().effectiveScenario;
   return <EngineComparisonConflictNotice />;
 }
 
@@ -107,7 +107,7 @@ describe('engine conflict notice for a reader GPU comparison', () => {
           <EphemeralUrlStateContext.Provider value>
             <GlobalFilterProvider
               initialModel={Model.DeepSeek_V4_Pro}
-              initialSequence={Sequence.OneK_OneK}
+              initialScenario={Scenario.OneK_OneK}
               initialPrecisions={[Precision.FP4]}
             >
               <InferenceProvider activeTab="inference">
@@ -118,13 +118,13 @@ describe('engine conflict notice for a reader GPU comparison', () => {
         </QueryClientProvider>,
       ),
     );
-    await settle(() => sequence === Sequence.OneK_OneK && fetchMock.mock.calls.length > 0);
+    await settle(() => scenario === Scenario.OneK_OneK && fetchMock.mock.calls.length > 0);
 
     act(() => actions!.setSelectedGPUs(['b300_vllm', 'b300_sglang']));
     await settle(() => false);
     expect(notice()).toBeNull();
 
-    act(() => setSequence!(Sequence.EightK_OneK));
+    act(() => setScenario!(Scenario.EightK_OneK));
     await settle(() => notice() !== null);
     expect(notice()?.textContent).toContain('SGLang');
   });

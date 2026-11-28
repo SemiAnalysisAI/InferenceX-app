@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 
 import { buildChartData } from './unofficial-chart-data';
 import {
   overlaySelectionReducer,
-  parseAvailableModelsAndSequences,
+  parseAvailableModelsAndScenarios,
   parseUnofficialRunIds,
   type OverlaySelectionState,
 } from './unofficial-run-provider';
@@ -71,13 +71,13 @@ function rawPowerArtifact(overrides: Record<string, unknown> = {}): Record<strin
   };
 }
 
-describe('parseAvailableModelsAndSequences', () => {
+describe('parseAvailableModelsAndScenarios', () => {
   it('returns empty array for null input', () => {
-    expect(parseAvailableModelsAndSequences(null)).toEqual([]);
+    expect(parseAvailableModelsAndScenarios(null)).toEqual([]);
   });
 
   it('returns empty array for empty chart data', () => {
-    expect(parseAvailableModelsAndSequences({})).toEqual([]);
+    expect(parseAvailableModelsAndScenarios({})).toEqual([]);
   });
 
   it('parses DeepSeek-R1 correctly', () => {
@@ -87,9 +87,9 @@ describe('parseAvailableModelsAndSequences', () => {
         interactivity: { data: [], gpus: {} },
       },
     };
-    const result = parseAvailableModelsAndSequences(chartData);
+    const result = parseAvailableModelsAndScenarios(chartData);
     expect(result).toEqual([
-      { model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK, precisions: [] },
+      { model: Model.DeepSeek_R1, sequence: Scenario.OneK_OneK, precisions: [] },
     ]);
   });
 
@@ -99,21 +99,21 @@ describe('parseAvailableModelsAndSequences', () => {
       'Kimi-K2.5_1k/8k': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
       'Kimi-K2.5_8k/1k': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
     };
-    const result = parseAvailableModelsAndSequences(chartData);
+    const result = parseAvailableModelsAndScenarios(chartData);
     expect(result).toHaveLength(3);
     expect(result).toContainEqual({
       model: Model.Kimi_K2_5,
-      sequence: Sequence.OneK_OneK,
+      sequence: Scenario.OneK_OneK,
       precisions: [],
     });
     expect(result).toContainEqual({
       model: Model.Kimi_K2_5,
-      sequence: Sequence.OneK_EightK,
+      sequence: Scenario.OneK_EightK,
       precisions: [],
     });
     expect(result).toContainEqual({
       model: Model.Kimi_K2_5,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: [],
     });
   });
@@ -125,9 +125,9 @@ describe('parseAvailableModelsAndSequences', () => {
         interactivity: { data: [], gpus: {} },
       },
     };
-    const result = parseAvailableModelsAndSequences(chartData);
+    const result = parseAvailableModelsAndScenarios(chartData);
     expect(result).toEqual([
-      { model: Model.Qwen3_5, sequence: Sequence.OneK_OneK, precisions: [] },
+      { model: Model.Qwen3_5, sequence: Scenario.OneK_OneK, precisions: [] },
     ]);
   });
 
@@ -135,9 +135,9 @@ describe('parseAvailableModelsAndSequences', () => {
     const chartData = {
       'MiniMax-M2.5_1k/1k': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
     };
-    const result = parseAvailableModelsAndSequences(chartData);
+    const result = parseAvailableModelsAndScenarios(chartData);
     expect(result).toEqual([
-      { model: Model.MiniMax_M2_5, sequence: Sequence.OneK_OneK, precisions: [] },
+      { model: Model.MiniMax_M2_5, sequence: Scenario.OneK_OneK, precisions: [] },
     ]);
   });
 
@@ -145,8 +145,8 @@ describe('parseAvailableModelsAndSequences', () => {
     const chartData = {
       'UnknownModel_1k/1k': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
     };
-    expect(parseAvailableModelsAndSequences(chartData)).toEqual([
-      { model: 'UnknownModel', sequence: Sequence.OneK_OneK, precisions: [] },
+    expect(parseAvailableModelsAndScenarios(chartData)).toEqual([
+      { model: 'UnknownModel', sequence: Scenario.OneK_OneK, precisions: [] },
     ]);
   });
 
@@ -154,7 +154,7 @@ describe('parseAvailableModelsAndSequences', () => {
     const chartData = {
       'no-underscore': { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } },
     };
-    expect(parseAvailableModelsAndSequences(chartData)).toEqual([]);
+    expect(parseAvailableModelsAndScenarios(chartData)).toEqual([]);
   });
 
   it('deduplicates identical model/sequence combinations', () => {
@@ -163,7 +163,7 @@ describe('parseAvailableModelsAndSequences', () => {
       ['Kimi-K2.5_1k/1k', entry],
       ['Kimi-K2.5_1k/1k', entry],
     ]);
-    const result = parseAvailableModelsAndSequences(chartData);
+    const result = parseAvailableModelsAndScenarios(chartData);
     expect(result).toHaveLength(1);
   });
 });
@@ -184,8 +184,8 @@ describe('unofficial run with an unregistered model and hardware', () => {
     ]);
 
     const chartData = buildChartData(rows);
-    expect(parseAvailableModelsAndSequences(chartData)).toEqual([
-      { model: 'futuremodel9', sequence: Sequence.OneK_OneK, precisions: ['fp8'] },
+    expect(parseAvailableModelsAndScenarios(chartData)).toEqual([
+      { model: 'futuremodel9', sequence: Scenario.OneK_OneK, precisions: ['fp8'] },
     ]);
     const { data, gpus } = chartData['futuremodel9_1k/1k'].interactivity;
     expect(data.map((point) => point.conc).toSorted((a, b) => a - b)).toEqual([64, 128]);
@@ -250,9 +250,9 @@ describe('buildChartData', () => {
     const officialPoint = official.chartData.flat().find((p) => p.hwKey === 'a100_vllm')!;
     expect(officialPoint.tokensPerDollarH?.y).toBe(point.tokensPerDollarH?.y);
     expect(
-      parseAvailableModelsAndSequences({ 'DeepSeek-V4.1-Flash_agentic-traces': data }),
+      parseAvailableModelsAndScenarios({ 'DeepSeek-V4.1-Flash_agentic-traces': data }),
     ).toEqual([
-      { model: Model.DeepSeek_V4_1_Flash, sequence: Sequence.AgenticTraces, precisions: ['fp4'] },
+      { model: Model.DeepSeek_V4_1_Flash, sequence: Scenario.AgenticTraces, precisions: ['fp4'] },
     ]);
   });
 
@@ -451,27 +451,27 @@ describe('buildChartData', () => {
     expect(a.x).not.toBe(b.x);
   });
 
-  it('buildChartData keys are compatible with parseAvailableModelsAndSequences', () => {
+  it('buildChartData keys are compatible with parseAvailableModelsAndScenarios', () => {
     const rows = [
       stubRow({ model: 'dsr1', isl: 1024, osl: 1024 }),
       stubRow({ model: 'gptoss120b', isl: 1024, osl: 8192 }),
       stubRow({ model: 'qwen3.5', isl: 8192, osl: 1024 }),
     ];
     const chartData = buildChartData(rows);
-    const available = parseAvailableModelsAndSequences(chartData);
+    const available = parseAvailableModelsAndScenarios(chartData);
     expect(available).toContainEqual({
       model: Model.DeepSeek_R1,
-      sequence: Sequence.OneK_OneK,
+      sequence: Scenario.OneK_OneK,
       precisions: ['fp8'],
     });
     expect(available).toContainEqual({
       model: Model.GptOss,
-      sequence: Sequence.OneK_EightK,
+      sequence: Scenario.OneK_EightK,
       precisions: ['fp8'],
     });
     expect(available).toContainEqual({
       model: Model.Qwen3_5,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp8'],
     });
   });

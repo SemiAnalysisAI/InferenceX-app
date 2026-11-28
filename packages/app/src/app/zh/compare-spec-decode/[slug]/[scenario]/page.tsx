@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import {
-  type ScenarioSegment,
-  sequenceForScenarioSegment,
-} from '@/lib/compare/compare-scenario-route';
+import { type ScenarioSegment, scenarioForSegment } from '@/lib/compare/compare-scenario-route';
 
 import { buildSpecDecodeMetadataZh, renderSpecDecodePageZh } from '../page';
 
@@ -19,7 +16,7 @@ interface Props {
 }
 
 function assertScenario(scenario: string): ScenarioSegment {
-  if (!sequenceForScenarioSegment(scenario)) notFound();
+  if (!scenarioForSegment(scenario)) notFound();
   return scenario.toLowerCase() as ScenarioSegment;
 }
 

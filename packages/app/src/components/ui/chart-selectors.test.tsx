@@ -5,7 +5,7 @@ import { expect, it, mock } from 'bun:test';
 
 import { ModelSelector, ScenarioSelector } from './chart-selectors';
 import { TooltipProvider } from './tooltip';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 const route = { pathname: '/infx/inference' };
 mock.module('next/navigation', () => ({ usePathname: () => route.pathname }));
@@ -65,16 +65,16 @@ it.each([
 });
 
 it.each([
-  ['/infx/inference', Sequence.AgenticTraces],
-  ['/zh/infx/inference', Sequence.AgenticTraces],
-  ['/infx/inference', Sequence.EightK_OneK],
-  ['/zh/infx/inference', Sequence.EightK_OneK],
+  ['/infx/inference', Scenario.AgenticTraces],
+  ['/zh/infx/inference', Scenario.AgenticTraces],
+  ['/infx/inference', Scenario.EightK_OneK],
+  ['/zh/infx/inference', Scenario.EightK_OneK],
 ])('omits the sole scenario before hydration on %s (%s)', (pathname, value) => {
   route.pathname = pathname;
   const container = document.createElement('div');
   container.innerHTML = renderToString(
     <TooltipProvider>
-      <ScenarioSelector value={value} availableSequences={[value]} onChange={() => {}} />
+      <ScenarioSelector value={value} availableScenarios={[value]} onChange={() => {}} />
     </TooltipProvider>,
   );
 

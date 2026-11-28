@@ -2,10 +2,12 @@ import {
   AUTHOR_NAME,
   AUTHOR_URL,
   HW_REGISTRY,
-  rowToSequence,
+  PRECISION_ALIASES,
+  PRECISION_KEYS,
+  rowToScenario,
   SITE_NAME,
   SITE_URL,
-  sequenceToIslOsl,
+  scenarioToIslOsl,
 } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
@@ -36,7 +38,7 @@ import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export { getCachedBenchmarks };
 
-export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
+export const KNOWN_PRECISIONS = new Set([...PRECISION_KEYS, ...Object.keys(PRECISION_ALIASES)]);
 
 export interface AgenticScenarioIntro {
   paragraph: string;
@@ -155,7 +157,7 @@ function buildAgenticGpuDataPoints(
   const points: GPUDataPoint[] = [];
   for (const row of rows) {
     if (row.hardware !== hw) continue;
-    if (rowToSequence(row) !== 'agentic-traces') continue;
+    if (rowToScenario(row) !== 'agentic-traces') continue;
     if (row.precision !== precision) continue;
     if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
@@ -199,7 +201,7 @@ function buildAgenticGpuDataPoints(
   return points;
 }
 
-export function buildGpuDataPointsForSequence(
+export function buildGpuDataPointsForScenario(
   rows: BenchmarkRow[],
   hw: string,
   sequence: string,
@@ -208,7 +210,7 @@ export function buildGpuDataPointsForSequence(
   if (sequence === 'agentic-traces') {
     return buildAgenticGpuDataPoints(rows, hw, precision);
   }
-  const islOsl = sequenceToIslOsl(sequence);
+  const islOsl = scenarioToIslOsl(sequence);
   return islOsl ? buildGpuDataPoints(rows, hw, islOsl.isl, islOsl.osl, precision) : [];
 }
 
@@ -222,8 +224,8 @@ export function computeCompareTableData(
   if (!sequence || !precision) return emptyCompareTableData();
 
   return compareTableDataFromPoints(
-    buildGpuDataPointsForSequence(rows, a, sequence, precision),
-    buildGpuDataPointsForSequence(rows, b, sequence, precision),
+    buildGpuDataPointsForScenario(rows, a, sequence, precision),
+    buildGpuDataPointsForScenario(rows, b, sequence, precision),
   );
 }
 
@@ -238,8 +240,8 @@ export function computeCompareImageRows(
 ): SsrInterpolatedRow[] {
   if (!sequence || !precision || interactivityRange.max <= interactivityRange.min) return [];
 
-  const pointsA = buildGpuDataPointsForSequence(rows, a, sequence, precision);
-  const pointsB = buildGpuDataPointsForSequence(rows, b, sequence, precision);
+  const pointsA = buildGpuDataPointsForScenario(rows, a, sequence, precision);
+  const pointsB = buildGpuDataPointsForScenario(rows, b, sequence, precision);
   if (pointsA.length === 0 && pointsB.length === 0) return [];
 
   const sampleCount = 17;

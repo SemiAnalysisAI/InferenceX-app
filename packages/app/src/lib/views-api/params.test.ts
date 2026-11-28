@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { VENDOR_ORDER } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_TCO_BASIS } from '@/lib/catalog/constants';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import { ViewsApiParamError } from './errors';
@@ -69,19 +69,19 @@ describe('resolveModelParam', () => {
 
 describe('parseSequenceParam', () => {
   it('accepts canonical and URL-segment forms', () => {
-    expect(parseSequenceParam('8k/1k', Sequence.EightK_OneK)).toBe(Sequence.EightK_OneK);
-    expect(parseSequenceParam('8k-1k', Sequence.EightK_OneK)).toBe(Sequence.EightK_OneK);
-    expect(parseSequenceParam('agentic', Sequence.EightK_OneK)).toBe(Sequence.AgenticTraces);
-    expect(parseSequenceParam('agentic_traces', Sequence.EightK_OneK)).toBe(Sequence.AgenticTraces);
+    expect(parseSequenceParam('8k/1k', Scenario.EightK_OneK)).toBe(Scenario.EightK_OneK);
+    expect(parseSequenceParam('8k-1k', Scenario.EightK_OneK)).toBe(Scenario.EightK_OneK);
+    expect(parseSequenceParam('agentic', Scenario.EightK_OneK)).toBe(Scenario.AgenticTraces);
+    expect(parseSequenceParam('agentic_traces', Scenario.EightK_OneK)).toBe(Scenario.AgenticTraces);
   });
 
   it('falls back when absent and rejects unknown values', () => {
-    expect(parseSequenceParam(null, Sequence.AgenticTraces)).toBe(Sequence.AgenticTraces);
-    expect(() => parseSequenceParam('16k/1k', Sequence.EightK_OneK)).toThrow(ViewsApiParamError);
+    expect(parseSequenceParam(null, Scenario.AgenticTraces)).toBe(Scenario.AgenticTraces);
+    expect(() => parseSequenceParam('16k/1k', Scenario.EightK_OneK)).toThrow(ViewsApiParamError);
   });
 
   it.each(['__proto__', 'constructor'])('rejects inherited sequence name %s', (value) => {
-    expect(() => parseSequenceParam(value, Sequence.EightK_OneK)).toThrow(ViewsApiParamError);
+    expect(() => parseSequenceParam(value, Scenario.EightK_OneK)).toThrow(ViewsApiParamError);
   });
 });
 

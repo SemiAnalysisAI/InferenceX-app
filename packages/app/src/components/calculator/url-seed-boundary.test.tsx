@@ -6,7 +6,7 @@ import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 import { mocked } from '@/test/helpers';
 
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 import type { CalculatorUrlSeed } from './url-seed';
 import { CalculatorUrlSeedBoundary } from './url-seed-boundary';
@@ -98,7 +98,7 @@ describe('CalculatorUrlSeedBoundary', () => {
 
     const input = container.querySelector('input');
     expect(input?.dataset.model).toBe(Model.DeepSeek_V4_Pro);
-    expect(input?.dataset.sequence).toBe(Sequence.OneK_OneK);
+    expect(input?.dataset.sequence).toBe(Scenario.OneK_OneK);
     expect(onRecoverableError).not.toHaveBeenCalled();
   });
 

@@ -6,7 +6,7 @@ Instructions for Claude agents implementing new entity additions.
 >
 > If data for a new model or GPU is ingested before the normalizer mappings exist, those rows are **silently skipped** — `resolveModelKey()` / `hwToGpuKey()` returns `null`, the skip tracker logs them, but nothing is written to the DB. The data isn't lost (source artifacts remain in GCS), but recovering requires a full re-ingest after adding the mappings.
 >
-> **Always warn the user:** the `packages/db` and `packages/constants` changes (normalizers, HW_REGISTRY, DB_MODEL_TO_DISPLAY) must be merged and deployed before the first benchmark run containing the new entity. Frontend changes can follow later otherwise the new entity will be missing from dropdowns and charts.
+> **Always warn the user:** the `packages/constants` registry entry (`MODEL_REGISTRY`, `HW_REGISTRY`) must be merged and deployed before the first benchmark run containing the new entity. Models, precisions and scenarios pair that entry with an enum member in the app, and the typecheck fails until both exist, so the two land in one PR.
 >
 > Unofficial-run overlays (`?unofficialrun=`) are the one exception. `/api/unofficial-run` calls `mapBenchmarkRow` with `allowUnregistered: true`, so a run with an unregistered model or GPU still plots. The model keeps its raw prefix (`infmax_model_prefix`, falling back to the HF model id) as both DB key and display name, and the GPU keeps its runner base (`cluster:zx9-lab` becomes `zx9`). The inference model selector lists such a model under "Unregistered models", the chart heading marks it "(unregistered model)", and a line under the heading names unregistered hardware. The official ETL never passes the option, so ingest still skips these rows. Overlays are a preview, not a substitute for the registry entries.
 
@@ -27,7 +27,7 @@ When asked to add a new model, GPU, or other entity:
 
 > **Agent tips:**
 >
-> - **TypeScript catches missing config entries.** Every enum uses `Record<Enum, ...>`, so adding an enum member without the corresponding config entry causes a type error. This is a safety net — just add the missing entry.
+> - **TypeScript catches a half-added entity.** Models, precisions and scenarios each have one registry in `packages/constants` and one enum in `data-mappings.ts`. The enum-keyed view of the registry (`EnumKeyed`) fails to compile unless both name exactly the same keys, so a missing registry entry or a missing enum member is a type error that names the key.
 > - **No DB schema or ingest pipeline changes are needed** for any entity type. The schema is open-ended and the ingest is fully parameterized. Don't waste time reading ingest files.
 
 ---
@@ -59,28 +59,22 @@ Present what you inferred and get confirmation + category in a single step. Incl
 
 **`packages/constants/src/models.ts`**:
 
-- Add to `DB_MODEL_TO_DISPLAY` (`dbKey: 'Display Name'`)
-
-**`packages/db/src/etl/normalizers.ts`**:
-
-- `MODEL_TO_KEY` — add paths visible in the run's job names and artifact names (HF paths, mount paths). Don't speculatively add paths you haven't seen.
-- `PREFIX_ALIASES` — **skip if the prefix matches the DB key after stripping precision suffixes** (the common case). Only needed for non-obvious aliases (e.g. `gptoss` → `gptoss120b`).
+- Add one entry to `MODEL_REGISTRY`, keyed by the display name. Its position sets the overview row order within the category.
+  - `dbKeys`: the DB buckets, oldest first. A point release of an existing model goes into that model's `dbKeys` instead of a new entry, with a `releaseNames` entry when it has its own name (`'kimik2.6': 'Kimi-K2.6'`).
+  - `label`: selector, chart and compare-page label, with the parameter count.
+  - `slug` and `seoName`: the URL segment and page-title name on `/inference`, `/compare`, `/model` and the per-model dashboard routes. `slugAliases` only if a family-level or older-version slug should redirect here.
+  - `category`, `logo`, `openRouterModelId`.
+  - `releaseDate`: the day the weights became public, with its source in a comment. Leave it out if it cannot be sourced.
+  - `aliases` only for retired or misspelled names API clients still send.
+- `MODEL_TO_KEY`, in the same file: add paths visible in the run's job names and artifact names (HF paths, mount paths). Don't speculatively add paths you haven't seen.
+- `MODEL_PREFIX_ALIASES`, in the same file: **skip if the prefix matches the DB key after stripping precision suffixes** (the common case). Only needed for non-obvious aliases (e.g. `gptoss` → `gptoss120b`).
 
 **`packages/app/src/lib/catalog/data-mappings.ts`**:
 
-1. `Model` enum — add member (value must match display name in `DB_MODEL_TO_DISPLAY`)
-2. `MODEL_CONFIG` — add one entry with `{ label, prefix, category }`
+- `Model` enum: add the member, with the registry key as its value.
+- `MODEL_SELECTOR_ORDER`: add it only if it should rank among the first models in selectors and model lists. Other models follow in registry order.
 
-Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPRECATED_MODELS`, `MODEL_PREFIX_MAPPING`, `getModelLabel()`) is derived automatically.
-
-**`packages/app/src/lib/compare/compare-slug.ts`** (easy to miss — the /compare and /compare-per-dollar pages do NOT derive from `MODEL_CONFIG`):
-
-- Add a `COMPARE_MODEL_SLUGS` entry with `{ slug, displayName, dbKeys, label, seoName }`. `displayName` must match the `Model` enum value, and `dbKeys` lists the DB buckets to query. Without this entry the model is absent from /compare, /compare-per-dollar, the sitemap, and their OG images.
-- `COMPARE_MODEL_ALIASES` — only if a family-level or older-version slug should 308 to the new entry.
-
-**`packages/app/src/lib/compare/compare-ssr.ts`**:
-
-- `KNOWN_MODELS` — add the display name so `?g_model=` URL overrides validate on compare pages.
+Everything else is derived from the entry: selector options and labels, category sets, the DB key maps, `/compare` and `/compare-per-dollar` slugs and aliases, the inference and per-model routes, the sitemap, `llms.txt`, API model names, the `/about` model list and release dates.
 
 **`packages/app/src/app/compare/page.tsx`** and **`packages/app/src/app/compare-per-dollar/page.tsx`**, plus their `packages/app/src/app/zh/` copies:
 
@@ -89,8 +83,6 @@ Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPR
 **`packages/app/src/lib/catalog/model-architectures.ts`** (optional — powers the per-model architecture diagram on the inference tab):
 
 - `MODEL_ARCHITECTURES` — add a `[Model.X]` entry with verified config.json values. Omitted models simply render no diagram (`getModelArchitecture` returns `undefined`), so this is non-blocking but expected for parity with other models.
-
-`/about` needs no change — its model list derives from `DB_MODEL_TO_DISPLAY` and includes the new key automatically once `models.ts` is updated.
 
 ---
 
@@ -130,7 +122,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 **`packages/db/src/etl/normalizers.ts`** (usually no change):
 
-- `hwToGpuKey()` lowercases the hardware name and keeps only the text before the first `-`, so artifact suffixes need no mapping and GPU keys cannot contain `-`. Add a `HW_ALIASES` entry only when that text differs from the GPU key (e.g. `vrnvl72` → `vr200`).
+- `hwToGpuKey()` lowercases the hardware name and keeps only the text before the first `-`, so artifact suffixes need no mapping and GPU keys cannot contain `-`. Add a `GPU_RUNNER_ALIASES` entry in `gpu-keys.ts` only when that text differs from the GPU key (e.g. `vrnvl72` → `vr200`).
 
 **`packages/app/src/lib/catalog/gpu-specs.ts`** (if specs provided):
 
@@ -157,16 +149,19 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 ### Then apply
 
+**`packages/constants/src/precision-keys.ts`**:
+
+- Add one entry to `PRECISION_REGISTRY` with `{ label }`, plus `aliases` for vendor-specific names artifacts report (`nvfp4`, `mxfp4`).
+
+**`packages/app/src/lib/catalog/data-mappings.ts`**:
+
+- `Precision` enum: add the member.
+
 **`packages/db/src/etl/normalizers.ts`**:
 
 - `PRECISION_SUFFIX` regex — add the keyword if it appears as a model name suffix
 
-**`packages/app/src/lib/catalog/data-mappings.ts`**:
-
-1. `Precision` enum — add member
-2. `PRECISION_CONFIG` — add one entry with `{ label }`
-
-Everything else (`PRECISION_OPTIONS`, `getPrecisionLabel()`) is derived automatically.
+Everything else (`PRECISION_OPTIONS`, `getPrecisionLabel()`, the ingest and MCP precision sets) is derived automatically.
 
 Chart shapes need no change. `getShapeKeyForPrecision()` in `packages/app/src/lib/charts/chart-rendering.ts` assigns shapes by the precision's position among the selected precisions.
 
@@ -174,9 +169,11 @@ Chart shapes need no change. `getShapeKeyForPrecision()` in `packages/app/src/li
 
 ## Adding a New Sequence Length
 
+A sequence length is a fixed-length scenario. The code calls every workload, fixed or agentic, a scenario.
+
 ### Infer from artifacts
 
-Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the sequence from the `{n}k{m}k` segment (e.g. `16k8k` from `bmk_dsr1_16k8k_fp8_sglang_...`).
+Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the scenario from the `{n}k{m}k` segment (e.g. `16k8k` from `bmk_dsr1_16k8k_fp8_sglang_...`).
 
 ### Ask the user to confirm
 
@@ -187,17 +184,15 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 ### Then apply
 
-**`packages/constants/src/models.ts`**:
+**`packages/constants/src/scenarios.ts`**:
 
-1. `sequenceToIslOsl()` — add forward mapping
-2. `islOslToSequence()` — add reverse mapping
+- Add one entry to `SCENARIO_REGISTRY` with `{ label, labelZh, compact, segment, category, kind, isl, osl }`. `segment` is the URL form (`8k-1k`).
 
 **`packages/app/src/lib/catalog/data-mappings.ts`**:
 
-1. `Sequence` enum — add member
-2. Add a `SEQUENCE_CONFIG` entry with `{ label, labelZh, compact, category, kind }`
+- `Scenario` enum: add the member.
 
-Everything else (`SEQUENCE_OPTIONS`, `SEQUENCE_PREFIX_MAPPING`, `getSequenceLabel()`) is derived automatically.
+Everything else (`SCENARIO_OPTIONS`, `getScenarioLabel()`, the ISL/OSL conversions, the compare scenario segments, and the `sequence` values and aliases the API accepts) is derived automatically.
 
 No ingest changes needed — `parseIslOsl()` regex handles any `{n}k{m}k` pattern.
 

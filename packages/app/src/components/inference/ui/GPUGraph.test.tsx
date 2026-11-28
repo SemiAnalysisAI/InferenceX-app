@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'bun:test';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { POWER_TIMELINE_METRIC_KEY } from '@/components/inference/utils/powerTimeline';
-import { Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Precision, Scenario } from '@/lib/catalog/data-mappings';
 import { overlayRooflineDasharray, overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { computeToggle } from '@/lib/shared/toggle-set';
 import {
@@ -114,7 +114,7 @@ describe('GPUGraph', () => {
           selectedDateRange: { startDate: '', endDate: '' },
           activeDates: new Set(dates.map((date) => `${date}_b200_sglang`)),
           selectedPrecisions: [Precision.FP4],
-          selectedSequence: Sequence.AgenticTraces,
+          selectedScenario: Scenario.AgenticTraces,
         },
       },
     );
@@ -395,7 +395,7 @@ describe('GPUGraph', () => {
           selectedDateRange: { startDate: '', endDate: '' },
           activeDates: new Set(['2025-03-01_h100']),
           selectedPrecisions: [Precision.FP4],
-          selectedSequence: Sequence.AgenticTraces,
+          selectedScenario: Scenario.AgenticTraces,
         },
       },
     );

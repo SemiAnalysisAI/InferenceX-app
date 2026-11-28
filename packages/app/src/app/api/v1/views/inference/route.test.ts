@@ -6,7 +6,7 @@ import {
   getEqualServiceSources,
 } from '@/components/inference/utils/equal-service-comparison';
 import { buildInferenceSeries } from '@/lib/views-api/series';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import type { BenchmarkRow } from '@/lib/api/api';
 
 const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } = {
@@ -226,7 +226,7 @@ describe('GET /api/v1/views/inference', () => {
     );
     mockGetLatestBenchmarks.mockResolvedValue(rows);
     const projected = buildInferenceSeries(rows, {
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       percentile: 'p90',
       precisions: ['fp8'],
       metricConfigKey: 'y_measuredAvgPower',

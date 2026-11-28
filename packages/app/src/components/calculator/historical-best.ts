@@ -1,6 +1,6 @@
 import type { BenchmarkRow } from '@/lib/api/api';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
-import { Percentile, type Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, type Scenario } from '@/lib/catalog/data-mappings';
 
 import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
 import { buildGpuGroups, type GroupMeta } from './throughput-data';
@@ -57,7 +57,7 @@ export interface HistoryGroups {
 
 export interface GroupHistoryOptions {
   rows: BenchmarkRow[];
-  sequence: Sequence;
+  sequence: Scenario;
   precisions: string[];
   percentile?: Percentile;
   tokenType?: CostType;
@@ -68,7 +68,7 @@ export interface GroupHistoryOptions {
 export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): HistoryGroups {
   const {
     rows,
-    sequence,
+    sequence: scenario,
     precisions,
     percentile = Percentile.P90,
     tokenType = 'total',
@@ -82,7 +82,7 @@ export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): Histor
   const runUrlsByGroup = new Map<string, Set<string>>();
 
   const { grouped, groupMeta } = buildGpuGroups<DatedGroupMeta>(rows, {
-    sequence,
+    sequence: scenario,
     precisions,
     percentile,
     tokenType,

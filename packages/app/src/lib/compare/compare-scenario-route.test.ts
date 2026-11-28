@@ -2,21 +2,20 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   compareScenarioPath,
-  isAgenticSequence,
+  isAgenticScenario,
   PRERENDERED_SCENARIO_SEGMENTS,
   prerenderedScenarioParams,
-  SCENARIO_SEGMENT_TO_SEQUENCE,
   SCENARIO_SEGMENTS,
-  scenarioSegmentForSequence,
-  sequenceForScenarioSegment,
+  segmentForScenario,
+  scenarioForSegment,
 } from './compare-scenario-route';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 
 describe('prerenderedScenarioParams', () => {
   it('pairs every prerendered slug with the agentic and 8k/1k scenarios', () => {
-    expect(PRERENDERED_SCENARIO_SEGMENTS.map(sequenceForScenarioSegment)).toEqual([
-      Sequence.AgenticTraces,
-      Sequence.EightK_OneK,
+    expect(PRERENDERED_SCENARIO_SEGMENTS.map(scenarioForSegment)).toEqual([
+      Scenario.AgenticTraces,
+      Scenario.EightK_OneK,
     ]);
     expect(
       prerenderedScenarioParams([{ slug: 'a-b200-vs-h100' }, { slug: 'b-b300-vs-gb300' }]),
@@ -34,39 +33,34 @@ describe('prerenderedScenarioParams', () => {
 });
 
 describe('compare scenario segments', () => {
-  it('covers every sequence', () => {
-    const mapped = new Set<string>(Object.values(SCENARIO_SEGMENT_TO_SEQUENCE));
-    expect(mapped).toEqual(new Set(Object.values(Sequence)));
-  });
-
   it('round-trips every segment through its sequence', () => {
     for (const segment of SCENARIO_SEGMENTS) {
-      const sequence = sequenceForScenarioSegment(segment);
-      expect(sequence).not.toBeNull();
-      expect(scenarioSegmentForSequence(sequence!)).toBe(segment);
+      const scenario = scenarioForSegment(segment);
+      expect(scenario).not.toBeNull();
+      expect(segmentForScenario(scenario!)).toBe(segment);
     }
   });
 
   it('maps the two headline workloads', () => {
-    expect(sequenceForScenarioSegment('agentic')).toBe('agentic-traces');
-    expect(sequenceForScenarioSegment('8k-1k')).toBe('8k/1k');
+    expect(scenarioForSegment('agentic')).toBe('agentic-traces');
+    expect(scenarioForSegment('8k-1k')).toBe('8k/1k');
   });
 
   it('resolves a capitalized segment rather than 404ing', () => {
-    expect(sequenceForScenarioSegment('Agentic')).toBe('agentic-traces');
+    expect(scenarioForSegment('Agentic')).toBe('agentic-traces');
   });
 
   it('rejects unknown segments so the route can 404', () => {
-    expect(sequenceForScenarioSegment('bogus')).toBeNull();
-    expect(sequenceForScenarioSegment('')).toBeNull();
-    expect(sequenceForScenarioSegment('8k/1k')).toBeNull();
+    expect(scenarioForSegment('bogus')).toBeNull();
+    expect(scenarioForSegment('')).toBeNull();
+    expect(scenarioForSegment('8k/1k')).toBeNull();
   });
 
   it('identifies the agentic sequence', () => {
-    expect(isAgenticSequence('agentic-traces')).toBe(true);
-    expect(isAgenticSequence('8k/1k')).toBe(false);
-    expect(isAgenticSequence(null)).toBe(false);
-    expect(isAgenticSequence(undefined)).toBe(false);
+    expect(isAgenticScenario('agentic-traces')).toBe(true);
+    expect(isAgenticScenario('8k/1k')).toBe(false);
+    expect(isAgenticScenario(null)).toBe(false);
+    expect(isAgenticScenario(undefined)).toBe(false);
   });
 });
 

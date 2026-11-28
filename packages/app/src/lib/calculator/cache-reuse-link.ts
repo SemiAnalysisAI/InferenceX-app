@@ -4,7 +4,7 @@ import { cacheReuseRecipeKey } from '@/components/calculator/cache-reuse';
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
 import type { AggDataEntry } from '@/components/inference/types';
 import { getHardwareKey } from '@/lib/charts/chart-utils';
-import { PRECISION_OPTIONS, Sequence } from '@/lib/catalog/data-mappings';
+import { PRECISION_OPTIONS, Scenario } from '@/lib/catalog/data-mappings';
 import { localePath, type Locale } from '@/lib/i18n/i18n';
 import { withChartState } from '@/lib/routing/url-state';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
@@ -16,7 +16,7 @@ export function cacheReuseHref(locale: Locale, point?: PointMeta): string {
   const params = new URLSearchParams(search);
   const model = DB_MODEL_TO_DISPLAY[point.model];
   if (model) params.set('g_model', model);
-  params.set('i_seq', Sequence.AgenticTraces);
+  params.set('i_seq', Scenario.AgenticTraces);
   if ((PRECISION_OPTIONS as readonly string[]).includes(point.precision)) {
     params.set('i_prec', point.precision);
   }

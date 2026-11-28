@@ -1,5 +1,5 @@
 // @test-environment jsdom
-import { DISPLAY_MODEL_TO_DB, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 import { hashKey, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as NextNavigation from 'next/navigation';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -23,12 +23,12 @@ import {
 } from '@/components/ui/chart-selectors';
 import { OPTION_HOVER_DWELL_MS } from '@/components/ui/option-intent';
 import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
-import { sequenceTrendHistoryQueryOptions } from '@/hooks/api/use-trend-history';
+import { scenarioTrendHistoryQueryOptions } from '@/hooks/api/use-trend-history';
 import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 import { EphemeralUrlStateContext } from '@/hooks/useUrlState';
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Precision, Scenario } from '@/lib/catalog/data-mappings';
 import {
   CLIENT_PATHNAME_CHANGE_EVENT,
   type ClientPathnameChangeDetail,
@@ -56,7 +56,7 @@ mock.module('next/navigation', () => ({
 }));
 mock.module('@/providers/unofficial-run-provider', () => ({
   ...actualUnofficialRun,
-  useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
+  useUnofficialRun: () => ({ availableModelsAndScenarios: [] }),
 }));
 
 // DeepSeek-V4-Pro runs 8k/1k at FP4 on two dates, 8k/1k at FP8 on a later date and 1k/1k on its
@@ -66,8 +66,8 @@ const ONE_K_DATE = '2026-06-11';
 const LATEST_DATE = '2026-06-12';
 const FP8_DATE = '2026-06-14';
 const AGENTIC_DATE = '2026-10-23';
-const EIGHT_K = { ...sequenceToIslOsl(Sequence.EightK_OneK)!, benchmark_type: 'fixed' };
-const ONE_K = { ...sequenceToIslOsl(Sequence.OneK_OneK)!, benchmark_type: 'fixed' };
+const EIGHT_K = { ...scenarioToIslOsl(Scenario.EightK_OneK)!, benchmark_type: 'fixed' };
+const ONE_K = { ...scenarioToIslOsl(Scenario.OneK_OneK)!, benchmark_type: 'fixed' };
 const AGENTIC = { isl: null, osl: null, benchmark_type: 'agentic_traces' };
 
 function availabilityRow(
@@ -206,14 +206,14 @@ const setSaveData = (saveData: boolean) =>
 
 /** Wires the real selectors as the calculator displays do, around the real throughput hook. */
 function CalculatorPage() {
-  const { selectedModel, effectiveSequence, effectivePrecisions } = useGlobalFilterSelection();
+  const { selectedModel, effectiveScenario, effectivePrecisions } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
-  const { availableModels, availableSequences, availablePrecisions } =
+  const { setSelectedModel, setSelectedScenario, setSelectedPrecisions } = useGlobalFilterActions();
+  const { availableModels, availableScenarios, availablePrecisions } =
     useGlobalFilterAvailability();
   const warm = useWarmThroughputChange();
-  useThroughputData(selectedModel, effectiveSequence, effectivePrecisions, selectedRunDate);
-  pageKey = throughputQueryOptions(selectedModel, effectiveSequence, selectedRunDate).queryKey;
+  useThroughputData(selectedModel, effectiveScenario, effectivePrecisions, selectedRunDate);
+  pageKey = throughputQueryOptions(selectedModel, effectiveScenario, selectedRunDate).queryKey;
   return (
     <>
       <ModelSelector
@@ -224,10 +224,10 @@ function CalculatorPage() {
         data-testid="model-selector"
       />
       <ScenarioSelector
-        value={effectiveSequence}
-        onChange={setSelectedSequence}
-        onOptionIntent={(sequence) => warm({ sequence })}
-        availableSequences={availableSequences}
+        value={effectiveScenario}
+        onChange={setSelectedScenario}
+        onOptionIntent={(scenario) => warm({ sequence: scenario })}
+        availableScenarios={availableScenarios}
         model={selectedModel}
         data-testid="scenario-selector"
       />
@@ -245,7 +245,7 @@ function CalculatorPage() {
 const calculatorPage = (
   <GlobalFilterProvider
     initialModel={Model.DeepSeek_V4_Pro}
-    initialSequence={Sequence.EightK_OneK}
+    initialScenario={Scenario.EightK_OneK}
     initialPrecisions={[Precision.FP4]}
   >
     <CalculatorPage />
@@ -303,7 +303,7 @@ describe('selector option intent on a calculator page', () => {
     const warmed = await newKeys(() => rest(option('Kimi K3')));
     expect(warmed.keys).toEqual(
       hashes(
-        throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey,
+        throughputQueryOptions(Model.Kimi_K3, Scenario.AgenticTraces, AGENTIC_DATE).queryKey,
         workflowInfoQueryOptions(AGENTIC_DATE).queryKey,
       ),
     );
@@ -319,7 +319,7 @@ describe('selector option intent on a calculator page', () => {
     const warmed = await newKeys(() => rest(option('FP8')));
     expect(warmed.keys).toEqual(
       hashes(
-        throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, FP8_DATE).queryKey,
+        throughputQueryOptions(Model.DeepSeek_V4_Pro, Scenario.EightK_OneK, FP8_DATE).queryKey,
         workflowInfoQueryOptions(FP8_DATE).queryKey,
       ),
     );
@@ -342,7 +342,7 @@ describe('selector option intent on a calculator page', () => {
     expect(document.activeElement).toBe(option('1K / 1K'));
     expect(warmed.keys).toEqual(
       hashes(
-        throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK, ONE_K_DATE).queryKey,
+        throughputQueryOptions(Model.DeepSeek_V4_Pro, Scenario.OneK_OneK, ONE_K_DATE).queryKey,
         workflowInfoQueryOptions(ONE_K_DATE).queryKey,
       ),
     );
@@ -366,7 +366,7 @@ describe('selector option intent on a calculator page', () => {
     expect(document.activeElement).toBe(option('Kimi K3'));
     expect(warmed.keys).toEqual(
       hashes(
-        throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey,
+        throughputQueryOptions(Model.Kimi_K3, Scenario.AgenticTraces, AGENTIC_DATE).queryKey,
         workflowInfoQueryOptions(AGENTIC_DATE).queryKey,
       ),
     );
@@ -446,8 +446,8 @@ describe('warmInferenceSelection', () => {
       {
         request: {
           model: Model.Kimi_K3,
-          selectedSequence: Sequence.AgenticTraces,
-          sequenceExplicit: true,
+          selectedScenario: Scenario.AgenticTraces,
+          scenarioExplicit: true,
           selectedPrecisions: [Precision.FP4],
           precisionExplicit: true,
           requestedRunDate: '',
@@ -455,8 +455,8 @@ describe('warmInferenceSelection', () => {
           requestedRunId: '',
         },
         selection: {
-          effectiveSequence: Sequence.AgenticTraces,
-          sequenceResolved: true,
+          effectiveScenario: Scenario.AgenticTraces,
+          scenarioResolved: true,
           effectivePrecisions: [Precision.FP4],
           availableDates: [AGENTIC_DATE],
           effectiveRunDate: AGENTIC_DATE,
@@ -466,7 +466,7 @@ describe('warmInferenceSelection', () => {
     );
     expect(prefetch.mock.calls.map(([options]) => hashKey(options.queryKey)).toSorted()).toEqual(
       hashes(
-        sequenceTrendHistoryQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces).queryKey,
+        scenarioTrendHistoryQueryOptions(Model.Kimi_K3, Scenario.AgenticTraces).queryKey,
         inferenceChartKey(Model.Kimi_K3),
       ),
     );

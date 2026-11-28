@@ -1,9 +1,9 @@
 import {
   getModelExclusion,
-  getSequenceDefaultExclusionGroup,
-  getSequenceExclusion,
-  getSequenceExclusionFamilies,
-  getSequenceExclusionPolicy,
+  getScenarioDefaultExclusionGroup,
+  getScenarioExclusion,
+  getScenarioExclusionFamilies,
+  getScenarioExclusionPolicy,
 } from '@/lib/catalog/data-mappings';
 import {
   buildExclusion,
@@ -21,31 +21,31 @@ export function isEngineGuardLifted(
 }
 
 export function comparisonDefaultGroup(
-  sequence: Parameters<typeof getSequenceExclusion>[0],
+  sequence: Parameters<typeof getScenarioExclusion>[0],
   isUnofficialRun: boolean,
 ): string | null {
   if (isUnofficialRun) return null;
-  return getSequenceDefaultExclusionGroup(sequence);
+  return getScenarioDefaultExclusionGroup(sequence);
 }
 
 export function comparisonExclusionPolicy(
-  sequence: Parameters<typeof getSequenceExclusion>[0],
+  sequence: Parameters<typeof getScenarioExclusion>[0],
 ): ExclusionConflictPolicy {
-  return getSequenceExclusionPolicy(sequence);
+  return getScenarioExclusionPolicy(sequence);
 }
 
 export function comparisonExclusion(
   model: Parameters<typeof getModelExclusion>[0],
-  sequence: Parameters<typeof getSequenceExclusion>[0],
+  sequence: Parameters<typeof getScenarioExclusion>[0],
   isUnofficialRun: boolean,
   isOverviewHistoryPair = false,
 ): Exclusion | null {
   if (isUnofficialRun || isOverviewHistoryPair) return null;
 
-  const specs = [...getModelExclusion(model), ...getSequenceExclusion(sequence)];
+  const specs = [...getModelExclusion(model), ...getScenarioExclusion(sequence)];
   if (specs.length === 0) return null;
 
-  const families = getSequenceExclusionFamilies(sequence);
+  const families = getScenarioExclusionFamilies(sequence);
   if (!families) return buildExclusion(specs);
   return buildExclusion(
     specs.map((spec) => ({

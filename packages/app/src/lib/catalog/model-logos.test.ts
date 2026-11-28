@@ -48,7 +48,7 @@ describe('model developer logos', () => {
     }
   });
 
-  it('points every MODEL_CONFIG logo at an existing file under public/logos', () => {
+  it('points every model logo at an existing file under public/logos', () => {
     for (const model of Object.values(Model)) {
       const logo = getModelLogo(model);
       if (!logo) continue;

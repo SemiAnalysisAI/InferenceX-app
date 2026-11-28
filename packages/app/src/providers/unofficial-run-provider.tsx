@@ -24,7 +24,7 @@ import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
-import { type Model, Sequence } from '@/lib/catalog/data-mappings';
+import { type Model, Scenario } from '@/lib/catalog/data-mappings';
 import { ApiRequestError } from '@/lib/api/api-request-error';
 import {
   isUnofficialRunUnavailableCode,
@@ -64,9 +64,9 @@ function deleteUnofficialRunParams(searchParams: URLSearchParams): void {
   for (const key of keysToDelete) searchParams.delete(key);
 }
 
-export interface AvailableModelSequence {
+export interface AvailableModelScenario {
   model: Model;
-  sequence: Sequence;
+  sequence: Scenario;
   precisions: string[];
 }
 
@@ -103,10 +103,10 @@ export interface UnofficialRunContextType {
   unavailable: { code: UnofficialRunUnavailableCode; runId: string } | null;
   clearUnofficialRun: () => void;
   dismissRun: (runId: string) => void;
-  availableModelsAndSequences: AvailableModelSequence[];
+  availableModelsAndScenarios: AvailableModelScenario[];
   getOverlayData: (
     model: Model,
-    sequence: Sequence,
+    scenario: Scenario,
     chartType: 'e2e' | 'interactivity',
     tokenBasis?: TokenBasis,
     chipBasis?: ChipBasis,
@@ -138,22 +138,22 @@ export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): 
   }, [input, reconcileOverlayScope]);
 }
 
-export function parseAvailableModelsAndSequences(
+export function parseAvailableModelsAndScenarios(
   chartData: UnofficialChartData | null,
-): AvailableModelSequence[] {
+): AvailableModelScenario[] {
   if (!chartData) return [];
 
-  const result: AvailableModelSequence[] = [];
-  const allSequences = Object.values(Sequence);
+  const result: AvailableModelScenario[] = [];
+  const allScenarios = Object.values(Scenario);
   for (const key of Object.keys(chartData)) {
     const lastUnderscoreIndex = key.lastIndexOf('_');
     if (lastUnderscoreIndex === -1) continue;
     // An unregistered model keeps its raw prefix as its identity, see isRegisteredModel.
     const model = key.slice(0, lastUnderscoreIndex) as Model;
-    const sequence = allSequences.find(
+    const scenario = allScenarios.find(
       (candidate) => candidate === key.slice(lastUnderscoreIndex + 1),
     );
-    if (!model || !sequence) continue;
+    if (!model || !scenario) continue;
     const group = chartData[key];
     const precisions = [
       ...new Set(
@@ -162,8 +162,8 @@ export function parseAvailableModelsAndSequences(
         ),
       ),
     ];
-    if (!result.some((entry) => entry.model === model && entry.sequence === sequence)) {
-      result.push({ model, sequence, precisions });
+    if (!result.some((entry) => entry.model === model && entry.sequence === scenario)) {
+      result.push({ model, sequence: scenario, precisions });
     }
   }
   return result;
@@ -440,8 +440,8 @@ export function UnofficialRunProvider({
         : null,
     [unofficialBenchmarkRows, chartDataModule],
   );
-  const availableModelsAndSequences = useMemo(
-    () => parseAvailableModelsAndSequences(unofficialChartData),
+  const availableModelsAndScenarios = useMemo(
+    () => parseAvailableModelsAndScenarios(unofficialChartData),
     [unofficialChartData],
   );
   const allOverlayHwTypes = useMemo(() => {
@@ -509,7 +509,7 @@ export function UnofficialRunProvider({
   const getOverlayData = useCallback(
     (
       model: Model,
-      sequence: Sequence,
+      scenario: Scenario,
       chartType: 'e2e' | 'interactivity',
       tokenBasis: TokenBasis = 'total',
       chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
@@ -523,7 +523,7 @@ export function UnofficialRunProvider({
           overlayVariantCache.set(key, source);
         }
       }
-      const chartGroup = source?.[`${model}_${sequence}`];
+      const chartGroup = source?.[`${model}_${scenario}`];
       if (!chartGroup) return null;
       const dataForChart = chartType === 'e2e' ? chartGroup.e2e : chartGroup.interactivity;
       return { data: dataForChart.data, hardwareConfig: dataForChart.gpus };
@@ -572,7 +572,7 @@ export function UnofficialRunProvider({
       unavailable,
       clearUnofficialRun,
       dismissRun,
-      availableModelsAndSequences,
+      availableModelsAndScenarios,
       getOverlayData,
       activeOverlayHwTypes: selection.activeOverlayHwTypes,
       allOverlayHwTypes,
@@ -594,7 +594,7 @@ export function UnofficialRunProvider({
       unavailable,
       clearUnofficialRun,
       dismissRun,
-      availableModelsAndSequences,
+      availableModelsAndScenarios,
       getOverlayData,
       selection.activeOverlayHwTypes,
       allOverlayHwTypes,

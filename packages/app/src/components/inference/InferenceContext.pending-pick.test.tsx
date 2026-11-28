@@ -1,5 +1,5 @@
 // @test-environment jsdom
-import { DISPLAY_MODEL_TO_DB, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as NextNavigation from 'next/navigation';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -18,7 +18,7 @@ import type { InferenceActionsContextType } from '@/components/inference/types';
 import { EphemeralUrlStateContext } from '@/hooks/useUrlState';
 import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Precision, Scenario } from '@/lib/catalog/data-mappings';
 import { loadSystemPowerModeler } from '@/lib/power/system-power-modeler';
 import { GlobalFilterProvider } from '@/providers/GlobalFilterContext';
 import * as UnofficialRunProvider from '@/providers/unofficial-run-provider';
@@ -31,7 +31,7 @@ mock.module('next/navigation', () => ({
 }));
 mock.module('@/providers/unofficial-run-provider', () => ({
   ...actualUnofficialRun,
-  useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
+  useUnofficialRun: () => ({ availableModelsAndScenarios: [] }),
 }));
 
 // The chart waits for the lazily loaded power model, so load it before rendering the provider.
@@ -57,7 +57,7 @@ const AVAILABILITY = compactAvailability(
         spec_method: 'none',
         disagg: false,
         date: DATE,
-        ...sequenceToIslOsl(Sequence.EightK_OneK)!,
+        ...scenarioToIslOsl(Scenario.EightK_OneK)!,
         benchmark_type: 'fixed',
       })),
     ),
@@ -91,7 +91,7 @@ const benchmarkRows = (model: Model): BenchmarkRow[] =>
             num_decode_gpu: 8,
             benchmark_type: 'single_turn',
             offload_mode: 'off',
-            ...sequenceToIslOsl(Sequence.EightK_OneK)!,
+            ...scenarioToIslOsl(Scenario.EightK_OneK)!,
             conc,
             image: 'example.invalid/inference:fixture',
             metrics: {
@@ -185,7 +185,7 @@ async function mount() {
         <EphemeralUrlStateContext.Provider value>
           <GlobalFilterProvider
             initialModel={Model.DeepSeek_V4_Pro}
-            initialSequence={Sequence.EightK_OneK}
+            initialScenario={Scenario.EightK_OneK}
             initialPrecisions={[Precision.FP4]}
           >
             <InferenceProvider activeTab="inference">

@@ -13,7 +13,7 @@ import {
   type XAxisMode,
 } from './chart-data-core';
 
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { rowToScenario } from '@semianalysisai/inferencex-constants';
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
@@ -68,7 +68,7 @@ import {
   type ChipBasis,
 } from '@/lib/benchmarks/chip-basis';
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
-import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { Scenario, type Model } from '@/lib/catalog/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { useSystemPowerModeler } from '@/lib/power/system-power-modeler';
 import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
@@ -163,7 +163,7 @@ export function chartBenchmarkQueries({
 
 export function useChartData(
   selectedModel: Model,
-  selectedSequence: Sequence,
+  selectedScenario: Scenario,
   selectedPrecisions: string[],
   selectedYAxisMetric: string,
   selectedXAxisMetric: string | null,
@@ -229,7 +229,7 @@ export function useChartData(
     allowDefaultRunPreference &&
     VR_DEFAULT_RUN.enabled &&
     selectedModel === VR_DEFAULT_RUN.model &&
-    selectedSequence === VR_DEFAULT_RUN.sequence &&
+    selectedScenario === VR_DEFAULT_RUN.sequence &&
     !queryDate &&
     !asOfRunId &&
     !compareGpuPair &&
@@ -288,7 +288,7 @@ export function useChartData(
   const rows = useMemo(() => {
     if (!allRows) return [];
     const seqFilter = (r: { isl: number | null; osl: number | null; benchmark_type: string }) =>
-      rowToSequence(r) === selectedSequence;
+      rowToScenario(r) === selectedScenario;
     const seqFiltered = filterOverviewHistoryRows(
       allRows.filter(seqFilter),
       overviewHistoryPair?.currentConfigKey,
@@ -308,7 +308,7 @@ export function useChartData(
         overviewHistoryPair?.baselineConfigKey,
       );
       const selected =
-        selectedSequence === Sequence.AgenticTraces ? dedupeAgenticHistoryRuns(filtered) : filtered;
+        selectedScenario === Scenario.AgenticTraces ? dedupeAgenticHistoryRuns(filtered) : filtered;
       return selected.map((r) => ({
         ...r,
         date: comparisonDates[i],
@@ -318,7 +318,7 @@ export function useChartData(
     return [...mainRows, ...extraRows];
   }, [
     allRows,
-    selectedSequence,
+    selectedScenario,
     comparisonDates,
     comparisonDataKey,
     selectedRunDate,
@@ -377,7 +377,7 @@ export function useChartData(
       (chartDefinitions as ChartDefinition[]).map((chartDef) => {
         const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
-        const isAgentic = selectedSequence === Sequence.AgenticTraces;
+        const isAgentic = selectedScenario === Scenario.AgenticTraces;
         const effectiveXMetric =
           chartDef.chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
         const resolved = resolveXAxisField(chartDef, selectedYAxisMetric, effectiveXMetric, {
@@ -565,7 +565,7 @@ export function useChartData(
       selectedE2eXAxisMetric,
       selectedPercentile,
       fixedSequenceStatistic,
-      selectedSequence,
+      selectedScenario,
       tokenRevenuePriceSource,
       tokenBasis,
       chipBasis,
@@ -619,7 +619,7 @@ export function useChartData(
             )
           : [];
 
-        const isAgentic = selectedSequence === Sequence.AgenticTraces;
+        const isAgentic = selectedScenario === Scenario.AgenticTraces;
 
         const { data: processedData, clippedData } = partitionChartDataByLimits(
           mappedData,
@@ -630,7 +630,7 @@ export function useChartData(
 
         return {
           model: selectedModel,
-          sequence: selectedSequence,
+          sequence: selectedScenario,
           chartDefinition,
           data: processedData,
           clippedData,
@@ -651,7 +651,7 @@ export function useChartData(
     chartData,
     loading,
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedYAxisMetric,
     selectedGPUs,
     userCosts,

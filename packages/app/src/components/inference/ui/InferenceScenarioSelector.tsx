@@ -22,10 +22,10 @@ export function InferenceScenarioSelector({
   variant?: 'field' | 'caption';
   id?: string;
 }) {
-  const { selectedSequence, selectedModel, selectedPrecisions } = useInferenceFilters();
-  const { availableSequences } = useInferenceData();
+  const { selectedScenario, selectedModel, selectedPrecisions } = useInferenceFilters();
+  const { availableScenarios } = useInferenceData();
   const { selectedYAxisMetric } = useInferenceDisplay();
-  const { setSelectedSequence, warmFilterChange } = useInferenceActions();
+  const { setSelectedScenario, warmFilterChange } = useInferenceActions();
   const analyticsContext = useInferenceAnalyticsContext();
   const metricKey = selectedYAxisMetric.replace(/^y_/u, '');
 
@@ -33,18 +33,18 @@ export function InferenceScenarioSelector({
     <ScenarioSelector
       id={id}
       variant={variant}
-      value={selectedSequence}
-      availableSequences={availableSequences}
+      value={selectedScenario}
+      availableScenarios={availableScenarios}
       model={selectedModel}
       data-testid="scenario-selector"
-      onOptionIntent={(sequence) => warmFilterChange({ sequence })}
-      onChange={(sequence) => {
-        setSelectedSequence(sequence);
-        track('inference_sequence_selected', { ...analyticsContext, sequence });
+      onOptionIntent={(scenario) => warmFilterChange({ sequence: scenario })}
+      onChange={(scenario) => {
+        setSelectedScenario(scenario);
+        track('inference_sequence_selected', { ...analyticsContext, sequence: scenario });
         if (selectedModel && selectedPrecisions.length > 0 && selectedYAxisMetric) {
           track('inference_filters_changed', {
             model: selectedModel,
-            sequence,
+            sequence: scenario,
             precision: selectedPrecisions.join(','),
             metric: selectedYAxisMetric,
             metric_label: isMetricKey(metricKey)

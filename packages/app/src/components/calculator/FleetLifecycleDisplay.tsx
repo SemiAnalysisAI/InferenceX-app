@@ -45,7 +45,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
 import { getModelSortIndex } from '@/lib/catalog/constants';
-import { Percentile, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario, type Model } from '@/lib/catalog/data-mappings';
 import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -136,7 +136,7 @@ export default function FleetLifecycleDisplay() {
       {(urlSeed) => (
         <GlobalFilterProvider
           initialModel={urlSeed.model}
-          initialSequence={urlSeed.sequence}
+          initialScenario={urlSeed.sequence}
           initialPrecisions={urlSeed.precisions}
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
@@ -159,14 +159,14 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const {
     tcoBasis,
     selectedModel,
-    effectiveSequence: selectedSequence,
+    effectiveScenario: selectedScenario,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedScenario, setSelectedPrecisions } = useGlobalFilterActions();
   const warmThroughputChange = useWarmThroughputChange();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels } =
+  const { availablePrecisions, availableScenarios, availableModels } =
     useGlobalFilterAvailability();
   const mode = 'interactivity_to_throughput' as const;
   const [costProvider, setCostProvider] = useState<CostProvider>('costh');
@@ -181,7 +181,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
 
   const { hardwareConfig, ranges, loading, error, hasData, availableHwKeys } = useThroughputData(
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedPrecisions,
     selectedRunDate,
     undefined,
@@ -192,7 +192,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     tcoBasis,
   );
 
-  const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  const isAgenticScenario = selectedScenario === Scenario.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
@@ -202,7 +202,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     writeUrlParams({ c_mw: Number.isFinite(parsed) && parsed > 0 ? raw : '' });
   }, []);
 
-  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
+  const selectionKey = `${selectedModel}|${selectedScenario}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
 
@@ -263,13 +263,13 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     [setSelectedModel],
   );
 
-  const handleSequenceChange = useCallback(
+  const handleScenarioChange = useCallback(
     (value: string) => {
       setVisibilityIntent(null);
-      setSelectedSequence(value as Sequence);
+      setSelectedScenario(value as Scenario);
       track('fleet_sequence_selected', { sequence: value });
     },
-    [setSelectedSequence],
+    [setSelectedScenario],
   );
 
   const handlePrecisionChange = useCallback(
@@ -379,7 +379,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                 legend={t.benchmarkGroup}
                 data-testid="fleet-benchmark-panel"
                 className={`grid-cols-1 md:grid-cols-2 ${
-                  isAgenticSequence && featureGateUnlocked ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+                  isAgenticScenario && featureGateUnlocked ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
                 }`}
               >
                 <div className="min-w-0 md:col-span-2">
@@ -397,15 +397,15 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                 <ScenarioSelector
                   id="fleet-sequence"
                   data-testid="fleet-sequence-selector"
-                  value={selectedSequence}
-                  onChange={handleSequenceChange}
+                  value={selectedScenario}
+                  onChange={handleScenarioChange}
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
-                  onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
-                  availableSequences={availableSequences}
+                  onOptionIntent={(scenario) => warmThroughputChange({ sequence: scenario })}
+                  availableScenarios={availableScenarios}
                   model={selectedModel}
                 />
-                {isAgenticSequence && featureGateUnlocked && (
+                {isAgenticScenario && featureGateUnlocked && (
                   <PercentileSelector
                     id="fleet-percentile"
                     data-testid="fleet-percentile-selector"
@@ -519,17 +519,17 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                     <LabelWithTooltip
                       htmlFor="fleet-target"
                       label={
-                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                        isAgenticScenario ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
                       }
                       tooltip={
-                        isAgenticSequence
+                        isAgenticScenario
                           ? t.targetAgenticTooltip(percentileLabel)
                           : t.targetTooltip
                       }
                     />
                     <RangeField
                       label={
-                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                        isAgenticScenario ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
                       }
                       min={currentRange.min}
                       max={currentRange.max}
@@ -615,7 +615,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
           mode={mode}
           visibleHwKeys={visibleHwKeys}
           selectedModel={selectedModel}
-          selectedSequence={selectedSequence}
+          selectedScenario={selectedScenario}
           selectedPrecisions={selectedPrecisions}
           selectedPercentile={selectedPercentile}
           mwInput={mwInput}

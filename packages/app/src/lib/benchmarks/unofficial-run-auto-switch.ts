@@ -1,4 +1,4 @@
-import type { AvailableModelSequence } from '@/providers/unofficial-run-provider';
+import type { AvailableModelScenario } from '@/providers/unofficial-run-provider';
 import type { Model } from '@/lib/catalog/data-mappings';
 
 export interface AutoSwitchDecision {
@@ -7,7 +7,7 @@ export interface AutoSwitchDecision {
 }
 
 export function computeAutoSwitchDecision(
-  unofficialAvailable: AvailableModelSequence[],
+  unofficialAvailable: AvailableModelScenario[],
   urlModel: string | undefined,
   selectedModel: Model,
   lastKey: string,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 import {
   FAVORITE_PRESETS,
@@ -127,7 +127,7 @@ describe('FAVORITE_PRESETS data integrity', () => {
       expect(preset.tags.length).toBeGreaterThan(0);
       expect(['comparison', 'improvements']).toContain(preset.category);
       expect(Object.values(Model)).toContain(preset.config.model);
-      expect(Object.values(Sequence)).toContain(preset.config.sequence);
+      expect(Object.values(Scenario)).toContain(preset.config.sequence);
       expect(preset.config.precisions.length).toBeGreaterThan(0);
       expect(preset.config.yAxisMetric).toBeTruthy();
     }

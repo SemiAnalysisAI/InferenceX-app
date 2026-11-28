@@ -1,6 +1,4 @@
-import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants/models';
-
-import { MODEL_TO_KEY } from '../etl/normalizers';
+import { DB_MODEL_TO_DISPLAY, MODEL_TO_KEY } from '@semianalysisai/inferencex-constants';
 
 export interface WorkloadSource {
   id: string;

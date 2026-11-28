@@ -69,12 +69,12 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
-  Sequence,
+  Scenario,
   type Model,
   type Precision,
   getModelLabel,
   getPrecisionLabel,
-  getSequenceLabel,
+  getScenarioLabel,
 } from '@/lib/catalog/data-mappings';
 import {
   getGpuSpecs,
@@ -384,7 +384,7 @@ export default function ThroughputCalculatorDisplay({ routeModel }: { routeModel
       {(urlSeed) => (
         <GlobalFilterProvider
           initialModel={urlSeed.model}
-          initialSequence={urlSeed.sequence}
+          initialScenario={urlSeed.sequence}
           initialPrecisions={urlSeed.precisions}
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
@@ -407,13 +407,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const {
     selectedModel,
-    effectiveSequence: selectedSequence,
+    effectiveScenario: selectedScenario,
     effectivePrecisions: selectedPrecisions,
     tcoBasis,
     chipBasis,
   } = useGlobalFilterSelection();
   const scenarioShowsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setChipBasis } =
+  const { setSelectedModel, setSelectedScenario, setSelectedPrecisions, setChipBasis } =
     useGlobalFilterActions();
   const warmThroughputChange = useWarmThroughputChange();
   const chipBasisControl = useMemo(
@@ -425,7 +425,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     [chipBasisControl],
   );
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels, availabilitySettled } =
+  const { availablePrecisions, availableScenarios, availableModels, availabilitySettled } =
     useGlobalFilterAvailability();
   const { availableRuns } = useGlobalFilterWorkflow();
   const mode = 'interactivity_to_throughput' as const;
@@ -486,7 +486,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     overlayAvailableHwKeys,
   } = useThroughputData(
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedPrecisions,
     selectedRunDate,
     overlayInput,
@@ -503,7 +503,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   // provisional selection would flash an empty chart and collapse the cost panel for a frame.
   const loading = throughputLoading || !availabilitySettled;
 
-  const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  const isAgenticScenario = selectedScenario === Scenario.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
@@ -523,7 +523,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }, [mwInput]);
 
-  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
+  const selectionKey = `${selectedModel}|${selectedScenario}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
 
@@ -657,13 +657,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     [setSelectedModel],
   );
 
-  const handleSequenceChange = useCallback(
+  const handleScenarioChange = useCallback(
     (value: string) => {
       setVisibilityIntent(null);
-      setSelectedSequence(value as Sequence);
+      setSelectedScenario(value as Scenario);
       track('calculator_sequence_selected', { sequence: value });
     },
-    [setSelectedSequence],
+    [setSelectedScenario],
   );
 
   const handlePrecisionChange = useCallback(
@@ -908,7 +908,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           targetValue,
           costType,
           costProvider,
-          isAgenticSequence ? selectedPercentile : undefined,
+          isAgenticScenario ? selectedPercentile : undefined,
         )
       : getChartTitle(
           barMetric,
@@ -916,7 +916,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           targetValue,
           costType,
           costProvider,
-          isAgenticSequence ? selectedPercentile : undefined,
+          isAgenticScenario ? selectedPercentile : undefined,
         );
   const chartTitle = totalChipBasis
     ? (withTotalChipQualifier(baseChartTitle.title, locale) ?? baseChartTitle.title)
@@ -951,15 +951,15 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       <ScenarioSelector
         id="calc-sequence"
         data-testid="calc-sequence-selector"
-        value={selectedSequence}
-        onChange={handleSequenceChange}
+        value={selectedScenario}
+        onChange={handleScenarioChange}
         open={openDropdown === 'sequence'}
         onOpenChange={handleDropdownOpenChange('sequence')}
-        onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
-        availableSequences={availableSequences}
+        onOptionIntent={(scenario) => warmThroughputChange({ sequence: scenario })}
+        availableScenarios={availableScenarios}
         model={selectedModel}
       />
-      {isAgenticSequence && featureGateUnlocked && (
+      {isAgenticScenario && featureGateUnlocked && (
         <PercentileSelector
           id="calc-percentile"
           data-testid="calc-percentile-selector"
@@ -1137,12 +1137,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           <LabelWithTooltip
                             htmlFor="calc-target"
                             label={
-                              isAgenticSequence
+                              isAgenticScenario
                                 ? t.targetAgenticLabel(percentileLabel)
                                 : t.targetLabel
                             }
                             tooltip={
-                              isAgenticSequence
+                              isAgenticScenario
                                 ? t.targetAgenticTooltip(percentileLabel)
                                 : t.targetTooltip
                             }
@@ -1166,7 +1166,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         </div>
                         <RangeField
                           label={
-                            isAgenticSequence
+                            isAgenticScenario
                               ? t.targetAgenticLabel(percentileLabel)
                               : t.targetLabel
                           }
@@ -1228,7 +1228,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               analyticsPrefix="calculator"
               analyticsContext={selectionAnalyticsContext({
                 model: selectedModel,
-                sequence: selectedSequence,
+                sequence: selectedScenario,
                 precisions: selectedPrecisions,
                 gpuCount: visibleHwKeys.size,
               })}
@@ -1316,7 +1316,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           .map((p) => getPrecisionLabel(p as Precision))
                           .join(
                             ', ',
-                          )} · ${getSequenceLabel(selectedSequence, locale)} · SemiAnalysis InferenceX™`}
+                          )} · ${getScenarioLabel(selectedScenario, locale)} · SemiAnalysis InferenceX™`}
                         metaEnd={
                           barMetric === 'cost' && plottedBases.length > 0 ? (
                             <PricesSourceLink />

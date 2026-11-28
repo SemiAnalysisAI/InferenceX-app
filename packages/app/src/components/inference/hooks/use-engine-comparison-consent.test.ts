@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'bun:test';
 
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import { comparisonExclusion } from '../utils/comparison-exclusion';
 import {
   needsEngineComparisonConsent,
@@ -12,7 +12,7 @@ import {
 } from './use-engine-comparison-consent';
 
 describe('same-SKU engine consent', () => {
-  const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, false);
+  const exclusion = comparisonExclusion(Model.DeepSeek_V4_Pro, Scenario.AgenticTraces, false);
 
   it.each([
     [['b200_vllm', 'b200_sglang'], true],
@@ -28,10 +28,10 @@ describe('same-SKU engine consent', () => {
 
   it('does not prompt for unrestricted/unofficial views or unrelated fixed-seq MTP rules', () => {
     expect(needsEngineComparisonConsent(['b200_vllm', 'b200_sglang'], null)).toBe(false);
-    expect(supportsEngineComparisonConsent(Sequence.OneK_OneK)).toBe(false);
-    expect(supportsEngineComparisonConsent(Sequence.OneK_EightK)).toBe(false);
-    expect(supportsEngineComparisonConsent(Sequence.EightK_OneK)).toBe(true);
-    expect(supportsEngineComparisonConsent(Sequence.AgenticTraces)).toBe(true);
+    expect(supportsEngineComparisonConsent(Scenario.OneK_OneK)).toBe(false);
+    expect(supportsEngineComparisonConsent(Scenario.OneK_EightK)).toBe(false);
+    expect(supportsEngineComparisonConsent(Scenario.EightK_OneK)).toBe(true);
+    expect(supportsEngineComparisonConsent(Scenario.AgenticTraces)).toBe(true);
   });
 
   it('applies only on confirmation, discards cancelled work and resets on scope changes', () => {

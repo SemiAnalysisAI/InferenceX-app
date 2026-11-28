@@ -4,7 +4,7 @@ import { Suspense, use, useState, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { ResultContext } from '@/components/ui/result-context';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import { stubGlobal, useFakeTimers, useRealTimers } from '@/test/helpers';
 import {
   $,
@@ -149,14 +149,14 @@ describe('Inference ChartControls', () => {
 
 const mountCost = (
   model: Model,
-  sequence: Sequence,
+  scenario: Scenario,
   selectedYAxisMetric = 'y_costh',
   showTcoBasis = true,
 ) =>
   mount(<CostControls showTcoBasis={showTcoBasis} />, {
     unofficial: {},
-    inference: { selectedYAxisMetric, selectedModel: model, selectedSequence: sequence },
-    globalFilters: { selectedModel: model, effectiveSequence: sequence },
+    inference: { selectedYAxisMetric, selectedModel: model, selectedScenario: scenario },
+    globalFilters: { selectedModel: model, effectiveScenario: scenario },
   });
 
 const expectBasisSwitch = () => {
@@ -168,41 +168,41 @@ const expectBasisSwitch = () => {
 
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
-    mountCost(Model.Qwen3_5, Sequence.EightK_OneK);
+    mountCost(Model.Qwen3_5, Scenario.EightK_OneK);
   });
 
-  for (const sequence of [Sequence.EightK_OneK, Sequence.AgenticTraces]) {
-    it(`switches the global TCO basis for Kimi K3 on ${sequence}`, () => {
-      mountCost(Model.Kimi_K3, sequence);
+  for (const scenario of [Scenario.EightK_OneK, Scenario.AgenticTraces]) {
+    it(`switches the global TCO basis for Kimi K3 on ${scenario}`, () => {
+      mountCost(Model.Kimi_K3, scenario);
       expectBasisSwitch();
     });
   }
 
   for (const model of [Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash]) {
     it(`switches the global TCO basis for ${model} on AgentX`, () => {
-      mountCost(model, Sequence.AgenticTraces);
+      mountCost(model, Scenario.AgenticTraces);
       expectBasisSwitch();
     });
   }
 
   it('hides the TCO basis toggle for other models and scenarios', () => {
-    mountCost(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK);
+    mountCost(Model.DeepSeek_V4_Pro, Scenario.EightK_OneK);
     expect($('[data-testid="yaxis-metric-selector"]')).not.toBeNull();
     expect($('[data-testid="tco-basis-toggle"]')).toBeNull();
-    mountCost(Model.Qwen3_5, Sequence.OneK_OneK);
+    mountCost(Model.Qwen3_5, Scenario.OneK_OneK);
     expect($('[data-testid="tco-basis-toggle"]')).toBeNull();
   });
 
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_tpPerMw'] as const) {
     it(`hides TCO for ${selectedYAxisMetric} even with visible TPU hardware`, () => {
-      mountCost(Model.Qwen3_5, Sequence.EightK_OneK, selectedYAxisMetric);
+      mountCost(Model.Qwen3_5, Scenario.EightK_OneK, selectedYAxisMetric);
       expect(isVisible(testId('yaxis-metric-selector'))).toBe(true);
       expect($('[data-testid="tco-basis-toggle"]')).toBeNull();
     });
   }
 
   it('hides TCO for a cost metric when no TPU hardware is visible', () => {
-    mountCost(Model.Qwen3_5, Sequence.EightK_OneK, 'y_costh', false);
+    mountCost(Model.Qwen3_5, Scenario.EightK_OneK, 'y_costh', false);
     expect(isVisible(testId('yaxis-metric-selector'))).toBe(true);
     expect($('[data-testid="tco-basis-toggle"]')).toBeNull();
   });
@@ -339,7 +339,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
       </PathnameContext.Provider>,
       {
         unofficial: {},
-        inference: { selectedSequence: Sequence.AgenticTraces, selectedXAxisMode: 'interactivity' },
+        inference: { selectedScenario: Scenario.AgenticTraces, selectedXAxisMode: 'interactivity' },
       },
     );
     click(get('[data-testid="inference-secondary-controls"] > button'));

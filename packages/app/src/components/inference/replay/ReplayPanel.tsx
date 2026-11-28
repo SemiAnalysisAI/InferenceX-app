@@ -12,7 +12,7 @@ import {
   type SetStateAction,
 } from 'react';
 
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { useInferenceDisplay, useInferenceFilters } from '@/components/inference/InferenceContext';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { track, trackOncePerSession } from '@/lib/analytics/analytics';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -174,17 +174,17 @@ export default function ReplayPanel({
   yLabel,
   xLabel,
 }: ReplayPanelProps) {
-  const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes } =
+  const { selectedModel, selectedScenario, selectedPrecisions, activeHwTypes } =
     useInferenceFilters();
   const { selectedE2eXAxisMetric, selectedXAxisMetric, selectedYAxisMetric } =
     useInferenceDisplay();
 
-  const { isl = 0, osl = 0 } = sequenceToIslOsl(selectedSequence) ?? {};
+  const { isl = 0, osl = 0 } = scenarioToIslOsl(selectedScenario) ?? {};
   const history = useBenchmarkHistory(
     selectedModel,
     isl,
     osl,
-    selectedSequence === Sequence.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
+    selectedScenario === Scenario.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
   );
 
   const effectiveX =

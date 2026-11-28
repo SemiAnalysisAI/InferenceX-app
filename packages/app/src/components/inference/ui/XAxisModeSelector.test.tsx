@@ -7,7 +7,7 @@ mock.module('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
 mock.module('../InferenceContext', () => ({
   useInferenceDisplay: () => ({ selectedXAxisMode: 'interactivity', selectedPercentile: 'p90' }),
   useInferenceActions: () => ({ setSelectedXAxisMode: vi.fn() }),
-  useInferenceFilters: () => ({ selectedSequence: 'agentic-traces' }),
+  useInferenceFilters: () => ({ selectedScenario: 'agentic-traces' }),
 }));
 
 import { XAxisModeSelector } from './XAxisModeSelector';

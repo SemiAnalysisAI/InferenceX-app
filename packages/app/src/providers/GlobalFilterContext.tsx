@@ -36,11 +36,11 @@ import {
 } from '@/lib/routing/url-state';
 import { modelRoutePathnameRewrite, routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
-import { type AvailableModelSequence, useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { type AvailableModelScenario, useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { RunInfo } from '@/components/inference/types';
 import {
   getModelDefaultPrecisions,
-  isSequenceHiddenForModel,
+  isScenarioHiddenForModel,
   Model,
   MODEL_OPTIONS,
   isModelVisible,
@@ -49,8 +49,8 @@ import {
   modelRequiresObservations,
   Precision,
   PRECISION_OPTIONS,
-  Sequence,
-  SEQUENCE_OPTIONS,
+  Scenario,
+  SCENARIO_OPTIONS,
 } from '@/lib/catalog/data-mappings';
 import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
 import { setInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
@@ -59,7 +59,7 @@ import {
   countCurvesByPrecision,
   resolveEffectivePrecisions,
 } from '@/lib/benchmarks/default-precisions';
-import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
+import { resolveEffectiveScenario } from '@/lib/benchmarks/default-scenario';
 import type { WorkflowInfoResponse } from '@/lib/api/api';
 import {
   type AvailabilityIndex,
@@ -73,17 +73,17 @@ import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis'
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
-const APP_DEFAULT_SEQUENCE = Sequence.EightK_OneK;
+const APP_DEFAULT_SCENARIO = Scenario.EightK_OneK;
 
 export interface GlobalFilterSelectionContextType {
   selectedModel: Model;
-  selectedSequence: Sequence;
+  selectedScenario: Scenario;
   selectedPrecisions: string[];
   tcoBasis: TcoBasis;
   /** Which chips divide disaggregated input/output throughput. */
   chipBasis: ChipBasis;
-  effectiveSequence: Sequence;
-  sequenceResolved: boolean;
+  effectiveScenario: Scenario;
+  scenarioResolved: boolean;
   effectivePrecisions: string[];
 }
 
@@ -99,7 +99,7 @@ export interface GlobalFilterActionsContextType {
   setTcoBasis: (basis: TcoBasis) => void;
   setChipBasis: (basis: ChipBasis) => void;
   setSelectedModel: (model: Model, options?: ModelSelectionOptions) => void;
-  setSelectedSequence: (sequence: Sequence) => void;
+  setSelectedScenario: (scenario: Scenario) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedRunDate: (date: string) => void;
   setSelectedRunId: (id: string) => void;
@@ -116,7 +116,7 @@ export interface GlobalFilterRunContextType {
 
 export interface GlobalFilterAvailabilityContextType {
   availableModels: Model[];
-  availableSequences: Sequence[];
+  availableScenarios: Scenario[];
   availablePrecisions: string[];
   availableDates: string[];
   availability: AvailabilityIndex | undefined;
@@ -239,16 +239,16 @@ export function initialRequestedModel(
   return initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro;
 }
 
-/** The sequence the provider selects on mount. `urlSequence` is an explicit `i_seq` value. */
-export function initialSelectedSequence(
-  initialSequence: Sequence | undefined,
-  urlSequence: string | undefined,
-): Sequence {
-  if (initialSequence) return initialSequence;
-  if (urlSequence && Object.values(Sequence).includes(urlSequence as Sequence)) {
-    return urlSequence as Sequence;
+/** The scenario the provider selects on mount. `urlScenario` is an explicit `i_seq` value. */
+export function initialSelectedScenario(
+  initialScenario: Scenario | undefined,
+  urlScenario: string | undefined,
+): Scenario {
+  if (initialScenario) return initialScenario;
+  if (urlScenario && Object.values(Scenario).includes(urlScenario as Scenario)) {
+    return urlScenario as Scenario;
   }
-  return Sequence.EightK_OneK;
+  return Scenario.EightK_OneK;
 }
 
 /** A gated model renders as a public one until the gate unlocks. */
@@ -259,7 +259,7 @@ export function visibleSelectedModel(requested: Model, featureGateUnlocked: bool
 export interface FilterNavigationOverrides {
   model?: Model;
   /** An explicit `i_seq`, which also marks the sequence explicit. */
-  sequence?: Sequence;
+  sequence?: Scenario;
   precisions?: { selected: string[]; explicit: boolean };
   /** An explicit `g_rundate`, which also marks the run date explicit. */
   runDate?: string;
@@ -300,9 +300,9 @@ export function resolveFilterNavigationOverrides({
   }
 
   if (isExplicit('i_seq')) {
-    const urlSequence = getUrlParam('i_seq');
-    if (urlSequence !== undefined && isEnumValue(Sequence, urlSequence)) {
-      overrides.sequence = urlSequence;
+    const urlScenario = getUrlParam('i_seq');
+    if (urlScenario !== undefined && isEnumValue(Scenario, urlScenario)) {
+      overrides.sequence = urlScenario;
     }
   }
 
@@ -337,8 +337,8 @@ export function resolveFilterNavigationOverrides({
 export interface FilterRequest {
   /** The rendered model, after the feature gate. */
   model: Model;
-  selectedSequence: Sequence;
-  sequenceExplicit: boolean;
+  selectedScenario: Scenario;
+  scenarioExplicit: boolean;
   selectedPrecisions: string[];
   precisionExplicit: boolean;
   requestedRunDate: string;
@@ -353,7 +353,7 @@ export interface FilterRequest {
 export function resolveMountedFilterRequest({
   pathname,
   initialModel,
-  initialSequence,
+  initialScenario,
   initialPrecisions,
   initialRunDate,
   initialRunId,
@@ -363,7 +363,7 @@ export function resolveMountedFilterRequest({
 }: {
   pathname: string;
   initialModel?: Model;
-  initialSequence?: Sequence;
+  initialScenario?: Scenario;
   initialPrecisions?: string[];
   initialRunDate?: string;
   initialRunId?: string;
@@ -382,13 +382,13 @@ export function resolveMountedFilterRequest({
   const requestedModel = overrides.model ?? initialRequestedModel(initialModel, pathname);
   return {
     model: visibleSelectedModel(requestedModel, featureGateUnlocked),
-    selectedSequence:
+    selectedScenario:
       overrides.sequence ??
-      initialSelectedSequence(
-        initialSequence,
+      initialSelectedScenario(
+        initialScenario,
         isExplicit('i_seq') ? getUrlParam('i_seq') : undefined,
       ),
-    sequenceExplicit: overrides.sequence !== undefined || initialSequence !== undefined,
+    scenarioExplicit: overrides.sequence !== undefined || initialScenario !== undefined,
     selectedPrecisions:
       overrides.precisions?.selected ??
       (seedPrecisions.length > 0 ? seedPrecisions : [Precision.FP4]),
@@ -406,7 +406,7 @@ export function modelDbKeys(model: string): string[] {
 
 export function resolveAvailableModels(
   availability: AvailabilityIndex | undefined,
-  unofficialAvailable: readonly AvailableModelSequence[],
+  unofficialAvailable: readonly AvailableModelScenario[],
   featureGateUnlocked: boolean,
 ): Model[] {
   const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
@@ -420,44 +420,44 @@ export function resolveAvailableModels(
   return [...registered, ...unregistered];
 }
 
-export function resolveAvailableSequences(
+export function resolveAvailableScenarios(
   modelLines: readonly AvailabilityLine[],
-  unofficialAvailable: readonly AvailableModelSequence[],
+  unofficialAvailable: readonly AvailableModelScenario[],
   selectedModel: Model,
-): Sequence[] {
+): Scenario[] {
   const unofficialSeqs = unofficialAvailable
     .filter((a) => a.model === selectedModel)
-    .map((a) => a.sequence as Sequence);
-  const dbSeqs = modelLines.map((line) => line.sequence).filter((s): s is Sequence => s !== null);
+    .map((a) => a.sequence as Scenario);
+  const dbSeqs = modelLines.map((line) => line.sequence).filter((s): s is Scenario => s !== null);
   const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
-    (s) => !isSequenceHiddenForModel(selectedModel, s),
+    (s) => !isScenarioHiddenForModel(selectedModel, s),
   );
   return merged.length > 0
     ? merged
-    : SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(selectedModel, sequence));
+    : SCENARIO_OPTIONS.filter((scenario) => !isScenarioHiddenForModel(selectedModel, scenario));
 }
 
 export function isAvailabilityLoaded(
   availability: AvailabilityIndex | undefined,
-  unofficialAvailable: readonly AvailableModelSequence[],
+  unofficialAvailable: readonly AvailableModelScenario[],
   selectedModel: Model,
 ): boolean {
   return availability !== undefined || unofficialAvailable.some((a) => a.model === selectedModel);
 }
 
 export function unofficialPrecisionsFor(
-  unofficialAvailable: readonly AvailableModelSequence[],
+  unofficialAvailable: readonly AvailableModelScenario[],
   selectedModel: Model,
-  sequence: Sequence,
+  scenario: Scenario,
 ): string[] {
   return unofficialAvailable
-    .filter((a) => a.model === selectedModel && a.sequence === sequence)
+    .filter((a) => a.model === selectedModel && a.sequence === scenario)
     .flatMap((a) => a.precisions);
 }
 
 export function resolveAvailablePrecisions(
   availability: AvailabilityIndex | undefined,
-  sequenceLines: readonly AvailabilityLine[],
+  scenarioLines: readonly AvailabilityLine[],
   unofficialPrecisions: readonly string[],
 ): string[] {
   if (!availability) {
@@ -465,7 +465,7 @@ export function resolveAvailablePrecisions(
       ? [...new Set(unofficialPrecisions)].toSorted()
       : ['fp4'];
   }
-  const dbPrecs = sequenceLines.map((line) => line.precision);
+  const dbPrecs = scenarioLines.map((line) => line.precision);
   const merged = [...new Set([...dbPrecs, ...unofficialPrecisions])].toSorted();
   return merged.length > 0 ? merged : ['fp4'];
 }
@@ -477,7 +477,7 @@ export function resolveSelectionPrecisions({
   unofficialPrecisions,
   explicit,
   selectedModel,
-  sequence,
+  sequence: scenario,
 }: {
   selectedPrecisions: string[];
   availablePrecisions: string[];
@@ -485,7 +485,7 @@ export function resolveSelectionPrecisions({
   unofficialPrecisions: string[];
   explicit: boolean;
   selectedModel: Model;
-  sequence: Sequence;
+  sequence: Scenario;
 }): string[] {
   return resolveEffectivePrecisions({
     selectedPrecisions,
@@ -493,23 +493,23 @@ export function resolveSelectionPrecisions({
     curveCounts,
     unofficialPrecisions,
     explicit,
-    modelDefaultPrecisions: getModelDefaultPrecisions(selectedModel, sequence),
+    modelDefaultPrecisions: getModelDefaultPrecisions(selectedModel, scenario),
   });
 }
 
 export function resolveAvailableDates(
   availability: AvailabilityIndex | undefined,
-  sequenceLines: readonly AvailabilityLine[],
+  scenarioLines: readonly AvailabilityLine[],
   effectivePrecisions: readonly string[],
 ): string[] {
   if (!availability) return [];
-  const lines = sequenceLines.filter((line) => effectivePrecisions.includes(line.precision));
-  return datesOfLines(availability, lines.length > 0 ? lines : sequenceLines);
+  const lines = scenarioLines.filter((line) => effectivePrecisions.includes(line.precision));
+  return datesOfLines(availability, lines.length > 0 ? lines : scenarioLines);
 }
 
 export interface FilterSelection {
-  effectiveSequence: Sequence;
-  sequenceResolved: boolean;
+  effectiveScenario: Scenario;
+  scenarioResolved: boolean;
   effectivePrecisions: string[];
   availableDates: string[];
   effectiveRunDate: string;
@@ -518,7 +518,7 @@ export interface FilterSelection {
 /** A selection change as the provider's setters apply it. */
 export interface FilterChange {
   model?: Model;
-  sequence?: Sequence;
+  sequence?: Scenario;
   precisions?: string[];
   /** The URL the page moves to along with the change. The new route's selections apply on top. */
   navigation?: { pathname: string; search: string };
@@ -551,8 +551,8 @@ export function applyFilterChange(
   const next: FilterRequest = { ...request };
   if (change.model !== undefined) next.model = change.model;
   if (change.sequence !== undefined) {
-    next.selectedSequence = change.sequence;
-    next.sequenceExplicit = true;
+    next.selectedScenario = change.sequence;
+    next.scenarioExplicit = true;
   }
   if (change.precisions !== undefined) {
     next.selectedPrecisions = change.precisions;
@@ -573,8 +573,8 @@ export function applyFilterChange(
     next.model = visibleSelectedModel(overrides.model, featureGateUnlocked);
   }
   if (overrides.sequence !== undefined) {
-    next.selectedSequence = overrides.sequence;
-    next.sequenceExplicit = true;
+    next.selectedScenario = overrides.sequence;
+    next.scenarioExplicit = true;
   }
   if (overrides.precisions) {
     next.selectedPrecisions = overrides.precisions.selected;
@@ -595,40 +595,40 @@ export function applyFilterChange(
 export function resolveFilterSelection(
   availability: AvailabilityIndex | undefined,
   request: FilterRequest,
-  unofficialAvailable: readonly AvailableModelSequence[] = [],
+  unofficialAvailable: readonly AvailableModelScenario[] = [],
 ): FilterSelection {
   const { model } = request;
   const modelLines = availability ? linesForModels(availability, modelDbKeys(model)) : [];
-  const resolvedSequence = resolveEffectiveSequence({
-    selectedSequence: request.selectedSequence,
-    availableSequences: resolveAvailableSequences(modelLines, unofficialAvailable, model),
+  const resolvedScenario = resolveEffectiveScenario({
+    selectedScenario: request.selectedScenario,
+    availableScenarios: resolveAvailableScenarios(modelLines, unofficialAvailable, model),
     availabilityLoaded: isAvailabilityLoaded(availability, unofficialAvailable, model),
-    sequenceExplicit: request.sequenceExplicit,
+    scenarioExplicit: request.scenarioExplicit,
   });
-  const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
-  const sequenceLines = modelLines.filter((line) => line.sequence === effectiveSequence);
+  const effectiveScenario = resolvedScenario ?? APP_DEFAULT_SCENARIO;
+  const scenarioLines = modelLines.filter((line) => line.sequence === effectiveScenario);
   const unofficialPrecisions = unofficialPrecisionsFor(
     unofficialAvailable,
     model,
-    effectiveSequence,
+    effectiveScenario,
   );
   const effectivePrecisions = resolveSelectionPrecisions({
     selectedPrecisions: request.selectedPrecisions,
     availablePrecisions: resolveAvailablePrecisions(
       availability,
-      sequenceLines,
+      scenarioLines,
       unofficialPrecisions,
     ),
-    curveCounts: countCurvesByPrecision(sequenceLines),
+    curveCounts: countCurvesByPrecision(scenarioLines),
     unofficialPrecisions,
     explicit: request.precisionExplicit,
     selectedModel: model,
-    sequence: effectiveSequence,
+    sequence: effectiveScenario,
   });
-  const availableDates = resolveAvailableDates(availability, sequenceLines, effectivePrecisions);
+  const availableDates = resolveAvailableDates(availability, scenarioLines, effectivePrecisions);
   return {
-    effectiveSequence,
-    sequenceResolved: resolvedSequence !== null,
+    effectiveScenario,
+    scenarioResolved: resolvedScenario !== null,
     effectivePrecisions,
     availableDates,
     effectiveRunDate: resolveEffectiveRunDate(
@@ -642,7 +642,7 @@ export function resolveFilterSelection(
 export function GlobalFilterProvider({
   children,
   initialModel,
-  initialSequence,
+  initialScenario,
   initialPrecisions,
   initialRunDate,
   initialRunId,
@@ -650,7 +650,7 @@ export function GlobalFilterProvider({
 }: {
   children: ReactNode;
   initialModel?: Model;
-  initialSequence?: Sequence;
+  initialScenario?: Scenario;
   initialPrecisions?: string[];
   initialRunDate?: string;
   initialRunId?: string;
@@ -685,18 +685,18 @@ export function GlobalFilterProvider({
     [featureGateUnlocked],
   );
 
-  const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() =>
-    initialSelectedSequence(
-      initialSequence,
+  const [selectedScenario, setSelectedScenarioRaw] = useState<Scenario>(() =>
+    initialSelectedScenario(
+      initialScenario,
       hasExplicitUrlParam('i_seq') ? getUrlParam('i_seq') : undefined,
     ),
   );
-  const [sequenceExplicit, setSequenceExplicit] = useState<boolean>(
-    () => initialSequence !== undefined,
+  const [scenarioExplicit, setScenarioExplicit] = useState<boolean>(
+    () => initialScenario !== undefined,
   );
-  const setSelectedSequence = useCallback((sequence: Sequence) => {
-    setSelectedSequenceRaw(sequence);
-    setSequenceExplicit(true);
+  const setSelectedScenario = useCallback((scenario: Scenario) => {
+    setSelectedScenarioRaw(scenario);
+    setScenarioExplicit(true);
   }, []);
 
   const initialValidPrecisions = useMemo(
@@ -734,7 +734,7 @@ export function GlobalFilterProvider({
       initialChipBasis,
     });
     if (overrides.model !== undefined) setSelectedModel(overrides.model);
-    if (overrides.sequence !== undefined) setSelectedSequence(overrides.sequence);
+    if (overrides.sequence !== undefined) setSelectedScenario(overrides.sequence);
     if (overrides.precisions) {
       setSelectedPrecisionsRaw(overrides.precisions.selected);
       setPrecisionExplicit(overrides.precisions.explicit);
@@ -761,7 +761,7 @@ export function GlobalFilterProvider({
   const retryAvailability = useCallback(() => {
     void refetchAvailability();
   }, [refetchAvailability]);
-  const { availableModelsAndSequences: unofficialAvailable } = useUnofficialRun();
+  const { availableModelsAndScenarios: unofficialAvailable } = useUnofficialRun();
 
   const dbModelKeys = useMemo<string[]>(() => modelDbKeys(selectedModel), [selectedModel]);
 
@@ -789,8 +789,8 @@ export function GlobalFilterProvider({
     }
   }, [unofficialAvailable, selectedModel, featureGateUnlocked]);
 
-  const availableSequences = useMemo(
-    () => resolveAvailableSequences(modelLines, unofficialAvailable, selectedModel),
+  const availableScenarios = useMemo(
+    () => resolveAvailableScenarios(modelLines, unofficialAvailable, selectedModel),
     [modelLines, unofficialAvailable, selectedModel],
   );
 
@@ -799,37 +799,37 @@ export function GlobalFilterProvider({
     [availability, unofficialAvailable, selectedModel],
   );
 
-  const resolvedSequence = useMemo(
+  const resolvedScenario = useMemo(
     () =>
-      resolveEffectiveSequence({
-        selectedSequence,
-        availableSequences,
+      resolveEffectiveScenario({
+        selectedScenario,
+        availableScenarios,
         availabilityLoaded,
-        sequenceExplicit,
+        scenarioExplicit,
       }),
-    [selectedSequence, availableSequences, availabilityLoaded, sequenceExplicit],
+    [selectedScenario, availableScenarios, availabilityLoaded, scenarioExplicit],
   );
-  const sequenceResolved = resolvedSequence !== null;
-  const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
+  const scenarioResolved = resolvedScenario !== null;
+  const effectiveScenario = resolvedScenario ?? APP_DEFAULT_SCENARIO;
 
-  const sequenceLines = useMemo(
-    () => modelLines.filter((line) => line.sequence === effectiveSequence),
-    [modelLines, effectiveSequence],
+  const scenarioLines = useMemo(
+    () => modelLines.filter((line) => line.sequence === effectiveScenario),
+    [modelLines, effectiveScenario],
   );
 
   const unofficialPrecisionsForSelection = useMemo(
-    () => unofficialPrecisionsFor(unofficialAvailable, selectedModel, effectiveSequence),
-    [unofficialAvailable, selectedModel, effectiveSequence],
+    () => unofficialPrecisionsFor(unofficialAvailable, selectedModel, effectiveScenario),
+    [unofficialAvailable, selectedModel, effectiveScenario],
   );
 
   const availablePrecisions = useMemo(
-    () => resolveAvailablePrecisions(availability, sequenceLines, unofficialPrecisionsForSelection),
-    [availability, sequenceLines, unofficialPrecisionsForSelection],
+    () => resolveAvailablePrecisions(availability, scenarioLines, unofficialPrecisionsForSelection),
+    [availability, scenarioLines, unofficialPrecisionsForSelection],
   );
 
   const precisionCurveCounts = useMemo(
-    () => countCurvesByPrecision(sequenceLines),
-    [sequenceLines],
+    () => countCurvesByPrecision(scenarioLines),
+    [scenarioLines],
   );
 
   const effectivePrecisions = useMemo(
@@ -841,7 +841,7 @@ export function GlobalFilterProvider({
         unofficialPrecisions: unofficialPrecisionsForSelection,
         explicit: precisionExplicit,
         selectedModel,
-        sequence: effectiveSequence,
+        sequence: effectiveScenario,
       }),
     [
       selectedPrecisions,
@@ -850,13 +850,13 @@ export function GlobalFilterProvider({
       unofficialPrecisionsForSelection,
       precisionExplicit,
       selectedModel,
-      effectiveSequence,
+      effectiveScenario,
     ],
   );
 
   const availableDates = useMemo(
-    () => resolveAvailableDates(availability, sequenceLines, effectivePrecisions),
-    [availability, sequenceLines, effectivePrecisions],
+    () => resolveAvailableDates(availability, scenarioLines, effectivePrecisions),
+    [availability, scenarioLines, effectivePrecisions],
   );
 
   const setSelectedRunDateManual = useCallback((date: string) => {
@@ -912,7 +912,7 @@ export function GlobalFilterProvider({
       ...getRequestedRunUrlParams(requestedRunDate, requestedRunId),
       g_tco: tcoBasis,
       g_chips: chipBasis,
-      i_seq: sequenceResolved ? effectiveSequence : undefined,
+      i_seq: scenarioResolved ? effectiveScenario : undefined,
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
     // Canonicalizing a bare route and settling non-model filters also rewrite the path, but only a
@@ -928,8 +928,8 @@ export function GlobalFilterProvider({
     requestedRunId,
     tcoBasis,
     chipBasis,
-    effectiveSequence,
-    sequenceResolved,
+    effectiveScenario,
+    scenarioResolved,
     effectivePrecisions,
     precisionExplicit,
     setUrlParams,
@@ -938,22 +938,22 @@ export function GlobalFilterProvider({
   const selectionValue = useMemo<GlobalFilterSelectionContextType>(
     () => ({
       selectedModel,
-      selectedSequence,
+      selectedScenario,
       selectedPrecisions,
       tcoBasis,
       chipBasis,
-      effectiveSequence,
-      sequenceResolved,
+      effectiveScenario,
+      scenarioResolved,
       effectivePrecisions,
     }),
     [
       selectedModel,
-      selectedSequence,
+      selectedScenario,
       selectedPrecisions,
       tcoBasis,
       chipBasis,
-      effectiveSequence,
-      sequenceResolved,
+      effectiveScenario,
+      scenarioResolved,
       effectivePrecisions,
     ],
   );
@@ -961,8 +961,8 @@ export function GlobalFilterProvider({
   const previewInputs = {
     request: {
       model: selectedModel,
-      selectedSequence,
-      sequenceExplicit,
+      selectedScenario,
+      scenarioExplicit,
       selectedPrecisions,
       precisionExplicit,
       requestedRunDate,
@@ -995,7 +995,7 @@ export function GlobalFilterProvider({
       setTcoBasis,
       setChipBasis,
       setSelectedModel: selectModel,
-      setSelectedSequence,
+      setSelectedScenario,
       setSelectedPrecisions,
       setSelectedRunDate: setSelectedRunDateManual,
       setSelectedRunId,
@@ -1003,7 +1003,7 @@ export function GlobalFilterProvider({
     }),
     [
       selectModel,
-      setSelectedSequence,
+      setSelectedScenario,
       setSelectedPrecisions,
       setSelectedRunDateManual,
       setSelectedRunId,
@@ -1024,7 +1024,7 @@ export function GlobalFilterProvider({
   const availabilityValue = useMemo<GlobalFilterAvailabilityContextType>(
     () => ({
       availableModels,
-      availableSequences,
+      availableScenarios,
       availablePrecisions,
       availableDates,
       availability,
@@ -1035,7 +1035,7 @@ export function GlobalFilterProvider({
     }),
     [
       availableModels,
-      availableSequences,
+      availableScenarios,
       availablePrecisions,
       availableDates,
       availability,

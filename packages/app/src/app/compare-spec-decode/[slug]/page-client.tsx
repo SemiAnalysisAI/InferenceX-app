@@ -16,7 +16,7 @@ import {
 } from '@/providers/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import { toModel, toPrecisions, toScenario } from '@/lib/compare/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 import {
@@ -64,7 +64,7 @@ interface CompareSpecDecodePageClientProps {
   slug: string;
   modelLabel: string;
   modelDisplayName: string;
-  defaultSequence: string | null;
+  defaultScenario: string | null;
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
   narrative: string[];
@@ -85,7 +85,7 @@ export default function CompareSpecDecodePageClient({
   slug,
   modelLabel,
   modelDisplayName,
-  defaultSequence,
+  defaultScenario,
   defaultPrecision,
   ssrTableData,
   narrative,
@@ -107,13 +107,13 @@ export default function CompareSpecDecodePageClient({
   }, [slug, gpu, method]);
 
   const initialModel = toModel(modelDisplayName);
-  const initialSequence = toSequence(defaultSequence);
+  const initialScenario = toScenario(defaultScenario);
   const initialPrecisions = toPrecisions(defaultPrecision);
 
   return (
     <GlobalFilterProvider
       initialModel={initialModel}
-      initialSequence={initialSequence}
+      initialScenario={initialScenario}
       initialPrecisions={initialPrecisions}
     >
       <div className="flex flex-col gap-4">
@@ -193,8 +193,8 @@ export default function CompareSpecDecodePageClient({
                         {' '}
                         <span className="text-muted-foreground">
                           {isZh
-                            ? `（以上数据基于此 URL 固定的 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 工作负载；切换序列长度或模型后，表格和图表会同步更新。表格始终使用本页指定的精度，控件中的精度选项只影响图表。）`
-                            : `(Numbers reflect this URL's pinned ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} workload — changing sequence or model updates both the table and chart; the table stays pinned to this page's precision, so precision toggles in the controls affect the chart only.)`}
+                            ? `（以上数据基于此 URL 固定的 ${defaultScenario ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 工作负载；切换序列长度或模型后，表格和图表会同步更新。表格始终使用本页指定的精度，控件中的精度选项只影响图表。）`
+                            : `(Numbers reflect this URL's pinned ${defaultScenario ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} workload — changing sequence or model updates both the table and chart; the table stays pinned to this page's precision, so precision toggles in the controls affect the chart only.)`}
                         </span>
                       </>
                     )}
@@ -226,7 +226,7 @@ export default function CompareSpecDecodePageClient({
             aLabel={isZh ? `启用 ${aLabel}` : aLabel}
             bLabel={isZh ? '关闭投机解码' : bLabel}
             ssrTableData={ssrTableData}
-            ssrSequence={defaultSequence}
+            ssrScenario={defaultScenario}
             ssrModel={initialModel}
             ssrPrecisions={defaultPrecision ? [defaultPrecision] : (initialPrecisions ?? [])}
             emptyStateText={t.emptyState}
@@ -282,7 +282,7 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
-  ssrSequence,
+  ssrScenario,
   ssrModel,
   ssrPrecisions,
   emptyStateText,
@@ -293,25 +293,25 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
-  ssrSequence: string | null;
+  ssrScenario: string | null;
   ssrModel: ReturnType<typeof toModel>;
   ssrPrecisions: string[];
   emptyStateText: string;
 }) {
   const {
-    selectedSequence,
-    effectiveSequence,
+    selectedScenario,
+    effectiveScenario,
     effectivePrecisions,
     selectedModel,
     selectedPrecisions,
-    sequenceResolved,
+    scenarioResolved,
   } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableDates } = useGlobalFilterAvailability();
 
   const { gpuDataByGroupKey, loading, error } = useThroughputData(
     selectedModel,
-    effectiveSequence,
+    effectiveScenario,
     effectivePrecisions,
     selectedRunDate,
   );
@@ -347,12 +347,12 @@ function CompareTableSection({
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      ssrSequence={ssrSequence}
+      ssrScenario={ssrScenario}
       ssrModel={ssrModel}
       ssrPrecisions={ssrPrecisions}
-      selectedSequence={selectedSequence}
-      effectiveSequence={effectiveSequence}
-      sequenceResolved={sequenceResolved}
+      selectedScenario={selectedScenario}
+      effectiveScenario={effectiveScenario}
+      scenarioResolved={scenarioResolved}
       selectedModel={selectedModel}
       selectedPrecisions={pinTablePrecisions(selectedPrecisions, precision)}
       effectivePrecisions={pinTablePrecisions(effectivePrecisions, precision)}

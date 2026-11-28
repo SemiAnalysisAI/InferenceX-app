@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { applyQuickFilters } from '@/components/inference/utils/quickFilters';
 
 import { buildInferenceSeries, type InferenceSeriesOptions } from './series';
@@ -62,7 +62,7 @@ function metrics(overrides: Record<string, number> = {}) {
 }
 
 const BASE_OPTIONS: InferenceSeriesOptions = {
-  sequence: Sequence.EightK_OneK,
+  sequence: Scenario.EightK_OneK,
   percentile: 'p90',
   precisions: ['fp8'],
   metricConfigKey: 'y_tpPerGpu',
@@ -332,7 +332,7 @@ describe('buildInferenceSeries', () => {
     });
     const result = buildInferenceSeries([row], {
       ...BASE_OPTIONS,
-      sequence: Sequence.AgenticTraces,
+      sequence: Scenario.AgenticTraces,
       metricConfigKey: 'y_utilityModeledWatts',
       xmode: 'e2e-normalized-interactivity',
       derivedMetrics: {
@@ -351,7 +351,7 @@ describe('buildInferenceSeries', () => {
     Reflect.deleteProperty(row, 'id');
     const result = buildInferenceSeries([row], {
       ...BASE_OPTIONS,
-      sequence: Sequence.AgenticTraces,
+      sequence: Scenario.AgenticTraces,
       xmode: 'e2e-normalized-interactivity',
       derivedMetrics: {},
     });

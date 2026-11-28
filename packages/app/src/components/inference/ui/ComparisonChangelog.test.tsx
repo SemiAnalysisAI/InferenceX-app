@@ -3,7 +3,7 @@ import { act, createElement, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi, mock } from 'bun:test';
 
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 
 import ComparisonChangelog from './ComparisonChangelog';
 
@@ -16,7 +16,7 @@ const BASE: Props = {
   selectedGPUs: ['h200_sglang'],
   selectedPrecisions: ['fp8'],
   modelDbKeys: ['dsr1'],
-  selectedSequence: Sequence.EightK_OneK,
+  selectedScenario: Scenario.EightK_OneK,
   totalDatesQueried: 0,
   selectedDates: [],
   selectedDateRange: { startDate: '', endDate: '' },

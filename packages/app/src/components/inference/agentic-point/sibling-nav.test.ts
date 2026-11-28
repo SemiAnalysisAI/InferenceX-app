@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { BenchmarkSibling } from '@/hooks/api/use-benchmark-siblings';
+import type { BenchmarkSibling, BenchmarkSku } from '@/hooks/api/use-benchmark-siblings';
 
-import { chipLabel } from './sibling-nav';
+import { chipLabel, skuHeading } from './sibling-nav';
 
 function sibling(overrides: Partial<BenchmarkSibling> = {}): BenchmarkSibling {
   return {
@@ -34,6 +34,34 @@ function sibling(overrides: Partial<BenchmarkSibling> = {}): BenchmarkSibling {
     ...overrides,
   };
 }
+
+describe('skuHeading', () => {
+  const sku: BenchmarkSku = {
+    hardware: 'gb200',
+    framework: 'dynamo-sglang',
+    model: 'kimik3.1',
+    precision: 'fp4',
+    spec_method: 'none',
+    benchmark_type: 'agentic_traces',
+    github_run_id: 1,
+    date: '2026-11-04',
+    dataset_slug: null,
+  };
+
+  it('names the hardware, model and engine as the registries do', () => {
+    expect(skuHeading(sku)).toBe('GB200 NVL72 · Kimi-K3.1-Pro · FP4 · Dynamo SGLang');
+  });
+
+  it('names a point release by its own bucket, not the model it is grouped under', () => {
+    expect(skuHeading({ ...sku, model: 'glm5.3' })).toContain('· GLM-5.3 ·');
+  });
+
+  it('keeps an unregistered model or chip readable', () => {
+    expect(skuHeading({ ...sku, hardware: 'zx9', model: 'newmodel' })).toBe(
+      'ZX9 · newmodel · FP4 · Dynamo SGLang',
+    );
+  });
+});
 
 describe('chipLabel', () => {
   it('shows DWDP group width and count on prefill-only runs', () => {

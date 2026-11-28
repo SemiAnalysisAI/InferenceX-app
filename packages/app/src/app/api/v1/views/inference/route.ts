@@ -42,7 +42,7 @@ import {
   Model,
   Percentile,
   PERCENTILE_OPTIONS,
-  Sequence,
+  Scenario,
 } from '@/lib/catalog/data-mappings';
 import { buildHeadroomRows, HEADROOM_INTERACTIVITIES } from '@/lib/power/headroom';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
@@ -78,7 +78,7 @@ import {
 } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
-import { HW_REGISTRY, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, rowToScenario } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
@@ -127,7 +127,7 @@ const XMETRIC_VALUES = ['median_ttft', 'p75_ttft', 'p90_ttft', 'p95_ttft', 'p99_
 interface InferenceViewParams {
   readonly model: string;
   readonly dbModelKeys: readonly string[];
-  readonly sequence: Sequence;
+  readonly sequence: Scenario;
   readonly precisions: readonly string[];
   readonly precisionsExplicit: boolean;
   readonly metric: string;
@@ -175,7 +175,7 @@ function buildView(
 ): InferenceViewData {
   // Precision auto-resolution runs against the sequence-scoped rows, exactly
   // like the dashboard's densest-precision default.
-  const seqRows = rows.filter((row) => rowToSequence(row) === params.sequence);
+  const seqRows = rows.filter((row) => rowToScenario(row) === params.sequence);
   const availablePrecisions = [...new Set(seqRows.map((row) => row.precision))].toSorted();
   const resolvedPrecisions = resolveEffectivePrecisions({
     selectedPrecisions: [...params.precisions],
@@ -315,7 +315,7 @@ export function GET(request: NextRequest) {
     const search = request.nextUrl.searchParams;
 
     const { displayName, dbModelKeys } = resolveModelParam(search.get('model'));
-    const sequence = parseSequenceParam(search.get('sequence'), Sequence.EightK_OneK);
+    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
     const precisions = parsePrecisionsParam(search.get('precisions'));
     const metric = parseMetricParam(search.get('metric'));
     const requestedXMode = parseEnumParam<XAxisMode>(
@@ -327,7 +327,7 @@ export function GET(request: NextRequest) {
     // The trace-derived mode has no server-side data source; resolve it to the
     // interactivity chart (the dashboard applies the same fallback on fixed-seq).
     const xmode: SeriesXMode =
-      requestedXMode === 'e2e-normalized-interactivity' && sequence !== Sequence.AgenticTraces
+      requestedXMode === 'e2e-normalized-interactivity' && scenario !== Scenario.AgenticTraces
         ? 'interactivity'
         : requestedXMode;
     const xstat = parseEnumParam(search.get('xstat'), 'xstat', ['mean', 'median'], 'median');
@@ -352,7 +352,7 @@ export function GET(request: NextRequest) {
     const best = parseBoolParam(
       search.get('best'),
       'best',
-      !isBestPerSkuDefaultOff(displayName as Model, sequence),
+      !isBestPerSkuDefaultOff(displayName as Model, scenario),
     );
     const format = parseFormatParam(search.get('format'));
     const serviceCompare = parseBoolParam(search.get('serviceCompare'), 'serviceCompare', false);
@@ -404,7 +404,7 @@ export function GET(request: NextRequest) {
     const params: InferenceViewParams = {
       model: displayName,
       dbModelKeys,
-      sequence,
+      sequence: scenario,
       precisions,
       precisionsExplicit: precisions.length > 0,
       metric,
@@ -433,7 +433,7 @@ export function GET(request: NextRequest) {
 
     async function project(rows: BenchmarkRow[], scope: InferenceViewParams) {
       let metrics: DerivedAgenticMetricMap | undefined;
-      if (sequence === Sequence.AgenticTraces && xmode === 'e2e-normalized-interactivity') {
+      if (scenario === Scenario.AgenticTraces && xmode === 'e2e-normalized-interactivity') {
         metrics = {};
         const ids = [
           ...new Set(rows.map((row) => row.id).filter((id) => Number.isSafeInteger(id) && id > 0)),
@@ -464,7 +464,7 @@ export function GET(request: NextRequest) {
       dates.length === 0 &&
       !search.has('unofficialrun') &&
       displayName === VR_DEFAULT_RUN.model &&
-      sequence === VR_DEFAULT_RUN.sequence &&
+      scenario === VR_DEFAULT_RUN.sequence &&
       VR_DEFAULT_RUN.enabled &&
       !FIXTURES_MODE
     )
@@ -525,7 +525,7 @@ export function GET(request: NextRequest) {
               comparator: serviceComparator,
               // The dashboard reads streaming speed at the selected statistic.
               interactivityField: resolveServiceField('median_intvty', {
-                isAgentic: sequence === Sequence.AgenticTraces,
+                isAgentic: scenario === Scenario.AgenticTraces,
                 percentile,
                 fixedSequenceStatistic: xstat,
               }),
@@ -589,11 +589,11 @@ export function GET(request: NextRequest) {
 
     const resolvedParams = {
       model: displayName,
-      sequence: sequence as string,
+      sequence: scenario as string,
       precisions: data.resolvedPrecisions,
       metric,
       xmode,
-      xstat: sequence === Sequence.AgenticTraces ? null : xstat,
+      xstat: scenario === Scenario.AgenticTraces ? null : xstat,
       xmetric,
       percentile,
       date: date ?? null,

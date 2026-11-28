@@ -17,20 +17,20 @@ export function resolveBenchmarkSeed({
   scope,
   seedRows,
   seedModel,
-  seedSequence,
+  seedScenario,
   selectedModel,
-  selectedSequence,
+  selectedScenario,
 }: {
   scope?: string;
   seedRows?: BenchmarkRow[];
   seedModel?: string;
-  seedSequence?: string;
+  seedScenario?: string;
   selectedModel: string;
-  selectedSequence: string;
+  selectedScenario: string;
 }): BenchmarkSeed {
   if (!seedRows) return { scope };
   const covers =
-    selectedModel === seedModel && (!seedSequence || selectedSequence === seedSequence);
+    selectedModel === seedModel && (!seedScenario || selectedScenario === seedScenario);
   if (!covers) return {};
-  return { rows: seedRows, scope: seedSequence ? `${scope}:${seedSequence}` : scope };
+  return { rows: seedRows, scope: seedScenario ? `${scope}:${seedScenario}` : scope };
 }

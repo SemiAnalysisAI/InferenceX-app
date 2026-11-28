@@ -8,7 +8,7 @@ import {
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
-import { GPU_KEYS, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { GPU_KEYS, scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { cachedJson } from '@/lib/cache/api-cache';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
@@ -21,7 +21,7 @@ import {
   type CompareModelSlug,
 } from '@/lib/compare/compare-slug';
 import { computeCompareStat } from '@/lib/compare/compare-ssr';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import {
   buildCompareTable,
   buildPrecisionBreakdown,
@@ -136,8 +136,8 @@ export function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const { modelEntry, a, b } = resolvePair(searchParams);
     const scenarioParam = searchParams.get('scenario');
-    const requestedSequence = scenarioParam
-      ? parseSequenceParam(scenarioParam, Sequence.EightK_OneK, 'scenario')
+    const requestedScenario = scenarioParam
+      ? parseSequenceParam(scenarioParam, Scenario.EightK_OneK, 'scenario')
       : null;
     const variant = parseEnumParam(
       searchParams.get('variant'),
@@ -148,14 +148,14 @@ export function GET(request: NextRequest) {
     const customTiers = parseTiersParam(searchParams.get('tiers'));
     const format = parseFormatParam(searchParams.get('format'));
 
-    const fallbackSequence = comparisonScenarioForModel(modelEntry).sequence;
+    const fallbackScenario = comparisonScenarioForModel(modelEntry).sequence;
     const derived = await getComparePageDerivedData(
       modelEntry.dbKeys,
       a,
       b,
-      requestedSequence,
+      requestedScenario,
       null,
-      fallbackSequence,
+      fallbackScenario,
     );
     const rows = derived.initialPairBenchmarkRows;
 
@@ -189,7 +189,7 @@ export function GET(request: NextRequest) {
       summary.byPrecision = buildPrecisionBreakdown(rows, a, b, derived.sequence);
     }
     if (variant === 'spec-decode') {
-      const islOsl = derived.sequence ? sequenceToIslOsl(derived.sequence) : null;
+      const islOsl = derived.sequence ? scenarioToIslOsl(derived.sequence) : null;
       summary.bySpecDecode =
         islOsl && derived.precision
           ? buildSpecDecodeBreakdown(
@@ -212,7 +212,7 @@ export function GET(request: NextRequest) {
         slug: canonicalCompareSlug(modelEntry.slug, a, b),
         model: modelEntry.displayName,
         gpus: [a, b],
-        scenario: requestedSequence ?? 'auto',
+        scenario: requestedScenario ?? 'auto',
         variant,
         tiers: customTiers ?? 'default',
         format,

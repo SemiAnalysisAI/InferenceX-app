@@ -11,7 +11,7 @@ import type {
 } from '@/components/inference/types';
 import { useTrendHistory } from '@/hooks/api/use-trend-history';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
-import type { Model, Sequence } from '@/lib/catalog/data-mappings';
+import type { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 import {
   buildTrendCurves,
@@ -29,7 +29,7 @@ export {
 
 interface UseInterpolatedTrendDataParams {
   selectedModel: Model;
-  selectedSequence: Sequence;
+  selectedScenario: Scenario;
   selectedPrecisions: string[];
   selectedYAxisMetric: string;
   targetInteractivity: number;
@@ -51,7 +51,7 @@ interface UseInterpolatedTrendDataResult {
 
 export function useInterpolatedTrendData({
   selectedModel,
-  selectedSequence,
+  selectedScenario,
   selectedPrecisions,
   selectedYAxisMetric,
   targetInteractivity,
@@ -65,7 +65,7 @@ export function useInterpolatedTrendData({
     isLoading,
     error,
     refetch,
-  } = useTrendHistory(enabled ? selectedModel : '', selectedSequence);
+  } = useTrendHistory(enabled ? selectedModel : '', selectedScenario);
   const trendMetricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
   const requestedMetrics = useMemo(() => trendMetricDependencies(trendMetricKey), [trendMetricKey]);
 

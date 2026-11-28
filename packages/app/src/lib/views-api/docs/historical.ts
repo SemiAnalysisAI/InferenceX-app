@@ -1,3 +1,5 @@
+import { SCENARIO_KEYS } from '@semianalysisai/inferencex-constants';
+
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
 import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-base';
 import {
@@ -10,6 +12,7 @@ import {
   arraySchema,
   listParam,
 } from '@/lib/api/api-documentation-helpers';
+import { VENDOR_VALUES } from '@/lib/views-api/params';
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
@@ -69,7 +72,7 @@ const parameters: readonly ApiParameter[] = [
     ),
     schema: {
       type: 'string',
-      enum: ['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'],
+      enum: SCENARIO_KEYS,
       default: '8k/1k',
     },
     example: 'agentic-traces',
@@ -118,10 +121,12 @@ const parameters: readonly ApiParameter[] = [
     ),
     'h200,mi355x',
   ),
-  listParam('vendors', text('Comma-separated GPU vendors.', '逗号分隔的 GPU 厂商。'), 'AMD', [
+  listParam(
+    'vendors',
+    text('Comma-separated GPU vendors.', '逗号分隔的 GPU 厂商。'),
     'AMD',
-    'NVIDIA',
-  ]),
+    VENDOR_VALUES,
+  ),
   listParam(
     'frameworks',
     text('Comma-separated framework families.', '逗号分隔的推理框架系列。'),

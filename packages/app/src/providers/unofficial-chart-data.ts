@@ -1,4 +1,4 @@
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToScenario } from '@semianalysisai/inferencex-constants';
 
 import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
 import chartDefinitions from '@/components/inference/metric-registry';
@@ -24,7 +24,7 @@ export function buildChartData(
   const groups = new Map<string, BenchmarkRow[]>();
   for (const row of benchmarks) {
     const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-    const sequence = rowToSequence(row);
+    const sequence = rowToScenario(row);
     if (!sequence) continue;
     const key = `${displayModel}_${sequence}`;
     if (!groups.has(key)) groups.set(key, []);

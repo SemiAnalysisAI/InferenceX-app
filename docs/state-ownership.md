@@ -74,7 +74,7 @@ and returned benchmark data are unchanged.
 
 Availability owns explicit settled and error states. Consumers must distinguish an
 unresolved request from a settled empty result. Inference fetches are gated on
-`sequenceResolved` and render `availabilityError` rather than an indefinite skeleton.
+`scenarioResolved` and render `availabilityError` rather than an indefinite skeleton.
 
 The availability domain publishes the decoded `AvailabilityIndex` (`availability`), not
 raw rows. Consumers filter its lines with `linesForModels` and read dates with
@@ -82,7 +82,7 @@ raw rows. Consumers filter its lines with `linesForModels` and read dates with
 
 **Why here, not InferenceProvider**: Model, sequence, and precision are cross-tab. EvaluationContext consumes `selectedModel` and `availableModels` directly. If these lived in InferenceProvider, EvaluationProvider would need an indirect coupling or duplicate state.
 
-**"Effective" values and auto-correction**: When a previously valid user selection becomes invalid after a model or sequence change, `effectiveSequence` / `effectivePrecisions` silently switch to the nearest valid option. Components always consume `effectiveSequence` / `effectivePrecisions`, never `selectedSequence` / `selectedPrecisions` directly. This prevents empty-chart states on filter transitions.
+**"Effective" values and auto-correction**: When a previously valid user selection becomes invalid after a model or scenario change, `effectiveScenario` / `effectivePrecisions` silently switch to the nearest valid option. Components always consume `effectiveScenario` / `effectivePrecisions`, never `selectedScenario` / `selectedPrecisions` directly. This prevents empty-chart states on filter transitions.
 
 ---
 

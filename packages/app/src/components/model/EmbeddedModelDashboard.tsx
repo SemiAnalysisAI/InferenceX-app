@@ -5,7 +5,7 @@ import { GlobalFilterProvider } from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { EphemeralUrlStateContext } from '@/hooks/useUrlState';
-import { toModel, toSequence } from '@/lib/compare/compare-enum-coerce';
+import { toModel, toScenario } from '@/lib/compare/compare-enum-coerce';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
 export default function EmbeddedModelDashboard({
@@ -29,7 +29,7 @@ export default function EmbeddedModelDashboard({
     <EphemeralUrlStateContext.Provider value={true}>
       <GlobalFilterProvider
         initialModel={toModel(displayName)}
-        initialSequence={toSequence(sequence)}
+        initialScenario={toScenario(sequence)}
         initialChipBasis={chipBasis}
       >
         <InferenceProvider

@@ -42,8 +42,8 @@ import { exportToCsv } from '@/lib/export/csv-export';
 import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/catalog/constants';
 import {
   getModelLabel,
-  getSequenceLabel,
-  Sequence,
+  getScenarioLabel,
+  Scenario,
   type Model,
   type Percentile,
 } from '@/lib/catalog/data-mappings';
@@ -81,7 +81,7 @@ interface FleetLifecycleProps {
   mode: CalculatorMode;
   visibleHwKeys: Set<string>;
   selectedModel: Model;
-  selectedSequence: Sequence;
+  selectedScenario: Scenario;
   selectedPrecisions: string[];
   selectedPercentile?: Percentile;
   mwInput: string;
@@ -470,7 +470,7 @@ export default function FleetLifecycle({
   mode,
   visibleHwKeys,
   selectedModel,
-  selectedSequence,
+  selectedScenario,
   selectedPrecisions,
   selectedPercentile,
   mwInput,
@@ -485,7 +485,7 @@ export default function FleetLifecycle({
   const historical = useHistoricalBest({
     tcoBasis,
     model: selectedModel,
-    sequence: selectedSequence,
+    sequence: selectedScenario,
     precisions: selectedPrecisions,
     targetValue,
     mode,
@@ -507,7 +507,7 @@ export default function FleetLifecycle({
   const [cacheInput, setCacheInput] = useState(
     () => readUrlParams().c_cache ?? String(DEFAULTS.cachedInputPct),
   );
-  const isAgentic = selectedSequence === Sequence.AgenticTraces;
+  const isAgentic = selectedScenario === Scenario.AgenticTraces;
   const cacheReadRatio = isAgentic
     ? Math.min(1, (parseNonNegative(cacheInput) ?? DEFAULTS.cachedInputPct) / 100)
     : 1;
@@ -896,7 +896,7 @@ export default function FleetLifecycle({
         {t.title}
       </Heading>
       <p className="text-sm text-muted-foreground mb-2">
-        {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)} ·{' '}
+        {getModelLabel(selectedModel)} · {getScenarioLabel(selectedScenario, locale)} ·{' '}
         {t.captionTarget(targetValue)}
         {mw ? ` · ${mw} MW` : ''}
       </p>
@@ -1232,7 +1232,7 @@ export default function FleetLifecycle({
               analyticsPrefix="calculator_lifecycle"
               analyticsContext={selectionAnalyticsContext({
                 model: selectedModel,
-                sequence: selectedSequence,
+                sequence: selectedScenario,
                 precisions: selectedPrecisions,
                 gpuCount: visibleHwKeys.size,
               })}

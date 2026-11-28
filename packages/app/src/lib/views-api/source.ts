@@ -10,7 +10,7 @@ import {
 import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import { isUnofficialRunUnavailableCode } from '@/lib/api/unofficial-run-unavailable';
-import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario } from '@/lib/catalog/data-mappings';
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { NextRequest } from 'next/server';
 import { ViewsApiParamError, ViewsUpstreamError } from './errors';
@@ -51,9 +51,9 @@ export function readResponse<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function selection(search: URLSearchParams, fallback = Sequence.AgenticTraces) {
+export function selection(search: URLSearchParams, fallback = Scenario.AgenticTraces) {
   const { displayName: model } = resolveModelParam(search.get('model'));
-  const sequence = parseSequenceParam(search.get('sequence'), fallback);
+  const scenario = parseSequenceParam(search.get('sequence'), fallback);
   const date = parseDateParam(search.get('date'), 'date');
   const runId = parseRunIdParam(search.get('runId'));
   const percentile = parseEnumParam(
@@ -65,7 +65,7 @@ export function selection(search: URLSearchParams, fallback = Sequence.AgenticTr
   const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
   const precisions = parsePrecisionsParam(search.get('precisions'));
   const gpus = parseFreeListParam(search.get('gpus'));
-  return { model, sequence, date, runId, percentile, tcoBasis, precisions, gpus };
+  return { model, sequence: scenario, date, runId, percentile, tcoBasis, precisions, gpus };
 }
 export type ViewSelection = Omit<ReturnType<typeof selection>, 'precisions'> & {
   precisions: string[];

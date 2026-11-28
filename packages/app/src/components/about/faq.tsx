@@ -1,14 +1,15 @@
 import {
-  DB_MODEL_TO_DISPLAY,
+  DB_MODEL_RELEASE_NAMES,
   FRAMEWORK_LABELS,
   GPU_KEYS,
   GPU_VENDORS,
   HW_REGISTRY,
-  PRECISION_KEYS,
+  MODEL_REGISTRY,
+  PRECISION_REGISTRY,
 } from '@semianalysisai/inferencex-constants';
 
 import { CAROUSEL_LABELS, CAROUSEL_ORGS } from '@/components/quotes/quotes-data';
-import { isModelVisible } from '@/lib/catalog/data-mappings';
+import { isModelVisible, MODEL_OPTIONS } from '@/lib/catalog/data-mappings';
 import {
   ARTICLE_H2_CLASS,
   READING_LINK_CLASS,
@@ -39,22 +40,13 @@ const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((groups, key
 
 export const GENERATED_FAQ_DATA = {
   gpuGroups: Object.entries(gpusByVendor).map(([vendor, gpus]) => `${vendor}: ${gpus.join(', ')}`),
-  // Several DB keys share one display name (glm5.2 and glm5.3 both show as GLM-5.2), so dedupe.
-  modelNames: [
-    ...new Set(
-      Object.values({
-        ...DB_MODEL_TO_DISPLAY,
-        'kimik2.6': 'Kimi-K2.6',
-        'kimik2.7-code': 'Kimi-K2.7-Code',
-        'minimaxm2.7': 'MiniMax-M2.7',
-        'glm5.1': 'GLM-5.1',
-      }),
-    ),
-  ].filter((model) => isModelVisible(model)),
+  modelNames: MODEL_OPTIONS.filter((model) => isModelVisible(model)).flatMap((model) =>
+    MODEL_REGISTRY[model].dbKeys.map((dbKey) => DB_MODEL_RELEASE_NAMES[dbKey]),
+  ),
   frameworkNames: [...new Set(Object.values(FRAMEWORK_LABELS))].map((name) =>
     name.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
   ),
-  precisionNames: [...PRECISION_KEYS].map((precision) => precision.toUpperCase()),
+  precisionNames: Object.values(PRECISION_REGISTRY).map((precision) => precision.label),
   supporterOrgs: CAROUSEL_ORGS.map((org) => CAROUSEL_LABELS[org] ?? org),
 } as const;
 

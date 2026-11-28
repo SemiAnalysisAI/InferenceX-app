@@ -74,13 +74,13 @@ describe('benchmarkQueryOptions', () => {
       type: 'calculator',
       sequence: '1k/1k',
     });
-    const otherSequence = benchmarkQueryOptions('m', '2026-03-01', true, false, undefined, false, {
+    const otherScenario = benchmarkQueryOptions('m', '2026-03-01', true, false, undefined, false, {
       type: 'calculator',
       sequence: '8k/1k',
     });
 
     expect(calculator.queryKey).not.toEqual(raw.queryKey);
-    expect(calculator.queryKey).not.toEqual(otherSequence.queryKey);
+    expect(calculator.queryKey).not.toEqual(otherScenario.queryKey);
   });
 
   it('seeds only the matching initial calculator query', () => {

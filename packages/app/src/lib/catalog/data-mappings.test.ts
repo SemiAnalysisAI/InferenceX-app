@@ -1,31 +1,31 @@
 import { describe, it, expect } from 'bun:test';
 
 import {
-  getModelAndSequence,
-  getModelAndSequenceFromArtifact,
+  getModelAndScenario,
+  getModelAndScenarioFromArtifact,
   getModelLabel,
   getOpenRouterModelId,
   MODEL_OPTIONS,
-  SEQUENCE_OPTIONS,
+  SCENARIO_OPTIONS,
   getModelExclusion,
-  getSequenceDefaultExclusionGroup,
-  getSequenceExclusion,
-  getSequenceExclusionFamilies,
-  getSequenceExclusionPolicy,
-  getSequenceLabel,
+  getScenarioDefaultExclusionGroup,
+  getScenarioExclusion,
+  getScenarioExclusionFamilies,
+  getScenarioExclusionPolicy,
+  getScenarioLabel,
   getPrecisionLabel,
   getEvalBenchmarkLabel,
   isModelDeprecated,
   isModelMaintenance,
   isModelDefault,
-  isSequenceDeprecated,
-  isSequenceDeprecatedForModel,
-  isSequenceHiddenForModel,
-  getSequenceCategoryForModel,
+  isScenarioDeprecated,
+  isScenarioDeprecatedForModel,
+  isScenarioHiddenForModel,
+  getScenarioCategoryForModel,
   isBestPerSkuDefaultOff,
   showsTcoBasisSelector,
   Model,
-  Sequence,
+  Scenario,
   Precision,
   EvalBenchmark,
 } from '@/lib/catalog/data-mappings';
@@ -63,155 +63,165 @@ describe('model selector ordering', () => {
   });
 });
 
-describe('getModelAndSequence', () => {
+describe('getModelAndScenario', () => {
   it('recognizes the GLM Flash fixed-sequence overlay without using the non-Flash bucket', () => {
-    expect(getModelAndSequence('bmk_glm5.3flash_8k1k_fp8_sglang')).toEqual({
+    expect(getModelAndScenario('bmk_glm5.3flash_8k1k_fp8_sglang')).toEqual({
       model: Model.GLM_5_3_Flash,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
     });
   });
 
   it.each(['fp8', 'fp4', 'nvfp4'])(
     'keeps Flash %s artifacts out of the older GLM buckets',
     (precision) => {
-      expect(getModelAndSequence(`bmk_glm5.3flash_agentic_${precision}_sglang`)).toEqual({
+      expect(getModelAndScenario(`bmk_glm5.3flash_agentic_${precision}_sglang`)).toEqual({
         model: Model.GLM_5_3_Flash,
-        sequence: Sequence.AgenticTraces,
+        sequence: Scenario.AgenticTraces,
       });
     },
   );
 
   it('parses artifact name with 70b model and 1k1k sequence', () => {
-    const result = getModelAndSequence('results_70b_1k1k_fp8');
-    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_OneK });
+    const result = getModelAndScenario('results_70b_1k1k_fp8');
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Scenario.OneK_OneK });
   });
 
   it('parses artifact name with 70b model and 1k8k sequence', () => {
-    const result = getModelAndSequence('results_70b_1k8k');
-    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_EightK });
+    const result = getModelAndScenario('results_70b_1k8k');
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Scenario.OneK_EightK });
   });
 
   it('parses artifact name with 70b model and 8k1k sequence', () => {
-    const result = getModelAndSequence('results_70b_8k1k');
-    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.EightK_OneK });
+    const result = getModelAndScenario('results_70b_8k1k');
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Scenario.EightK_OneK });
   });
 
   it('parses artifact name with dsr1 model prefix', () => {
-    const result = getModelAndSequence('results_dsr1_1k1k');
-    expect(result).toEqual({ model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK });
+    const result = getModelAndScenario('results_dsr1_1k1k');
+    expect(result).toEqual({ model: Model.DeepSeek_R1, sequence: Scenario.OneK_OneK });
   });
 
   it('parses artifact name with gptoss model prefix', () => {
-    const result = getModelAndSequence('results_gptoss_1k8k');
-    expect(result).toEqual({ model: Model.GptOss, sequence: Sequence.OneK_EightK });
+    const result = getModelAndScenario('results_gptoss_1k8k');
+    expect(result).toEqual({ model: Model.GptOss, sequence: Scenario.OneK_EightK });
+  });
+
+  it('parses an ingest prefix alias as the model its bucket belongs to', () => {
+    expect(getModelAndScenario('results_kimik2.7_8k1k')).toEqual({
+      model: Model.Kimi_K2_5,
+      sequence: Scenario.EightK_OneK,
+    });
+    expect(
+      getModelAndScenarioFromArtifact({ infmax_model_prefix: 'dsv4pro', isl: 8192, osl: 1024 }),
+    ).toEqual({ model: Model.DeepSeek_V4_Pro, sequence: Scenario.EightK_OneK });
   });
 
   it('parses artifact name with qwen3.5 model prefix', () => {
-    const result = getModelAndSequence('results_qwen3.5_8k1k');
-    expect(result).toEqual({ model: Model.Qwen3_5, sequence: Sequence.EightK_OneK });
+    const result = getModelAndScenario('results_qwen3.5_8k1k');
+    expect(result).toEqual({ model: Model.Qwen3_5, sequence: Scenario.EightK_OneK });
   });
 
   it('parses artifact name with kimik2.5 model prefix', () => {
-    const result = getModelAndSequence('results_kimik2.5_1k1k');
-    expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
+    const result = getModelAndScenario('results_kimik2.5_1k1k');
+    expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Scenario.OneK_OneK });
   });
 
   it('keeps kimik3.1 artifacts out of the kimik3 bucket', () => {
     expect(
-      getModelAndSequence(
+      getModelAndScenario(
         'bmk_agentic_kimik3.1_tp8_conc16_kvdram-hicache_spec-draft_model_fp4_sglang',
       ),
-    ).toEqual({ model: Model.Kimi_K3_1_Pro, sequence: Sequence.AgenticTraces });
-    expect(getModelAndSequence('bmk_agentic_kimik3_tp8_conc16_fp4_vllm')).toEqual({
+    ).toEqual({ model: Model.Kimi_K3_1_Pro, sequence: Scenario.AgenticTraces });
+    expect(getModelAndScenario('bmk_agentic_kimik3_tp8_conc16_fp4_vllm')).toEqual({
       model: Model.Kimi_K3,
-      sequence: Sequence.AgenticTraces,
+      sequence: Scenario.AgenticTraces,
     });
   });
 
   it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
-    const result = getModelAndSequence('results_glm5.2_1k1k');
-    expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+    const result = getModelAndScenario('results_glm5.2_1k1k');
+    expect(result).toEqual({ model: Model.GLM_5_2, sequence: Scenario.OneK_OneK });
   });
 
   it.each(['glm5.2', 'glm5.3'])('recognizes the %s alias in unofficial artifacts', (prefix) => {
-    expect(getModelAndSequence(`results_${prefix}_1k1k`)).toEqual({
+    expect(getModelAndScenario(`results_${prefix}_1k1k`)).toEqual({
       model: Model.GLM_5_2,
-      sequence: Sequence.OneK_OneK,
+      sequence: Scenario.OneK_OneK,
     });
     expect(
-      getModelAndSequenceFromArtifact({ infmax_model_prefix: prefix, isl: 1024, osl: 1024 }),
-    ).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+      getModelAndScenarioFromArtifact({ infmax_model_prefix: prefix, isl: 1024, osl: 1024 }),
+    ).toEqual({ model: Model.GLM_5_2, sequence: Scenario.OneK_OneK });
   });
 
   it('returns undefined for unrecognized model prefix', () => {
-    expect(getModelAndSequence('results_unknown_1k1k')).toBeUndefined();
+    expect(getModelAndScenario('results_unknown_1k1k')).toBeUndefined();
   });
 
   it('returns undefined for recognized model but no sequence', () => {
-    expect(getModelAndSequence('results_70b_nosequence')).toBeUndefined();
+    expect(getModelAndScenario('results_70b_nosequence')).toBeUndefined();
   });
 
   it('returns undefined for recognized sequence but no model', () => {
-    expect(getModelAndSequence('results_1k1k')).toBeUndefined();
+    expect(getModelAndScenario('results_1k1k')).toBeUndefined();
   });
 
   it('returns undefined for empty string', () => {
-    expect(getModelAndSequence('')).toBeUndefined();
+    expect(getModelAndScenario('')).toBeUndefined();
   });
 
   it('returns undefined for completely unrelated string', () => {
-    expect(getModelAndSequence('foo_bar_baz')).toBeUndefined();
+    expect(getModelAndScenario('foo_bar_baz')).toBeUndefined();
   });
 });
 
-describe('getModelAndSequenceFromArtifact', () => {
+describe('getModelAndScenarioFromArtifact', () => {
   it('parses structured artifact with dsr1 prefix and 1k/1k ISL/OSL', () => {
-    const result = getModelAndSequenceFromArtifact({
+    const result = getModelAndScenarioFromArtifact({
       infmax_model_prefix: 'dsr1',
       isl: 1024,
       osl: 1024,
     });
-    expect(result).toEqual({ model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK });
+    expect(result).toEqual({ model: Model.DeepSeek_R1, sequence: Scenario.OneK_OneK });
   });
 
   it('parses structured artifact with 70b prefix and 1k/8k ISL/OSL', () => {
-    const result = getModelAndSequenceFromArtifact({
+    const result = getModelAndScenarioFromArtifact({
       infmax_model_prefix: '70b',
       isl: 1024,
       osl: 8192,
     });
-    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_EightK });
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Scenario.OneK_EightK });
   });
 
   it('parses structured artifact with gptoss prefix and 8k/1k ISL/OSL', () => {
-    const result = getModelAndSequenceFromArtifact({
+    const result = getModelAndScenarioFromArtifact({
       infmax_model_prefix: 'gptoss',
       isl: 8192,
       osl: 1024,
     });
-    expect(result).toEqual({ model: Model.GptOss, sequence: Sequence.EightK_OneK });
+    expect(result).toEqual({ model: Model.GptOss, sequence: Scenario.EightK_OneK });
   });
 
   it('parses structured artifact with qwen3.5 prefix', () => {
-    const result = getModelAndSequenceFromArtifact({
+    const result = getModelAndScenarioFromArtifact({
       infmax_model_prefix: 'qwen3.5',
       isl: 1024,
       osl: 1024,
     });
-    expect(result).toEqual({ model: Model.Qwen3_5, sequence: Sequence.OneK_OneK });
+    expect(result).toEqual({ model: Model.Qwen3_5, sequence: Scenario.OneK_OneK });
   });
 
   it('parses structured artifact with kimik2.5 prefix', () => {
-    const result = getModelAndSequenceFromArtifact({
+    const result = getModelAndScenarioFromArtifact({
       infmax_model_prefix: 'kimik2.5',
       isl: 8192,
       osl: 1024,
     });
-    expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.EightK_OneK });
+    expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Scenario.EightK_OneK });
   });
 
   it('returns undefined for unknown model prefix', () => {
-    const result = getModelAndSequenceFromArtifact({
+    const result = getModelAndScenarioFromArtifact({
       infmax_model_prefix: 'unknown',
       isl: 1024,
       osl: 1024,
@@ -220,7 +230,7 @@ describe('getModelAndSequenceFromArtifact', () => {
   });
 
   it('returns undefined for unknown ISL/OSL combination (8k/8k)', () => {
-    const result = getModelAndSequenceFromArtifact({
+    const result = getModelAndScenarioFromArtifact({
       infmax_model_prefix: 'dsr1',
       isl: 8192,
       osl: 8192,
@@ -285,65 +295,65 @@ describe('isModelMaintenance', () => {
   });
 });
 
-describe('isSequenceDeprecated', () => {
+describe('isScenarioDeprecated', () => {
   it('returns true for deprecated sequence OneK_EightK', () => {
-    expect(isSequenceDeprecated(Sequence.OneK_EightK)).toBe(true);
+    expect(isScenarioDeprecated(Scenario.OneK_EightK)).toBe(true);
   });
 
   it('returns true for deprecated sequence OneK_OneK', () => {
-    expect(isSequenceDeprecated(Sequence.OneK_OneK)).toBe(true);
+    expect(isScenarioDeprecated(Scenario.OneK_OneK)).toBe(true);
   });
 
   it('returns false for non-deprecated sequence EightK_OneK', () => {
-    expect(isSequenceDeprecated(Sequence.EightK_OneK)).toBe(false);
+    expect(isScenarioDeprecated(Scenario.EightK_OneK)).toBe(false);
   });
 });
 
-describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
+describe('isScenarioDeprecatedForModel / getScenarioCategoryForModel', () => {
   it('marks 8K/1K deprecated for MiniMax M3 (retired 2026-08-04, InferenceX#2493)', () => {
-    expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(true);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.MiniMax_M3)).toBe('deprecated');
+    expect(isScenarioDeprecatedForModel(Model.MiniMax_M3, Scenario.EightK_OneK)).toBe(true);
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK, Model.MiniMax_M3)).toBe('deprecated');
   });
 
   it('marks 8K/1K deprecated for DeepSeek V4 Pro (last sweep 2026-09-08, InferenceX#2728)', () => {
-    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(true);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_V4_Pro)).toBe(
+    expect(isScenarioDeprecatedForModel(Model.DeepSeek_V4_Pro, Scenario.EightK_OneK)).toBe(true);
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK, Model.DeepSeek_V4_Pro)).toBe(
       'deprecated',
     );
   });
 
   it('deprecates Qwen3.5 8K/1K without hiding history or retiring AgentX', () => {
-    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('deprecated');
-    expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isScenarioDeprecatedForModel(Model.Qwen3_5, Scenario.EightK_OneK)).toBe(true);
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK, Model.Qwen3_5)).toBe('deprecated');
+    expect(isScenarioHiddenForModel(Model.Qwen3_5, Scenario.EightK_OneK)).toBe(false);
     expect(isModelDeprecated(Model.Qwen3_5)).toBe(false);
-    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.Qwen3_5)).toBe('default');
+    expect(getScenarioCategoryForModel(Scenario.AgenticTraces, Model.Qwen3_5)).toBe('default');
   });
 
   it('keeps 8K/1K default for models still sweeping it', () => {
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_R1)).toBe('default');
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK, Model.DeepSeek_R1)).toBe('default');
   });
 
   it('does not un-deprecate globally deprecated sequences', () => {
-    expect(getSequenceCategoryForModel(Sequence.OneK_OneK, Model.MiniMax_M3)).toBe('deprecated');
-    expect(getSequenceCategoryForModel(Sequence.OneK_OneK, Model.DeepSeek_V4_Pro)).toBe(
+    expect(getScenarioCategoryForModel(Scenario.OneK_OneK, Model.MiniMax_M3)).toBe('deprecated');
+    expect(getScenarioCategoryForModel(Scenario.OneK_OneK, Model.DeepSeek_V4_Pro)).toBe(
       'deprecated',
     );
   });
 
   it('falls back to the global category when no model is given', () => {
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK)).toBe('default');
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, null)).toBe('default');
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK)).toBe('default');
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK, null)).toBe('default');
   });
 
   it('leaves MiniMax M3 agentic traces active', () => {
-    expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.AgenticTraces)).toBe(false);
-    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.MiniMax_M3)).toBe('default');
+    expect(isScenarioDeprecatedForModel(Model.MiniMax_M3, Scenario.AgenticTraces)).toBe(false);
+    expect(getScenarioCategoryForModel(Scenario.AgenticTraces, Model.MiniMax_M3)).toBe('default');
   });
 
   it('leaves DeepSeek V4 Pro agentic traces active', () => {
-    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces)).toBe(false);
-    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.DeepSeek_V4_Pro)).toBe(
+    expect(isScenarioDeprecatedForModel(Model.DeepSeek_V4_Pro, Scenario.AgenticTraces)).toBe(false);
+    expect(getScenarioCategoryForModel(Scenario.AgenticTraces, Model.DeepSeek_V4_Pro)).toBe(
       'default',
     );
   });
@@ -351,18 +361,18 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
 
 describe('isBestPerSkuDefaultOff', () => {
   it('opens Qwen3.5 8K/1K and agentic charts with Best per SKU enabled', () => {
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Scenario.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Scenario.AgenticTraces)).toBe(false);
   });
 
   it('keeps Best per SKU on for other Qwen3.5 scenarios and other models', () => {
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.OneK_OneK)).toBe(false);
-    expect(isBestPerSkuDefaultOff(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_8_Flash_Next, Sequence.AgenticTraces)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Scenario.OneK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.DeepSeek_V4_Pro, Scenario.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_8_Flash_Next, Scenario.AgenticTraces)).toBe(false);
   });
 
   it('treats a missing model or scenario as the global default', () => {
-    expect(isBestPerSkuDefaultOff(null, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(null, Scenario.EightK_OneK)).toBe(false);
     expect(isBestPerSkuDefaultOff(Model.Qwen3_5, undefined)).toBe(false);
   });
 });
@@ -371,9 +381,9 @@ describe('showsTcoBasisSelector', () => {
   it.each([Model.Qwen3_5, Model.Kimi_K3])(
     'shows the selector for %s only on 8K/1K and AgentX',
     (model) => {
-      for (const sequence of Object.values(Sequence)) {
-        expect(showsTcoBasisSelector(model, sequence)).toBe(
-          sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces,
+      for (const scenario of Object.values(Scenario)) {
+        expect(showsTcoBasisSelector(model, scenario)).toBe(
+          scenario === Scenario.EightK_OneK || scenario === Scenario.AgenticTraces,
         );
       }
     },
@@ -382,19 +392,19 @@ describe('showsTcoBasisSelector', () => {
   it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash, Model.Qwen3_8_Flash_Next])(
     'shows the selector for %s only on AgentX',
     (model) => {
-      for (const sequence of Object.values(Sequence)) {
-        expect(showsTcoBasisSelector(model, sequence)).toBe(sequence === Sequence.AgenticTraces);
+      for (const scenario of Object.values(Scenario)) {
+        expect(showsTcoBasisSelector(model, scenario)).toBe(scenario === Scenario.AgenticTraces);
       }
     },
   );
 
   it('keeps unrelated models hidden', () => {
-    expect(showsTcoBasisSelector(Model.Kimi_K2_5, Sequence.AgenticTraces)).toBe(false);
-    expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
+    expect(showsTcoBasisSelector(Model.Kimi_K2_5, Scenario.AgenticTraces)).toBe(false);
+    expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Scenario.EightK_OneK)).toBe(false);
   });
 
   it('hides the selector when the model or scenario is unknown', () => {
-    expect(showsTcoBasisSelector(null, Sequence.EightK_OneK)).toBe(false);
+    expect(showsTcoBasisSelector(null, Scenario.EightK_OneK)).toBe(false);
     expect(showsTcoBasisSelector(Model.Qwen3_5, undefined)).toBe(false);
   });
 });
@@ -406,34 +416,34 @@ describe('comparison exclusions', () => {
   });
 
   it('applies the unsuffixed STP rule to Agentic Traces and 8K/1K only', () => {
-    expect(getSequenceExclusion(Sequence.AgenticTraces).map((spec) => spec.suffix)).toEqual([null]);
-    expect(getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.suffix)).toEqual([null]);
-    expect(getSequenceExclusion(Sequence.OneK_OneK)).toEqual([]);
-    expect(getSequenceExclusion(Sequence.OneK_EightK)).toEqual([]);
+    expect(getScenarioExclusion(Scenario.AgenticTraces).map((spec) => spec.suffix)).toEqual([null]);
+    expect(getScenarioExclusion(Scenario.EightK_OneK).map((spec) => spec.suffix)).toEqual([null]);
+    expect(getScenarioExclusion(Scenario.OneK_OneK)).toEqual([]);
+    expect(getScenarioExclusion(Scenario.OneK_EightK)).toEqual([]);
   });
 
   it('guards only vLLM and SGLang on both 8K/1K and Agentic', () => {
-    expect(getSequenceExclusionFamilies(Sequence.EightK_OneK)).toEqual(['vllm', 'sglang']);
-    expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toEqual(['vllm', 'sglang']);
-    expect(getSequenceExclusionFamilies(Sequence.OneK_OneK)).toBeNull();
+    expect(getScenarioExclusionFamilies(Scenario.EightK_OneK)).toEqual(['vllm', 'sglang']);
+    expect(getScenarioExclusionFamilies(Scenario.AgenticTraces)).toEqual(['vllm', 'sglang']);
+    expect(getScenarioExclusionFamilies(Scenario.OneK_OneK)).toBeNull();
   });
 
   it('shares one STP spec between the scenarios that carry it', () => {
-    expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual(
-      getSequenceExclusion(Sequence.AgenticTraces),
+    expect(getScenarioExclusion(Scenario.EightK_OneK)).toEqual(
+      getScenarioExclusion(Scenario.AgenticTraces),
     );
     expect(
-      getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.participatingFamilies),
+      getScenarioExclusion(Scenario.EightK_OneK).map((spec) => spec.participatingFamilies),
     ).toEqual([undefined]);
   });
 
   it('keeps one engine group on the scenarios that restrict STP engines', () => {
-    expect(getSequenceExclusionPolicy(Sequence.EightK_OneK)).toBe('keep-sticky');
-    expect(getSequenceExclusionPolicy(Sequence.AgenticTraces)).toBe('keep-sticky');
-    expect(getSequenceExclusionPolicy(Sequence.OneK_OneK)).toBe('clear-all');
-    expect(getSequenceDefaultExclusionGroup(Sequence.EightK_OneK)).toBe('vllm');
-    expect(getSequenceDefaultExclusionGroup(Sequence.AgenticTraces)).toBe('vllm');
-    expect(getSequenceDefaultExclusionGroup(Sequence.OneK_OneK)).toBeNull();
+    expect(getScenarioExclusionPolicy(Scenario.EightK_OneK)).toBe('keep-sticky');
+    expect(getScenarioExclusionPolicy(Scenario.AgenticTraces)).toBe('keep-sticky');
+    expect(getScenarioExclusionPolicy(Scenario.OneK_OneK)).toBe('clear-all');
+    expect(getScenarioDefaultExclusionGroup(Scenario.EightK_OneK)).toBe('vllm');
+    expect(getScenarioDefaultExclusionGroup(Scenario.AgenticTraces)).toBe('vllm');
+    expect(getScenarioDefaultExclusionGroup(Scenario.OneK_OneK)).toBeNull();
   });
 });
 
@@ -470,20 +480,20 @@ describe('getOpenRouterModelId', () => {
   });
 });
 
-describe('getSequenceLabel', () => {
+describe('getScenarioLabel', () => {
   it('returns correct label for each known sequence', () => {
-    expect(getSequenceLabel(Sequence.OneK_OneK)).toBe('1K / 1K');
-    expect(getSequenceLabel(Sequence.OneK_EightK)).toBe('1K / 8K');
-    expect(getSequenceLabel(Sequence.EightK_OneK)).toBe('8K / 1K');
-    expect(getSequenceLabel(Sequence.AgenticTraces)).toBe('Agentic');
+    expect(getScenarioLabel(Scenario.OneK_OneK)).toBe('1K / 1K');
+    expect(getScenarioLabel(Scenario.OneK_EightK)).toBe('1K / 8K');
+    expect(getScenarioLabel(Scenario.EightK_OneK)).toBe('8K / 1K');
+    expect(getScenarioLabel(Scenario.AgenticTraces)).toBe('Agentic');
   });
 
   it('returns the Chinese agentic scenario label for the zh locale', () => {
-    expect(getSequenceLabel(Sequence.AgenticTraces, 'zh')).toBe('智能体');
+    expect(getScenarioLabel(Scenario.AgenticTraces, 'zh')).toBe('智能体');
   });
 
   it('falls back to the sequence value for unknown sequence', () => {
-    const result = getSequenceLabel('16k/16k' as Sequence);
+    const result = getScenarioLabel('16k/16k' as Scenario);
     expect(result).toBe('16k/16k');
   });
 });
@@ -514,29 +524,29 @@ describe('getEvalBenchmarkLabel', () => {
   });
 });
 
-describe('isSequenceHiddenForModel', () => {
+describe('isScenarioHiddenForModel', () => {
   it.each([Model.Muse_Spark_Open])('only offers AgentX for %s', (model) => {
     expect(
-      SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(model, sequence)),
-    ).toEqual([Sequence.AgenticTraces]);
+      SCENARIO_OPTIONS.filter((scenario) => !isScenarioHiddenForModel(model, scenario)),
+    ).toEqual([Scenario.AgenticTraces]);
   });
   it('offers GLM Flash 8K/1K and AgentX without exposing other fixed sequences', () => {
     expect(
-      SEQUENCE_OPTIONS.filter(
-        (sequence) => !isSequenceHiddenForModel(Model.GLM_5_3_Flash, sequence),
+      SCENARIO_OPTIONS.filter(
+        (scenario) => !isScenarioHiddenForModel(Model.GLM_5_3_Flash, scenario),
       ),
-    ).toEqual([Sequence.EightK_OneK, Sequence.AgenticTraces]);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_3_Flash)).toBe('default');
+    ).toEqual([Scenario.EightK_OneK, Scenario.AgenticTraces]);
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK, Model.GLM_5_3_Flash)).toBe('default');
   });
   it('shows 8K/1K and Agentic coding for GLM-5.2 / GLM-5.3', () => {
-    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(false);
-    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('default');
-    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.GLM_5_2)).toBe('default');
+    expect(isScenarioHiddenForModel(Model.GLM_5_2, Scenario.EightK_OneK)).toBe(false);
+    expect(isScenarioHiddenForModel(Model.GLM_5_2, Scenario.AgenticTraces)).toBe(false);
+    expect(getScenarioCategoryForModel(Scenario.EightK_OneK, Model.GLM_5_2)).toBe('default');
+    expect(getScenarioCategoryForModel(Scenario.AgenticTraces, Model.GLM_5_2)).toBe('default');
   });
 
   it('leaves other models untouched', () => {
-    expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
-    expect(isSequenceHiddenForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(false);
+    expect(isScenarioHiddenForModel(Model.Qwen3_5, Scenario.EightK_OneK)).toBe(false);
+    expect(isScenarioHiddenForModel(Model.MiniMax_M3, Scenario.EightK_OneK)).toBe(false);
   });
 });

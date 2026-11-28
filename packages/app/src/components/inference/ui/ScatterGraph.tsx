@@ -53,9 +53,9 @@ import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import {
   getChartWatermark,
   getPrecisionLabel,
-  getSequenceLabel,
+  getScenarioLabel,
   type Precision,
-  Sequence,
+  Scenario,
 } from '@/lib/catalog/data-mappings';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/benchmarks/known-issues';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -596,7 +596,7 @@ const ScatterGraph = React.memo(
       scopePickPending,
       selectedPrecisions,
       selectedRunId,
-      selectedSequence,
+      selectedScenario,
       quickFilters,
       lockedFrameworks,
       minimalChrome,
@@ -889,9 +889,9 @@ const ScatterGraph = React.memo(
         legendChangelogsByHardware(
           data,
           availableRuns,
-          selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn',
+          selectedScenario === Scenario.AgenticTraces ? 'agentic_traces' : 'single_turn',
         ),
-      [data, availableRuns, selectedSequence],
+      [data, availableRuns, selectedScenario],
     );
 
     const groupedData = useMemo(
@@ -1276,12 +1276,12 @@ const ScatterGraph = React.memo(
       quickFilters.deployment.length +
       quickFilters.power.length +
       (quickFilters.topologies?.length ?? 0) +
-      (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+      (selectedScenario === Scenario.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);
       setQuickFilterDeployment([]);
-      if (selectedSequence !== Sequence.AgenticTraces) setQuickFilterSpec([]);
+      if (selectedScenario !== Scenario.AgenticTraces) setQuickFilterSpec([]);
       setQuickFilterPower([]);
       setQuickFilterTopologies([]);
     }, [
@@ -1291,7 +1291,7 @@ const ScatterGraph = React.memo(
       setQuickFilterSpec,
       setQuickFilterPower,
       setQuickFilterTopologies,
-      selectedSequence,
+      selectedScenario,
     ]);
 
     const pointsTable = useMemo(() => {
@@ -4343,7 +4343,7 @@ const ScatterGraph = React.memo(
       <div
         className="contents"
         data-orange-chicken-eligible={
-          selectedSequence === Sequence.AgenticTraces ? 'true' : undefined
+          selectedScenario === Scenario.AgenticTraces ? 'true' : undefined
         }
       >
         <D3Chart<InferenceData>
@@ -4543,7 +4543,7 @@ const ScatterGraph = React.memo(
                             setHideNonOptimal(checked);
                             track('latency_hide_non_optimal_toggled', { enabled: checked });
                           },
-                          ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
+                          ...(showPowerEnvelope || selectedScenario === Scenario.AgenticTraces
                             ? {
                                 infoTooltip: showPowerEnvelope
                                   ? legendT.powerBoundaryInfo
@@ -4734,7 +4734,7 @@ const ScatterGraph = React.memo(
               if (!open) setPointsTableTarget(null);
             }}
             title={pointsTable.title}
-            subtitle={`${modelLabel} · ${getSequenceLabel(selectedSequence)}`}
+            subtitle={`${modelLabel} · ${getScenarioLabel(selectedScenario)}`}
             accentColor={pointsTable.color}
             rows={pointsTable.rows}
             isOverlay={pointsTable.isOverlay}

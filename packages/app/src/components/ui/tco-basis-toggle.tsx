@@ -16,8 +16,8 @@ const LABELS = {
 } as const;
 
 export function useShowsTcoBasisSelector(): boolean {
-  const { selectedModel, effectiveSequence } = useGlobalFilterSelection();
-  return showsTcoBasisSelector(selectedModel, effectiveSequence);
+  const { selectedModel, effectiveScenario } = useGlobalFilterSelection();
+  return showsTcoBasisSelector(selectedModel, effectiveScenario);
 }
 
 export function TcoBasisToggle({

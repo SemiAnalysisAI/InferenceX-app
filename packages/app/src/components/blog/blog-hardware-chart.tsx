@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { EphemeralUrlStateContext } from '@/hooks/useUrlState';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import { toModel, toPrecisions, toScenario } from '@/lib/compare/compare-enum-coerce';
 import { GlobalFilterProvider } from '@/providers/GlobalFilterContext';
 import { UnofficialRunProvider } from '@/providers/unofficial-run-provider';
 
@@ -36,7 +36,7 @@ export function HardwareChart({
         <UnofficialRunProvider>
           <GlobalFilterProvider
             initialModel={initialModel}
-            initialSequence={toSequence(sequence)}
+            initialScenario={toScenario(sequence)}
             initialPrecisions={initialPrecisions}
           >
             <InferenceProvider

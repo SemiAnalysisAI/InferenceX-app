@@ -18,7 +18,8 @@ import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis'
 import {
   Percentile,
   PRECISION_OPTIONS,
-  Sequence,
+  Scenario,
+  SCENARIO_OPTIONS,
   type Precision,
 } from '@/lib/catalog/data-mappings';
 import {
@@ -26,6 +27,7 @@ import {
   resolveModelName,
   type ResolvedModel,
 } from '@/lib/catalog/model-name-resolver';
+import { SCENARIO_BY_SEGMENT } from '@/lib/compare/compare-scenario-route';
 
 import { ViewsApiParamError } from './errors';
 
@@ -54,34 +56,22 @@ export function resolveModelParam(value: string | null, param = 'model'): Resolv
   return resolved;
 }
 
-const SEQUENCE_ALIASES: Readonly<Record<string, Sequence>> = {
-  '1k/1k': Sequence.OneK_OneK,
-  '1k-1k': Sequence.OneK_OneK,
-  '1k/8k': Sequence.OneK_EightK,
-  '1k-8k': Sequence.OneK_EightK,
-  '8k/1k': Sequence.EightK_OneK,
-  '8k-1k': Sequence.EightK_OneK,
-  'agentic-traces': Sequence.AgenticTraces,
-  agentic_traces: Sequence.AgenticTraces,
-  agentic: Sequence.AgenticTraces,
+const SEQUENCE_ALIASES: Readonly<Record<string, Scenario>> = {
+  ...Object.fromEntries(SCENARIO_OPTIONS.map((scenario) => [scenario, scenario])),
+  ...SCENARIO_BY_SEGMENT,
+  // The benchmark_type that agentic rows are stored under.
+  agentic_traces: Scenario.AgenticTraces,
 };
-
-export const VIEWS_SEQUENCE_VALUES: readonly string[] = [
-  '1k/1k',
-  '1k/8k',
-  '8k/1k',
-  'agentic-traces',
-];
 
 export function parseSequenceParam(
   value: string | null,
-  fallback: Sequence,
+  fallback: Scenario,
   param = 'sequence',
-): Sequence {
+): Scenario {
   if (!value) return fallback;
   const alias = value.toLowerCase();
   if (!Object.hasOwn(SEQUENCE_ALIASES, alias)) {
-    throw new ViewsApiParamError(param, `Unknown sequence: ${value}`, VIEWS_SEQUENCE_VALUES);
+    throw new ViewsApiParamError(param, `Unknown sequence: ${value}`, SCENARIO_OPTIONS);
   }
   return SEQUENCE_ALIASES[alias];
 }

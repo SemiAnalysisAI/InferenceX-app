@@ -14,12 +14,12 @@ import {
   firstSubmissionDates,
   getActualLatestRelease,
   imageRowDisplayModel,
-  imageRowSequence,
+  imageRowScenario,
   isActiveImageRow,
   isOutdated,
   isStaleAgentx,
-  resolveSelectedSequence,
-  sequenceOptionsForModel,
+  resolveSelectedScenario,
+  scenarioOptionsForModel,
 } from '@/components/latest-image/latest-image-utils';
 import type { FrameworkReleases, LatestImageRow } from '@/lib/api/api';
 import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
@@ -73,8 +73,8 @@ export function GET(request: NextRequest) {
         ? 'all'
         : (active.map(imageRowDisplayModel).find((name) => name.toLowerCase() === requestedModel) ??
           resolveModelParam(requestedModel).displayName);
-    const sequences = sequenceOptionsForModel(active, model);
-    const sequence = resolveSelectedSequence(sequences, s.get('sequence') ?? 'agentic-traces');
+    const sequences = scenarioOptionsForModel(active, model);
+    const sequence = resolveSelectedScenario(sequences, s.get('sequence') ?? 'agentic-traces');
     const filters = { model, precision, spec, hardware, nodeType, frameworks, sequence };
     const firstSubmitted = firstSubmissionDates(raw);
     const rows = active
@@ -86,7 +86,7 @@ export function GET(request: NextRequest) {
         return {
           ...row,
           displayModel: imageRowDisplayModel(row),
-          sequence: imageRowSequence(row),
+          sequence: imageRowScenario(row),
           ageDays,
           actualLatest: release?.tag ?? null,
           outdated: isOutdated(row.image, release, earliestSubmission(firstSubmitted, row)),

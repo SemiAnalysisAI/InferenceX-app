@@ -21,7 +21,7 @@ import type {
 } from '@/providers/GlobalFilterContext';
 import type { UnofficialRunContextType } from '@/providers/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { Model, Sequence, Precision } from '@/lib/catalog/data-mappings';
+import { Model, Scenario, Precision } from '@/lib/catalog/data-mappings';
 import React from 'react';
 
 /**
@@ -189,15 +189,15 @@ export function createMockInferenceContextValues(
     graphs: [
       {
         model: Model.DeepSeek_R1,
-        sequence: Sequence.EightK_OneK,
+        sequence: Scenario.EightK_OneK,
         chartDefinition: createMockChartDefinition(),
         data: [createMockInferenceData()],
       },
     ],
     selectedModel: Model.DeepSeek_R1,
     setSelectedModel: namedStub('setSelectedModel'),
-    selectedSequence: Sequence.EightK_OneK,
-    setSelectedSequence: namedStub('setSelectedSequence'),
+    selectedScenario: Scenario.EightK_OneK,
+    setSelectedScenario: namedStub('setSelectedScenario'),
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions'),
     loading: false,
@@ -287,7 +287,7 @@ export function createMockInferenceContextValues(
     selectedRunId: '12345678',
     setSelectedRunId: namedStub('setSelectedRunId'),
     availablePrecisions: [Precision.FP4, Precision.FP8],
-    availableSequences: [Sequence.EightK_OneK, Sequence.OneK_OneK],
+    availableScenarios: [Scenario.EightK_OneK, Scenario.OneK_OneK],
     availableModels: [Model.DeepSeek_R1],
     userPowers: null,
     setUserPowers: namedStub('setUserPowers'),
@@ -412,16 +412,16 @@ export function createMockGlobalFilterContexts(
   const values = {
     selectedModel: Model.DeepSeek_R1,
     setSelectedModel: namedStub('setSelectedModel_global'),
-    selectedSequence: Sequence.EightK_OneK,
-    setSelectedSequence: namedStub('setSelectedSequence_global'),
+    selectedScenario: Scenario.EightK_OneK,
+    setSelectedScenario: namedStub('setSelectedScenario_global'),
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions_global'),
     tcoBasis: 'internal' as const,
     setTcoBasis: namedStub('setTcoBasis_global'),
     chipBasis: 'pool' as 'pool' | 'total',
     setChipBasis: namedStub('setChipBasis_global'),
-    effectiveSequence: Sequence.EightK_OneK,
-    sequenceResolved: true,
+    effectiveScenario: Scenario.EightK_OneK,
+    scenarioResolved: true,
     effectivePrecisions: [Precision.FP4],
     selectedRunDate: '2025-03-01',
     setSelectedRunDate: namedStub('setSelectedRunDate_global'),
@@ -430,7 +430,7 @@ export function createMockGlobalFilterContexts(
     setSelectedRunId: namedStub('setSelectedRunId_global'),
     previewFilterChange: namedStub('previewFilterChange_global'),
     availableModels: [Model.DeepSeek_R1],
-    availableSequences: [Sequence.EightK_OneK, Sequence.OneK_OneK],
+    availableScenarios: [Scenario.EightK_OneK, Scenario.OneK_OneK],
     availablePrecisions: [Precision.FP4, Precision.FP8],
     availableDates: ['2025-02-28', '2025-03-01'],
     effectiveRunDate: '2025-03-01',
@@ -450,17 +450,17 @@ export function createMockGlobalFilterContexts(
       tcoBasis: values.tcoBasis,
       chipBasis: values.chipBasis,
       selectedModel: values.selectedModel,
-      selectedSequence: values.selectedSequence,
+      selectedScenario: values.selectedScenario,
       selectedPrecisions: values.selectedPrecisions,
-      effectiveSequence: values.effectiveSequence,
-      sequenceResolved: values.sequenceResolved,
+      effectiveScenario: values.effectiveScenario,
+      scenarioResolved: values.scenarioResolved,
       effectivePrecisions: values.effectivePrecisions,
     },
     actions: {
       setTcoBasis: values.setTcoBasis,
       setChipBasis: values.setChipBasis,
       setSelectedModel: values.setSelectedModel,
-      setSelectedSequence: values.setSelectedSequence,
+      setSelectedScenario: values.setSelectedScenario,
       setSelectedPrecisions: values.setSelectedPrecisions,
       setSelectedRunDate: values.setSelectedRunDate,
       setSelectedRunId: values.setSelectedRunId,
@@ -474,7 +474,7 @@ export function createMockGlobalFilterContexts(
     },
     availability: {
       availableModels: values.availableModels,
-      availableSequences: values.availableSequences,
+      availableScenarios: values.availableScenarios,
       availablePrecisions: values.availablePrecisions,
       availableDates: values.availableDates,
       availability: values.availability,
@@ -508,7 +508,7 @@ export function createMockUnofficialRunContext(
     unavailable: null,
     clearUnofficialRun: namedStub('clearUnofficialRun'),
     dismissRun: namedStub('dismissRun'),
-    availableModelsAndSequences: [],
+    availableModelsAndScenarios: [],
     getOverlayData: () => null,
     activeOverlayHwTypes: new Set<string>(),
     allOverlayHwTypes: new Set<string>(),

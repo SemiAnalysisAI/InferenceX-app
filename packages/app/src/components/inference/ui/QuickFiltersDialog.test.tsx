@@ -3,7 +3,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import { afterEach, describe, expect, it, vi } from 'bun:test';
 
 import type { QuickFilters } from '@/components/inference/types';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { useFakeTimers, useRealTimers } from '@/test/helpers';
 import {
   $,
@@ -116,7 +116,7 @@ describe('QuickFiltersDialog', () => {
         </PathnameContext.Provider>,
         {
           inference: {
-            selectedSequence: Sequence.AgenticTraces,
+            selectedScenario: Scenario.AgenticTraces,
             quickFilters: {
               vendors: ['AMD'],
               frameworks: [],
@@ -173,7 +173,7 @@ describe('QuickFiltersDialog', () => {
   it('removes speculative decoding from agentic charts and toggles supported filters', () => {
     render(
       withProviders(<QuickFiltersDialog open onOpenChange={vi.fn()} />, {
-        inference: { selectedSequence: Sequence.AgenticTraces, availableQuickFilters },
+        inference: { selectedScenario: Scenario.AgenticTraces, availableQuickFilters },
       }),
     );
     click(testId('quick-filter-vendor-NVIDIA'));

@@ -1,4 +1,4 @@
-import { sequenceForScenarioSegment } from '@/lib/compare/compare-scenario-route';
+import { scenarioForSegment } from '@/lib/compare/compare-scenario-route';
 import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare/compare-slug';
 import {
   canonicalPrecisionCompareSlug,
@@ -45,7 +45,7 @@ export function compareCanonicalRedirectUrl(url: URL): URL | null {
   const groups = match?.groups;
   if (!groups?.family || !groups.slug) return null;
   const { locale = '', family, slug, scenario } = groups;
-  if (scenario && !sequenceForScenarioSegment(scenario)) return null;
+  if (scenario && !scenarioForSegment(scenario)) return null;
   const canonical = canonicalSlug(family, slug);
   if (!canonical || canonical === slug.toLowerCase()) return null;
   const target = new URL(url);

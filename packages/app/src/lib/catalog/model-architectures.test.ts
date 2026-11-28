@@ -1,4 +1,4 @@
-import { MODEL_RELEASE_DATES, getModelReleaseDate } from '@semianalysisai/inferencex-constants';
+import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 import { describe, expect, it } from 'bun:test';
 
 import { MODEL_OPTIONS, Model } from '@/lib/catalog/data-mappings';
@@ -21,7 +21,7 @@ import {
   MODEL_ARCHITECTURES,
 } from './model-architectures';
 
-describe('MODEL_RELEASE_DATES coverage', () => {
+describe('model release date coverage', () => {
   it('leaves the unverified GLM-5.3-Flash release date unknown', () => {
     const missing = MODEL_OPTIONS.filter((model) => !getModelReleaseDate(model));
     expect(missing).toEqual([Model.GLM_5_3_Flash]);
@@ -43,13 +43,6 @@ describe('MODEL_RELEASE_DATES coverage', () => {
     expect(getModelReleaseDate(Model.DeepSeek_R1)).toBe('2025-05-28');
     expect(getModelReleaseDate(Model.Llama3_3_70B)).toBe('2024-12-06');
     expect(getModelReleaseDate(Model.Llama3_1_70B)).toBe('2024-07-23');
-  });
-
-  it('names a real model, so no entry is dead weight', () => {
-    const displayNames = new Set<string>(Object.values(Model));
-    for (const model of Object.keys(MODEL_RELEASE_DATES)) {
-      expect(displayNames.has(model), `${model} matches no Model display name`).toBe(true);
-    }
   });
 });
 

@@ -6,7 +6,7 @@ describe('shouldRequestTrendHistory', () => {
   it('waits for the sequence to resolve', () => {
     expect(
       shouldRequestTrendHistory({
-        sequenceResolved: false,
+        scenarioResolved: false,
         chartDataLoading: true,
         hasInteractivityChart: false,
       }),
@@ -16,7 +16,7 @@ describe('shouldRequestTrendHistory', () => {
   it('starts alongside the benchmark rows, before the chart is known', () => {
     expect(
       shouldRequestTrendHistory({
-        sequenceResolved: true,
+        scenarioResolved: true,
         chartDataLoading: true,
         hasInteractivityChart: false,
       }),
@@ -26,7 +26,7 @@ describe('shouldRequestTrendHistory', () => {
   it('keeps requesting once the rows produce an interactivity chart', () => {
     expect(
       shouldRequestTrendHistory({
-        sequenceResolved: true,
+        scenarioResolved: true,
         chartDataLoading: false,
         hasInteractivityChart: true,
       }),
@@ -36,7 +36,7 @@ describe('shouldRequestTrendHistory', () => {
   it('stops when the rows loaded without an interactivity chart, so the no-data state shows', () => {
     expect(
       shouldRequestTrendHistory({
-        sequenceResolved: true,
+        scenarioResolved: true,
         chartDataLoading: false,
         hasInteractivityChart: false,
       }),

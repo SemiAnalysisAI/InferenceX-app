@@ -5,6 +5,8 @@ export * from './gpu-keys';
 export * from './metric-keys';
 export * from './precision-keys';
 export * from './models';
+export * from './registry';
+export * from './scenarios';
 export * from './seo';
 export * from './tables';
 export * from './tco';

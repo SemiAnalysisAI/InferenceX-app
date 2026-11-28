@@ -3,7 +3,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'bun:test';
 
-import { Model, MODEL_OPTIONS, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, MODEL_OPTIONS, Scenario } from '@/lib/catalog/data-mappings';
 import {
   $,
   $$,
@@ -184,17 +184,17 @@ describe('Chart Selectors', () => {
 
   describe('ScenarioSelector', () => {
     for (const variant of ['field', 'caption'] as const) {
-      for (const sequence of [Sequence.AgenticTraces, Sequence.EightK_OneK]) {
-        it(`omits the entire ${variant} for sole scenario ${sequence}`, () => {
+      for (const scenario of [Scenario.AgenticTraces, Scenario.EightK_OneK]) {
+        it(`omits the entire ${variant} for sole scenario ${scenario}`, () => {
           const changeScenario = vi.fn();
           render(
             <TooltipProvider delayDuration={0}>
               <div data-testid="selector-host">
                 <ScenarioSelector
                   variant={variant}
-                  value={sequence}
+                  value={scenario}
                   onChange={changeScenario}
-                  availableSequences={[sequence]}
+                  availableScenarios={[scenario]}
                   data-testid="scenario-selector"
                 />
               </div>
@@ -207,7 +207,7 @@ describe('Chart Selectors', () => {
 
       const Harness = () => {
         const [multiple, setMultiple] = useState(false);
-        const [value, setValue] = useState(Sequence.AgenticTraces);
+        const [value, setValue] = useState(Scenario.AgenticTraces);
         return (
           <TooltipProvider delayDuration={0}>
             <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
@@ -217,8 +217,8 @@ describe('Chart Selectors', () => {
                 variant={variant}
                 value={value}
                 onChange={setValue}
-                availableSequences={
-                  multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
+                availableScenarios={
+                  multiple ? [Scenario.AgenticTraces, Scenario.EightK_OneK] : [value]
                 }
                 data-testid="scenario-selector"
               />
@@ -237,10 +237,10 @@ describe('Chart Selectors', () => {
         expect(selector.disabled).toBe(false);
         click(selector);
         click(await eventually(() => contains('[data-select-option]', '8K / 1K')));
-        await eventually(() => expect(selected()).toBe(Sequence.EightK_OneK));
+        await eventually(() => expect(selected()).toBe(Scenario.EightK_OneK));
         click(contains('button', 'Toggle scenarios'));
         await eventually(() => expect(host().childNodes).toHaveLength(0));
-        expect(selected()).toBe(Sequence.EightK_OneK);
+        expect(selected()).toBe(Scenario.EightK_OneK);
       });
     }
 
@@ -250,9 +250,9 @@ describe('Chart Selectors', () => {
           <TooltipProvider delayDuration={0}>
             <div className="w-40 p-3">
               <ScenarioSelector
-                value={Sequence.AgenticTraces}
+                value={Scenario.AgenticTraces}
                 onChange={() => {}}
-                availableSequences={[Sequence.AgenticTraces]}
+                availableScenarios={[Scenario.AgenticTraces]}
                 data-testid="scenario-selector"
               />
             </div>
@@ -267,9 +267,9 @@ describe('Chart Selectors', () => {
       render(
         <TooltipProvider delayDuration={0}>
           <ScenarioSelector
-            value={Sequence.AgenticTraces}
+            value={Scenario.AgenticTraces}
             onChange={() => {}}
-            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
+            availableScenarios={[Scenario.EightK_OneK, Scenario.AgenticTraces]}
             model={Model.MiniMax_M3}
             data-testid="scenario-selector"
           />
@@ -289,9 +289,9 @@ describe('Chart Selectors', () => {
       render(
         <TooltipProvider delayDuration={0}>
           <ScenarioSelector
-            value={Sequence.AgenticTraces}
+            value={Scenario.AgenticTraces}
             onChange={() => {}}
-            availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
+            availableScenarios={[Scenario.EightK_OneK, Scenario.AgenticTraces]}
             model={Model.Qwen3_5}
             data-testid="scenario-selector"
           />

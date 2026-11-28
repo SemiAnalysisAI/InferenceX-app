@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { Sequence } from '../catalog/data-mappings';
+import { Scenario } from '../catalog/data-mappings';
 import {
   EMBED_DEFAULT_Y_AXIS_METRIC,
   EMBED_SKIN_HEADER,
@@ -108,9 +108,9 @@ describe('parseEmbedOptions', () => {
   });
 
   it('resolves scenario path segments and raw sequence keys', () => {
-    expect(parseEmbedOptions({ scenario: 'agentic' }).sequence).toBe(Sequence.AgenticTraces);
-    expect(parseEmbedOptions({ scenario: '8k-1k' }).sequence).toBe(Sequence.EightK_OneK);
-    expect(parseEmbedOptions({ i_seq: '1k/8k' }).sequence).toBe(Sequence.OneK_EightK);
+    expect(parseEmbedOptions({ scenario: 'agentic' }).sequence).toBe(Scenario.AgenticTraces);
+    expect(parseEmbedOptions({ scenario: '8k-1k' }).sequence).toBe(Scenario.EightK_OneK);
+    expect(parseEmbedOptions({ i_seq: '1k/8k' }).sequence).toBe(Scenario.OneK_EightK);
     expect(parseEmbedOptions({ scenario: 'bogus' }).sequence).toBeUndefined();
   });
 

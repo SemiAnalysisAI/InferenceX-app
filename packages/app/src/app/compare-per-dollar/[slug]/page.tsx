@@ -7,9 +7,9 @@ import { compareChipPageLink } from '@/lib/compare/compare-chip-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import {
-  isAgenticSequence,
+  isAgenticScenario,
   type ScenarioSegment,
-  sequenceForScenarioSegment,
+  scenarioForSegment,
 } from '@/lib/compare/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n/i18n';
 import {
@@ -111,9 +111,9 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
     permanentRedirect(scenarioPath(canonical, scenarioSegment));
   }
 
-  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
+  const pathScenario = scenarioSegment ? scenarioForSegment(scenarioSegment) : null;
   const {
-    sequence: effectiveSequence,
+    sequence: effectiveScenario,
     precision: effectivePrecision,
     summaryA,
     summaryB,
@@ -127,7 +127,7 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
     parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    pathSequence,
+    pathScenario,
     null,
     comparisonScenarioForModel(parsed.model).sequence,
   );
@@ -183,15 +183,15 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
         label={label}
         modelLabel={parsed.model.label}
         defaultModel={parsed.model.displayName}
-        defaultSequence={effectiveSequence}
+        defaultScenario={effectiveScenario}
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         initialBenchmarkRows={initialCompareBenchmarkRows(
           initialPairBenchmarkRows,
-          effectiveSequence,
+          effectiveScenario,
         )}
         narrative={narrative}
-        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO : null}
+        agenticIntro={isAgenticScenario(effectiveScenario) ? AGENTIC_SCENARIO_INTRO : null}
         aLabel={aLabel}
         bLabel={bLabel}
         aVendor={aMeta?.vendor ?? ''}

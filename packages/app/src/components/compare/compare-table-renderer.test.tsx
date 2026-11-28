@@ -48,12 +48,12 @@ function renderTable(overrides: Partial<React.ComponentProps<typeof CompareTable
         aLabel="H100"
         bLabel="B200"
         ssrTableData={SSR_TABLE}
-        ssrSequence="1k1k"
+        ssrScenario="1k1k"
         ssrModel="dsr1"
         ssrPrecisions={['fp8']}
-        selectedSequence="1k1k"
-        effectiveSequence="1k1k"
-        sequenceResolved
+        selectedScenario="1k1k"
+        effectiveScenario="1k1k"
+        scenarioResolved
         selectedModel="dsr1"
         selectedPrecisions={['fp8']}
         effectivePrecisions={['fp8']}
@@ -81,14 +81,14 @@ describe('CompareTableRenderer', () => {
   });
 
   it('replaces the server table with a loading state for a shared sequence', () => {
-    renderTable({ selectedSequence: '8k1k', effectiveSequence: '8k1k', loading: true });
+    renderTable({ selectedScenario: '8k1k', effectiveScenario: '8k1k', loading: true });
     expect(table()).toBeNull();
     expect(status()?.dataset.status).toBe('loading');
     expect(status()?.textContent).toBe('Loading comparison data for the selected workload…');
   });
 
   it('reports a failed fetch for the selected sequence', () => {
-    renderTable({ selectedSequence: '8k1k', effectiveSequence: '8k1k', error: 'HTTP 500' });
+    renderTable({ selectedScenario: '8k1k', effectiveScenario: '8k1k', error: 'HTTP 500' });
     expect(table()).toBeNull();
     expect(status()?.getAttribute('role')).toBe('alert');
     expect(status()?.textContent).toContain('failed to load');
@@ -96,7 +96,7 @@ describe('CompareTableRenderer', () => {
 
   it('uses the selection empty state, not the server text, for another sequence', () => {
     locale.current = 'zh';
-    renderTable({ selectedSequence: '8k1k', effectiveSequence: '8k1k' });
+    renderTable({ selectedScenario: '8k1k', effectiveScenario: '8k1k' });
     expect(status()?.textContent).toBe(
       '所选工作负载暂时没有可用于插值对比的数据。请在下方图表控件中选择其他序列。',
     );

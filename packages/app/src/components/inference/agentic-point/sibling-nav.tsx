@@ -3,7 +3,11 @@
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+import {
+  DB_MODEL_RELEASE_NAMES,
+  DB_MODEL_TO_DISPLAY,
+  HW_REGISTRY,
+} from '@semianalysisai/inferencex-constants';
 import { noteAgenticSiblingStep } from '@/lib/routing/agentic-detail-origin';
 
 import type { BenchmarkSibling, BenchmarkSku } from '@/hooks/api/use-benchmark-siblings';
@@ -19,52 +23,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/shared/utils';
+import { cn, getFrameworkLabel } from '@/lib/shared/utils';
 import { track } from '@/lib/analytics/analytics';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-const HW_LABELS: Record<string, string> = {
-  b200: 'B200',
-  b300: 'B300',
-  gb200: 'GB200',
-  gb300: 'GB300',
-  h100: 'H100',
-  h200: 'H200',
-  mi300x: 'MI300X',
-  mi325x: 'MI325X',
-  mi355x: 'MI355X',
-};
-
-const MODEL_LABELS: Record<string, string> = {
-  dsr1: 'DeepSeek R1',
-  dsv4: 'DeepSeek V4 Pro',
-  glm5: 'GLM-5',
-  'glm5.1': 'GLM-5.1',
-  gptoss120b: 'gpt-oss 120B',
-  kimik2: 'Kimi K2',
-  'kimik2.5': 'Kimi K2.5',
-  'kimik2.6': 'Kimi K2.6',
-  llama70b: 'Llama 3.3 70B',
-  'minimaxm2.5': 'MiniMax M2.5',
-  'minimaxm2.7': 'MiniMax M2.7',
-  'qwen3.5': 'Qwen 3.5',
-};
-
-function hwLabel(hw: string) {
-  return HW_LABELS[hw] ?? hw.toUpperCase();
-}
-function modelLabel(m: string) {
-  return MODEL_LABELS[m] ?? m;
-}
-function frameworkLabel(fw: string) {
-  if (fw === 'vllm') return 'vLLM';
-  if (fw === 'sglang') return 'SGLang';
-  if (fw === 'trt') return 'TRT';
-  if (fw === 'mori-sglang') return 'Mori-SGLang';
-  if (fw.startsWith('dynamo-')) return `Dynamo ${fw.slice('dynamo-'.length).toUpperCase()}`;
-  return fw;
+export function skuHeading(sku: BenchmarkSku): string {
+  return [
+    HW_REGISTRY[sku.hardware]?.label ?? sku.hardware.toUpperCase(),
+    DB_MODEL_RELEASE_NAMES[sku.model] ?? sku.model,
+    sku.precision.toUpperCase(),
+    getFrameworkLabel(sku.framework),
+  ].join(' · ');
 }
 
 export function chipLabel(s: BenchmarkSibling): string {
@@ -242,13 +213,11 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
 
   const currentId = siblings.find((s) => s.is_current)?.id;
 
-  const skuLabel = `${hwLabel(sku.hardware)} · ${modelLabel(sku.model)} · ${sku.precision.toUpperCase()} · ${frameworkLabel(sku.framework)}`;
-
   return (
     <div className="border-b border-border/40 pb-4 mb-4">
       <div className="flex flex-col items-start gap-1 mb-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
         <h1 className="min-w-0 break-words text-xl font-semibold text-foreground sm:text-2xl">
-          {skuLabel}
+          {skuHeading(sku)}
         </h1>
         <span className="text-xs text-muted-foreground">
           {t.pointCount(siblings.length)} ·{' '}

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { OptionInfo } from '@/components/ui/option-info';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
   for (const [locale, width] of [
@@ -123,14 +123,14 @@ describe('Consistent informational help', () => {
   }
 });
 
-function ScenarioSelectorHarness({ initial = Sequence.AgenticTraces }: { initial?: Sequence }) {
+function ScenarioSelectorHarness({ initial = Scenario.AgenticTraces }: { initial?: Scenario }) {
   const [value, setValue] = useState<string>(initial);
   return (
     <TooltipProvider delayDuration={0}>
       <ScenarioSelector
         value={value}
         onChange={setValue}
-        availableSequences={[Sequence.EightK_OneK, Sequence.AgenticTraces]}
+        availableScenarios={[Scenario.EightK_OneK, Scenario.AgenticTraces]}
         data-testid="scenario-selector"
       />
     </TooltipProvider>
@@ -153,7 +153,7 @@ function PrecisionSelectorHarness() {
 
 function SelectableContextHarness() {
   const [multipleOptions, setMultipleOptions] = useState(false);
-  const [scenario, setScenario] = useState(Sequence.EightK_OneK);
+  const [scenario, setScenario] = useState(Scenario.EightK_OneK);
   const [precisions, setPrecisions] = useState(['fp4']);
   return (
     <TooltipProvider>
@@ -161,7 +161,7 @@ function SelectableContextHarness() {
         data-testid="toggle-options"
         onClick={() => {
           setMultipleOptions(!multipleOptions);
-          setScenario(Sequence.EightK_OneK);
+          setScenario(Scenario.EightK_OneK);
           setPrecisions(['fp4']);
         }}
       >
@@ -171,10 +171,10 @@ function SelectableContextHarness() {
         <ScenarioSelector
           value={scenario}
           onChange={setScenario}
-          availableSequences={
+          availableScenarios={
             multipleOptions
-              ? [Sequence.EightK_OneK, Sequence.AgenticTraces]
-              : [Sequence.EightK_OneK]
+              ? [Scenario.EightK_OneK, Scenario.AgenticTraces]
+              : [Scenario.EightK_OneK]
           }
           data-testid="scenario-selector"
         />
@@ -291,9 +291,9 @@ describe('Chart Selectors', () => {
         <TooltipProvider delayDuration={0}>
           <div className="grid gap-3 p-4">
             <ScenarioSelector
-              value={Sequence.EightK_OneK}
+              value={Scenario.EightK_OneK}
               onChange={() => {}}
-              availableSequences={[Sequence.EightK_OneK]}
+              availableScenarios={[Scenario.EightK_OneK]}
             />
             <PrecisionSelector value={['fp4']} onChange={() => {}} availablePrecisions={['fp4']} />
           </div>
@@ -344,9 +344,9 @@ describe('Chart Selectors', () => {
           <TooltipProvider delayDuration={0}>
             <div className="w-40 p-3">
               <ScenarioSelector
-                value={Sequence.AgenticTraces}
+                value={Scenario.AgenticTraces}
                 onChange={() => {}}
-                availableSequences={[Sequence.AgenticTraces, Sequence.EightK_OneK]}
+                availableScenarios={[Scenario.AgenticTraces, Scenario.EightK_OneK]}
                 data-testid="scenario-selector"
               />
             </div>
@@ -376,12 +376,12 @@ describe('Chart Selectors', () => {
             <TooltipProvider delayDuration={0}>
               <div className="w-44 p-3">
                 <ScenarioSelector
-                  value={Sequence.AgenticTraces}
+                  value={Scenario.AgenticTraces}
                   onChange={cy.stub().as('changeScenario')}
-                  availableSequences={[
-                    Sequence.AgenticTraces,
-                    Sequence.EightK_OneK,
-                    Sequence.OneK_OneK,
+                  availableScenarios={[
+                    Scenario.AgenticTraces,
+                    Scenario.EightK_OneK,
+                    Scenario.OneK_OneK,
                   ]}
                   model={Model.Qwen3_5}
                   data-testid="scenario-selector"
@@ -418,27 +418,27 @@ describe('Chart Selectors', () => {
             ]);
           });
         cy.get('[data-testid="selector-category-deprecated-info"]').should('not.exist');
-        cy.get(`[data-testid="option-help-${Sequence.OneK_OneK}"]`).trigger('pointerover', {
+        cy.get(`[data-testid="option-help-${Scenario.OneK_OneK}"]`).trigger('pointerover', {
           pointerType: 'mouse',
         });
-        cy.get(`[data-testid="option-help-content-${Sequence.OneK_OneK}"]`).should(
+        cy.get(`[data-testid="option-help-content-${Scenario.OneK_OneK}"]`).should(
           'contain.text',
           locale === 'zh'
             ? 'CI 容量已重新分配给智能体编程和多轮对话场景。'
             : 'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
         );
-        cy.get(`[data-testid="option-help-${Sequence.OneK_OneK}"]`).trigger('pointerout', {
+        cy.get(`[data-testid="option-help-${Scenario.OneK_OneK}"]`).trigger('pointerout', {
           pointerType: 'mouse',
         });
-        cy.get(`[data-testid="option-help-content-${Sequence.OneK_OneK}"]`).should('not.exist');
+        cy.get(`[data-testid="option-help-content-${Scenario.OneK_OneK}"]`).should('not.exist');
         cy.contains('[data-select-option]', '1K / 1K').click();
-        cy.get('@changeScenario').should('have.been.calledOnceWith', Sequence.OneK_OneK);
+        cy.get('@changeScenario').should('have.been.calledOnceWith', Scenario.OneK_OneK);
         cy.get('[data-slot="select-content"]').should('not.exist');
       });
     }
 
     it('keeps scenario explainers out of the closed control for every scenario', () => {
-      cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
+      cy.mount(<ScenarioSelectorHarness initial={Scenario.EightK_OneK} />);
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
       assertClosedScenarioHasNoHelp(36);
 

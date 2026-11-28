@@ -1,3 +1,5 @@
+import { MODEL_REGISTRY, type ModelName } from './models';
+
 export interface FwEntry {
   label: string;
 }
@@ -46,15 +48,9 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
   aiperf: 'AIPerf',
 };
 
-export const MODEL_SPEC_METHOD_LABELS: Record<string, Record<string, string>> = {
-  'MiniMax-M3': { mtp: 'M3 EAGLE' },
-  'Kimi-K3': { mtp: 'DSpark' },
-  'MiniMax-M3.1-Flash': { mtp: 'DSpark' },
-};
-
 export function resolveFrameworkPartLabel(model: string | undefined, part: string): string {
   return (
-    (model ? MODEL_SPEC_METHOD_LABELS[model]?.[part] : undefined) ??
+    (model ? MODEL_REGISTRY[model as ModelName]?.specMethodLabels?.[part] : undefined) ??
     FRAMEWORK_LABELS[part] ??
     part.toUpperCase()
   );

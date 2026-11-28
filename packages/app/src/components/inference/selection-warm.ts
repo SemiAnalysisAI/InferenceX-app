@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 
-import { sequenceTrendHistoryQueryOptions } from '@/hooks/api/use-trend-history';
+import { scenarioTrendHistoryQueryOptions } from '@/hooks/api/use-trend-history';
 import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 import type { BenchmarkRow, WorkflowInfoResponse } from '@/lib/api/api';
 import {
@@ -27,7 +27,7 @@ export interface InferenceChartPage {
   scope?: string;
   seedRows?: BenchmarkRow[];
   seedModel?: string;
-  seedSequence?: string;
+  seedScenario?: string;
 }
 
 /**
@@ -45,16 +45,16 @@ export function warmInferenceSelection(
   if (page.activeTab === 'historical') {
     prefetchEnabled(
       queryClient,
-      sequenceTrendHistoryQueryOptions(model, selection.effectiveSequence),
+      scenarioTrendHistoryQueryOptions(model, selection.effectiveScenario),
     );
   }
   const seed = resolveBenchmarkSeed({
     scope: page.scope,
     seedRows: page.seedRows,
     seedModel: page.seedModel,
-    seedSequence: page.seedSequence,
+    seedScenario: page.seedScenario,
     selectedModel: model,
-    selectedSequence: selection.effectiveSequence,
+    selectedScenario: selection.effectiveScenario,
   });
 
   const warmRuns = (workflow: WorkflowInfoResponse | undefined) => {
@@ -74,8 +74,8 @@ export function warmInferenceSelection(
       ),
       asOfRunId: runs.asOfRunId,
       runId: runs.benchmarkRunId,
-      enabled: selection.sequenceResolved,
-      prefetchLatestRows: !selection.sequenceResolved && !selection.effectiveRunDate && !seed.rows,
+      enabled: selection.scenarioResolved,
+      prefetchLatestRows: !selection.scenarioResolved && !selection.effectiveRunDate && !seed.rows,
       scope: seed.scope,
       initialRows: seed.rows,
     });

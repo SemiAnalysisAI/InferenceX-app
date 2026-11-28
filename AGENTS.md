@@ -165,7 +165,7 @@ The Python file has a header comment explaining the pipeline and a `_cli()` entr
 
 ## Model Parameter Counts
 
-Total / active parameter counts live in `MODEL_ARCHITECTURES` (`packages/app/src/lib/catalog/model-architectures.ts`). Verify against the HF model card before adding a model or changing `MODEL_CONFIG` labels in `packages/app/src/lib/catalog/data-mappings.ts` or blog/docs prose. Point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
+Total / active parameter counts live in `MODEL_ARCHITECTURES` (`packages/app/src/lib/catalog/model-architectures.ts`). Verify against the HF model card before adding a model or changing `MODEL_REGISTRY` labels in `packages/constants/src/models.ts` or blog/docs prose. Point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
 
 **Common mislabel traps** (have all bitten this repo at least once — do not repeat):
 

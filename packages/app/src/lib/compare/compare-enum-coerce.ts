@@ -1,12 +1,12 @@
-import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Precision, Scenario } from '@/lib/catalog/data-mappings';
 
 export function toModel(value: string): Model | undefined {
   return Object.values(Model).includes(value as Model) ? (value as Model) : undefined;
 }
 
-export function toSequence(value: string | null): Sequence | undefined {
+export function toScenario(value: string | null): Scenario | undefined {
   if (!value) return undefined;
-  return Object.values(Sequence).includes(value as Sequence) ? (value as Sequence) : undefined;
+  return Object.values(Scenario).includes(value as Scenario) ? (value as Scenario) : undefined;
 }
 
 export function toPrecisions(value: string | null): string[] | undefined {

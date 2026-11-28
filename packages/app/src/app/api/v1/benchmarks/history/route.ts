@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 
-import { islOslToSequence } from '@semianalysisai/inferencex-constants';
+import { islOslToScenario } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import { cachedJson } from '@/lib/cache/api-cache';
@@ -40,7 +40,7 @@ function applyCalculatorView<
   },
 >(rows: T[], isl: number | null, osl: number | null): T[] {
   if (isl === null || osl === null) return rows;
-  const sequence = islOslToSequence(isl, osl);
+  const sequence = islOslToScenario(isl, osl);
   if (!sequence) return rows;
   return toCalculatorBenchmarkRows(rows, sequence);
 }

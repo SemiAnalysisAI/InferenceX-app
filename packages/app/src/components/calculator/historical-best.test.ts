@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 
 import {
   bestSoFarProgression,
@@ -80,7 +80,7 @@ function options(
 ) {
   return {
     rows,
-    sequence: Sequence.OneK_OneK,
+    sequence: Scenario.OneK_OneK,
     precisions: ['fp4'],
     targetValue: 50,
     mode: 'interactivity_to_throughput' as const,
@@ -578,7 +578,7 @@ describe('agentic traces', () => {
   it('groups rows that have no ISL/OSL, keyed on the agentic sequence', () => {
     const groups = groupHistoryByHwKeyAndDate({
       rows: agenticRows,
-      sequence: Sequence.AgenticTraces,
+      sequence: Scenario.AgenticTraces,
       precisions: ['fp4'],
     });
     expect(groups.datesSeen).toBe(2);
@@ -594,7 +594,7 @@ describe('agentic traces', () => {
     const agentic = selectBestFromGroups(
       groupHistoryByHwKeyAndDate({
         rows: agenticRows,
-        sequence: Sequence.AgenticTraces,
+        sequence: Scenario.AgenticTraces,
         precisions: ['fp4'],
       }),
       {
@@ -627,7 +627,7 @@ describe('agentic traces', () => {
     const progressions = bestSoFarProgression(
       groupHistoryByHwKeyAndDate({
         rows: agenticRows,
-        sequence: Sequence.AgenticTraces,
+        sequence: Scenario.AgenticTraces,
         precisions: ['fp4'],
       }),
       {

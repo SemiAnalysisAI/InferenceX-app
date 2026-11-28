@@ -1,4 +1,8 @@
-import { DB_MODEL_TO_DISPLAY, DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import {
+  DB_MODEL_TO_DISPLAY,
+  DISPLAY_MODEL_TO_DB,
+  MODEL_REGISTRY,
+} from '@semianalysisai/inferencex-constants';
 
 import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 
@@ -13,23 +17,18 @@ export interface ResolvedModel {
 export const MODEL_DISPLAY_NAMES: readonly string[] = Object.keys(DISPLAY_MODEL_TO_DB).toSorted();
 
 /**
- * Retired or misspelled names that API clients still send, each naming exactly one current display
- * model. Names that could mean more than one model (for example `Qwen3.8`) stay unknown.
+ * Names that API clients still send besides the display name, each naming exactly one current
+ * display model: point releases that share a display bucket, and retired or misspelled names.
+ * Names that could mean more than one model (for example `Qwen3.8`) stay unknown.
  */
-export const LEGACY_MODEL_NAMES: Readonly<Record<string, string>> = {
-  // The display name has a hyphen after Qwen; the model card does not.
-  'Qwen3.5-397B-A17B': 'Qwen-3.5-397B-A17B',
-  // The dashboard label carries the checkpoint date.
-  'DeepSeek-V4-Pro-0813': 'DeepSeek-V4-Pro',
-  // Point releases that share a display bucket with an earlier name.
-  'Kimi-K2.6': 'Kimi-K2.5',
-  'Kimi-K2.7-Code': 'Kimi-K2.5',
-  'MiniMax-M2.7': 'MiniMax-M2.5',
-  'GLM-5.1': 'GLM-5',
-  'GLM-5.3': 'GLM-5.2',
-  'Kimi-K3.1': 'Kimi-K3.1-Pro',
-  'Llama-3.3-70B-Instruct': 'Llama-3.3-70B-Instruct-FP8',
-};
+export const LEGACY_MODEL_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(MODEL_REGISTRY).flatMap(([displayName, entry]) =>
+    [...Object.values(entry.releaseNames ?? {}), ...(entry.aliases ?? [])].map((name) => [
+      name,
+      displayName,
+    ]),
+  ),
+);
 
 function lowercaseIndex(entries: Iterable<readonly [string, string]>): Map<string, string> {
   return new Map([...entries].map(([name, displayName]) => [name.toLowerCase(), displayName]));

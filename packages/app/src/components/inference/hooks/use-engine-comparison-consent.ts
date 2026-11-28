@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
 
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import type { Exclusion } from '@/lib/benchmarks/exclusion';
 
-export function supportsEngineComparisonConsent(sequence: Sequence): boolean {
-  return sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces;
+export function supportsEngineComparisonConsent(scenario: Scenario): boolean {
+  return scenario === Scenario.EightK_OneK || scenario === Scenario.AgenticTraces;
 }
 
 export function needsEngineComparisonConsent(

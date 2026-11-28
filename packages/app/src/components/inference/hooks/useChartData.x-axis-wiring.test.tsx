@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { processOverlayChartData } from '@/components/inference/utils';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
@@ -114,7 +114,7 @@ function Probe({
 }) {
   result = useChartData(
     energy ? Model.DeepSeek_V4_Pro : Model.DeepSeek_R1,
-    energy ? Sequence.EightK_OneK : Sequence.OneK_OneK,
+    energy ? Scenario.EightK_OneK : Scenario.OneK_OneK,
     [energy ? 'fp4' : 'fp8'],
     metric,
     'p90_ttft',

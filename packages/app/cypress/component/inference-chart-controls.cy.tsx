@@ -1,5 +1,5 @@
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
 import { ResultContext } from '@/components/ui/result-context';
@@ -175,9 +175,9 @@ describe('Inference ChartControls cost metrics', () => {
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
-        selectedSequence: Sequence.EightK_OneK,
+        selectedScenario: Scenario.EightK_OneK,
       },
-      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveScenario: Scenario.EightK_OneK },
     });
   });
 

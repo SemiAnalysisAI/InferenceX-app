@@ -1,4 +1,19 @@
-import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants/models';
+import {
+  type CategoryTag,
+  DB_MODEL_TO_DISPLAY,
+  type EnumKeyed,
+  MODEL_PREFIX_ALIASES,
+  MODEL_REGISTRY,
+  type ModelEntry,
+  type ModelName,
+  PRECISION_REGISTRY,
+  type PrecisionEntry,
+  type PrecisionKey,
+  type ScenarioKind,
+  SCENARIO_REGISTRY,
+  type ScenarioEntry,
+  type ScenarioKey,
+} from '@semianalysisai/inferencex-constants';
 
 import type { ExclusionConflictPolicy, ExclusionSpec } from '../benchmarks/exclusion';
 
@@ -25,8 +40,6 @@ export enum Model {
   Muse_Spark_Open = 'Muse-Spark-Open',
 }
 
-export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
-
 export function groupByCategory<T>(
   items: T[],
   classify: (item: T) => CategoryTag,
@@ -42,19 +55,6 @@ export function groupByCategory<T>(
     groups[classify(item)].push(item);
   }
   return groups;
-}
-
-interface ModelConfig {
-  label: string;
-  prefix: string;
-  category: CategoryTag;
-  openRouterModelId?: string;
-  logo?: string;
-  exclusion?: ExclusionSpec[];
-  /** Pending registrations remain inference-selectable, but are not measured fallback choices. */
-  requiresObservations?: boolean;
-  /** UI visibility only; raw benchmark/API identities remain available. */
-  featureGated?: boolean;
 }
 
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
@@ -75,148 +75,10 @@ const STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
 
 const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
 
-const MODEL_CONFIG: Record<Model, ModelConfig> = {
-  [Model.Muse_Spark_Open]: {
-    label: 'Muse Spark 1.3/Open 816B',
-    prefix: 'musespark',
-    category: 'default',
-    logo: 'meta-color.svg',
-  },
-  [Model.DeepSeek_V4_Pro]: {
-    label: 'DeepSeek V4 Pro 0813 1.6T',
-    prefix: 'dsv4',
-    category: 'deprecated',
-    openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
-    logo: 'deepseek-color.svg',
-    exclusion: MTP_ENGINE_EXCLUSION,
-  },
-  [Model.DeepSeek_V4_1_Flash]: {
-    label: 'DeepSeek V4.1 Flash 552B',
-    prefix: 'dsv41flash',
-    category: 'default',
-    openRouterModelId: 'deepseek/deepseek-v4.1-flash',
-    logo: 'deepseek-color.svg',
-  },
-  [Model.Kimi_K3_1_Pro]: {
-    label: 'Kimi K3.1 Pro 2.8T',
-    prefix: 'kimik3.1',
-    category: 'default',
-    openRouterModelId: 'moonshotai/kimi-k3.1-pro',
-    logo: 'kimi-color.svg',
-  },
-  [Model.Kimi_K3]: {
-    label: 'Kimi K3 2.8T',
-    prefix: 'kimik3',
-    category: 'deprecated',
-    openRouterModelId: 'moonshotai/kimi-k3',
-    logo: 'kimi-color.svg',
-  },
-  [Model.Kimi_K2_5]: {
-    label: 'Kimi K2.5/2.6/2.7-Code 1T',
-    prefix: 'kimik2.5',
-    category: 'deprecated',
-    openRouterModelId: 'moonshotai/kimi-k2.7-code',
-    logo: 'kimi-color.svg',
-  },
-  [Model.MiniMax_M3]: {
-    label: 'MiniMax M3 428B',
-    prefix: 'minimaxm3',
-    category: 'deprecated',
-    openRouterModelId: 'minimax/minimax-m3',
-    logo: 'minimax-color.svg',
-  },
-  [Model.MiniMax_M3_1_Flash]: {
-    label: 'MiniMax M3.1 Flash 428B',
-    prefix: 'minimaxm31flash',
-    category: 'default',
-    openRouterModelId: 'minimax/minimax-m3.1-flash',
-    logo: 'minimax-color.svg',
-  },
-  [Model.DeepSeek_R1]: {
-    label: 'DeepSeek R1 0528 671B',
-    prefix: 'dsr1',
-    category: 'maintenance',
-    openRouterModelId: 'deepseek/deepseek-r1-0528',
-    logo: 'deepseek-color.svg',
-  },
-  [Model.GLM_5]: {
-    label: 'GLM5/5.1 744B',
-    prefix: 'glm5',
-    category: 'deprecated',
-    openRouterModelId: 'z-ai/glm-5.1',
-    logo: 'zai-color.svg',
-  },
-  [Model.GLM_5_2]: {
-    label: 'GLM5.2/GLM5.3 744B',
-    prefix: 'glm5.2',
-    category: 'default',
-    openRouterModelId: 'z-ai/glm-5.3',
-    logo: 'zai-color.svg',
-  },
-  [Model.Qwen3_5]: {
-    label: 'Qwen3.5 397B',
-    prefix: 'qwen3.5',
-    category: 'default',
-    openRouterModelId: 'qwen/qwen3.5-397b-a17b',
-    logo: 'qwen-color.svg',
-  },
-  [Model.GLM_5_3_Flash]: {
-    label: 'GLM 5.3 Flash',
-    prefix: 'glm5.3flash',
-    category: 'default',
-    logo: 'zai-color.svg',
-    requiresObservations: true,
-    featureGated: true,
-  },
-  [Model.Qwen3_8_Flash_Next]: {
-    label: 'Qwen3.8 Flash Next 176B',
-    prefix: 'qwen3.8next',
-    category: 'default',
-    openRouterModelId: 'qwen/qwen3.8-flash',
-    logo: 'qwen-color.svg',
-  },
-  [Model.Qwen3_8_27B]: {
-    label: 'Qwen3.8 27B',
-    prefix: 'qwen3.827b',
-    category: 'experimental',
-    openRouterModelId: 'qwen/qwen3.8-27b',
-    logo: 'qwen-color.svg',
-  },
-  [Model.Qwen3_8_27B_Eager]: {
-    label: 'Qwen3.8 27B (eager)',
-    prefix: 'qwen3.827beager',
-    category: 'experimental',
-    openRouterModelId: 'qwen/qwen3.8-27b',
-    logo: 'qwen-color.svg',
-  },
-  [Model.GptOss]: {
-    label: 'gpt-oss 120B',
-    prefix: 'gptoss',
-    category: 'deprecated',
-    openRouterModelId: 'openai/gpt-oss-120b',
-    logo: 'openai.svg',
-  },
-  [Model.MiniMax_M2_5]: {
-    label: 'MiniMax M2.5/2.7 230B',
-    prefix: 'minimaxm2.5',
-    category: 'deprecated',
-    openRouterModelId: 'minimax/minimax-m2.7',
-    logo: 'minimax-color.svg',
-  },
-  [Model.Llama3_3_70B]: {
-    label: 'Llama 3.3 70B Instruct',
-    prefix: '70b',
-    category: 'deprecated',
-    openRouterModelId: 'meta-llama/llama-3.3-70b-instruct',
-    logo: 'meta-color.svg',
-  },
-  [Model.Llama3_1_70B]: {
-    label: 'Llama 3.1 70B Instruct',
-    prefix: '',
-    category: 'hidden',
-    openRouterModelId: 'meta-llama/llama-3.1-70b-instruct',
-    logo: 'meta-color.svg',
-  },
+const MODEL_CONFIG: EnumKeyed<Model, ModelName, ModelEntry> = MODEL_REGISTRY;
+
+const MODEL_EXCLUSIONS: Partial<Record<Model, ExclusionSpec[]>> = {
+  [Model.DeepSeek_V4_Pro]: MTP_ENGINE_EXCLUSION,
 };
 
 function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
@@ -296,7 +158,7 @@ export function modelRequiresObservations(model: Model): boolean {
 
 export function getModelExclusion(model: Model | string | null | undefined): ExclusionSpec[] {
   if (!model) return [];
-  return MODEL_CONFIG[model as Model]?.exclusion ?? [];
+  return MODEL_EXCLUSIONS[model as Model] ?? [];
 }
 
 export function hasExclusion(model: Model | string | null | undefined): boolean {
@@ -312,111 +174,83 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 
-export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
-  (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
-    .filter(([, c]) => c.prefix)
-    .flatMap(([m, c]) =>
-      [...new Set([c.prefix, ...(DISPLAY_MODEL_TO_DB[m] ?? [])])].map((prefix) => [prefix, m]),
-    ),
-);
+export const MODEL_PREFIX_MAPPING: Record<string, Model> = {
+  ...(DB_MODEL_TO_DISPLAY as Record<string, Model>),
+  ...Object.fromEntries(
+    Object.entries(MODEL_PREFIX_ALIASES).map(([prefix, dbKey]) => [
+      prefix,
+      DB_MODEL_TO_DISPLAY[dbKey] as Model,
+    ]),
+  ),
+  // Llama 3.3 artifact names and changelog keys carry the bare `70b` prefix.
+  '70b': Model.Llama3_3_70B,
+};
 
 const MODEL_PREFIXES_LONGEST_FIRST = Object.keys(MODEL_PREFIX_MAPPING).toSorted(
   (a, b) => b.length - a.length,
 );
 
-export enum Sequence {
+export enum Scenario {
   OneK_OneK = '1k/1k',
   OneK_EightK = '1k/8k',
   EightK_OneK = '8k/1k',
   AgenticTraces = 'agentic-traces',
 }
 
-export type ScenarioKind = 'fixed-seq' | 'agentic';
+const SCENARIO_CONFIG: EnumKeyed<Scenario, ScenarioKey, ScenarioEntry> = SCENARIO_REGISTRY;
 
-export function sequenceKind(seq: Sequence): ScenarioKind {
-  return seq === Sequence.AgenticTraces ? 'agentic' : 'fixed-seq';
+export function scenarioKind(scenario: Scenario): ScenarioKind {
+  return SCENARIO_CONFIG[scenario].kind;
 }
 
-interface SequenceConfig {
-  label: string;
-  labelZh: string;
-  compact: string;
-  category: CategoryTag;
-  kind: ScenarioKind;
-  exclusion?: ExclusionSpec[];
-  exclusionPolicy?: ExclusionConflictPolicy;
-  defaultExclusionGroup?: string;
-  exclusionFamilies?: readonly string[];
+interface ScenarioExclusionConfig {
+  exclusion: ExclusionSpec[];
+  exclusionPolicy: ExclusionConflictPolicy;
+  defaultExclusionGroup: string;
+  exclusionFamilies: readonly string[];
 }
 
-const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
-  [Sequence.OneK_OneK]: {
-    label: '1K / 1K',
-    labelZh: '1K / 1K',
-    compact: '1k1k',
-    category: 'deprecated',
-    kind: 'fixed-seq',
-  },
-  [Sequence.OneK_EightK]: {
-    label: '1K / 8K',
-    labelZh: '1K / 8K',
-    compact: '1k8k',
-    category: 'deprecated',
-    kind: 'fixed-seq',
-  },
-  [Sequence.EightK_OneK]: {
-    label: '8K / 1K',
-    labelZh: '8K / 1K',
-    compact: '8k1k',
-    category: 'default',
-    kind: 'fixed-seq',
-    exclusion: STP_ENGINE_EXCLUSION,
-    exclusionPolicy: 'keep-sticky',
-    defaultExclusionGroup: 'vllm',
-    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
-  },
-  [Sequence.AgenticTraces]: {
-    label: 'Agentic',
-    labelZh: '智能体',
-    compact: 'agentic',
-    category: 'default',
-    kind: 'agentic',
-    exclusion: STP_ENGINE_EXCLUSION,
-    exclusionPolicy: 'keep-sticky',
-    defaultExclusionGroup: 'vllm',
-    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
-  },
+const GUARDED_ENGINE_EXCLUSION: ScenarioExclusionConfig = {
+  exclusion: STP_ENGINE_EXCLUSION,
+  exclusionPolicy: 'keep-sticky',
+  defaultExclusionGroup: 'vllm',
+  exclusionFamilies: GUARDED_ENGINE_FAMILIES,
 };
 
-export function getSequenceExclusion(
-  sequence: Sequence | string | null | undefined,
+const SCENARIO_EXCLUSIONS: Partial<Record<Scenario, ScenarioExclusionConfig>> = {
+  [Scenario.EightK_OneK]: GUARDED_ENGINE_EXCLUSION,
+  [Scenario.AgenticTraces]: GUARDED_ENGINE_EXCLUSION,
+};
+
+export function getScenarioExclusion(
+  scenario: Scenario | string | null | undefined,
 ): ExclusionSpec[] {
-  if (!sequence) return [];
-  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusion ?? [];
+  if (!scenario) return [];
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.exclusion ?? [];
 }
 
-export function getSequenceExclusionPolicy(
-  sequence: Sequence | string | null | undefined,
+export function getScenarioExclusionPolicy(
+  scenario: Scenario | string | null | undefined,
 ): ExclusionConflictPolicy {
-  if (!sequence) return 'clear-all';
-  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionPolicy ?? 'clear-all';
+  if (!scenario) return 'clear-all';
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.exclusionPolicy ?? 'clear-all';
 }
 
-export function getSequenceDefaultExclusionGroup(
-  sequence: Sequence | string | null | undefined,
+export function getScenarioDefaultExclusionGroup(
+  scenario: Scenario | string | null | undefined,
 ): string | null {
-  if (!sequence) return null;
-  return SEQUENCE_CONFIG[sequence as Sequence]?.defaultExclusionGroup ?? null;
+  if (!scenario) return null;
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.defaultExclusionGroup ?? null;
 }
 
-export function getSequenceExclusionFamilies(
-  sequence: Sequence | string | null | undefined,
+export function getScenarioExclusionFamilies(
+  scenario: Scenario | string | null | undefined,
 ): readonly string[] | null {
-  if (!sequence) return null;
-  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionFamilies ?? null;
+  if (!scenario) return null;
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.exclusionFamilies ?? null;
 }
 
-export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
+export const SCENARIO_OPTIONS = Object.keys(SCENARIO_CONFIG) as Scenario[];
 
 export enum Percentile {
   P75 = 'p75',
@@ -434,88 +268,88 @@ export function getPercentileLabel(p: Percentile): string {
   return PERCENTILE_CONFIG[p]?.label ?? p;
 }
 
-export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
-  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][])
+export const DEPRECATED_SCENARIOS: ReadonlySet<Scenario> = new Set(
+  (Object.entries(SCENARIO_CONFIG) as [Scenario, (typeof SCENARIO_CONFIG)[Scenario]][])
     .filter(([, c]) => c.category === 'deprecated')
     .map(([s]) => s),
 );
 
-export function isSequenceDeprecated(sequence: Sequence): boolean {
-  return DEPRECATED_SEQUENCES.has(sequence);
+export function isScenarioDeprecated(scenario: Scenario): boolean {
+  return DEPRECATED_SCENARIOS.has(scenario);
 }
 
-export function getSequenceCategory(sequence: Sequence): CategoryTag {
-  return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
+export function getScenarioCategory(scenario: Scenario): CategoryTag {
+  return SCENARIO_CONFIG[scenario]?.category ?? 'default';
 }
 
-const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
-  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
-  [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
-  [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
+const MODEL_DEPRECATED_SCENARIOS: Partial<Record<Model, ReadonlySet<Scenario>>> = {
+  [Model.Qwen3_5]: new Set([Scenario.EightK_OneK]),
+  [Model.MiniMax_M3]: new Set([Scenario.EightK_OneK]),
+  [Model.DeepSeek_V4_Pro]: new Set([Scenario.EightK_OneK]),
 };
 
-export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
-  return MODEL_DEPRECATED_SEQUENCES[model]?.has(sequence) ?? false;
+export function isScenarioDeprecatedForModel(model: Model, scenario: Scenario): boolean {
+  return MODEL_DEPRECATED_SCENARIOS[model]?.has(scenario) ?? false;
 }
 
-const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+const MODEL_HIDDEN_SCENARIOS: Partial<Record<Model, ReadonlySet<Scenario>>> = {
   [Model.GLM_5_3_Flash]: new Set(
-    SEQUENCE_OPTIONS.filter(
-      (sequence) => sequence !== Sequence.AgenticTraces && sequence !== Sequence.EightK_OneK,
+    SCENARIO_OPTIONS.filter(
+      (scenario) => scenario !== Scenario.AgenticTraces && scenario !== Scenario.EightK_OneK,
     ),
   ),
   [Model.Muse_Spark_Open]: new Set(
-    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+    SCENARIO_OPTIONS.filter((scenario) => scenario !== Scenario.AgenticTraces),
   ),
 };
 
-export function isSequenceHiddenForModel(model: Model, sequence: Sequence): boolean {
-  return MODEL_HIDDEN_SEQUENCES[model]?.has(sequence) ?? false;
+export function isScenarioHiddenForModel(model: Model, scenario: Scenario): boolean {
+  return MODEL_HIDDEN_SCENARIOS[model]?.has(scenario) ?? false;
 }
 
-export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | null): CategoryTag {
-  if (model && isSequenceDeprecatedForModel(model, sequence)) return 'deprecated';
-  return getSequenceCategory(sequence);
+export function getScenarioCategoryForModel(scenario: Scenario, model?: Model | null): CategoryTag {
+  if (model && isScenarioDeprecatedForModel(model, scenario)) return 'deprecated';
+  return getScenarioCategory(scenario);
 }
 
-const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Sequence>>> = {};
+const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Scenario>>> = {};
 
 export function isBestPerSkuDefaultOff(
   model: Model | null | undefined,
-  sequence: Sequence | null | undefined,
+  scenario: Scenario | null | undefined,
 ): boolean {
-  if (!model || !sequence) return false;
-  return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(sequence) ?? false;
+  if (!model || !scenario) return false;
+  return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(scenario) ?? false;
 }
 
-const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
-  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
-  [Model.Kimi_K3]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
+const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Scenario>>> = {
+  [Model.Qwen3_5]: new Set([Scenario.EightK_OneK, Scenario.AgenticTraces]),
+  [Model.Kimi_K3]: new Set([Scenario.EightK_OneK, Scenario.AgenticTraces]),
   // Muse Spark Open exposes only Agentic Traces, where its TPUv7 results live.
-  [Model.Muse_Spark_Open]: new Set([Sequence.AgenticTraces]),
+  [Model.Muse_Spark_Open]: new Set([Scenario.AgenticTraces]),
   // GLM-5.2 and GLM-5.3 Flash have TPUv7 results on Agentic Traces only.
-  [Model.GLM_5_2]: new Set([Sequence.AgenticTraces]),
-  [Model.GLM_5_3_Flash]: new Set([Sequence.AgenticTraces]),
+  [Model.GLM_5_2]: new Set([Scenario.AgenticTraces]),
+  [Model.GLM_5_3_Flash]: new Set([Scenario.AgenticTraces]),
   // Qwen3.8 Flash Next has TPUv7 results on Agentic Traces only.
-  [Model.Qwen3_8_Flash_Next]: new Set([Sequence.AgenticTraces]),
+  [Model.Qwen3_8_Flash_Next]: new Set([Scenario.AgenticTraces]),
 };
 
 export function showsTcoBasisSelector(
   model: Model | null | undefined,
-  sequence: Sequence | null | undefined,
+  scenario: Scenario | null | undefined,
 ): boolean {
-  if (!model || !sequence) return false;
-  return MODEL_TCO_BASIS_SELECTOR[model]?.has(sequence) ?? false;
+  if (!model || !scenario) return false;
+  return MODEL_TCO_BASIS_SELECTOR[model]?.has(scenario) ?? false;
 }
 
-export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
-  const config = SEQUENCE_CONFIG[sequence];
-  if (!config) return sequence;
+export function getScenarioLabel(scenario: Scenario, locale: 'en' | 'zh' = 'en'): string {
+  const config = SCENARIO_CONFIG[scenario];
+  if (!config) return scenario;
   return locale === 'zh' ? config.labelZh : config.label;
 }
 
-const SEQUENCE_PREFIX_MAPPING: Record<string, Sequence> = Object.fromEntries(
-  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][]).map(
+const SCENARIO_PREFIX_MAPPING: Record<string, Scenario> = Object.fromEntries(
+  (Object.entries(SCENARIO_CONFIG) as [Scenario, (typeof SCENARIO_CONFIG)[Scenario]][]).map(
     ([s, c]) => [c.compact, s],
   ),
 );
@@ -528,13 +362,7 @@ export enum Precision {
   INT4 = 'int4',
 }
 
-const PRECISION_CONFIG: Record<Precision, { label: string }> = {
-  [Precision.FP4]: { label: 'FP4' },
-  [Precision.FP4FP8]: { label: 'FP4+FP8' },
-  [Precision.FP8]: { label: 'FP8' },
-  [Precision.BF16]: { label: 'BF16' },
-  [Precision.INT4]: { label: 'INT4' },
-};
+const PRECISION_CONFIG: EnumKeyed<Precision, PrecisionKey, PrecisionEntry> = PRECISION_REGISTRY;
 
 export const PRECISION_OPTIONS = Object.keys(PRECISION_CONFIG) as Precision[];
 
@@ -543,17 +371,17 @@ export function getPrecisionLabel(precision: Precision): string {
 }
 
 const MODEL_DEFAULT_PRECISIONS: Partial<
-  Record<Model, Partial<Record<Sequence, readonly Precision[]>>>
+  Record<Model, Partial<Record<Scenario, readonly Precision[]>>>
 > = {
-  [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
-  [Model.Qwen3_5]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+  [Model.GLM_5_2]: { [Scenario.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+  [Model.Qwen3_5]: { [Scenario.AgenticTraces]: [Precision.FP4, Precision.FP8] },
 };
 
 export function getModelDefaultPrecisions(
   model: Model,
-  sequence: Sequence,
+  scenario: Scenario,
 ): readonly Precision[] | undefined {
-  return MODEL_DEFAULT_PRECISIONS[model]?.[sequence];
+  return MODEL_DEFAULT_PRECISIONS[model]?.[scenario];
 }
 
 export enum EvalBenchmark {
@@ -568,11 +396,11 @@ export function getEvalBenchmarkLabel(benchmark: EvalBenchmark): string {
   return EVAL_BENCHMARK_CONFIG[benchmark]?.label ?? benchmark;
 }
 
-export function getModelAndSequence(
+export function getModelAndScenario(
   artifactName: string,
-): { model: Model; sequence: Sequence } | undefined {
+): { model: Model; sequence: Scenario } | undefined {
   let model: Model | undefined;
-  let sequence: Sequence | undefined;
+  let scenario: Scenario | undefined;
 
   for (const key of MODEL_PREFIXES_LONGEST_FIRST) {
     if (artifactName.includes(key)) {
@@ -581,31 +409,31 @@ export function getModelAndSequence(
     }
   }
 
-  for (const key in SEQUENCE_PREFIX_MAPPING) {
+  for (const key in SCENARIO_PREFIX_MAPPING) {
     if (artifactName.includes(key)) {
-      sequence = SEQUENCE_PREFIX_MAPPING[key];
+      scenario = SCENARIO_PREFIX_MAPPING[key];
       break;
     }
   }
 
-  if (model && sequence) {
-    return { model, sequence };
+  if (model && scenario) {
+    return { model, sequence: scenario };
   }
 
   return undefined;
 }
 
-export function getModelAndSequenceFromArtifact(
+export function getModelAndScenarioFromArtifact(
   artifact: any,
-): { model: Model; sequence: Sequence } | undefined {
+): { model: Model; sequence: Scenario } | undefined {
   let seq = '';
   seq += artifact.isl === 1024 ? '1k' : '8k';
   seq += artifact.osl === 1024 ? '1k' : '8k';
 
   const model = MODEL_PREFIX_MAPPING[artifact.infmax_model_prefix as string];
-  const sequence = SEQUENCE_PREFIX_MAPPING[seq];
-  if (model && sequence) {
-    return { model, sequence };
+  const scenario = SCENARIO_PREFIX_MAPPING[seq];
+  if (model && scenario) {
+    return { model, sequence: scenario };
   }
 
   return undefined;

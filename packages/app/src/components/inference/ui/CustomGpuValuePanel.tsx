@@ -142,7 +142,7 @@ const CustomGpuValuePanel = memo(
     const locale = useLocale();
     const t = STRINGS[locale];
     const { selectedYAxisMetric } = useInferenceDisplay();
-    const { selectedPrecisions, selectedModel, selectedSequence } = useInferenceFilters();
+    const { selectedPrecisions, selectedModel, selectedScenario } = useInferenceFilters();
     const { setUserPowers } = useInferenceActions();
 
     const config = PANEL_CONFIG[kind];
@@ -158,7 +158,7 @@ const CustomGpuValuePanel = memo(
 
     const previousFiltersRef = useRef<CustomGpuPanelFilters>({
       model: selectedModel,
-      sequence: selectedSequence,
+      sequence: selectedScenario,
       precisions: selectedPrecisions,
       yAxisMetric: selectedYAxisMetric,
     });
@@ -187,7 +187,7 @@ const CustomGpuValuePanel = memo(
       const prevFilters = previousFiltersRef.current;
       const currentFilters: CustomGpuPanelFilters = {
         model: selectedModel,
-        sequence: selectedSequence,
+        sequence: selectedScenario,
         precisions: selectedPrecisions,
         yAxisMetric: selectedYAxisMetric,
       };
@@ -198,7 +198,7 @@ const CustomGpuValuePanel = memo(
         setInputErrors({});
         previousFiltersRef.current = currentFilters;
       }
-    }, [defaultValues, selectedModel, selectedPrecisions, selectedSequence, selectedYAxisMetric]);
+    }, [defaultValues, selectedModel, selectedPrecisions, selectedScenario, selectedYAxisMetric]);
 
     const handleInputChange = useCallback(
       (gpuKey: string, value: string) => {

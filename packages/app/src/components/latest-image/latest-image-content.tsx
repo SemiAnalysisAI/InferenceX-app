@@ -22,7 +22,7 @@ import { useFrameworkReleases } from '@/hooks/api/use-framework-releases';
 import { useLatestImages } from '@/hooks/api/use-latest-images';
 import type { LatestImageRow } from '@/lib/api/api';
 import { track } from '@/lib/analytics/analytics';
-import { Sequence, getSequenceLabel, isModelVisible } from '@/lib/catalog/data-mappings';
+import { Scenario, getScenarioLabel, isModelVisible } from '@/lib/catalog/data-mappings';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getFrameworkLabel } from '@/lib/shared/utils';
@@ -42,8 +42,8 @@ import {
   isActiveImageRow,
   isOutdated,
   isStaleAgentx,
-  resolveSelectedSequence,
-  sequenceOptionsForModel,
+  resolveSelectedScenario,
+  scenarioOptionsForModel,
 } from './latest-image-utils';
 
 const STRINGS = {
@@ -156,8 +156,8 @@ const STRINGS = {
 
 type NodeType = 'single' | 'disagg' | 'all';
 
-function sequenceOptionLabel(seq: string, locale: 'en' | 'zh'): string {
-  return seq === Sequence.AgenticTraces ? getSequenceLabel(Sequence.AgenticTraces, locale) : seq;
+function scenarioOptionLabel(seq: string, locale: 'en' | 'zh'): string {
+  return seq === Scenario.AgenticTraces ? getScenarioLabel(Scenario.AgenticTraces, locale) : seq;
 }
 
 function deriveOptions(data: LatestImageRow[]) {
@@ -211,7 +211,7 @@ export function CurrentImageContent() {
     ? requestedModel
     : 'all';
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
-  const [selectedSequence, setSelectedSequence] = useState<string>(Sequence.AgenticTraces);
+  const [selectedScenario, setSelectedScenario] = useState<string>(Scenario.AgenticTraces);
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
   const [selectedHardware, setSelectedHardware] = useState<string>('all');
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('all');
@@ -230,10 +230,10 @@ export function CurrentImageContent() {
   const options = useMemo(() => (activeRows ? deriveOptions(activeRows) : null), [activeRows]);
 
   const sequenceOptions = useMemo(
-    () => (activeRows ? sequenceOptionsForModel(activeRows, selectedModel) : []),
+    () => (activeRows ? scenarioOptionsForModel(activeRows, selectedModel) : []),
     [activeRows, selectedModel],
   );
-  const effectiveSequence = resolveSelectedSequence(sequenceOptions, selectedSequence);
+  const effectiveScenario = resolveSelectedScenario(sequenceOptions, selectedScenario);
 
   const today = useMemo(() => new Date(), []);
 
@@ -241,7 +241,7 @@ export function CurrentImageContent() {
     () => ({
       model: selectedModel,
       precision: selectedPrecision,
-      sequence: effectiveSequence,
+      sequence: effectiveScenario,
       spec: selectedSpecMethod,
       hardware: selectedHardware,
       nodeType: selectedNodeType,
@@ -250,7 +250,7 @@ export function CurrentImageContent() {
     [
       selectedModel,
       selectedPrecision,
-      effectiveSequence,
+      effectiveScenario,
       selectedSpecMethod,
       selectedHardware,
       selectedNodeType,
@@ -288,9 +288,9 @@ export function CurrentImageContent() {
                       onValueChange={(v) => {
                         track('current_image_model_changed', { model: v });
                         setSelectedModel(v);
-                        const next = sequenceOptionsForModel(activeRows ?? [], v);
-                        if (next.length > 0 && !next.includes(selectedSequence)) {
-                          setSelectedSequence(next[0]);
+                        const next = scenarioOptionsForModel(activeRows ?? [], v);
+                        if (next.length > 0 && !next.includes(selectedScenario)) {
+                          setSelectedScenario(next[0]);
                         }
                       }}
                     >
@@ -342,10 +342,10 @@ export function CurrentImageContent() {
                       tooltip={t.tooltipIslOsl}
                     />
                     <Select
-                      value={effectiveSequence}
+                      value={effectiveScenario}
                       onValueChange={(v) => {
                         track('current_image_sequence_changed', { sequence: v });
-                        setSelectedSequence(v);
+                        setSelectedScenario(v);
                       }}
                     >
                       <SelectTrigger id="image-sequence-select" className="w-full min-w-0">
@@ -354,7 +354,7 @@ export function CurrentImageContent() {
                       <SelectContent>
                         {sequenceOptions.map((s) => (
                           <SelectItem key={s} value={s}>
-                            {sequenceOptionLabel(s, locale)}
+                            {scenarioOptionLabel(s, locale)}
                           </SelectItem>
                         ))}
                       </SelectContent>

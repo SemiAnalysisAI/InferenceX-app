@@ -5,13 +5,13 @@
  * the request stops and the page shows its no-data state rather than a trend skeleton or error.
  */
 export function shouldRequestTrendHistory({
-  sequenceResolved,
+  scenarioResolved,
   chartDataLoading,
   hasInteractivityChart,
 }: {
-  sequenceResolved: boolean;
+  scenarioResolved: boolean;
   chartDataLoading: boolean;
   hasInteractivityChart: boolean;
 }): boolean {
-  return sequenceResolved && (chartDataLoading || hasInteractivityChart);
+  return scenarioResolved && (chartDataLoading || hasInteractivityChart);
 }

@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '9262546d652a4dc4ba7ee03425891d072f020ba181202b6e2cab1e48a95018e0',
+    sourceSha256: '6c4fd1dabbff4625e8e8552b06f7aa29f9237adbc580db031d79d10d9a617197',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -83,7 +83,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-compare-view',
-    sourceSha256: '9939ff7d37fe1de61577459b52cb6e9267f09f6555b57b9eae2ff17e6a1bfa18',
+    sourceSha256: '8054b40e62dbd96f33351e7f6e3fa9dd7d377902ac98353b6cdd6f841b44a869',
   },
   {
     source: 'src/app/api/v1/views/current-inferencex-image/route.ts',
@@ -91,7 +91,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: 'b92a5213636276ae1ce22a2649c388a8c65e8281deb23f5b519a4f50b612b504',
+    sourceSha256: 'd1fef99ad144717b02fa08370e94da752b36010066f95bde6ceaaac50877d924',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-fleet-view',
-    sourceSha256: '0cfbf9653ba0e5fd121849c1b82a45baa0788812848cc208732b5043657390f4',
+    sourceSha256: 'f71b1cf2b8a9145ed35223bd146c83de16429cef118d25b9f66ef7325d51e2bf',
   },
   {
     source: 'src/app/api/v1/views/gpu-metrics/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '5480da2448014598971d33579d30d3ec21b9a0fb02098da2e2a7c6a6951b9169',
+    sourceSha256: '1f0a0c83de5e252989c2b87d54f12cf9c0c955d00f6d28467d82ddfb781bd67a',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'b2c8119694ae3e98b349b22016ffa0b02149f90e4b6280ec8329080934bd6993',
+    sourceSha256: '44b9aaada2dfb85afb8beb530733aab0f3a4adb337d502f4e537c024a9550e3e',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -157,7 +157,7 @@ export const apiRouteCatalog = [
     operationId: 'get-view-options',
     // Kimi K3.1 Pro leads MODEL_OPTIONS and the inference landing route;
     // explicit-model API requirements and defaults.model remain unchanged.
-    sourceSha256: '79f8765d704cef43d9c976fe2a40e1a4dd23a3de0b30c411dacbf8144a345327',
+    sourceSha256: 'b74c343f957fe3e57787b4e91b57058a6dcf8e1a1326e7bb7a720f1f51e4a848',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -720,7 +720,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: 'ec0725c55db090c1987f43f889dc01c8092c52c9bf4da25d9e3424aac050203a',
+    sourceSha256: '5d657e97724ee51deca2fe3665747fdc233ecff1f88f109071cb7488a7291286',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/trends/route.ts',
@@ -1282,7 +1282,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: '2ef19d035a474778efaa90f74edafdd287b6aef39a2cdad3bed41bb9423be196',
+    sourceSha256: '368126e95fccb5a8c684eef1e8ffb5a335e3b05c70f2bd0db7737e0aaf8a60e5',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
@@ -1855,7 +1855,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: 'bd4f108feade8cb2aa7ff83523bfdea271db8f03dfb95a32af819e83bf01932d',
+    sourceSha256: '9f5a3d050d0fd99713988309923edaf57e87739926b0a2b00204c6969a9adb38',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1873,7 +1873,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'c3082fab095dbf821fd0c4ca9132770e7073e5e65d4517193fa856ca01759a06',
+    sourceSha256: '867f8384ec6385328c00a43a057539aac7a106b7387e736e4d4c4f2b4a789860',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1882,7 +1882,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: '5fde3ac11e933e40c027a3e8d950039bf9ddf342ffbadfa5132eb1df5b9ac497',
+    sourceSha256: 'd1f267e95631a7c4471c1eb7c326068eb4c4c8fbcacae37c275c422de1d030f3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1900,7 +1900,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '6435027256cd93a5a22f2d579b3e184c234b9014a0d3fe23c47e049e8e815b0e',
+    sourceSha256: '5b3f87d8d35e913f5680bcc2788bc08a47c5542d43e8f3c97bed12e987a9cade',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1918,7 +1918,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: 'ee14df85ab82d9e917545a1ba4ca297d89353b6f2acae5ef378553d1bdb8a8e3',
+    sourceSha256: 'e84d275265ea8bc0f8959cf3521d41a70b59490d000890271def6ed2dd83e001',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1927,7 +1927,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/api/pareto-api.ts',
-    sourceSha256: 'e42ab184f78ce81e322822a043a7e40d18bb97fb3da2c10b0bfb2528a26c9fca',
+    sourceSha256: 'c3ee15cc5fedfe9d2ea4199f879258850d39cb41c194b5296080f147fcc6d52b',
     reviewArea: {
       en: 'Pareto selectors, validation, source scope, missing-axis counts and boundary observations.',
       zh: 'Pareto 选择条件、验证、来源范围、缺失坐标计数和边界观测值。',
@@ -1951,7 +1951,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-request-params.ts',
-    sourceSha256: '876c31f250ec60274675f7adc05155b1e0e52771a6a0aea54ae1daa17ce1b3c2',
+    sourceSha256: '1599646d72e9a4e24f74aa229b4da58f97714f50ebe824f030f168f9fd5fb235',
     reviewArea: {
       en: '/api/v1/benchmarks query validation and 400 messages.',
       zh: '/api/v1/benchmarks 查询参数校验与 400 错误信息。',
@@ -1999,7 +1999,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/catalog/model-name-resolver.ts',
-    sourceSha256: 'e1ff58681093cbe5ba4ee18fea43d96cade58c330dc28bbf942dd6e24ff33a88',
+    sourceSha256: '51ef2cc94b76b44fa27666669f98ecf02297f6e046ce4812665f62b3fc117411',
     reviewArea: {
       en: 'Accepted model= forms (display names, DB keys, slugs, legacy names) for the benchmark reads and the views API.',
       zh: '基准读取接口与视图 API 接受的 model= 形式（展示名称、DB 键、slug、旧名称）。',
@@ -2082,7 +2082,7 @@ export const apiContractSourceDigests = [
     // Disaggregated rows now read the stored per-deployed-GPU tput_per_gpu without
     // a second decode ÷ total rescale. costPerMtok values change; parameters,
     // response shape and the documented cost formula are unchanged.
-    sourceSha256: '15d10533b96590ffc21208fbf7b4d7806757afff5bd467dd5d05598dd93fbdc7',
+    sourceSha256: '07d2955be215cefe2751bebaae45d6090518972b6be0068da4030ddbbcdb1d85',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -2116,10 +2116,34 @@ export const apiContractSourceDigests = [
     // Reviewed for the Kimi-K3.1-Pro addition (InferenceX#4803): one new DB key,
     // `kimik3.1`, with its own display name and release date. No endpoint or
     // parameter shape changes, so the docs stand.
-    sourceSha256: 'd331d67e91f5bf56eeee7c2d30c34448d498ddb33e21399bcb3854d5ed599c3d',
+    sourceSha256: '4fe42a82cffd45d6514117730558d1826b06408069d776ddfe1f7c467a163fa4',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
+    },
+  },
+  {
+    source: '../constants/src/scenarios.ts',
+    sourceSha256: '16ccd084bca8144be29f649a86c7fb23702277a2c4fa95112c65c14d5177fc87',
+    reviewArea: {
+      en: 'Published scenario values, their URL-segment aliases, and ISL/OSL mappings.',
+      zh: '已发布的场景取值、对应的 URL 路径段别名，以及 ISL/OSL 映射。',
+    },
+  },
+  {
+    source: '../constants/src/precision-keys.ts',
+    sourceSha256: 'a7d23a7fd29a62608a600e4d999da7d3f7c2fafd48ddd5a9fb70f3916ce618e8',
+    reviewArea: {
+      en: 'Published precision values, labels, and the precisions compare views report.',
+      zh: '已发布的精度取值、标签，以及对比视图返回的精度。',
+    },
+  },
+  {
+    source: 'src/lib/views-api/options-view.ts',
+    sourceSha256: '5109209260a00e1688108af96e8add60b87e321cb4e01572fb4f71f2fff3e4d6',
+    reviewArea: {
+      en: 'The /api/v1/views/options payload and the API reference example taken from it.',
+      zh: '/api/v1/views/options 的响应内容，以及取自该响应的 API 参考文档示例。',
     },
   },
   {

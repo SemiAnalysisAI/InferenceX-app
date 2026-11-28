@@ -10,7 +10,7 @@ import type { HardwareConfig } from '@/components/inference/types';
 import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
-import { type Sequence, Percentile, type Model } from '@/lib/catalog/data-mappings';
+import { type Scenario, Percentile, type Model } from '@/lib/catalog/data-mappings';
 
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { type FilterChange, useWarmFilterChange } from '@/providers/GlobalFilterContext';
@@ -55,7 +55,7 @@ export interface OverlayInput {
  */
 export function throughputQueryOptions(
   model: Model,
-  sequence: Sequence,
+  scenario: Scenario,
   runDate: string,
   {
     enabled = true,
@@ -80,7 +80,7 @@ export function throughputQueryOptions(
       ? undefined
       : {
           type: 'calculator',
-          sequence,
+          sequence: scenario,
           ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
         },
     includePower ? undefined : initialRows,
@@ -92,13 +92,13 @@ export function throughputQueryOptions(
  * profit estimator passes its fixed `sequence`, and its power views pass `includePower`.
  */
 export function useWarmThroughputChange({
-  sequence,
+  sequence: scenario,
   includePower = false,
-}: { sequence?: Sequence; includePower?: boolean } = {}): (change: FilterChange) => void {
+}: { sequence?: Scenario; includePower?: boolean } = {}): (change: FilterChange) => void {
   return useWarmFilterChange(({ request, selection }, queryClient) => {
     const options = throughputQueryOptions(
       request.model,
-      sequence ?? selection.effectiveSequence,
+      scenario ?? selection.effectiveScenario,
       selection.effectiveRunDate,
       { includePower },
     );
@@ -108,7 +108,7 @@ export function useWarmThroughputChange({
 
 export function useThroughputData(
   selectedModel: Model,
-  selectedSequence: Sequence,
+  selectedScenario: Scenario,
   selectedPrecisions: string[],
   selectedRunDate: string,
   overlay?: OverlayInput,
@@ -132,7 +132,7 @@ export function useThroughputData(
     isLoading: queryLoading,
     error: queryError,
   } = useQuery(
-    throughputQueryOptions(selectedModel, selectedSequence, selectedRunDate, {
+    throughputQueryOptions(selectedModel, selectedScenario, selectedRunDate, {
       enabled,
       includePower,
       initialRows,
@@ -168,7 +168,7 @@ export function useThroughputData(
 
     const multiPrecision = selectedPrecisions.length > 1;
     const shared = {
-      sequence: selectedSequence,
+      sequence: selectedScenario,
       precisions: selectedPrecisions,
       percentile: selectedPercentile,
       tokenType: selectedTokenType,
@@ -220,7 +220,7 @@ export function useThroughputData(
   }, [
     allRows,
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedPrecisions,
     selectedPercentile,
     selectedTokenType,

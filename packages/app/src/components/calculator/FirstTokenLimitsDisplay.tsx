@@ -64,9 +64,9 @@ import { getGpuSpecs, getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
-  getSequenceLabel,
+  getScenarioLabel,
   Percentile,
-  Sequence,
+  Scenario,
   type Model,
 } from '@/lib/catalog/data-mappings';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -250,7 +250,7 @@ export default function FirstTokenLimitsDisplay() {
       {(urlSeed) => (
         <GlobalFilterProvider
           initialModel={urlSeed.model}
-          initialSequence={urlSeed.sequence}
+          initialScenario={urlSeed.sequence}
           initialPrecisions={urlSeed.precisions}
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
@@ -275,11 +275,11 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     tcoBasis,
     chipBasis,
     selectedModel,
-    effectiveSequence: selectedSequence,
+    effectiveScenario: selectedScenario,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setChipBasis } =
+  const { setSelectedModel, setSelectedScenario, setSelectedPrecisions, setChipBasis } =
     useGlobalFilterActions();
   const warmThroughputChange = useWarmThroughputChange();
   const chipBasisControl = useMemo(
@@ -291,7 +291,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     [chipBasisControl],
   );
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels } =
+  const { availablePrecisions, availableScenarios, availableModels } =
     useGlobalFilterAvailability();
 
   const [costProvider, setCostProvider] = useState<CostProvider>('costh');
@@ -326,7 +326,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     overlayAvailableHwKeys,
   } = useThroughputData(
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedPrecisions,
     selectedRunDate,
     overlayInput,
@@ -339,13 +339,13 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     chipBasis,
   );
 
-  const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  const isAgenticScenario = selectedScenario === Scenario.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
-  const statLabel = isAgenticSequence
+  const statLabel = isAgenticScenario
     ? selectedPercentile.toUpperCase()
     : STAT_LABELS[locale].median;
 
-  const defaultMinInteractivity = isAgenticSequence
+  const defaultMinInteractivity = isAgenticScenario
     ? DEFAULT_FIRST_TOKEN_MIN_INTERACTIVITY.agentic
     : DEFAULT_FIRST_TOKEN_MIN_INTERACTIVITY.fixed;
   const minInteractivity = useMemo(() => {
@@ -362,7 +362,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
   }, [isUnofficialRun, availableHwKeys, overlayAvailableHwKeys]);
 
-  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
+  const selectionKey = `${selectedModel}|${selectedScenario}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
 
@@ -424,13 +424,13 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     },
     [setSelectedModel],
   );
-  const handleSequenceChange = useCallback(
+  const handleScenarioChange = useCallback(
     (value: string) => {
       setVisibilityIntent(null);
-      setSelectedSequence(value as Sequence);
+      setSelectedScenario(value as Scenario);
       track('first_token_sequence_selected', { sequence: value });
     },
-    [setSelectedSequence],
+    [setSelectedScenario],
   );
   const handlePrecisionChange = useCallback(
     (value: string[]) => {
@@ -656,7 +656,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       r.runUrl ?? '',
     ]);
     exportToCsv(`InferenceX_first_token_limits_${selectedModel}.csv`, headers, body, [
-      `${getModelLabel(selectedModel)} • ${getSequenceLabel(selectedSequence, locale)}`,
+      `${getModelLabel(selectedModel)} • ${getScenarioLabel(selectedScenario, locale)}`,
       t.captionFloor(minInteractivity, statLabel),
       getCostProviderLabel(costProvider, locale),
       ...(costType === 'total' ? [] : [chipBasisCsvNote(chipBasis, locale)]),
@@ -668,7 +668,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     costUnit,
     tableRows,
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     locale,
     minInteractivity,
     costProvider,
@@ -688,7 +688,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
           {t.title}
         </Heading>
         <p className="text-sm text-muted-foreground mb-2">
-          {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)} ·{' '}
+          {getModelLabel(selectedModel)} · {getScenarioLabel(selectedScenario, locale)} ·{' '}
           {t.captionFloor(minInteractivity, statLabel)} ·{' '}
           {getCostProviderLabel(costProvider, locale)} ·{' '}
           {t.captionRows(result.qualifyingRows, result.measuredRows)}
@@ -807,7 +807,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                 legend={t.benchmarkGroup}
                 data-testid="first-token-benchmark-panel"
                 className={`grid-cols-1 md:grid-cols-2 ${
-                  isAgenticSequence && featureGateUnlocked ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+                  isAgenticScenario && featureGateUnlocked ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
                 }`}
               >
                 <div className="min-w-0 md:col-span-2">
@@ -825,15 +825,15 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                 <ScenarioSelector
                   id="first-token-sequence"
                   data-testid="first-token-sequence-selector"
-                  value={selectedSequence}
-                  onChange={handleSequenceChange}
+                  value={selectedScenario}
+                  onChange={handleScenarioChange}
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
-                  onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
-                  availableSequences={availableSequences}
+                  onOptionIntent={(scenario) => warmThroughputChange({ sequence: scenario })}
+                  availableScenarios={availableScenarios}
                   model={selectedModel}
                 />
-                {isAgenticSequence && featureGateUnlocked && (
+                {isAgenticScenario && featureGateUnlocked && (
                   <PercentileSelector
                     id="first-token-percentile"
                     data-testid="first-token-percentile-selector"
@@ -1005,7 +1005,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
               analyticsPrefix="first_token"
               analyticsContext={selectionAnalyticsContext({
                 model: selectedModel,
-                sequence: selectedSequence,
+                sequence: selectedScenario,
                 precisions: selectedPrecisions,
                 gpuCount: visibleHwKeys.size,
               })}

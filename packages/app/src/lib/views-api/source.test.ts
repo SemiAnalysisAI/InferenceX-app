@@ -2,7 +2,7 @@ import { cachedJson } from '@/lib/cache/api-cache';
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'bun:test';
 import { readResponse, selection, sourceRequest } from './source';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import { ViewsUpstreamError } from './upstream-error';
 
 describe('Kimi K3 TCO selection', () => {
@@ -11,7 +11,7 @@ describe('Kimi K3 TCO selection', () => {
     const defaults = selection(search);
     expect(defaults.model).toBe(Model.Kimi_K3);
     expect(defaults.sequence).toBe(
-      sequence === 'agentic' ? Sequence.AgenticTraces : Sequence.EightK_OneK,
+      sequence === 'agentic' ? Scenario.AgenticTraces : Scenario.EightK_OneK,
     );
     expect(defaults.tcoBasis).toBe('internal');
     for (const basis of ['external', 'internal']) {
@@ -28,7 +28,7 @@ describe('AgentX-only TCO selection', () => {
       const search = new URLSearchParams({ model, sequence: 'agentic' });
       const defaults = selection(search);
       expect(defaults.model).toBe(model);
-      expect(defaults.sequence).toBe(Sequence.AgenticTraces);
+      expect(defaults.sequence).toBe(Scenario.AgenticTraces);
       expect(defaults.tcoBasis).toBe('internal');
       for (const basis of ['external', 'internal']) {
         search.set('tcoBasis', basis);

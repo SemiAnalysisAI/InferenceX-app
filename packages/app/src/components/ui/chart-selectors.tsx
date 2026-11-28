@@ -20,18 +20,18 @@ import { InfoHelp } from '@/components/ui/option-info';
 import {
   type Model,
   type Precision,
-  type Sequence,
+  type Scenario,
   type Percentile,
   PERCENTILE_OPTIONS,
   getModelCategory,
   getModelLabel,
   getPercentileLabel,
   getPrecisionLabel,
-  getSequenceCategoryForModel,
-  getSequenceLabel,
+  getScenarioCategoryForModel,
+  getScenarioLabel,
   groupByCategory,
   isRegisteredModel,
-  sequenceKind,
+  scenarioKind,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
@@ -56,13 +56,13 @@ const STRINGS = {
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
     fixedSequenceLength: 'Fixed Sequence Length',
-    deprecatedSequenceLabel: (label: string) => `${label} (deprecated)`,
+    deprecatedScenarioLabel: (label: string) => `${label} (deprecated)`,
     experimentalSupport: 'Experimental Support (WIP)',
     maintenanceMode: 'Maintenance Mode',
     maintenanceReason: 'Updated at a lower priority because these models are irrelevant.',
     deprecated: 'Deprecated',
     deprecatedModelReason: 'Model is no longer actively benchmarked.',
-    deprecatedSequenceReason:
+    deprecatedScenarioReason:
       'CI capacity was reallocated to agentic coding and multi-turn chat scenarios.',
     unregisteredModels: 'Unregistered models',
     unregisteredModelReason:
@@ -86,13 +86,13 @@ const STRINGS = {
     precisionTooltip:
       '模型权重的数值精度。FP4 等低精度占用更少显存并提高吞吐量，但与 FP8 等高精度相比可能略微降低准确度。',
     fixedSequenceLength: '固定序列长度',
-    deprecatedSequenceLabel: (label: string) => `${label}（已弃用）`,
+    deprecatedScenarioLabel: (label: string) => `${label}（已弃用）`,
     experimentalSupport: '实验性支持（开发中）',
     maintenanceMode: '维护模式',
     maintenanceReason: '这些模型的相关性较低，因此以较低优先级更新。',
     deprecated: '已弃用',
     deprecatedModelReason: '该模型已不再进行活跃基准测试。',
-    deprecatedSequenceReason: 'CI 容量已重新分配给智能体编程和多轮对话场景。',
+    deprecatedScenarioReason: 'CI 容量已重新分配给智能体编程和多轮对话场景。',
     unregisteredModels: '未注册模型',
     unregisteredModelReason:
       '仅出现在非官方运行中。InferenceX 的模型注册表中尚无该模型，因此直接显示其原始模型前缀。',
@@ -278,10 +278,10 @@ export function ModelSelector({
 interface SequenceSelectorProps {
   id?: string;
   value: string;
-  onChange: (value: Sequence) => void;
+  onChange: (value: Scenario) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  availableSequences: string[];
+  availableScenarios: string[];
   model?: Model | null;
   'data-testid'?: string;
 }
@@ -292,21 +292,21 @@ export function SequenceSelector({
   onChange,
   open,
   onOpenChange,
-  availableSequences,
+  availableScenarios,
   model,
   'data-testid': testId,
 }: SequenceSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const groups = groupByCategory(availableSequences, (s) =>
-    getSequenceCategoryForModel(s as Sequence, model),
+  const groups = groupByCategory(availableScenarios, (s) =>
+    getScenarioCategoryForModel(s as Scenario, model),
   );
   const sections = [
     {
       id: 'default',
       options: groups.default.map((seq) => ({
         value: seq,
-        label: getSequenceLabel(seq as Sequence, locale),
+        label: getScenarioLabel(seq as Scenario, locale),
       })),
     },
     ...(groups.deprecated.length > 0
@@ -317,12 +317,12 @@ export function SequenceSelector({
               <CategorySectionTitle
                 id="deprecated"
                 label={t.deprecated}
-                reason={t.deprecatedSequenceReason}
+                reason={t.deprecatedScenarioReason}
               />
             ),
             options: groups.deprecated.map((seq) => ({
               value: seq,
-              label: getSequenceLabel(seq as Sequence, locale),
+              label: getScenarioLabel(seq as Scenario, locale),
             })),
           },
         ]
@@ -340,7 +340,7 @@ export function SequenceSelector({
             const next = values[0];
             if (!next) return;
             track('selector_sequence_changed', { sequence: next });
-            onChange(next as Sequence);
+            onChange(next as Scenario);
           }}
           open={open}
           onOpenChange={onOpenChange}
@@ -363,14 +363,14 @@ interface ScenarioSelectorProps {
   variant?: 'field' | 'caption';
   id?: string;
   value: string;
-  onChange: (value: Sequence) => void;
+  onChange: (value: Scenario) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  availableSequences: string[];
+  availableScenarios: string[];
   model?: Model | null;
   'data-testid'?: string;
   /** Called with a scenario once the user shows intent toward its option. */
-  onOptionIntent?: (value: Sequence) => void;
+  onOptionIntent?: (value: Scenario) => void;
 }
 
 export function ScenarioSelector({
@@ -380,30 +380,30 @@ export function ScenarioSelector({
   onChange,
   open,
   onOpenChange,
-  availableSequences,
+  availableScenarios,
   model,
   'data-testid': testId,
   onOptionIntent,
 }: ScenarioSelectorProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const fixedSeq = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'fixed-seq');
-  const agentic = availableSequences.filter((s) => sequenceKind(s as Sequence) === 'agentic');
+  const fixedSeq = availableScenarios.filter((s) => scenarioKind(s as Scenario) === 'fixed-seq');
+  const agentic = availableScenarios.filter((s) => scenarioKind(s as Scenario) === 'agentic');
   const fixedGroups = groupByCategory(fixedSeq, (s) =>
-    getSequenceCategoryForModel(s as Sequence, model),
+    getScenarioCategoryForModel(s as Scenario, model),
   );
-  if (availableSequences.length <= 1) return null;
+  if (availableScenarios.length <= 1) return null;
   const scenarioLabel = (seq: string) => {
-    const label = getSequenceLabel(seq as Sequence, locale);
-    return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
-      ? t.deprecatedSequenceLabel(label)
+    const label = getScenarioLabel(seq as Scenario, locale);
+    return getScenarioCategoryForModel(seq as Scenario, model) === 'deprecated'
+      ? t.deprecatedScenarioLabel(label)
       : label;
   };
   const toScenarioOption = (seq: string) => ({
     value: seq,
     label: scenarioLabel(seq),
     help:
-      sequenceKind(seq as Sequence) === 'agentic' ? (
+      scenarioKind(seq as Scenario) === 'agentic' ? (
         <p>
           {t.agenticScenarioTooltip}{' '}
           <a
@@ -418,8 +418,8 @@ export function ScenarioSelector({
       ) : (
         <>
           <p>{t.islOslTooltip}</p>
-          {getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated' && (
-            <p>{t.deprecatedSequenceReason}</p>
+          {getScenarioCategoryForModel(seq as Scenario, model) === 'deprecated' && (
+            <p>{t.deprecatedScenarioReason}</p>
           )}
         </>
       ),
@@ -438,11 +438,11 @@ export function ScenarioSelector({
       searchable={false}
       onValueChange={(v) => {
         track('selector_scenario_changed', { scenario: v });
-        onChange(v as Sequence);
+        onChange(v as Scenario);
       }}
       open={open}
       onOpenChange={onOpenChange}
-      onOptionIntent={onOptionIntent && ((v) => onOptionIntent(v as Sequence))}
+      onOptionIntent={onOptionIntent && ((v) => onOptionIntent(v as Scenario))}
       groups={[
         { label: '', options: agentic.map(toScenarioOption) },
         {

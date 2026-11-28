@@ -8,21 +8,17 @@ import {
   FEATURED_AGENTX_MODELS,
   isNewAgentxModel,
 } from '@/lib/compare/compare-agentx';
+import { getModelLogo, type Model } from '@/lib/catalog/data-mappings';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-const MODEL_LOGOS: Record<string, string> = {
-  'muse-spark-open': '/logos/meta-color.svg',
-  'kimi-k31-pro': '/logos/kimi-color.svg',
-  'kimi-k3': '/logos/kimi-color.svg',
-  'deepseek-v41-flash': '/logos/deepseek-color.svg',
-  'deepseek-v4': '/logos/deepseek-color.svg',
-  'glm-5-3': '/logos/zai-color.svg',
-  'minimax-m3': '/logos/minimax-color.svg',
-  'qwen-3-8-flash-next': '/logos/qwen-color.svg',
-  'qwen-3-5': '/logos/qwen-color.svg',
-};
+const MODEL_LOGOS: Record<string, string> = Object.fromEntries(
+  FEATURED_AGENTX_MODELS.flatMap((model) => {
+    const logo = getModelLogo(model.displayName as Model);
+    return logo ? [[model.slug, `/logos/${logo}`]] : [];
+  }),
+);
 
 interface VendorMarkGradient {
   id: string;

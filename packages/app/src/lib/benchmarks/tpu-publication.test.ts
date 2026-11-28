@@ -16,7 +16,7 @@ import { calculatePowerForGpus } from '../shared/utils';
 import { getVendor } from '../charts/dynamic-colors';
 import { rowToLightweightPoint } from '@/components/inference/hooks/useInterpolatedTrendData';
 import { buildGpuGroups } from '@/components/calculator/useThroughputData';
-import { Sequence } from '../catalog/data-mappings';
+import { Scenario } from '../catalog/data-mappings';
 
 const url = 'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/30864013158';
 const rows = normalizeArtifactRows(sweep.benchmarks, '2026-08-03', url);
@@ -78,7 +78,7 @@ describe('TPU publication paths', () => {
     );
     expect(seriesPoints[0].costh.y).toBe(external.costh.y);
     const groups = buildGpuGroups([row], {
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp8'],
       tcoBasis: 'internal',
       classify: (hwKey) => ({ key: hwKey, meta: { hwKey } }),

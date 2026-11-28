@@ -67,7 +67,7 @@ export function CostTierSelector({
   const t = STRINGS[locale];
   const triggerId = useId();
   const { selectedYAxisMetric } = useInferenceDisplay();
-  const { selectedModel, selectedSequence, selectedPrecisions, userCosts } = useInferenceFilters();
+  const { selectedModel, selectedScenario, selectedPrecisions, userCosts } = useInferenceFilters();
   const { setSelectedYAxisMetric, setUserCosts } = useInferenceActions();
   const analyticsContext = useInferenceAnalyticsContext();
   const { tcoBasis } = useGlobalFilterSelection();
@@ -120,10 +120,10 @@ export function CostTierSelector({
       cost_tier: (isMetricKey(tierKey) ? metricCostTier(tierKey) : undefined) ?? 'unknown',
       metric_label: isMetricKey(tierKey) ? metricOptionTitle(tierKey, 'en') : value,
     });
-    if (selectedModel && selectedSequence && selectedPrecisions.length > 0) {
+    if (selectedModel && selectedScenario && selectedPrecisions.length > 0) {
       track('inference_filters_changed', {
         model: selectedModel,
-        sequence: selectedSequence,
+        sequence: selectedScenario,
         precision: selectedPrecisions.join(','),
         metric: value,
         metric_label: isMetricKey(tierKey) ? metricOptionTitle(tierKey, 'en') : value,
