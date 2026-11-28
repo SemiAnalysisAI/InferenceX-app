@@ -1,0 +1,989 @@
+/* Kamaji's Boiler: the boiler-room game dialog. Loaded only with the game chunk, so none of this
+   costs anything until the player opens it. Everything is scoped under `.ghibli`. */
+
+.ghibli .ghibli-boiler-overlay {
+  background:
+    radial-gradient(ellipse at 50% 110%, rgba(196, 92, 40, 0.28), transparent 60%),
+    rgba(28, 22, 16, 0.62);
+}
+
+.ghibli .ghibli-boiler {
+  --boiler-ink: #33291f;
+  --boiler-soft: #6b5a45;
+  --boiler-paper: #f8efd9;
+  --boiler-paper-deep: #efe0bf;
+  --boiler-wood: #7a4b2a;
+  --boiler-wood-dark: #4d2c17;
+  --boiler-ember: #c4562a;
+  --boiler-glow: #f2b65a;
+  --boiler-jade: #3f7a66;
+  width: min(1060px, 96vw);
+  max-width: none;
+  max-height: 94dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 12px;
+  padding: 18px 20px 20px;
+  color: var(--boiler-ink);
+  border: 1px solid rgba(110, 82, 48, 0.45);
+  border-radius: 18px 22px 16px 24px / 22px 16px 24px 18px;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(255, 255, 255, 0.55), transparent 45%),
+    radial-gradient(ellipse at 100% 100%, rgba(196, 140, 74, 0.18), transparent 55%),
+    linear-gradient(176deg, var(--boiler-paper), var(--boiler-paper-deep));
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 250, 236, 0.5),
+    inset 0 0 40px rgba(140, 98, 48, 0.18),
+    0 28px 60px -20px rgba(20, 12, 4, 0.7);
+  scrollbar-color: rgba(122, 75, 42, 0.55) transparent;
+  scrollbar-width: thin;
+}
+
+.ghibli .ghibli-boiler > button[class*='absolute'] {
+  color: var(--boiler-soft);
+}
+
+.ghibli .ghibli-boiler-title {
+  margin: 0;
+  padding-right: 36px;
+  font-family: var(--ghibli-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--boiler-wood-dark);
+}
+
+.ghibli .ghibli-boiler p {
+  margin: 0;
+}
+
+.ghibli .ghibli-boiler-lede {
+  max-width: 62ch;
+  color: var(--boiler-soft);
+  line-height: 1.5;
+}
+
+.ghibli .ghibli-boiler-small {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--boiler-soft);
+}
+
+.ghibli .ghibli-boiler-section {
+  font-family: var(--ghibli-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--boiler-wood-dark);
+}
+
+.ghibli .ghibli-boiler-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.ghibli .ghibli-boiler-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- buttons: little wooden bath tags ---------------------------------------------------- */
+
+.ghibli .ghibli-boiler-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--boiler-ink);
+  cursor: pointer;
+  border: 1px solid rgba(77, 44, 23, 0.45);
+  border-radius: 10px 12px 9px 13px / 12px 9px 13px 10px;
+  background: linear-gradient(180deg, #fff8e8, #f1dfbd);
+  box-shadow:
+    0 2px 0 rgba(77, 44, 23, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    background-color 120ms;
+}
+
+.ghibli .ghibli-boiler-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 3px 0 rgba(77, 44, 23, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.ghibli .ghibli-boiler-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 0 0 rgba(77, 44, 23, 0.45),
+    inset 0 2px 3px rgba(77, 44, 23, 0.25);
+}
+
+.ghibli .ghibli-boiler-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ghibli .ghibli-boiler-btn[data-tone='primary'] {
+  color: #fff8ea;
+  border-color: var(--boiler-wood-dark);
+  background: linear-gradient(180deg, #a2482a, #7e3219);
+  box-shadow:
+    0 2px 0 var(--boiler-wood-dark),
+    inset 0 1px 0 rgba(255, 210, 170, 0.5);
+}
+
+.ghibli .ghibli-boiler-btn[data-tone='tag'] {
+  color: #f9f3e2;
+  border-color: #23493d;
+  background: linear-gradient(180deg, #4f8c76, #336655);
+  box-shadow:
+    0 2px 0 #23493d,
+    inset 0 1px 0 rgba(220, 255, 236, 0.4);
+}
+
+.ghibli .ghibli-boiler :is(button, input, select, canvas, label):focus-visible {
+  outline: 3px solid var(--boiler-glow);
+  outline-offset: 2px;
+}
+
+/* ---- menu --------------------------------------------------------------------------------- */
+
+.ghibli .ghibli-boiler-menu,
+.ghibli .ghibli-boiler-howto,
+.ghibli .ghibli-boiler-mapview,
+.ghibli .ghibli-boiler-shop {
+  display: grid;
+  gap: 12px;
+}
+
+.ghibli .ghibli-boiler-ledger {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  font-size: 0.875rem;
+  border: 1px dashed rgba(110, 82, 48, 0.4);
+  border-radius: 10px;
+  background: rgba(255, 252, 240, 0.6);
+}
+
+.ghibli .ghibli-boiler-ledger li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ghibli .ghibli-boiler-star {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+  background: radial-gradient(circle at 40% 35%, #fff2c4, #f2a64a 60%, #c5642a);
+  clip-path: polygon(
+    50% 0%,
+    61% 32%,
+    95% 25%,
+    70% 52%,
+    92% 82%,
+    58% 70%,
+    50% 100%,
+    42% 70%,
+    8% 82%,
+    30% 52%,
+    5% 25%,
+    39% 32%
+  );
+}
+
+.ghibli .ghibli-boiler-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.ghibli .ghibli-boiler-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 108px;
+  padding: 14px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--boiler-ink);
+  cursor: pointer;
+  border: 1px solid rgba(110, 82, 48, 0.4);
+  border-radius: 16px 12px 18px 12px / 12px 18px 12px 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6), transparent 60%),
+    linear-gradient(160deg, #fbf3dd, #ecdab4);
+  box-shadow:
+    0 3px 0 rgba(110, 82, 48, 0.3),
+    0 10px 18px -14px rgba(60, 38, 16, 0.6);
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.ghibli .ghibli-boiler-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 5px 0 rgba(110, 82, 48, 0.3),
+    0 14px 22px -14px rgba(60, 38, 16, 0.6);
+}
+
+.ghibli .ghibli-boiler-card:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(110, 82, 48, 0.3);
+}
+
+.ghibli .ghibli-boiler-card-name {
+  font-family: var(--ghibli-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--boiler-wood-dark);
+}
+
+.ghibli .ghibli-boiler-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(110, 82, 48, 0.25);
+}
+
+.ghibli .ghibli-boiler-settings .ghibli-toggles {
+  display: inline-flex;
+}
+
+.ghibli .ghibli-boiler-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.ghibli .ghibli-boiler-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--boiler-ember);
+}
+
+.ghibli .ghibli-boiler-howto ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.4em;
+  line-height: 1.5;
+}
+
+.ghibli .ghibli-boiler-howto li::marker {
+  color: var(--boiler-ember);
+  font-weight: 700;
+}
+
+/* ---- the sea-railway map ------------------------------------------------------------------- */
+
+.ghibli .ghibli-boiler-map {
+  display: block;
+  width: 100%;
+  max-width: 680px;
+  margin-inline: auto;
+  aspect-ratio: 480 / 260;
+  border: 1px solid rgba(60, 90, 110, 0.4);
+  border-radius: 14px;
+  background: #cfe3e6;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+.ghibli .ghibli-boiler-route {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-items: center;
+}
+
+.ghibli .ghibli-boiler-route li {
+  position: relative;
+  flex: 1 1 0;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(110, 82, 48, 0.18);
+}
+
+.ghibli .ghibli-boiler-route li[data-medal='1'] {
+  background: #b37a4a;
+}
+.ghibli .ghibli-boiler-route li[data-medal='2'] {
+  background: #9aa3a8;
+}
+.ghibli .ghibli-boiler-route li[data-medal='3'] {
+  background: #d9a73a;
+}
+
+.ghibli .ghibli-boiler-route li[data-current='true'] {
+  box-shadow:
+    0 0 0 2px var(--boiler-paper),
+    0 0 0 4px var(--boiler-ember);
+}
+
+.ghibli .ghibli-boiler-route button {
+  position: absolute;
+  inset: -12px 0;
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+}
+
+.ghibli .ghibli-boiler-station {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--boiler-ember);
+  border-radius: 4px 12px 12px 4px;
+  background: rgba(255, 252, 240, 0.7);
+}
+
+.ghibli .ghibli-boiler-station[data-locked='true'] {
+  border-left-color: rgba(110, 82, 48, 0.35);
+  opacity: 0.8;
+}
+
+.ghibli .ghibli-boiler-station-name {
+  font-family: var(--ghibli-display);
+  font-weight: 600;
+  color: var(--boiler-wood-dark);
+}
+
+.ghibli .ghibli-boiler-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  color: #fff6ea;
+  border-radius: 999px;
+  background: var(--boiler-ember);
+}
+
+/* ---- loadout -------------------------------------------------------------------------------- */
+
+.ghibli .ghibli-boiler-loadout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.ghibli .ghibli-boiler-loadout fieldset {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid rgba(110, 82, 48, 0.3);
+  border-radius: 12px;
+  background: rgba(255, 252, 240, 0.5);
+}
+
+.ghibli .ghibli-boiler-loadout legend {
+  padding: 0 6px;
+  font-family: var(--ghibli-display);
+  font-weight: 600;
+  color: var(--boiler-wood-dark);
+}
+
+.ghibli .ghibli-boiler-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: center;
+  min-height: 40px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.ghibli .ghibli-boiler-choice:has(input:checked) {
+  border-color: rgba(196, 86, 42, 0.55);
+  background: rgba(242, 182, 90, 0.18);
+}
+
+.ghibli .ghibli-boiler-choice[data-locked='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ghibli .ghibli-boiler-choice input {
+  grid-row: span 2;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--boiler-ember);
+}
+
+.ghibli .ghibli-boiler-choice-name {
+  font-weight: 600;
+}
+
+/* ---- Kamaji's drawers (upgrades) ------------------------------------------------------------ */
+
+.ghibli .ghibli-boiler-drawers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ghibli .ghibli-boiler-drawer {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 12px 14px;
+  border: 1px solid rgba(77, 44, 23, 0.5);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 14px, #d9b06a 0 4px, #6b3f20 5px, transparent 6px),
+    linear-gradient(180deg, #f6e7c6, #e7cf9f);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 246, 222, 0.5),
+    0 2px 0 rgba(77, 44, 23, 0.4);
+  padding-top: 26px;
+}
+
+.ghibli .ghibli-boiler-pips {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.ghibli .ghibli-boiler-pips span {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(77, 44, 23, 0.5);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.ghibli .ghibli-boiler-pips span[data-on='true'] {
+  background: radial-gradient(circle at 40% 35%, #fff2c4, #f2a64a 60%, #c5642a);
+}
+
+/* ---- play ------------------------------------------------------------------------------------- */
+
+.ghibli .ghibli-boiler-play {
+  display: grid;
+  grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ghibli .ghibli-boiler-stage {
+  display: grid;
+  gap: 8px;
+}
+
+.ghibli .ghibli-boiler-stage-head {
+  display: grid;
+  gap: 6px;
+}
+
+.ghibli .ghibli-boiler-stage-title {
+  font-family: var(--ghibli-display);
+  font-weight: 600;
+  color: var(--boiler-wood-dark);
+}
+
+.ghibli .ghibli-boiler-stage-head .ghibli-boiler-route li {
+  height: 6px;
+}
+
+.ghibli .ghibli-boiler-canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+}
+
+.ghibli .ghibli-boiler-canvas {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 4 / 5;
+  border: 2px solid var(--boiler-wood-dark);
+  border-radius: 12px;
+  background: #2a1d14;
+  box-shadow:
+    inset 0 0 0 2px rgba(242, 182, 90, 0.25),
+    0 8px 20px -12px rgba(20, 12, 4, 0.8);
+  touch-action: manipulation;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ghibli .ghibli-boiler-veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px;
+  text-align: center;
+  color: #fff6e4;
+  border-radius: 12px;
+  background: rgba(30, 20, 12, 0.72);
+  overflow-y: auto;
+}
+
+.ghibli .ghibli-boiler-veil .ghibli-boiler-small {
+  color: #eadcc4;
+}
+
+.ghibli .ghibli-boiler-result-title {
+  font-family: var(--ghibli-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.ghibli .ghibli-boiler-medal {
+  padding: 4px 16px;
+  font-weight: 700;
+  border-radius: 999px;
+  color: var(--boiler-ink);
+  background: #d8cbb2;
+}
+.ghibli .ghibli-boiler-medal[data-medal='1'] {
+  background: #d39a66;
+}
+.ghibli .ghibli-boiler-medal[data-medal='2'] {
+  background: #d7dde0;
+}
+.ghibli .ghibli-boiler-medal[data-medal='3'] {
+  background: linear-gradient(180deg, #ffe08a, #d9a73a);
+}
+
+.ghibli .ghibli-boiler-stats {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 14px;
+  margin: 0;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.ghibli .ghibli-boiler-stats dt {
+  color: #eadcc4;
+}
+
+.ghibli .ghibli-boiler-stats dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.ghibli .ghibli-boiler-pad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 480px;
+}
+
+.ghibli .ghibli-boiler-door {
+  flex: 1 1 0;
+  min-width: 44px;
+  min-height: 44px;
+  font: inherit;
+  font-weight: 700;
+  color: #fff8ea;
+  cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  border-radius: 12px 12px 6px 6px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--door) 80%, white), var(--door));
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  transition: transform 90ms ease-out;
+}
+
+.ghibli .ghibli-boiler-door[aria-pressed='true'] {
+  transform: translateY(2px);
+  border-color: var(--boiler-glow);
+  box-shadow:
+    0 0 0 2px var(--boiler-glow),
+    0 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.ghibli .ghibli-boiler-door:active {
+  transform: translateY(3px);
+}
+
+/* ---- HUD ------------------------------------------------------------------------------------- */
+
+.ghibli .ghibli-boiler-hud {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.ghibli .ghibli-boiler-toast {
+  min-height: 2.6em;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  border-radius: 10px;
+  background: rgba(255, 252, 240, 0.75);
+  border: 1px solid rgba(110, 82, 48, 0.25);
+}
+
+.ghibli .ghibli-boiler-meter {
+  display: grid;
+  gap: 4px;
+  --meter: var(--boiler-jade);
+}
+
+.ghibli .ghibli-boiler-meter[data-tone='kv'] {
+  --meter: #4a6f9a;
+}
+.ghibli .ghibli-boiler-meter[data-tone='heat'] {
+  --meter: var(--boiler-ember);
+}
+.ghibli .ghibli-boiler-meter[data-tone='boss'] {
+  --meter: #6b3a7a;
+}
+.ghibli .ghibli-boiler-meter[data-tone='walk'] {
+  --meter: #7a6a3a;
+}
+.ghibli .ghibli-boiler-meter[data-tone='kv'][data-hot='true'] {
+  --meter: #b8322a;
+}
+
+.ghibli .ghibli-boiler-meter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ghibli .ghibli-boiler-meter-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(77, 44, 23, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.ghibli .ghibli-boiler-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  max-width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--meter) 70%, white), var(--meter));
+  transition: width 240ms ease-out;
+}
+
+.ghibli .ghibli-boiler-meter-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--boiler-ink);
+}
+
+.ghibli .ghibli-boiler-stat-line {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.ghibli .ghibli-boiler-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.ghibli .ghibli-boiler-grid > div {
+  padding: 6px 8px;
+  border: 1px solid rgba(110, 82, 48, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 252, 240, 0.6);
+}
+
+.ghibli .ghibli-boiler-grid > div[data-low='true'] {
+  border-color: rgba(184, 50, 42, 0.6);
+  background: rgba(250, 220, 205, 0.7);
+}
+
+.ghibli .ghibli-boiler-grid dt {
+  font-size: 0.75rem;
+  color: var(--boiler-soft);
+}
+
+.ghibli .ghibli-boiler-grid dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.ghibli .ghibli-boiler-grid small {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--boiler-soft);
+}
+
+.ghibli .ghibli-boiler-lanterns {
+  display: flex;
+  gap: 5px;
+  padding-top: 3px;
+}
+
+.ghibli .ghibli-boiler-lanterns span {
+  width: 12px;
+  height: 16px;
+  border: 1px solid rgba(77, 44, 23, 0.5);
+  border-radius: 5px 5px 4px 4px;
+  background: rgba(120, 100, 80, 0.25);
+}
+
+.ghibli .ghibli-boiler-lanterns span[data-lit='true'] {
+  background: radial-gradient(circle at 50% 60%, #fff1b8, #f2a64a 70%);
+  box-shadow: 0 0 6px rgba(242, 166, 74, 0.7);
+}
+
+.ghibli .ghibli-boiler-pareto {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid rgba(110, 82, 48, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 252, 240, 0.6);
+}
+
+.ghibli .ghibli-boiler-pareto figcaption {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ghibli .ghibli-boiler-pareto svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ghibli .ghibli-boiler-pareto-paper {
+  fill: rgba(255, 255, 255, 0.55);
+  stroke: rgba(110, 82, 48, 0.35);
+}
+
+.ghibli .ghibli-boiler-pareto-slo {
+  stroke: #b8322a;
+  stroke-dasharray: 3 3;
+}
+
+.ghibli .ghibli-boiler-pareto-frontier {
+  fill: none;
+  stroke: var(--boiler-jade);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.ghibli .ghibli-boiler-pareto-dot {
+  fill: #4a6f9a;
+}
+
+.ghibli .ghibli-boiler-pareto-pin {
+  fill: #d9a73a;
+  stroke: var(--boiler-wood-dark);
+  stroke-width: 0.6;
+}
+
+.ghibli .ghibli-boiler-pareto-now {
+  fill: var(--boiler-ember);
+  stroke: #fff6ea;
+  stroke-width: 1.5;
+}
+
+.ghibli .ghibli-boiler-pareto-axis {
+  font-size: 8px;
+  fill: var(--boiler-soft);
+}
+
+.ghibli .ghibli-boiler-bench {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed rgba(110, 82, 48, 0.4);
+  border-radius: 10px;
+}
+
+.ghibli .ghibli-boiler-bench label:not(.ghibli-boiler-check) {
+  display: grid;
+  gap: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ghibli .ghibli-boiler-bench input[type='range'] {
+  width: 100%;
+  min-height: 28px;
+  accent-color: var(--boiler-ember);
+}
+
+.ghibli .ghibli-boiler-bench select {
+  min-height: 36px;
+  padding: 4px 8px;
+  font: inherit;
+  border: 1px solid rgba(110, 82, 48, 0.4);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+/* ---- small screens and touch ----------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .ghibli .ghibli-boiler {
+    width: 100vw;
+    max-height: 100dvh;
+    padding: 14px 12px 16px;
+    border-radius: 0;
+  }
+
+  .ghibli .ghibli-boiler-play {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ghibli .ghibli-boiler-canvas-wrap,
+  .ghibli .ghibli-boiler-canvas,
+  .ghibli .ghibli-boiler-pad {
+    max-width: none;
+  }
+
+  .ghibli .ghibli-boiler-canvas-wrap {
+    width: min(100%, calc(64dvh * 0.8));
+    margin-inline: auto;
+  }
+
+  .ghibli .ghibli-boiler-hud {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Phone: a compact row of live cues pinned to the top of the dialog while the full HUD sits
+   below the playfield. Hidden on wider screens, where the HUD is beside the playfield. */
+.ghibli .ghibli-boiler-chips {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .ghibli .ghibli-boiler-chips {
+    position: sticky;
+    top: -14px;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    margin: -4px -4px 0;
+    padding: 6px 4px;
+    background: var(--boiler-paper);
+    border-bottom: 1px solid rgba(110, 82, 48, 0.3);
+  }
+
+  .ghibli .ghibli-boiler-chips > span {
+    display: grid;
+    min-width: 0;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: var(--boiler-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border: 1px solid rgba(110, 82, 48, 0.3);
+    border-radius: 8px;
+    background: #fffaf0;
+  }
+
+  .ghibli .ghibli-boiler-chips b {
+    color: var(--boiler-ink);
+    font-size: 0.875rem;
+  }
+
+  .ghibli .ghibli-boiler-chips > span[data-warn='true'] {
+    border-color: #b4413a;
+  }
+}
+
+@media (pointer: coarse) {
+  .ghibli .ghibli-boiler-btn,
+  .ghibli .ghibli-boiler-check,
+  .ghibli .ghibli-boiler-choice {
+    min-height: 44px;
+  }
+
+  .ghibli .ghibli-boiler-door {
+    min-height: 52px;
+  }
+
+  .ghibli .ghibli-boiler-route button {
+    inset: -17px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghibli .ghibli-boiler *,
+  .ghibli .ghibli-boiler {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .ghibli .ghibli-boiler-card:hover,
+  .ghibli .ghibli-boiler-btn:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* The board / start row stays in reach while the loadout scrolls. */
+.ghibli .ghibli-boiler-mapview > .ghibli-boiler-row:last-child {
+  position: sticky;
+  bottom: -20px;
+  z-index: 1;
+  margin: 0 -20px -20px;
+  padding: 10px 20px 14px;
+  border-top: 1px solid rgba(110, 82, 48, 0.25);
+  background: linear-gradient(180deg, rgba(239, 224, 191, 0.92), var(--boiler-paper-deep));
+}
+
+.ghibli .ghibli-boiler-loadout fieldset {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+@media (max-width: 760px) {
+  .ghibli .ghibli-boiler-mapview > .ghibli-boiler-row:last-child {
+    bottom: -16px;
+    margin: 0 -12px -16px;
+    padding: 10px 12px 12px;
+  }
+}
+
+/* Nothing to say: the slot keeps its height so the meters stay put, but shows no pill. It stays
+   rendered (not hidden) so the live region still announces the next line. */
+.ghibli .ghibli-boiler .ghibli-boiler-toast:empty,
+.ghibli .ghibli-boiler .ghibli-boiler-toast[data-empty] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
