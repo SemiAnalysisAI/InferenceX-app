@@ -1,0 +1,3618 @@
+/* Studio Ghibli theme. Loaded only while the `ghibli` theme is active; every rule is scoped
+   under `.ghibli` (except the embed hides at the end). Character art is cut out of official
+   stills published at ghibli.jp; see public/decorative/ghibli/README.md. */
+
+@font-face {
+  font-family: 'GhibliDisplay';
+  src: url('../../app/fonts/Ghibli-Fraunces-SoftSemiBold.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'GhibliRounded';
+  src: url('../../app/fonts/Ghibli-ZenMaruGothic-Medium.woff2') format('woff2');
+  font-weight: 100 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'GhibliRounded';
+  src: url('../../app/fonts/Ghibli-ZenMaruGothic-Bold.woff2') format('woff2');
+  font-weight: 601 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* The STUDIO GHIBLI wordmark is set in ITC Avant Garde Gothic. TeX Gyre Adventor is a free
+   revival of that design (GUST Font License); see app/fonts/GHIBLI-FONTS.md. Latin only. */
+@font-face {
+  font-family: 'GhibliWordmark';
+  src: url('../../app/fonts/Ghibli-Adventor-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2013-2014, U+2018-201D, U+2026, U+2192;
+}
+
+/* ---- palette per film (base tokens live in globals.css) -------------------------------- */
+
+.ghibli[data-ghibli-film='spirited'] {
+  --primary: #a8433a;
+  --ring: #a8433a;
+  --sidebar-primary: #a8433a;
+  --sidebar-ring: #a8433a;
+  --secondary: #2f6f8f;
+  --accent: #f5e0d2;
+  --sidebar-accent: #f5e0d2;
+  --ghibli-glow: #f2b48c;
+  --ghibli-wash: #f6e4d8;
+}
+
+.ghibli[data-ghibli-film='heron'] {
+  --primary: #356981;
+  --ring: #356981;
+  --sidebar-primary: #356981;
+  --sidebar-ring: #356981;
+  --secondary: #b8702e;
+  --accent: #f3e3cc;
+  --sidebar-accent: #f3e3cc;
+  --ghibli-glow: #f3c98d;
+  --ghibli-wash: #f4e7d4;
+}
+
+.ghibli[data-ghibli-film='howl'] {
+  --primary: #335f98;
+  --ring: #335f98;
+  --sidebar-primary: #335f98;
+  --sidebar-ring: #335f98;
+  --secondary: #c8621f;
+  --accent: #fbe6c4;
+  --sidebar-accent: #fbe6c4;
+  --ghibli-glow: #ffc370;
+  --ghibli-wash: #e4eef7;
+}
+
+.ghibli[data-ghibli-film='mononoke'] {
+  --primary: #3a7451;
+  --ring: #3a7451;
+  --sidebar-primary: #3a7451;
+  --sidebar-ring: #3a7451;
+  --secondary: #7a5934;
+  --accent: #dde8c8;
+  --sidebar-accent: #dde8c8;
+  --ghibli-glow: #e6eab0;
+  --ghibli-wash: #e3eddb;
+}
+
+.ghibli[data-ghibli-film='ponyo'] {
+  --primary: #21729b;
+  --ring: #21729b;
+  --sidebar-primary: #21729b;
+  --sidebar-ring: #21729b;
+  --secondary: #c94a3b;
+  --accent: #fde2dc;
+  --sidebar-accent: #fde2dc;
+  --ghibli-glow: #ffd0c2;
+  --ghibli-wash: #dfeff4;
+}
+
+/* ---- type ------------------------------------------------------------------------------ */
+
+/* Outranks the body's next/font class so every sans surface, D3 chart labels included,
+   uses the rounded face. Chinese text falls back to the system's rounded or sans faces. */
+.ghibli body {
+  --font-dm-sans:
+    'GhibliRounded', 'Hiragino Maru Gothic ProN', 'PingFang SC', 'Microsoft YaHei',
+    var(--font-dm-sans-base, sans-serif);
+  --ghibli-display:
+    'GhibliDisplay', 'Iowan Old Style', Georgia, 'Hiragino Mincho ProN', 'Yu Mincho',
+    'Noto Serif SC', 'Noto Serif CJK SC', 'Songti SC', 'STSong', serif;
+  --ghibli-ink: #2f3a34;
+  --ghibli-paper: #fffcf3;
+  --ghibli-edge: rgba(128, 116, 78, 0.32);
+  --ghibli-soft-radius: 22px 18px 24px 16px / 18px 24px 16px 22px;
+}
+
+.ghibli :is(h1, h2, h3, [data-slot='card-title'], .ghibli-banner-title) {
+  font-family: var(--ghibli-display);
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+.ghibli ::selection {
+  background: color-mix(in oklab, var(--ghibli-glow, #f2d48c) 70%, transparent);
+}
+
+.ghibli .autumn-leaves {
+  display: none;
+}
+
+/* ---- header and navigation --------------------------------------------------------------- */
+
+.ghibli header[data-testid='header'] {
+  border-bottom-color: transparent;
+  background-color: color-mix(in oklab, var(--ghibli-paper) 88%, transparent);
+  box-shadow:
+    0 1px 0 var(--ghibli-edge),
+    0 8px 22px -16px rgba(52, 78, 58, 0.55);
+}
+
+.ghibli header[data-testid='header'] nav > a {
+  border-radius: 999px;
+  transition:
+    color 0.2s,
+    background-color 0.2s;
+}
+
+.ghibli header[data-testid='header'] nav > a:hover {
+  background-color: color-mix(in oklab, var(--accent) 80%, transparent);
+  color: var(--primary);
+}
+
+.ghibli .ghibli-toggle:hover {
+  color: var(--primary);
+}
+
+/* Calcifer warms the active dashboard tab (every tab gets the same room so nothing jumps). */
+.ghibli :is([data-testid='chart-section-tabs'] a, [data-testid='mobile-chart-select'] a) {
+  position: relative;
+  padding-left: 1.45rem;
+}
+
+.ghibli
+  :is(
+    [data-testid='chart-section-tabs'] [data-tab-active='true'],
+    [data-testid='mobile-chart-select'] a[aria-current='page']
+  )::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0.1rem;
+  width: 19px;
+  height: 17px;
+  translate: 0 -55%;
+  background: url('/decorative/ghibli/sprites/calcifer-flame.webp') center / contain no-repeat;
+  filter: drop-shadow(0 0 4px rgba(255, 150, 40, 0.65));
+  animation: ghibli-flicker 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ghibli [data-testid='chart-section-tabs'] [data-tab-active='true'],
+.ghibli [data-testid='mobile-chart-select'] a[aria-current='page'] {
+  color: color-mix(in oklab, var(--primary) 70%, var(--ghibli-ink));
+}
+
+.ghibli .tab-indicator {
+  background: linear-gradient(90deg, #f7b548, #ea6a2f);
+  border-radius: 999px;
+}
+
+/* ---- controls ---------------------------------------------------------------------------- */
+
+.ghibli [data-slot='button'][class*='bg-primary'] {
+  border-radius: 999px;
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.14),
+    0 3px 8px -4px rgba(36, 56, 40, 0.5);
+}
+
+.ghibli
+  :is(
+    [data-slot='button'][class*='border'],
+    [data-slot='select-trigger'],
+    [role='combobox'],
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea
+  ) {
+  border-color: color-mix(in oklab, var(--primary) 26%, var(--border));
+  border-radius: 14px;
+  background-color: color-mix(in oklab, var(--ghibli-paper) 92%, transparent);
+}
+
+.ghibli :is([data-slot='select-trigger'], [role='combobox']):focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 25%, transparent);
+}
+
+.ghibli [data-slot='tabs-list'] {
+  border-radius: 999px;
+  background-color: color-mix(in oklab, var(--accent) 85%, transparent);
+}
+
+.ghibli [data-slot='tabs-trigger'] {
+  border-radius: 999px;
+}
+
+.ghibli [data-slot='popover-content'] {
+  border-color: var(--ghibli-edge);
+  border-radius: 18px;
+  background-color: var(--ghibli-paper);
+  box-shadow: 0 14px 32px -18px rgba(48, 60, 40, 0.55);
+}
+
+/* ---- cards, charts, tooltip ------------------------------------------------------------------ */
+
+.ghibli [data-slot='card'] {
+  border-color: var(--ghibli-edge);
+  border-radius: var(--ghibli-soft-radius);
+  background-color: color-mix(in oklab, var(--ghibli-paper) 98%, transparent);
+  background-image:
+    radial-gradient(
+      120% 80% at 0% 0%,
+      color-mix(in oklab, var(--ghibli-wash, #eef2e2) 55%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(90% 60% at 100% 100%, rgba(214, 232, 206, 0.35), transparent 60%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 12px 30px -22px rgba(48, 72, 48, 0.6);
+}
+
+/* ---- charts: painted, not plotted ---------------------------------------------------------
+   The plot is a small watercolour: sky wash at the top, meadow at the bottom, pencil gridlines,
+   brushed curves and gouache dabs for points (ghibli-charts.ts paints the dabs, then gives each
+   frame a hand wobble and paper grain). Washes stay translucent so the watermark shows. */
+
+.ghibli .canvas-point-surface {
+  border-radius: 14px 18px 6px 16px;
+  background-image:
+    radial-gradient(46% 40% at 88% 4%, rgb(255 222 150 / 0.4), transparent 72%),
+    radial-gradient(30% 20% at 24% 15%, rgb(255 255 255 / 0.62), transparent 72%),
+    radial-gradient(22% 15% at 37% 21%, rgb(255 255 255 / 0.5), transparent 72%),
+    radial-gradient(26% 16% at 64% 12%, rgb(255 255 255 / 0.46), transparent 72%),
+    radial-gradient(64% 26% at 16% 104%, rgb(122 166 96 / 0.34), transparent 72%),
+    radial-gradient(74% 30% at 80% 108%, rgb(104 156 108 / 0.3), transparent 72%),
+    linear-gradient(
+      180deg,
+      rgb(142 194 222 / 0.36),
+      rgb(196 224 226 / 0.24) 36%,
+      rgb(255 247 222 / 0.14) 62%,
+      rgb(204 222 164 / 0.26)
+    );
+}
+
+/* Gridlines are ruled in soft pencil; the canvas pass makes the hand shake a little. */
+.ghibli svg[data-testid='d3-chart-svg'] :is(.grid-h, .grid-v) line {
+  stroke: rgb(104 90 58 / 0.3);
+  stroke-width: 1.1px;
+  stroke-dasharray: 15 6 4 6;
+  stroke-linecap: round;
+}
+
+.ghibli svg[data-testid='d3-chart-svg'] .grid-v line {
+  stroke: rgb(104 90 58 / 0.17);
+}
+
+/* Axes are inked with a round brush. */
+.ghibli svg[data-testid='d3-chart-svg'] :is(.x-axis, .y-axis) path.domain {
+  stroke: #6d6245;
+  stroke-width: 2px;
+  stroke-linecap: round;
+}
+
+.ghibli svg[data-testid='d3-chart-svg'] .grid :is(.border-right, .border-top) {
+  stroke: transparent;
+}
+
+.ghibli svg[data-testid='d3-chart-svg'] .tick line {
+  stroke: #8a7d58;
+  stroke-linecap: round;
+}
+
+.ghibli svg[data-testid='d3-chart-svg'] .tick text {
+  fill: #5a5038;
+}
+
+.ghibli svg[data-testid='d3-chart-svg'] :is(.x-axis-label, .y-axis-label) {
+  font-family: var(--ghibli-display);
+}
+
+/* Curves are single loaded brush strokes: wide, round at both ends, a little translucent. */
+.ghibli svg[data-testid='d3-chart-svg'] :is(.roofline-path, .overlay-roofline-path) {
+  stroke-width: 4px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-opacity: 0.86;
+}
+
+/* Charts that draw their marks in SVG get the same soft hand. */
+.ghibli svg[data-testid='d3-chart-svg'] rect.bar {
+  rx: 5px;
+  fill-opacity: 0.86;
+  /* A brushed rim: the pigment pools darker where the stroke lifted, in uneven dashes. */
+  stroke: rgb(64 52 24 / 0.42);
+  stroke-width: 1.2px;
+  stroke-dasharray: 34 2 14 1.5 22 2.5;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+/* SVG points carry the same glint the canvas dabs do (see ghibli-charts.ts). */
+.ghibli svg[data-testid='d3-chart-svg'] .ghibli-point-marker {
+  pointer-events: none;
+}
+
+.ghibli svg[data-testid='d3-chart-svg'] .dot-group .visible-shape {
+  stroke: rgb(64 52 24 / 0.35);
+  stroke-width: 1px;
+  fill-opacity: 0.9;
+}
+
+/* Legend swatches are soot sprites in the series colour, the same figure the circle points
+   are (ghibli-charts.ts): a fuzzy body, two white eyes, dark pupils. */
+.ghibli .legend-container label > span:first-child > span.rounded-full {
+  border-radius: 0;
+  scale: 1.45;
+  background-image:
+    radial-gradient(circle at 36% 49%, #2a2418 0 1.1px, transparent 1.4px),
+    radial-gradient(circle at 67% 49%, #2a2418 0 1.1px, transparent 1.4px);
+  -webkit-mask: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%27-1.1 -1.1 2.2 2.2%27%3E%3Cpath fill-rule=%27evenodd%27 d=%27M1.02,0.00L0.79,0.14L0.96,0.35L0.69,0.40L0.78,0.66L0.51,0.61L0.51,0.88L0.27,0.75L0.18,1.00L0.00,0.80L-0.18,1.00L-0.27,0.75L-0.51,0.88L-0.51,0.61L-0.78,0.66L-0.69,0.40L-0.96,0.35L-0.79,0.14L-1.02,0.00L-0.79,-0.14L-0.96,-0.35L-0.69,-0.40L-0.78,-0.66L-0.51,-0.61L-0.51,-0.88L-0.27,-0.75L-0.18,-1.00L-0.00,-0.80L0.18,-1.00L0.27,-0.75L0.51,-0.88L0.51,-0.61L0.78,-0.66L0.69,-0.40L0.96,-0.35L0.79,-0.14ZM-0.65,-0.06a0.31,0.31 0 1,0 0.62,0a0.31,0.31 0 1,0 -0.62,0ZM0.03,-0.06a0.31,0.31 0 1,0 0.62,0a0.31,0.31 0 1,0 -0.62,0Z%27/%3E%3Cpath d=%27M-0.45,-0.02a0.15,0.15 0 1,0 0.30,0a0.15,0.15 0 1,0 -0.30,0ZM0.23,-0.02a0.15,0.15 0 1,0 0.30,0a0.15,0.15 0 1,0 -0.30,0Z%27/%3E%3C/svg%3E')
+    center / contain no-repeat;
+  mask: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%27-1.1 -1.1 2.2 2.2%27%3E%3Cpath fill-rule=%27evenodd%27 d=%27M1.02,0.00L0.79,0.14L0.96,0.35L0.69,0.40L0.78,0.66L0.51,0.61L0.51,0.88L0.27,0.75L0.18,1.00L0.00,0.80L-0.18,1.00L-0.27,0.75L-0.51,0.88L-0.51,0.61L-0.78,0.66L-0.69,0.40L-0.96,0.35L-0.79,0.14L-1.02,0.00L-0.79,-0.14L-0.96,-0.35L-0.69,-0.40L-0.78,-0.66L-0.51,-0.61L-0.51,-0.88L-0.27,-0.75L-0.18,-1.00L-0.00,-0.80L0.18,-1.00L0.27,-0.75L0.51,-0.88L0.51,-0.61L0.78,-0.66L0.69,-0.40L0.96,-0.35L0.79,-0.14ZM-0.65,-0.06a0.31,0.31 0 1,0 0.62,0a0.31,0.31 0 1,0 -0.62,0ZM0.03,-0.06a0.31,0.31 0 1,0 0.62,0a0.31,0.31 0 1,0 -0.62,0Z%27/%3E%3Cpath d=%27M-0.45,-0.02a0.15,0.15 0 1,0 0.30,0a0.15,0.15 0 1,0 -0.30,0ZM0.23,-0.02a0.15,0.15 0 1,0 0.30,0a0.15,0.15 0 1,0 -0.30,0Z%27/%3E%3C/svg%3E')
+    center / contain no-repeat;
+}
+
+.ghibli .legend-container li:nth-child(even) label > span:first-child > span.rounded-full {
+  rotate: 12deg;
+}
+
+.ghibli [data-chart-tooltip] > * {
+  border-color: #cdbf93;
+  border-radius: 16px;
+  background-color: #fffaf0;
+  box-shadow: 0 14px 28px -16px rgba(64, 52, 24, 0.55);
+}
+
+.ghibli [data-slot='skeleton'] {
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 196, 120, 0.35) 50%,
+    transparent 80%
+  );
+  background-size: 220% 100%;
+  animation: ghibli-ember 2.4s ease-in-out infinite;
+}
+
+/* Calcifer sits in the big chart placeholder while a chart loads. */
+.ghibli [data-slot='skeleton'][class*='h-[600px]'] {
+  position: relative;
+}
+
+.ghibli [data-slot='skeleton'][class*='h-[600px]']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 96px;
+  height: 83px;
+  translate: -50% -50%;
+  background: url('/decorative/ghibli/sprites/calcifer-flame.webp') center / contain no-repeat;
+  filter: drop-shadow(0 0 14px rgba(255, 150, 40, 0.6));
+  animation: ghibli-flicker 1.6s ease-in-out infinite;
+}
+
+/* ---- footer: sea waves and jellyfish --------------------------------------------------------- */
+
+.ghibli footer[data-testid='footer'] {
+  background-image: linear-gradient(
+    180deg,
+    transparent 0,
+    rgba(150, 199, 220, 0.38) 46px,
+    rgba(206, 230, 236, 0.75) 140px,
+    rgba(234, 243, 238, 0.92) 100%
+  );
+}
+
+.ghibli .ghibli-footer-sea {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 56px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ghibli .ghibli-wave {
+  position: absolute;
+  right: -200px;
+  bottom: 0;
+  left: 0;
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  animation: ghibli-wave-roll 18s linear infinite;
+}
+
+.ghibli .ghibli-wave-back {
+  height: 34px;
+  opacity: 0.45;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='34' viewBox='0 0 200 34'%3E%3Cpath d='M0 18 C 25 6 50 6 75 16 S 125 28 150 16 S 190 8 200 18 V34 H0Z' fill='%2393c2d6'/%3E%3C/svg%3E");
+  animation-duration: 26s;
+}
+
+.ghibli .ghibli-wave-mid {
+  height: 28px;
+  opacity: 0.6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='28' viewBox='0 0 200 28'%3E%3Cpath d='M0 14 C 30 2 60 4 100 14 S 170 24 200 14 V28 H0Z' fill='%236faecb'/%3E%3Cpath d='M20 10 q 10 -5 20 0 M120 16 q 10 -5 20 0' stroke='%23ffffff' stroke-width='2' fill='none' stroke-linecap='round' opacity='.7'/%3E%3C/svg%3E");
+  animation-direction: reverse;
+}
+
+.ghibli .ghibli-wave-front {
+  height: 18px;
+  opacity: 0.55;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='18' viewBox='0 0 200 18'%3E%3Cpath d='M0 9 C 40 0 60 0 100 9 S 160 18 200 9 V18 H0Z' fill='%23d4ecf2'/%3E%3C/svg%3E");
+  animation-duration: 12s;
+}
+
+.ghibli .ghibli-jelly {
+  position: absolute;
+  bottom: 4px;
+  width: auto;
+  height: 22px;
+  opacity: 0.9;
+  animation: ghibli-bob 5s ease-in-out infinite;
+}
+
+.ghibli .ghibli-jelly-a {
+  left: 12%;
+}
+
+.ghibli .ghibli-jelly-b {
+  left: 58%;
+  height: 17px;
+  animation-delay: -2s;
+}
+
+.ghibli .ghibli-jelly-c {
+  left: 82%;
+  height: 19px;
+  animation-delay: -3.4s;
+}
+
+.ghibli .ghibli-ponyo-bubble {
+  left: 36%;
+  bottom: 2px;
+  height: 44px;
+  animation-duration: 6.5s;
+}
+
+/* ---- background sky ------------------------------------------------------------------------- */
+
+.ghibli .ghibli-sky {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    #b9d9ec 0%,
+    #d3e7ef 24%,
+    #e9f0e6 48%,
+    #f3efe1 72%,
+    #f1ead6 100%
+  );
+}
+
+.ghibli .ghibli-sun {
+  position: absolute;
+  top: -18vh;
+  right: -8vw;
+  width: 60vw;
+  height: 60vh;
+  background: radial-gradient(
+    closest-side,
+    rgba(255, 246, 214, 0.9),
+    rgba(255, 238, 196, 0.35) 55%,
+    transparent
+  );
+}
+
+.ghibli .ghibli-clouds {
+  position: absolute;
+  left: -50%;
+  width: 200%;
+  translate: 0 calc(var(--ghibli-scroll, 0) * -0.05px);
+  animation: ghibli-drift 260s linear infinite;
+}
+
+.ghibli .ghibli-clouds-far {
+  top: 6vh;
+  height: 30vh;
+  opacity: 0.75;
+  filter: blur(1.5px);
+  background:
+    radial-gradient(9% 34% at 8% 50%, #fff 60%, transparent 62%),
+    radial-gradient(6% 26% at 13% 40%, #fff 60%, transparent 62%),
+    radial-gradient(10% 30% at 34% 62%, #fbfdff 60%, transparent 62%),
+    radial-gradient(7% 24% at 39% 50%, #fff 60%, transparent 62%),
+    radial-gradient(11% 32% at 62% 46%, #fff 60%, transparent 62%),
+    radial-gradient(6% 22% at 67% 36%, #fff 60%, transparent 62%),
+    radial-gradient(9% 30% at 86% 58%, #fbfdff 60%, transparent 62%);
+}
+
+.ghibli .ghibli-clouds-near {
+  top: 22vh;
+  height: 34vh;
+  opacity: 0.6;
+  filter: blur(3px);
+  translate: 0 calc(var(--ghibli-scroll, 0) * -0.12px);
+  animation-duration: 170s;
+  animation-direction: reverse;
+  background:
+    radial-gradient(12% 30% at 20% 50%, #fff 58%, transparent 62%),
+    radial-gradient(8% 22% at 26% 38%, #fff 58%, transparent 62%),
+    radial-gradient(13% 28% at 52% 58%, #fff 58%, transparent 62%),
+    radial-gradient(12% 30% at 80% 44%, #fff 58%, transparent 62%),
+    radial-gradient(8% 20% at 85% 34%, #fff 58%, transparent 62%);
+}
+
+.ghibli .ghibli-hills {
+  position: absolute;
+  right: -10%;
+  bottom: 0;
+  left: -10%;
+}
+
+.ghibli .ghibli-hills-far {
+  height: 34vh;
+  translate: 0 calc(var(--ghibli-scroll, 0) * 0.02px);
+  background:
+    radial-gradient(40% 70% at 18% 100%, #b9d3a6 60%, transparent 61%),
+    radial-gradient(46% 62% at 62% 100%, #c4dcae 60%, transparent 61%),
+    radial-gradient(34% 56% at 94% 100%, #b6cfa0 60%, transparent 61%);
+  opacity: 0.75;
+}
+
+.ghibli .ghibli-hills-near {
+  height: 22vh;
+  translate: 0 calc(var(--ghibli-scroll, 0) * 0.04px);
+  background:
+    radial-gradient(52% 80% at 30% 100%, #9fc283 60%, transparent 61%),
+    radial-gradient(48% 70% at 84% 100%, #a8c98c 60%, transparent 61%);
+  opacity: 0.7;
+}
+
+.ghibli .ghibli-grass {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 9vh;
+  background:
+    radial-gradient(circle at 12px 70%, #fff6d8 0 2px, transparent 2.5px) 0 0 / 90px 100%,
+    radial-gradient(circle at 54px 50%, #f4c5cf 0 2px, transparent 2.5px) 0 0 / 130px 100%,
+    linear-gradient(180deg, transparent, rgba(126, 168, 98, 0.55) 70%, rgba(112, 156, 86, 0.7));
+}
+
+/* Watercolour paper grain over the whole sky. */
+.ghibli .ghibli-paper {
+  position: absolute;
+  inset: 0;
+  opacity: 0.32;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .38 0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- banner ------------------------------------------------------------------------------- */
+
+.ghibli .ghibli-theme-banner {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem 1.75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 1.1rem 1.4rem;
+  overflow: hidden;
+  border: 1px solid var(--ghibli-edge);
+  border-radius: 28px 20px 30px 18px / 20px 30px 18px 28px;
+  background: color-mix(in oklab, var(--ghibli-paper) 90%, transparent);
+  box-shadow: 0 14px 34px -24px rgba(40, 64, 44, 0.7);
+}
+
+.ghibli .ghibli-banner-wash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.3;
+  mask-image: linear-gradient(90deg, transparent 15%, #000 70%);
+}
+
+.ghibli .ghibli-banner-wash img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 45%;
+  filter: saturate(0.85) blur(0.5px);
+}
+
+.ghibli .ghibli-banner-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.ghibli .ghibli-banner-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ghibli .ghibli-totoro-nod {
+  flex: none;
+  width: 40px;
+  height: 45px;
+  opacity: 0.75;
+  transform-origin: 50% 100%;
+}
+
+.ghibli .ghibli-totoro-nod:hover {
+  animation: ghibli-rattle 0.9s ease-in-out;
+}
+
+.ghibli .ghibli-banner-title {
+  margin: 0;
+  color: color-mix(in oklab, var(--primary) 55%, var(--ghibli-ink));
+  font-size: 1.65rem;
+  line-height: 1.1;
+}
+
+.ghibli .ghibli-banner-subtitle {
+  margin: 0.15rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.ghibli .ghibli-banner-line {
+  display: block;
+  min-height: 2.8em;
+  max-width: 44rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ghibli-ink);
+  font-family: var(--ghibli-display);
+  font-size: 1.05rem;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ghibli .ghibli-banner-line-text {
+  display: inline-block;
+  animation: ghibli-line-in 0.8s ease-out both;
+}
+
+.ghibli .ghibli-banner-line-text::before {
+  content: '\201C';
+  margin-right: 0.1em;
+  color: var(--primary);
+}
+
+.ghibli .ghibli-banner-line-text::after {
+  content: '\201D';
+  margin-left: 0.1em;
+  color: var(--primary);
+}
+
+.ghibli .ghibli-banner-line:focus-visible,
+.ghibli .ghibli-film-chip:focus-visible,
+.ghibli .ghibli-kodama:focus-visible,
+.ghibli .ghibli-gold:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.ghibli .ghibli-film-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ghibli .ghibli-film-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0.25rem 0.8rem 0.25rem 0.3rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 25%, var(--border));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ghibli-ink);
+  cursor: pointer;
+  transition:
+    background-color 0.25s,
+    color 0.25s,
+    transform 0.25s;
+}
+
+.ghibli .ghibli-film-chip:hover {
+  transform: translateY(-1px);
+  background: #fff;
+}
+
+.ghibli .ghibli-film-chip img {
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--ghibli-wash, #eef2e2);
+  object-fit: contain;
+}
+
+.ghibli .ghibli-film-chip-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ghibli .ghibli-film-chip-year {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+}
+
+.ghibli .ghibli-film-chip[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* The selected film wears the four-colour door dial from Howl's castle (green, blue, red, black). */
+.ghibli .ghibli-film-chip[aria-pressed='true'] img {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--ghibli-wash, #eef2e2), var(--ghibli-wash, #eef2e2)) padding-box,
+    conic-gradient(#4f7a3a 0 25%, #3b62a0 0 50%, #a8433a 0 75%, #26241f 0) border-box;
+}
+
+.ghibli .ghibli-film-chip[aria-pressed='true'] .ghibli-film-chip-year {
+  color: color-mix(in oklab, var(--primary-foreground) 80%, transparent);
+}
+
+.ghibli .ghibli-polaroid {
+  width: 230px;
+  margin: 0;
+  padding: 8px 8px 6px;
+  border-radius: 4px;
+  background: #fffdf8;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 12px 24px -14px rgba(40, 40, 20, 0.6);
+  rotate: 2deg;
+}
+
+.ghibli .ghibli-polaroid img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1920 / 1038;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.ghibli .ghibli-polaroid figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  color: var(--ghibli-ink);
+  font-family: var(--ghibli-display);
+  font-size: 0.78rem;
+}
+
+.ghibli .ghibli-polaroid-credit {
+  color: var(--muted-foreground);
+  font-family: var(--font-dm-sans);
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+/* ---- character layer ------------------------------------------------------------------------ */
+
+.ghibli .ghibli-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ghibli .ghibli-scene img {
+  display: block;
+  user-select: none;
+}
+
+.ghibli .ghibli-castle-walk {
+  position: absolute;
+  bottom: 7vh;
+  left: 0;
+  width: 150px;
+  opacity: 0.9;
+  animation: ghibli-castle-walk 240s linear infinite;
+  animation-delay: -150s;
+}
+
+/* Each film keeps to its own cast: the walking castle belongs to Howl's film only. */
+.ghibli:not([data-ghibli-film='howl']) .ghibli-castle-walk {
+  display: none;
+}
+
+.ghibli .ghibli-castle-bob {
+  animation: ghibli-gait 2.4s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.ghibli .ghibli-castle-img {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 6px 6px rgba(40, 50, 30, 0.25));
+}
+
+.ghibli .ghibli-soot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: auto;
+  height: 22px;
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+.ghibli .ghibli-soot.is-hopping {
+  animation: ghibli-hop 0.32s ease-in-out infinite;
+}
+
+.ghibli .ghibli-kodama {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* A 44 px tap target round the sprite; the image keeps its size and sits at the bottom. */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 44px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ghibli .ghibli-kodama img,
+.ghibli .ghibli-kodama-buddy {
+  width: auto;
+  height: 100%;
+  transform-origin: 50% 90%;
+  transition: rotate 0.35s ease;
+  filter: drop-shadow(0 2px 2px rgba(30, 50, 40, 0.25));
+}
+
+.ghibli .ghibli-kodama:hover img,
+.ghibli .ghibli-kodama:focus-visible img {
+  rotate: -14deg;
+}
+
+.ghibli .ghibli-kodama.is-rattling img {
+  animation: ghibli-rattle 0.9s ease-in-out;
+}
+
+.ghibli .ghibli-kodama-buddy {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 38px;
+  animation: ghibli-rattle 4.5s ease-in-out infinite;
+}
+
+.ghibli .ghibli-ponyo-surf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 80px;
+  will-change: transform, opacity;
+}
+
+.ghibli .ghibli-ponyo-surf img {
+  width: auto;
+  height: 100%;
+}
+
+.ghibli .ghibli-flight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+.ghibli .ghibli-flight img {
+  width: 100%;
+  height: auto;
+  animation: ghibli-bob 2.2s ease-in-out infinite;
+}
+
+.ghibli .ghibli-heron {
+  width: 170px;
+}
+
+.ghibli .ghibli-parakeets {
+  width: 230px;
+}
+
+.ghibli .ghibli-haku {
+  width: 300px;
+  opacity: 0.95;
+}
+
+.ghibli .ghibli-resident {
+  position: absolute;
+  display: none;
+}
+
+.ghibli .ghibli-resident img {
+  width: auto;
+  height: 100%;
+}
+
+.ghibli[data-ghibli-film='mononoke'] .ghibli-san,
+.ghibli[data-ghibli-film='spirited'] .ghibli-noface-stand {
+  display: block;
+}
+
+.ghibli .ghibli-san {
+  bottom: -6px;
+  left: 6px;
+  height: 92px;
+  opacity: 0.95;
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+
+.ghibli .ghibli-san.is-tucked {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.ghibli .ghibli-resident.ghibli-noface-stand.is-tucked {
+  opacity: 0;
+}
+
+.ghibli .ghibli-noface-stand {
+  right: 4px;
+  bottom: 18vh;
+  height: 104px;
+  opacity: 0;
+  translate: 70px 0;
+  transition:
+    opacity 1.6s ease,
+    translate 1.6s ease;
+}
+
+.ghibli .ghibli-noface-stand.is-visible {
+  opacity: 0.92;
+  translate: 0 0;
+}
+
+.ghibli .ghibli-footer-sea .ghibli-only-ponyo {
+  display: none;
+}
+
+.ghibli[data-ghibli-film='ponyo'] .ghibli-footer-sea .ghibli-only-ponyo {
+  display: block;
+}
+
+.ghibli .ghibli-warawara {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.ghibli .ghibli-warawara img {
+  width: auto;
+  height: 30px;
+  animation: ghibli-bob 3s ease-in-out infinite;
+}
+
+.ghibli .ghibli-turnip {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+}
+
+.ghibli .ghibli-turnip-hop {
+  animation: ghibli-turnip-hop 1.15s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.ghibli .ghibli-turnip img {
+  width: auto;
+  height: 78px;
+}
+
+.ghibli .ghibli-footprint {
+  position: absolute;
+  bottom: 10px;
+  width: 16px;
+  height: 20px;
+  animation:
+    ghibli-print-in 0.4s ease-out both,
+    ghibli-fade-out 1.5s ease-in 7.5s forwards;
+}
+
+.ghibli .ghibli-footprint.is-right {
+  bottom: 24px;
+}
+
+.ghibli .ghibli-footprint::before,
+.ghibli .ghibli-footprint::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 7px;
+  height: 16px;
+  border-radius: 50% 50% 45% 45% / 65% 65% 35% 35%;
+  background: rgba(70, 58, 36, 0.38);
+}
+
+.ghibli .ghibli-footprint::before {
+  left: 0;
+  rotate: -8deg;
+}
+
+.ghibli .ghibli-footprint::after {
+  right: 0;
+  rotate: 8deg;
+}
+
+.ghibli .ghibli-flower {
+  position: absolute;
+  bottom: 14px;
+  left: -2px;
+  width: 20px;
+  height: 20px;
+  --ghibli-petal: #f6b4c6;
+  background:
+    radial-gradient(circle at 50% 50%, #ffd65a 0 3px, transparent 3.5px),
+    radial-gradient(circle at 50% 18%, var(--ghibli-petal) 0 4.5px, transparent 5px),
+    radial-gradient(circle at 82% 50%, var(--ghibli-petal) 0 4.5px, transparent 5px),
+    radial-gradient(circle at 50% 82%, var(--ghibli-petal) 0 4.5px, transparent 5px),
+    radial-gradient(circle at 18% 50%, var(--ghibli-petal) 0 4.5px, transparent 5px);
+  scale: 0;
+  animation: ghibli-bloom 0.9s cubic-bezier(0.3, 1.6, 0.5, 1) 0.45s forwards;
+}
+
+.ghibli .ghibli-flower-1 {
+  --ghibli-petal: #fff3c2;
+}
+
+.ghibli .ghibli-flower-2 {
+  --ghibli-petal: #b9d8f4;
+}
+
+.ghibli .ghibli-chorus {
+  position: absolute;
+  inset: 0;
+}
+
+.ghibli .ghibli-chorus-kodama {
+  position: absolute;
+  width: auto;
+  height: 52px;
+  translate: -50% 0;
+  transform-origin: 50% 90%;
+  animation:
+    ghibli-pop-up 0.6s ease-out both,
+    ghibli-rattle 0.9s ease-in-out 4;
+}
+
+.ghibli .ghibli-soot-pile {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  width: auto;
+  height: 28px;
+  translate: var(--ghibli-pile-x, 0) var(--ghibli-pile-y, 0);
+  animation: ghibli-pop-up 0.6s ease-out both;
+  transition: translate 0.8s ease-in;
+}
+
+.ghibli .ghibli-soot-pile.is-scattering {
+  translate: var(--ghibli-run, 0) 0;
+}
+
+.ghibli .ghibli-offer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 86px;
+  height: 76px;
+  animation: ghibli-fade-in 0.6s ease-out both;
+}
+
+.ghibli .ghibli-offer-noface {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: 76px;
+  filter: drop-shadow(0 4px 4px rgba(20, 20, 20, 0.25));
+}
+
+.ghibli .ghibli-gold {
+  position: absolute;
+  top: 36px;
+  left: -14px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ghibli .ghibli-gold::before {
+  content: '';
+  position: absolute;
+  inset: 8px 6px 9px;
+  border-radius: 45% 55% 40% 60% / 55% 45% 55% 45%;
+  background: radial-gradient(circle at 35% 30%, #fff4b8, #f4c542 45%, #b8861c);
+  box-shadow: 0 0 10px 2px rgba(255, 210, 80, 0.7);
+  animation: ghibli-shimmer 1.6s ease-in-out infinite;
+}
+
+.ghibli .ghibli-nugget {
+  position: absolute;
+  width: 10px;
+  height: 8px;
+  border-radius: 45% 55% 40% 60%;
+  background: radial-gradient(circle at 35% 30%, #fff4b8, #f4c542 45%, #b8861c);
+  animation: ghibli-nugget-fall 1.4s ease-in both;
+}
+
+.ghibli .ghibli-toast {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 0.65rem 0.95rem;
+  border: 1px solid var(--ghibli-edge);
+  border-radius: 18px 14px 18px 6px;
+  background: var(--ghibli-paper);
+  box-shadow: 0 12px 26px -16px rgba(40, 50, 30, 0.6);
+  color: var(--ghibli-ink);
+  font-family: var(--ghibli-display);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  opacity: 0;
+  translate: 0 10px;
+  transition:
+    opacity 0.4s ease,
+    translate 0.4s ease;
+}
+
+.ghibli .ghibli-toast:empty {
+  display: none;
+}
+
+.ghibli .ghibli-toast.is-visible {
+  opacity: 1;
+  translate: 0 0;
+}
+
+.ghibli .ghibli-egg-castle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 250px;
+}
+
+.ghibli .ghibli-egg-castle img,
+.ghibli .ghibli-egg-totoro img,
+.ghibli .ghibli-egg-calcifer img,
+.ghibli .ghibli-egg-ponyo img,
+.ghibli .ghibli-egg-static img {
+  width: 100%;
+  height: auto;
+}
+
+.ghibli .ghibli-egg-castle img {
+  animation: ghibli-bob 3s ease-in-out infinite;
+}
+
+.ghibli .ghibli-egg-totoro {
+  position: absolute;
+  right: 8vw;
+  bottom: 0;
+  width: 170px;
+  animation: ghibli-peek-up 7s ease-in-out both;
+}
+
+.ghibli .ghibli-egg-calcifer {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  width: 230px;
+  translate: -50% 0;
+  filter: drop-shadow(0 0 24px rgba(255, 140, 40, 0.75));
+  animation: ghibli-flare 4.6s ease-in-out both;
+}
+
+.ghibli .ghibli-egg-ponyo {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 220px;
+  animation: ghibli-float-up 8.2s ease-in-out both;
+}
+
+.ghibli .ghibli-egg-static {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  width: 260px;
+  translate: -50% -50%;
+  animation: ghibli-fade-in 0.6s ease-out both;
+}
+
+/* ---- keyframes ----------------------------------------------------------------------------- */
+
+@keyframes ghibli-flicker {
+  0%,
+  100% {
+    scale: 1;
+    filter: drop-shadow(0 0 4px rgba(255, 150, 40, 0.6));
+  }
+  50% {
+    scale: 1.08 1.14;
+    filter: drop-shadow(0 0 8px rgba(255, 170, 60, 0.85));
+  }
+}
+
+@keyframes ghibli-ember {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes ghibli-wave-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-200px);
+  }
+}
+
+@keyframes ghibli-bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -5px;
+  }
+}
+
+@keyframes ghibli-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(25%);
+  }
+}
+
+@keyframes ghibli-castle-walk {
+  from {
+    transform: translateX(calc(100vw + 40px));
+  }
+  to {
+    transform: translateX(-220px);
+  }
+}
+
+@keyframes ghibli-gait {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-3px) rotate(-1.2deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-3px) rotate(1.2deg);
+  }
+}
+
+@keyframes ghibli-hop {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -10px;
+  }
+}
+
+@keyframes ghibli-rattle {
+  0%,
+  100% {
+    rotate: 0deg;
+  }
+  15% {
+    rotate: -12deg;
+  }
+  30% {
+    rotate: 10deg;
+  }
+  45% {
+    rotate: -8deg;
+  }
+  60% {
+    rotate: 6deg;
+  }
+  75% {
+    rotate: -3deg;
+  }
+}
+
+@keyframes ghibli-turnip-hop {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  12% {
+    transform: translateY(0) scaleY(0.94);
+  }
+  45% {
+    transform: translateY(-26px) scaleY(1.02);
+  }
+  80% {
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes ghibli-print-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes ghibli-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes ghibli-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ghibli-bloom {
+  from {
+    scale: 0;
+    rotate: -40deg;
+  }
+  to {
+    scale: 1;
+    rotate: 0deg;
+  }
+}
+
+@keyframes ghibli-pop-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ghibli-shimmer {
+  0%,
+  100% {
+    box-shadow: 0 0 8px 1px rgba(255, 210, 80, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 14px 4px rgba(255, 220, 110, 0.9);
+  }
+}
+
+@keyframes ghibli-nugget-fall {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--ghibli-dx, 0), 170px) rotate(220deg);
+  }
+}
+
+@keyframes ghibli-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ghibli-peek-up {
+  0% {
+    transform: translateY(100%);
+  }
+  25%,
+  75% {
+    transform: translateY(8%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes ghibli-flare {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  35%,
+  55% {
+    transform: scale(0.95);
+  }
+  45%,
+  65% {
+    transform: scale(1.06);
+  }
+  85% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+@keyframes ghibli-float-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 30%);
+  }
+  15% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-46%, -38vh);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-54%, -62vh);
+  }
+}
+
+/* ---- depth: pigments, Lantern Dusk, signboard, controls ---------------------------------- */
+
+/* Overlay runs are mixed from mineral pigments (shu, gunjō, rokushō, ōdo, shikon, beni, ai,
+   kuchiba): distinct hues at similar weight, all dark enough to read on the paper wash. */
+html.ghibli {
+  --overlay-run-0: #b8432f;
+  --overlay-run-1: #3557a0;
+  --overlay-run-2: #2f8270;
+  --overlay-run-3: #b07a1c;
+  --overlay-run-4: #6a4a8f;
+  --overlay-run-5: #b3416a;
+  --overlay-run-6: #22607e;
+  --overlay-run-7: #7d5a2a;
+  scrollbar-color: color-mix(in oklab, var(--primary) 55%, #8a7a50) #efe8d2;
+}
+
+/* The ink brush and its soot sprite. Text fields keep the caret. */
+.ghibli body {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Cpath d='M2 2v15l4-4 3 7 3-1.3-3-6.7h6z' fill='%232f3a34' stroke='%23fffcf3' stroke-width='1.3' stroke-linejoin='round'/%3E%3Cg transform='translate(19 19)'%3E%3Cpath d='M0-5.5l1 2 2-1.2-.2 2.3 2.3.2-1.2 2 2 1-2 1 1.2 2-2.3.2.2 2.3-2-1.2-1 2-1-2-2 1.2.2-2.3-2.3-.2 1.2-2-2-1 2-1-1.2-2 2.3-.2-.2-2.3 2 1.2z' fill='%23231d18'/%3E%3Ccircle cx='-1.6' cy='-.4' r='1.3' fill='%23fff'/%3E%3Ccircle cx='1.6' cy='-.4' r='1.3' fill='%23fff'/%3E%3C/g%3E%3C/svg%3E")
+      2 2,
+    auto;
+}
+
+.ghibli
+  :is(a[href], button:not(:disabled), [role='button'], [role='tab'], summary, select, label[for]) {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Cpath d='M9 9l13 13' stroke='%23a5793e' stroke-width='3.4' stroke-linecap='round'/%3E%3Cpath d='M8 8l3 3' stroke='%235a3b1e' stroke-width='4'/%3E%3Cpath d='M2 2c3 .5 6 2 7.5 5.5L7.5 9.5C4 8 2.5 5 2 2z' fill='%232f3a34' stroke='%23fffcf3' stroke-width='1'/%3E%3C/svg%3E")
+      2 2,
+    pointer;
+}
+
+.ghibli
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']),
+    textarea,
+    [contenteditable='true']
+  ) {
+  cursor: text;
+}
+
+/* Hanko stamps for code and keys: vermilion ink on cream, a little off-square. */
+.ghibli :where(code, kbd, samp):not(pre code) {
+  padding: 0.05em 0.4em;
+  border: 1px solid rgb(176 58 40 / 0.55);
+  border-radius: 3px 5px 3px 6px;
+  background: rgb(255 244 232 / 0.85);
+  color: #9a3020;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.6);
+}
+
+.ghibli :where(kbd) {
+  border-bottom-width: 2px;
+  font-weight: 600;
+}
+
+/* ---- header: wooden signboard and seal ---- */
+
+.ghibli header[data-testid='header'] [data-testid='inferencex-wordmark'] {
+  position: relative;
+  padding: 0.1rem 0.7rem 0.15rem;
+  border: 1px solid #5d3a1e;
+  border-radius: 4px 6px 4px 7px;
+  background:
+    repeating-linear-gradient(
+      93deg,
+      rgb(255 255 255 / 0) 0 7px,
+      rgb(255 236 200 / 0.12) 7px 8px,
+      rgb(80 44 16 / 0.12) 8px 10px
+    ),
+    linear-gradient(180deg, #a8703f, #855229 60%, #6e4220);
+  color: #fff3d8;
+  font-family: var(--ghibli-display);
+  text-shadow: 0 1px 0 rgb(60 30 8 / 0.65);
+  box-shadow:
+    inset 0 1px 0 rgb(255 220 170 / 0.45),
+    inset 0 -2px 0 rgb(60 30 8 / 0.35),
+    0 2px 0 rgb(60 30 8 / 0.35);
+}
+
+/* Two pegs hold the board. */
+.ghibli header[data-testid='header'] [data-testid='inferencex-wordmark']::before,
+.ghibli header[data-testid='header'] [data-testid='inferencex-wordmark']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  translate: 0 -50%;
+  border-radius: 50%;
+  background: #3e2410;
+  box-shadow: inset 0 1px 0 rgb(255 220 170 / 0.4);
+}
+
+.ghibli header[data-testid='header'] [data-testid='inferencex-wordmark']::before {
+  left: 3px;
+}
+
+.ghibli header[data-testid='header'] [data-testid='inferencex-wordmark']::after {
+  right: 3px;
+}
+
+/* A vermilion hanko pressed beside the board, as on a bathhouse ticket. */
+.ghibli header[data-testid='header'] [data-testid='header-brand'] {
+  position: relative;
+}
+
+.ghibli header[data-testid='header'] [data-testid='header-brand']::after {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: -2px;
+  rotate: -8deg;
+  border-radius: 4px 3px 5px 3px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 4.5h10M9 4.5v9M5 8.5h8M4.5 13.5h9' stroke='%23fff4ea' stroke-width='1.6' stroke-linecap='round' fill='none'/%3E%3C/svg%3E")
+      center / 100% no-repeat,
+    #b8352a;
+  box-shadow:
+    inset 0 0 0 1.5px rgb(255 244 234 / 0.6),
+    0 0 0 1px rgb(150 40 30 / 0.5);
+  opacity: 0.92;
+}
+
+/* On the narrowest phones the header keeps the stock width: no seal, tighter board. */
+@media (max-width: 359px) {
+  .ghibli header[data-testid='header'] [data-testid='header-brand']::after {
+    display: none;
+  }
+
+  .ghibli header[data-testid='header'] [data-testid='inferencex-wordmark'] {
+    padding-inline: 0.45rem;
+  }
+}
+
+/* ---- controls with more hand ---- */
+
+.ghibli [data-slot='button'] {
+  transition:
+    translate 0.12s ease-out,
+    box-shadow 0.12s ease-out,
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.ghibli
+  [data-slot='button']:is([class*='bg-primary'], [class*='bg-secondary']):hover:not(:disabled) {
+  translate: 0 -1px;
+}
+
+.ghibli [data-slot='button']:active:not(:disabled) {
+  translate: 0 1px;
+  box-shadow: inset 0 2px 3px rgb(48 40 20 / 0.22);
+}
+
+.ghibli [data-slot='button'][class*='hover:bg-accent']:active:not(:disabled) {
+  background-color: color-mix(in oklab, var(--accent) 80%, var(--primary) 12%);
+}
+
+/* Badges and chips are herbal tags: paper, a punched hole, a twist of string. */
+.ghibli :is([data-slot='badge'], [data-slot='select-chip']) {
+  position: relative;
+  padding-left: 1.15rem;
+  border-color: color-mix(in oklab, var(--primary) 30%, #b3ab88);
+  border-radius: 3px 999px 999px 3px;
+  background-color: color-mix(in oklab, #fff8e4 82%, var(--accent));
+  color: var(--ghibli-ink);
+}
+
+.ghibli :is([data-slot='badge'], [data-slot='select-chip'])::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0.4rem;
+  width: 5px;
+  height: 5px;
+  translate: 0 -50%;
+  border-radius: 50%;
+  background: var(--background);
+  box-shadow:
+    inset 0 0 0 1px rgb(110 90 50 / 0.55),
+    -4px 0 0 -1.5px #b8352a;
+}
+
+/* Calcifer lives in the switch: the thumb is a small flame that glows when it is on. */
+.ghibli [data-slot='switch'] {
+  border-color: rgb(110 90 50 / 0.3);
+}
+
+.ghibli [data-slot='switch'][data-state='checked'] {
+  background: linear-gradient(90deg, #6d3a1c, #b5532a);
+}
+
+.ghibli [data-slot='switch-thumb'] {
+  border-radius: 50% 50% 46% 46% / 62% 62% 38% 38%;
+  background: radial-gradient(circle at 50% 70%, #fff6dc 0 22%, #f6d9a4 60%, #e8c58a);
+  box-shadow: 0 1px 2px rgb(60 40 20 / 0.35);
+}
+
+.ghibli [data-slot='switch'][data-state='checked'] [data-slot='switch-thumb'] {
+  background:
+    radial-gradient(circle at 36% 58%, #2a1a10 0 1.2px, transparent 1.6px),
+    radial-gradient(circle at 64% 58%, #2a1a10 0 1.2px, transparent 1.6px),
+    radial-gradient(circle at 50% 75%, #fff4c4 0 26%, #ffb648 55%, #f0742c);
+  box-shadow: 0 0 8px 1px rgb(255 150 50 / 0.7);
+}
+
+/* Kamaji's ledger: ruled paper and a wooden heading rail. */
+.ghibli main table.w-full thead th {
+  border-bottom: 2px solid #8a6238;
+  background: linear-gradient(180deg, #f1e2c2, #e7d3ab);
+  color: #4d2c17;
+  font-family: var(--ghibli-display);
+}
+
+.ghibli main table.w-full tbody tr {
+  border-bottom-color: rgb(110 140 170 / 0.25);
+}
+
+.ghibli
+  main
+  table.w-full
+  tbody
+  tr:nth-child(even)
+  > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: rgb(244 236 214 / 0.55);
+}
+
+.ghibli main table.w-full tbody tr:hover > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: rgb(242 182 90 / 0.16);
+}
+
+/* Dialogs are sheets of parchment with soft torn corners. */
+.ghibli [role='dialog']:not(.ghibli-boiler) {
+  border-color: rgb(140 110 64 / 0.45);
+  border-radius: 20px 14px 22px 12px / 14px 22px 12px 20px;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgb(255 255 255 / 0.6), transparent 40%),
+    radial-gradient(ellipse at 100% 100%, rgb(200 160 96 / 0.16), transparent 50%),
+    var(--ghibli-paper, #fffcf3);
+  box-shadow:
+    inset 0 0 0 3px rgb(255 250 236 / 0.6),
+    inset 0 0 30px rgb(150 112 60 / 0.12),
+    0 24px 50px -24px rgb(40 30 10 / 0.6);
+}
+
+/* 404: the Sixth Station. A blue enamel platform sign on a post, water lapping at its foot. */
+.ghibli
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child {
+  position: relative;
+  margin-bottom: 2.4rem;
+  padding: 0.3rem 1.6rem;
+  border: 3px solid #f4f0e6;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #2e5a86, #234a72);
+  color: #f7f3ea;
+  font-family: var(--ghibli-display);
+  font-size: 2.25rem;
+  letter-spacing: 0.08em;
+  box-shadow:
+    0 0 0 2px #234a72,
+    0 8px 18px -8px rgb(20 40 60 / 0.6);
+}
+
+.ghibli
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 120px;
+  height: 2.3rem;
+  translate: -50% 0;
+  background:
+    linear-gradient(90deg, transparent 56px, #6c5a44 56px 64px, transparent 64px) top / 100% 70%
+      no-repeat,
+    radial-gradient(60% 40% at 50% 100%, rgb(120 176 200 / 0.75), transparent 70%) bottom / 100% 60%
+      no-repeat;
+}
+
+/* Empty plots: the train stop is flooded, and the bench is waiting for data. */
+.ghibli :is([data-slot='empty-state'], [data-testid='scatter-empty-state']) {
+  position: relative;
+  overflow: hidden;
+  border-color: rgb(110 140 170 / 0.35);
+  background:
+    radial-gradient(120% 40% at 50% 112%, rgb(122 178 204 / 0.45), transparent 70%),
+    linear-gradient(180deg, #fffcf3, #f3f0e4 70%, #e2eef0);
+}
+
+.ghibli [data-testid='scatter-empty-state']::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  bottom: 8px;
+  width: 56px;
+  height: 30px;
+  pointer-events: none;
+  background:
+    linear-gradient(#6c4a2c, #6c4a2c) 4px 6px / 48px 5px no-repeat,
+    linear-gradient(#6c4a2c, #6c4a2c) 4px 14px / 48px 4px no-repeat,
+    linear-gradient(#5a3c22, #5a3c22) 8px 14px / 4px 12px no-repeat,
+    linear-gradient(#5a3c22, #5a3c22) 44px 14px / 4px 12px no-repeat,
+    linear-gradient(180deg, transparent 60%, rgb(110 170 196 / 0.7) 60%) 0 0 / 100% 100% no-repeat;
+  border-radius: 0 0 10px 10px;
+  opacity: 0.75;
+}
+
+/* ---- banner: bath tag, lantern, compact row ---- */
+
+.ghibli .ghibli-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.ghibli .ghibli-boiler-launch {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'knot name'
+    'knot badge'
+    'knot medals';
+  align-items: center;
+  column-gap: 0.6rem;
+  min-height: 3rem;
+  padding: 0.35rem 0.95rem 0.4rem 0.6rem;
+  border: 1px solid #5d3a1e;
+  border-radius: 6px 14px 14px 6px;
+  background:
+    repeating-linear-gradient(
+      92deg,
+      rgb(255 255 255 / 0) 0 9px,
+      rgb(255 236 200 / 0.1) 9px 10px,
+      rgb(80 44 16 / 0.1) 10px 12px
+    ),
+    linear-gradient(180deg, #a36b3b, #7d4b25);
+  color: #fff3d8;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgb(255 220 170 / 0.4),
+    0 3px 0 #4a2c14,
+    0 8px 16px -10px rgb(40 20 6 / 0.7);
+  transition:
+    translate 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+
+.ghibli .ghibli-boiler-launch:hover {
+  translate: 0 -1px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 220 170 / 0.4),
+    0 4px 0 #4a2c14,
+    0 10px 18px -10px rgb(40 20 6 / 0.7);
+}
+
+.ghibli .ghibli-boiler-launch:active {
+  translate: 0 2px;
+  box-shadow:
+    inset 0 2px 3px rgb(40 20 6 / 0.4),
+    0 1px 0 #4a2c14;
+}
+
+.ghibli .ghibli-boiler-launch:focus-visible,
+.ghibli .ghibli-lantern-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.ghibli .ghibli-boiler-launch-knot {
+  grid-area: knot;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f3e6c8 0 3px, #4a2c14 3.5px 5px, #c43c2c 5.5px);
+  box-shadow: 0 0 0 1px rgb(40 20 6 / 0.4);
+}
+
+.ghibli .ghibli-boiler-launch-name {
+  grid-area: name;
+  font-family: var(--ghibli-display);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.ghibli .ghibli-boiler-launch-badge {
+  grid-area: badge;
+  color: #f3dcb4;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.ghibli .ghibli-boiler-launch-medals {
+  grid-area: medals;
+  display: flex;
+  gap: 3px;
+  padding-top: 2px;
+}
+
+.ghibli .ghibli-boiler-launch-medals span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(255 240 210 / 0.25);
+  box-shadow: inset 0 0 0 1px rgb(255 240 210 / 0.35);
+}
+
+.ghibli .ghibli-boiler-launch-medals span[data-medal='1'] {
+  background: #d39a66;
+}
+
+.ghibli .ghibli-boiler-launch-medals span[data-medal='2'] {
+  background: #e2e6e8;
+}
+
+.ghibli .ghibli-boiler-launch-medals span[data-medal='3'] {
+  background: #ffd45e;
+  box-shadow: 0 0 4px rgb(255 212 94 / 0.8);
+}
+
+.ghibli .ghibli-lantern-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0.25rem 0.8rem 0.25rem 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 25%, var(--border));
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.72);
+  color: var(--ghibli-ink);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.ghibli .ghibli-lantern-icon {
+  width: 14px;
+  height: 20px;
+  border-radius: 45% 45% 40% 40% / 50% 50% 40% 40%;
+  background:
+    linear-gradient(90deg, transparent 45%, rgb(90 50 20 / 0.35) 45% 55%, transparent 55%),
+    repeating-linear-gradient(180deg, transparent 0 3px, rgb(90 50 20 / 0.25) 3px 4px), #e8d6b0;
+  box-shadow:
+    inset 0 2px 0 #4a2c14,
+    inset 0 -2px 0 #4a2c14;
+}
+
+.ghibli .ghibli-lantern-toggle[aria-pressed='true'] .ghibli-lantern-icon {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 3px, rgb(140 40 20 / 0.3) 3px 4px),
+    radial-gradient(circle at 50% 55%, #fff1b8, #f2a64a 60%, #d2552c);
+  box-shadow:
+    inset 0 2px 0 #4a2c14,
+    inset 0 -2px 0 #4a2c14,
+    0 0 10px 2px rgb(255 170 70 / 0.65);
+}
+
+.ghibli .ghibli-lantern-toggle[aria-pressed='true'] {
+  border-color: #b5562c;
+  background: linear-gradient(180deg, #fff4d6, #f7d9a0);
+  box-shadow: 0 0 0 2px rgb(242 166 74 / 0.35);
+  font-weight: 600;
+}
+
+.ghibli .ghibli-banner-toggles {
+  display: none;
+}
+
+/* Away from home the banner folds into one slim row: title, film chips, the bath tag. */
+.ghibli .ghibli-theme-banner[data-compact='true'] {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0.55rem 1rem;
+  border-radius: 18px 14px 20px 12px / 14px 20px 12px 18px;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-banner-copy {
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.ghibli
+  .ghibli-theme-banner[data-compact='true']
+  :is(.ghibli-polaroid, .ghibli-banner-line, .ghibli-banner-subtitle, .ghibli-totoro-nod) {
+  display: none;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-banner-title {
+  font-size: 1.15rem;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-film-chip {
+  min-height: 2.25rem;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-film-chip-year {
+  display: none;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-boiler-launch {
+  grid-template-areas:
+    'knot name'
+    'knot medals';
+  min-height: 2.5rem;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-boiler-launch-badge {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-banner-actions {
+  margin-left: auto;
+}
+
+/* ---- Lantern Dusk: evening over the bathhouse ----
+   The sky, hills and header go to indigo and lantern gold. Every surface that carries content
+   (cards, charts, tables, dialogs, inputs) stays lantern-lit paper, so chart colours and point
+   shapes read exactly as they do by day. */
+
+.ghibli[data-ghibli-lantern='true'] {
+  color-scheme: light;
+  scrollbar-color: #d2a04e #1b2330;
+}
+
+.ghibli[data-ghibli-lantern='true'] body {
+  --background: #1b2330;
+  --foreground: #f2e8cf;
+  --muted-foreground: #cdc3a6;
+  --border: #4a5568;
+  --ghibli-edge: rgb(210 160 78 / 0.45);
+  --ghibli-glow: #f2b65a;
+  background-color: #1b2330;
+}
+
+.ghibli[data-ghibli-lantern='true']
+  :is(
+    [data-slot='card'],
+    [data-slot='popover-content'],
+    [data-slot='select-content'],
+    [data-slot='dropdown-menu-content'],
+    [role='dialog'],
+    [role='listbox'],
+    [role='menu'],
+    [data-chart-tooltip],
+    [data-testid='scatter-empty-state'],
+    .ghibli-theme-banner,
+    main table,
+    input,
+    textarea,
+    select,
+    [data-slot='select-trigger'],
+    [role='combobox'],
+    [data-slot='button'][class*='border'],
+    [data-slot='tabs-list']
+  ) {
+  --foreground: #2f3a34;
+  --muted-foreground: #55604f;
+  --border: #b3ab88;
+  color: var(--foreground);
+}
+
+.ghibli[data-ghibli-lantern='true'] [data-slot='card'] {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    0 0 0 1px rgb(210 160 78 / 0.35),
+    0 0 28px -6px rgb(242 182 90 / 0.35),
+    0 14px 30px -20px rgb(0 0 0 / 0.8);
+}
+
+.ghibli[data-ghibli-lantern='true'] .ghibli-sky {
+  background: linear-gradient(
+    180deg,
+    #141b28 0%,
+    #1b2436 30%,
+    #2c3150 58%,
+    #4a3a52 82%,
+    #6a4636 100%
+  );
+}
+
+.ghibli[data-ghibli-lantern='true'] .ghibli-sun {
+  top: 4vh;
+  right: 8vw;
+  width: 16vw;
+  height: 16vw;
+  background: radial-gradient(
+    closest-side,
+    rgb(250 244 220 / 0.95) 0 34%,
+    rgb(240 226 180 / 0.25) 46%,
+    transparent
+  );
+}
+
+.ghibli[data-ghibli-lantern='true'] .ghibli-clouds {
+  opacity: 0.16;
+}
+
+.ghibli[data-ghibli-lantern='true'] .ghibli-hills-far {
+  background:
+    radial-gradient(40% 70% at 18% 100%, #26344a 60%, transparent 61%),
+    radial-gradient(46% 62% at 62% 100%, #2c3a50 60%, transparent 61%),
+    radial-gradient(34% 56% at 94% 100%, #24324a 60%, transparent 61%);
+}
+
+.ghibli[data-ghibli-lantern='true'] .ghibli-hills-near {
+  background:
+    radial-gradient(52% 80% at 30% 100%, #1d2a3a 60%, transparent 61%),
+    radial-gradient(48% 70% at 84% 100%, #223042 60%, transparent 61%);
+}
+
+/* Paper lanterns strung along the meadow, and fireflies in the grass. */
+.ghibli[data-ghibli-lantern='true'] .ghibli-grass {
+  height: 14vh;
+  background:
+    radial-gradient(circle at 20px 30%, rgb(255 214 120 / 0.95) 0 1.5px, transparent 3px) 0 0 /
+      110px 100%,
+    radial-gradient(circle at 70px 62%, rgb(255 230 150 / 0.8) 0 1.2px, transparent 2.6px) 0 0 /
+      150px 100%,
+    radial-gradient(
+        9px 12px at 60px 18%,
+        #f2a64a 0 60%,
+        rgb(242 166 74 / 0.25) 62%,
+        transparent 75%
+      )
+      0 0 / 240px 100%,
+    linear-gradient(180deg, transparent, rgb(20 30 40 / 0.6) 70%, #121a24);
+}
+
+.ghibli[data-ghibli-lantern='true'] .ghibli-paper {
+  opacity: 0.12;
+  mix-blend-mode: screen;
+}
+
+.ghibli[data-ghibli-lantern='true'] header[data-testid='header'] {
+  background-color: rgb(24 32 46 / 0.92);
+  box-shadow:
+    0 1px 0 rgb(210 160 78 / 0.4),
+    0 8px 22px -14px rgb(0 0 0 / 0.8);
+}
+
+.ghibli[data-ghibli-lantern='true'] footer[data-testid='footer'] {
+  background-image: linear-gradient(
+    180deg,
+    transparent 0,
+    rgb(30 48 70 / 0.6) 46px,
+    rgb(20 30 44 / 0.9) 140px,
+    #141b28 100%
+  );
+}
+
+@media (max-width: 639px) {
+  .ghibli .ghibli-banner-toggles {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .ghibli .ghibli-banner-actions {
+    width: 100%;
+  }
+
+  .ghibli .ghibli-boiler-launch {
+    flex: 1 1 auto;
+  }
+
+  .ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-film-chips {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .ghibli .ghibli-lantern-toggle,
+  .ghibli .ghibli-boiler-launch {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghibli [data-slot='button'],
+  .ghibli .ghibli-boiler-launch {
+    transition: none;
+  }
+
+  .ghibli [data-slot='button']:hover:not(:disabled),
+  .ghibli .ghibli-boiler-launch:hover {
+    translate: none;
+  }
+}
+
+/* ---- ip-r1: studio identity, bath tokens, film-frame tickets and moments ------------------- */
+
+.ghibli .ghibli-banner-title {
+  font-family: 'GhibliWordmark', var(--ghibli-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ghibli .ghibli-polaroid figcaption > span:first-child {
+  font-family: 'GhibliWordmark', var(--ghibli-display);
+  letter-spacing: 0.02em;
+}
+
+/* Film chips read as Ghibli Museum film-frame tickets: a strip of sprocket holes along each
+   edge. */
+.ghibli .ghibli-film-chip {
+  --ghibli-sprocket: color-mix(in oklab, var(--ghibli-ink) 22%, transparent);
+  border-radius: 5px;
+  background:
+    radial-gradient(circle, var(--ghibli-sprocket) 1.3px, transparent 1.8px) 0 1px / 7px 5px
+      repeat-x,
+    radial-gradient(circle, var(--ghibli-sprocket) 1.3px, transparent 1.8px) 0 calc(100% - 1px) /
+      7px 5px repeat-x,
+    rgba(255, 255, 255, 0.72);
+}
+
+.ghibli .ghibli-film-chip:hover {
+  background:
+    radial-gradient(circle, var(--ghibli-sprocket) 1.3px, transparent 1.8px) 0 1px / 7px 5px
+      repeat-x,
+    radial-gradient(circle, var(--ghibli-sprocket) 1.3px, transparent 1.8px) 0 calc(100% - 1px) /
+      7px 5px repeat-x,
+    #fff;
+}
+
+.ghibli .ghibli-film-chip[aria-pressed='true'] {
+  --ghibli-sprocket: rgba(255, 255, 255, 0.45);
+  background:
+    radial-gradient(circle, var(--ghibli-sprocket) 1.3px, transparent 1.8px) 0 1px / 7px 5px
+      repeat-x,
+    radial-gradient(circle, var(--ghibli-sprocket) 1.3px, transparent 1.8px) 0 calc(100% - 1px) /
+      7px 5px repeat-x,
+    var(--primary);
+}
+
+/* The studio's light-blue opening card, inside the polaroid, once per session. */
+.ghibli .ghibli-polaroid-frame {
+  position: relative;
+  display: block;
+}
+
+.ghibli .ghibli-opening-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  background: #4f8fd1;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 1.4s ease,
+    visibility 0s linear 1.4s;
+}
+
+.ghibli .ghibli-polaroid[data-opening='true'] .ghibli-opening-card {
+  opacity: 1;
+  visibility: visible;
+  transition: none;
+}
+
+.ghibli .ghibli-polaroid .ghibli-opening-card img {
+  width: auto;
+  height: 80%;
+  aspect-ratio: 600 / 496;
+  object-fit: contain;
+}
+
+/* Toasts are wooden bathhouse tokens: a red name stamp, the line as spoken, then the note. */
+.ghibli .ghibli-toast {
+  border-color: #8a6438;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(
+      92deg,
+      rgba(120, 80, 40, 0.07) 0 2px,
+      transparent 2px 9px,
+      rgba(120, 80, 40, 0.05) 9px 10px,
+      transparent 10px 17px
+    ),
+    linear-gradient(180deg, #f3e2c2, #e8d0a6);
+  color: #3b2614;
+}
+
+.ghibli .ghibli-toast::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #8a6438;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.ghibli .ghibli-toast.is-quote {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: start;
+  max-width: min(440px, calc(100vw - 32px));
+}
+
+.ghibli .ghibli-toast-frame {
+  width: 116px;
+  padding: 3px;
+  border-radius: 3px;
+  background: #fffdf8;
+  box-shadow: 0 2px 6px -2px rgba(40, 30, 10, 0.45);
+  rotate: -2deg;
+}
+
+.ghibli .ghibli-toast-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 1px;
+}
+
+.ghibli .ghibli-toast-body {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.ghibli .ghibli-toast.is-quote .ghibli-toast-body:only-child {
+  grid-column: 1 / -1;
+}
+
+.ghibli .ghibli-toast-who {
+  justify-self: start;
+  padding: 0.05rem 0.45rem;
+  border-radius: 3px;
+  background: #a8433a;
+  color: #fffaf0;
+  font-family: 'GhibliWordmark', var(--font-dm-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.ghibli .ghibli-toast-line {
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.ghibli .ghibli-toast-note {
+  color: #5a4128;
+  font-family: var(--font-dm-sans);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+/* No-Face on the sea railway, at the right of the footer sea. */
+/* When no full-size spot is clear, the token shrinks to who and the line. */
+.ghibli .ghibli-toast.is-compact {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: min(520px, calc(100vw - 32px));
+  padding-block: 0.4rem;
+}
+
+.ghibli .ghibli-toast.is-compact .ghibli-toast-frame,
+.ghibli .ghibli-toast.is-compact .ghibli-toast-note {
+  display: none;
+}
+
+.ghibli .ghibli-train-card {
+  position: absolute;
+  top: 10px;
+  right: max(16px, 6vw);
+  z-index: 1;
+  width: 140px;
+  padding: 4px 4px 3px;
+  border-radius: 3px;
+  background: #fffdf8;
+  box-shadow: 0 10px 18px -12px rgba(20, 40, 60, 0.6);
+  rotate: -2.5deg;
+  pointer-events: none;
+  animation: ghibli-fade-in 2.4s ease-out both;
+}
+
+.ghibli .ghibli-train-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px;
+}
+
+/* The film's last card. */
+.ghibli .ghibli-owari {
+  position: absolute;
+  bottom: 6px;
+  left: max(16px, 4vw);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--ghibli-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  text-shadow: 0 1px 2px rgba(30, 60, 90, 0.45);
+}
+
+/* The heron-man peeks in from the right edge. */
+.ghibli .ghibli-heron-man {
+  position: absolute;
+  right: 0;
+  bottom: 18vh;
+  width: 150px;
+  animation: ghibli-heron-peek 8s ease-in-out both;
+}
+
+.ghibli .ghibli-heron-man img {
+  width: 100%;
+  height: auto;
+}
+
+@keyframes ghibli-heron-peek {
+  0% {
+    translate: 100% 0;
+  }
+  15%,
+  80% {
+    translate: 22% 0;
+  }
+  100% {
+    translate: 100% 0;
+  }
+}
+
+.ghibli .ghibli-ponyo-surf {
+  height: 58px;
+  transform-origin: 50% 100%;
+}
+
+/* ---- small screens ---------------------------------------------------------------------- */
+
+@media (max-width: 639px) {
+  .ghibli .ghibli-theme-banner {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0.9rem 0.95rem;
+  }
+
+  .ghibli .ghibli-polaroid {
+    display: none;
+  }
+
+  .ghibli .ghibli-banner-title {
+    font-size: 1.35rem;
+  }
+
+  .ghibli .ghibli-banner-subtitle {
+    display: none;
+  }
+
+  .ghibli .ghibli-banner-line {
+    min-height: 4.2em;
+    font-size: 0.95rem;
+  }
+
+  .ghibli .ghibli-film-chip {
+    flex: none;
+  }
+
+  .ghibli .ghibli-castle-walk {
+    width: 92px;
+    opacity: 0.78;
+  }
+
+  .ghibli .ghibli-kodama {
+    height: 44px;
+  }
+
+  .ghibli .ghibli-kodama img {
+    height: 34px;
+  }
+
+  .ghibli .ghibli-san {
+    height: 64px;
+  }
+
+  .ghibli .ghibli-noface-stand {
+    height: 72px;
+  }
+
+  .ghibli .ghibli-egg-calcifer,
+  .ghibli .ghibli-egg-ponyo {
+    width: 160px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ghibli .ghibli-castle-walk {
+    width: 180px;
+  }
+}
+
+/* ---- accessibility fallbacks ------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .ghibli :is(.ghibli-sky, .ghibli-scene, .ghibli-footer-sea, .ghibli-theme-banner) *,
+  .ghibli :is(.ghibli-sky, .ghibli-scene, .ghibli-footer-sea, .ghibli-theme-banner) *::before,
+  .ghibli :is(.ghibli-sky, .ghibli-scene, .ghibli-footer-sea, .ghibli-theme-banner) *::after,
+  .ghibli [data-tab-active='true']::before,
+  .ghibli [data-slot='skeleton'],
+  .ghibli [data-slot='skeleton']::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .ghibli .ghibli-castle-walk {
+    right: 16px;
+    left: auto;
+  }
+
+  .ghibli .ghibli-flower {
+    scale: 1;
+  }
+
+  .ghibli .ghibli-clouds,
+  .ghibli .ghibli-hills {
+    translate: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .ghibli .ghibli-sky,
+  .ghibli .ghibli-scene,
+  .ghibli .ghibli-footer-sea,
+  .ghibli .ghibli-banner-wash,
+  .ghibli [data-tab-active='true']::before,
+  .ghibli [data-slot='skeleton']::after {
+    display: none;
+  }
+
+  .ghibli .ghibli-theme-banner,
+  .ghibli .ghibli-film-chip {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .ghibli .ghibli-film-chip[aria-pressed='true'] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+@media print {
+  .ghibli .ghibli-sky,
+  .ghibli .ghibli-scene,
+  .ghibli .ghibli-footer-sea {
+    display: none;
+  }
+}
+
+html[data-inferencex-embed] [data-testid='ghibli-theme-banner'],
+html[data-inferencex-embed] .ghibli-sky,
+html[data-inferencex-embed] .ghibli-scene,
+html[data-inferencex-embed] .ghibli-footer-sea {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  /* Phones have little open space between controls, so the token stays small. */
+  .ghibli .ghibli-toast {
+    max-width: min(300px, calc(100vw - 32px));
+    padding: 0.45rem 0.7rem;
+    font-size: 0.85rem;
+  }
+
+  .ghibli .ghibli-toast-frame,
+  .ghibli .ghibli-toast-note {
+    display: none;
+  }
+
+  .ghibli .ghibli-toast.is-quote {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ghibli .ghibli-train-card {
+    top: 8px;
+    width: 108px;
+  }
+
+  .ghibli .ghibli-heron-man {
+    width: 104px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghibli .ghibli-heron-man {
+    animation: none;
+    translate: 22% 0;
+  }
+
+  .ghibli .ghibli-train-card,
+  .ghibli .ghibli-opening-card {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .ghibli .ghibli-opening-card,
+  .ghibli .ghibli-train-card,
+  .ghibli .ghibli-toast::before {
+    display: none;
+  }
+
+  .ghibli .ghibli-toast,
+  .ghibli .ghibli-toast-who {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .ghibli .ghibli-film-chip {
+    background: Canvas;
+  }
+
+  /* Without this the browser paints a Canvas backplate behind HighlightText, hiding the name. */
+  .ghibli .ghibli-film-chip[aria-pressed='true'],
+  .ghibli .ghibli-film-chip[aria-pressed='true'] * {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+@media print {
+  .ghibli .ghibli-train-card {
+    display: none;
+  }
+}
+
+html[data-inferencex-embed] .ghibli-train-card {
+  display: none;
+}
+
+/* A flight or a peek steps out of view while page content scrolls under it. */
+.ghibli .ghibli-transient.is-ducked,
+.ghibli .ghibli-castle-walk.is-ducked {
+  visibility: hidden;
+}
+
+/* ---- banner backdrop: the selected film, large, behind the right side ---------------------- */
+
+.ghibli .ghibli-theme-banner {
+  min-height: 300px;
+  background: var(--ghibli-paper);
+}
+
+.ghibli .ghibli-theme-banner .ghibli-banner-copy {
+  max-width: min(40rem, 50%);
+}
+
+.ghibli .ghibli-theme-banner .ghibli-banner-wash {
+  inset: 0 0 0 38%;
+  opacity: 1;
+  mask-image: linear-gradient(90deg, transparent 0, #000 22%);
+}
+
+.ghibli .ghibli-theme-banner .ghibli-banner-wash img {
+  object-position: center 30%;
+  filter: none;
+}
+
+.ghibli .ghibli-theme-banner[data-film='spirited'] .ghibli-banner-wash img {
+  object-position: 52% 10%;
+}
+
+.ghibli .ghibli-theme-banner[data-film='howl'] .ghibli-banner-wash img {
+  object-position: 60% 40%;
+}
+
+.ghibli .ghibli-theme-banner[data-film='ponyo'] .ghibli-banner-wash img {
+  object-position: 55% 35%;
+}
+
+/* After the opening card the polaroid steps aside: the backdrop is the picture. */
+.ghibli .ghibli-theme-banner .ghibli-polaroid {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.4rem;
+  transition:
+    opacity 1.4s ease,
+    visibility 0s linear 1.4s;
+}
+
+.ghibli .ghibli-theme-banner .ghibli-polaroid:not([data-opening='true']) {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.ghibli .ghibli-banner-credit {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--ghibli-paper) 82%, transparent);
+  color: var(--ghibli-ink);
+  font-family: var(--ghibli-display);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.ghibli .ghibli-banner-credit span + span {
+  color: var(--muted-foreground);
+  font-family: var(--font-dm-sans);
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] {
+  min-height: 0;
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-banner-copy {
+  max-width: none;
+}
+
+/* Off the home page the slim row keeps the film behind its right end. */
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-banner-wash {
+  inset: 0 0 0 48%;
+  mask-image: linear-gradient(90deg, transparent 0, #000 30%);
+}
+
+.ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-banner-credit {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .ghibli .ghibli-theme-banner {
+    min-height: 0;
+  }
+
+  .ghibli .ghibli-theme-banner .ghibli-banner-copy {
+    max-width: none;
+  }
+
+  /* On a phone the film is a full-width band above the copy. */
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-wash {
+    position: relative;
+    inset: auto;
+    height: 150px;
+    margin: -0.9rem -0.95rem 0;
+    mask-image: none;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-credit {
+    top: calc(150px - 2.4rem);
+    right: auto;
+    left: 0.5rem;
+  }
+
+  .ghibli .ghibli-theme-banner[data-compact='true'] .ghibli-banner-wash {
+    display: none;
+  }
+}
+
+/* ---- film strip in the chart card's header ---------------------------------------------- */
+
+.ghibli .ghibli-card-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background:
+    radial-gradient(circle, #f6efe0 0 1.6px, transparent 2px) 0 0 / 10px 4px repeat-x,
+    radial-gradient(circle, #f6efe0 0 1.6px, transparent 2px) 0 100% / 10px 4px repeat-x,
+    #2b2622;
+  box-shadow: 0 6px 14px -8px rgba(30, 30, 20, 0.6);
+}
+
+.ghibli .ghibli-card-strip[hidden],
+.ghibli .ghibli-card-frame[hidden] {
+  display: none;
+}
+
+.ghibli .ghibli-card-frame {
+  display: block;
+  width: 80px;
+  height: 45px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+@media (forced-colors: active) {
+  .ghibli .ghibli-card-strip {
+    display: none;
+  }
+}
+
+/* A slim token docked in the chart card's header gap: frame, speaker and line in one row. */
+.ghibli .ghibli-toast.is-docked {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  padding: 4px 22px 4px 5px;
+}
+
+.ghibli .ghibli-toast.is-docked:not(.is-quote) {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 5px 22px 5px 10px;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ghibli .ghibli-toast.is-docked .ghibli-toast-frame {
+  width: 66px;
+  padding: 2px;
+  rotate: 0deg;
+}
+
+.ghibli .ghibli-toast.is-docked .ghibli-toast-body {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ghibli .ghibli-toast.is-docked .ghibli-toast-who {
+  display: inline-block;
+  margin-right: 0.4rem;
+  font-size: 0.65rem;
+}
+
+.ghibli .ghibli-toast.is-docked .ghibli-toast-line {
+  font-size: 0.8125rem;
+}
+
+.ghibli .ghibli-toast.is-docked .ghibli-toast-note {
+  display: none;
+}
+
+/* Ponyo's ham ramen, where she arrives on the frontier. */
+.ghibli .ghibli-ponyo-ham {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 108px;
+  padding: 3px 3px 2px;
+  border-radius: 3px;
+  background: #fffdf8;
+  box-shadow: 0 4px 10px -4px rgba(40, 30, 10, 0.5);
+  animation: ghibli-fade-in 0.6s ease-out both;
+}
+
+.ghibli .ghibli-ponyo-ham img {
+  display: block;
+  width: 100%;
+  height: 56px;
+  border-radius: 1px;
+  object-fit: cover;
+}
+
+.ghibli .ghibli-ponyo-ham span {
+  display: block;
+  color: #a8433a;
+  font-family: var(--ghibli-display);
+  font-size: 0.75rem;
+  line-height: 1.1;
+  text-align: center;
+}
+
+/* Film passport: eight stamp slots under the banner actions; a stamp shows its film's still. */
+.ghibli .ghibli-passport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 10px;
+}
+
+.ghibli .ghibli-passport-label {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  color: var(--ghibli-ink);
+  font-family: var(--ghibli-display);
+  font-size: 0.8125rem;
+  line-height: 1.15;
+}
+
+.ghibli .ghibli-passport-count {
+  color: color-mix(in srgb, var(--ghibli-ink) 78%, transparent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ghibli .ghibli-passport-stamps {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ghibli .ghibli-passport-stamps li {
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  border: 1.5px dashed rgba(120, 90, 50, 0.55);
+  border-radius: 50%;
+  background: rgba(255, 250, 238, 0.7);
+}
+
+.ghibli .ghibli-passport-stamps li[data-have] {
+  border: 2px solid #b4413a;
+  box-shadow: 0 1px 3px rgba(60, 30, 10, 0.35);
+  transform: rotate(-6deg);
+}
+
+.ghibli .ghibli-passport-stamps img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ghibli .ghibli-passport[data-full] .ghibli-passport-stamps li {
+  border-color: #c99a2e;
+}
+
+.ghibli .ghibli-theme-banner[data-compact] .ghibli-passport {
+  display: none;
+}
+
+.ghibli .ghibli-card-frame[data-stamp] {
+  outline: 2px solid #b4413a;
+  outline-offset: -2px;
+}
+
+.ghibli .ghibli-card-strip[data-full='true'] {
+  background: #6b4a12;
+}
+
+@media (forced-colors: active) {
+  .ghibli .ghibli-passport-stamps li {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+  }
+}
+
+/* The chart card is a film frame: a sprocketed edge along the top and the film's wash under the
+   header, deeper than the other cards. The plot itself keeps its own surface. */
+.ghibli [data-slot='card']:has(svg[data-testid='d3-chart-svg']) {
+  border-width: 1.5px;
+  border-color: color-mix(in oklab, var(--ghibli-ink) 28%, var(--ghibli-edge));
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(255, 246, 226, 0.92) 9px 15px),
+    linear-gradient(#3b2f25, #3b2f25),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--ghibli-wash, #eef2e2) 92%, transparent),
+      transparent 160px
+    ),
+    radial-gradient(90% 60% at 100% 100%, rgba(214, 232, 206, 0.45), transparent 60%);
+  background-repeat: repeat-x, repeat-x, no-repeat, no-repeat;
+  background-position:
+    0 3px,
+    0 0,
+    0 0,
+    0 0;
+  background-size:
+    100% 4px,
+    100% 10px,
+    100% 100%,
+    100% 100%;
+}
+
+@media (forced-colors: active) {
+  .ghibli [data-slot='card']:has(svg[data-testid='d3-chart-svg']) {
+    background-image: none;
+  }
+}
+
+/* A token that content came up under leaves at once, without the fade. */
+.ghibli .ghibli-toast.is-gone {
+  visibility: hidden;
+  transition: none;
+}
+
+/* ---- first screen: the home banner stays short ------------------------------------------- */
+/* The page heading must stay on the first screen: one large still on the right (desktop) or
+   one full-width band on top (phone), a single row of film chips and a single row of actions.
+   The passport sits in the action row. */
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) {
+  min-height: 0;
+  margin-block: 0.25rem;
+  padding: 0.7rem 1.2rem 0.75rem;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-copy {
+  max-width: min(46rem, 60%);
+  gap: 0.45rem;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-wash {
+  inset: 0 0 0 44%;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-totoro-nod {
+  width: 32px;
+  height: 36px;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-heading {
+  align-items: baseline;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-heading > .min-w-0 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.75rem;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-title {
+  font-size: 1.5rem;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-line {
+  min-height: 2.7em;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chips {
+  flex-wrap: nowrap;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chip {
+  flex: none;
+  min-height: 2.25rem;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chip-year {
+  display: none;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-boiler-launch {
+  grid-template-areas:
+    'knot name'
+    'knot medals';
+  min-height: 2.75rem;
+  padding-block: 0.25rem 0.3rem;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-boiler-launch-badge {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-passport {
+  margin-top: 0;
+  flex-wrap: nowrap;
+}
+
+.ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-passport-stamps li {
+  width: 26px;
+  height: 26px;
+}
+
+@media (max-width: 639px) {
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) {
+    padding: 0 0.75rem 0.7rem;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-copy {
+    max-width: none;
+  }
+
+  /* The still is a full-width band; the title and the sound toggles sit on it. */
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-wash {
+    position: relative;
+    inset: auto;
+    height: 118px;
+    margin: 0 -0.75rem;
+    mask-image: none;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-credit {
+    top: 86px;
+  }
+
+  .ghibli
+    .ghibli-theme-banner[data-film='spirited']:not([data-compact='true'])
+    .ghibli-banner-wash
+    img {
+    object-position: 30% 10%;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-heading {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    align-items: center;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-heading > .min-w-0 {
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--ghibli-paper) 88%, transparent);
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-title {
+    font-size: 1.125rem;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-totoro-nod {
+    display: none;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-toggles {
+    gap: 0.25rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--ghibli-paper) 88%, transparent);
+  }
+
+  /* The rotating line is read on larger screens; on a phone the toasts carry the lines. */
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-line {
+    display: none;
+  }
+
+  /* Five round film chips in one row: the face is the label, the chosen film is named. */
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chips {
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chip {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 4px;
+    justify-content: center;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chip img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ghibli
+    .ghibli-theme-banner:not([data-compact='true'])
+    .ghibli-film-chip:not([aria-pressed='true'])
+    .ghibli-film-chip-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chip[aria-pressed='true'] {
+    flex: 1 1 auto;
+    gap: 0.3rem;
+    min-width: 0;
+    padding-right: 0.4rem;
+  }
+
+  .ghibli
+    .ghibli-theme-banner:not([data-compact='true'])
+    .ghibli-film-chip[aria-pressed='true']
+    .ghibli-film-chip-name {
+    /* Two short lines hold every film title at 390 px; one line cut "Spirited Away" short. */
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 0.75rem;
+    line-height: 1.1;
+    white-space: normal;
+  }
+
+  @media (max-width: 380px) {
+    .ghibli
+      .ghibli-theme-banner:not([data-compact='true'])
+      .ghibli-film-chip[aria-pressed='true']
+      .ghibli-film-chip-name {
+      -webkit-line-clamp: 3;
+      font-size: 0.68rem;
+      line-height: 1.05;
+    }
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-actions {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-boiler-launch {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-lantern-toggle {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-lantern-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* On a phone the passport shows its count; the stamps are on the chart strip. */
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-passport-stamps {
+    display: none;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-passport-label {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
+/* Narrowest phones: the still's caption names the film, so every chip is a round face. */
+@media (max-width: 359px) {
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-film-chip[aria-pressed='true'] {
+    flex: none;
+    gap: 0;
+    padding-right: 4px;
+  }
+
+  .ghibli
+    .ghibli-theme-banner:not([data-compact='true'])
+    .ghibli-film-chip[aria-pressed='true']
+    .ghibli-film-chip-name {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ghibli .ghibli-theme-banner:not([data-compact='true']) .ghibli-banner-title {
+    font-size: 0.95rem;
+  }
+}
+
+/* Round 5: SVG points carry the same painted figure the canvas draws (ghibli-charts.ts); the
+   chart's own marker stays underneath as a faint wash so its hit area and size still show. */
+.ghibli svg[data-testid='d3-chart-svg'] .dot-group:has(> .ghibli-point-figure) > .visible-shape {
+  fill-opacity: 0.22;
+  stroke-opacity: 0.2;
+}
+
+/* Round 5: the Sea Railway ticket (an egg chain across three pages) and the index of film
+   lines heard, both beside the passport stamps. */
+.ghibli .ghibli-ticket {
+  display: flex;
+  flex-direction: column;
+  max-width: 260px;
+  margin: 0;
+  padding: 3px 10px 4px;
+  border: 1.5px dashed #8a6a3a;
+  border-radius: 4px;
+  background: #f6ead0;
+  color: var(--ghibli-ink);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.ghibli .ghibli-ticket > span:first-child {
+  font-family: var(--ghibli-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.ghibli .ghibli-ticket[data-step='3'] {
+  border-style: solid;
+  border-color: #b4413a;
+}
+
+.ghibli .ghibli-lines {
+  position: relative;
+  color: var(--ghibli-ink);
+  font-size: 0.75rem;
+}
+
+.ghibli .ghibli-lines summary {
+  cursor: pointer;
+  font-family: var(--ghibli-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.ghibli .ghibli-lines ol {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  width: min(360px, 80vw);
+  margin: 0;
+  padding: 8px 12px 8px 26px;
+  border: 1px solid #cdbf93;
+  border-radius: 10px;
+  background: #fffaf0;
+  box-shadow: 0 10px 24px -14px rgb(64 52 24 / 0.6);
+  line-height: 1.35;
+}
+
+.ghibli .ghibli-lines li + li {
+  margin-top: 4px;
+}
+
+.ghibli .ghibli-lines li > span {
+  color: color-mix(in srgb, var(--ghibli-ink) 72%, transparent);
+}
+
+/* The painted empty state: soot sprites resting on the stock message card. */
+.ghibli [data-testid='scatter-empty-state'] {
+  border-color: #cdbf93;
+  background:
+    radial-gradient(ellipse 70% 60% at 30% 20%, rgb(255 236 196 / 0.85), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 80% 90%, rgb(196 222 205 / 0.7), transparent 70%), #fffaf0;
+}
+
+.ghibli .ghibli-empty-art {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.ghibli .ghibli-empty-art img {
+  height: 30px;
+  width: auto;
+}
+
+.ghibli .ghibli-empty-art img:nth-child(2) {
+  height: 22px;
+  transform: rotate(8deg);
+}
+
+.ghibli .ghibli-empty-note {
+  margin: 0;
+  color: color-mix(in srgb, var(--ghibli-ink) 80%, transparent);
+  font-family: var(--ghibli-display);
+  font-size: 0.8125rem;
+}
+
+/* Painted loading state: the stock skeleton becomes a paper wash with soot sprites carrying
+   konpeito across it (a background image, so the skeleton keeps its own box). */
+/* Real skeleton and the held one (?ghibli_hold=loading) share the painting. */
+.ghibli [data-slot='skeleton'].h-\[600px\],
+.ghibli .ghibli-hold-skeleton {
+  background-color: #f6ecd6;
+  background-image:
+    url('/decorative/ghibli/sprites/soot-konpeito.webp'),
+    url('/decorative/ghibli/sprites/soot-3.webp'), url('/decorative/ghibli/sprites/soot-2.webp'),
+    linear-gradient(100deg, transparent 20%, rgba(255, 196, 120, 0.35) 50%, transparent 80%);
+  background-repeat: no-repeat;
+  background-size:
+    52px auto,
+    30px auto,
+    22px auto,
+    220% 100%;
+  background-position:
+    18% 88%,
+    46% 90%,
+    70% 88%,
+    0 0;
+  animation: ghibli-soot-carry 3.2s ease-in-out infinite;
+}
+
+@keyframes ghibli-soot-carry {
+  0% {
+    background-position:
+      8% 88%,
+      36% 90%,
+      60% 88%,
+      100% 0;
+  }
+  50% {
+    background-position:
+      28% 86%,
+      56% 88%,
+      80% 86%,
+      0 0;
+  }
+  100% {
+    background-position:
+      8% 88%,
+      36% 90%,
+      60% 88%,
+      100% 0;
+  }
+}
+
+/* The wash-in on a chart update: a sheet of paper-coloured wash pulled off the plot left to
+   right, so the new points look painted in. Gone in 0.8 s; pointer-transparent. */
+.ghibli-wash-in {
+  position: fixed;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgb(255 250 238 / 0) 0,
+    rgb(255 246 226 / 0.9) 6%,
+    rgb(247 236 210 / 0.85) 100%
+  );
+  animation: ghibli-wash-in 0.8s ease-out forwards;
+}
+
+@keyframes ghibli-wash-in {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+/* The export seal: a hanko-red stamp and a line in its own row under the chart, clear of the
+   plot, legend and the stock watermark. */
+.ghibli .ghibli-export-seal {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 6px 16px 2px;
+  color: #6b4a2a;
+  font-family: var(--ghibli-display);
+  font-size: 0.75rem;
+}
+
+.ghibli .ghibli-export-seal img {
+  width: 34px;
+  height: auto;
+}
+
+.ghibli .ghibli-export-seal b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 2px solid #b4413a;
+  border-radius: 6px;
+  color: #b4413a;
+  font-size: 0.75rem;
+  line-height: 1;
+  transform: rotate(-6deg);
+}
+
+.ghibli .ghibli-meme-chase {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: end;
+  gap: 4px 14px;
+}
+
+.ghibli .ghibli-meme-chase figure {
+  margin: 0;
+  text-align: center;
+}
+
+.ghibli .ghibli-meme-chase img {
+  height: 34px;
+  width: auto;
+}
+
+.ghibli .ghibli-meme-chase figcaption {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #2a2418;
+  color: #fffaf0;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ghibli .ghibli-train-punch {
+  pointer-events: auto;
+  width: fit-content;
+  max-width: min(640px, calc(100% - 32px));
+  margin: 4px auto 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghibli [data-slot='skeleton'].h-\[600px\] {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .ghibli .ghibli-ticket,
+  .ghibli .ghibli-export-seal b {
+    border-color: CanvasText;
+  }
+}
+
+/* The chase meme is narrow enough for the gap under the legend on a chart page. */
+.ghibli-toast:has(.is-meme-frame) {
+  width: 270px;
+  max-width: 270px;
+}
+
+.ghibli-toast:has(.is-meme-frame) .ghibli-toast-frame {
+  width: auto;
+  height: auto;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.ghibli .ghibli-toast.is-quote:has(.is-meme-frame) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+}
+
+.ghibli .ghibli-toast .is-meme-frame {
+  rotate: 0deg;
+}
+
+.ghibli .ghibli-toast .is-meme-frame img {
+  width: auto;
+  height: 34px;
+  margin: 0 auto 2px;
+}
+
+.ghibli .ghibli-hold-skeleton {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.ghibli .ghibli-hold-caption {
+  margin: 48px 0 0;
+  color: #6b4a2a;
+  font-family: var(--ghibli-display);
+  font-size: 0.875rem;
+}
+
+html[data-ghibli-hold='loading'] [data-testid='d3-chart-svg'],
+html[data-ghibli-hold='loading'] [data-slot='card'] canvas {
+  visibility: hidden;
+}

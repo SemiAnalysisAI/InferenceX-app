@@ -546,6 +546,42 @@ html[data-inferencex-embed] .autumn-leaves {
   --radius: 0.5rem;
 }
 
+/* ghibli theme tokens: begin */
+.ghibli {
+  color-scheme: light;
+  --background: #f3efe1;
+  --foreground: #2f3a34;
+  --card: #fffcf3;
+  --card-foreground: #2f3a34;
+  --popover: #fffcf3;
+  --popover-foreground: #2f3a34;
+  --primary: #3a7451;
+  --primary-foreground: #ffffff;
+  --secondary: #2f6f8f;
+  --secondary-foreground: #ffffff;
+  --brand: var(--primary);
+  --brand-fill: var(--brand);
+  --muted: #e8e3cc;
+  --muted-foreground: #55604f;
+  --accent: #dde8c8;
+  --accent-foreground: #2f3a34;
+  --border: #b3ab88;
+  --border-alt: #cfc7a6;
+  --chart-grid: #ddd4b4;
+  --input: #b3ab88;
+  --ring: #3a7451;
+  --sidebar: #fffcf3;
+  --sidebar-foreground: #2f3a34;
+  --sidebar-primary: #3a7451;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dde8c8;
+  --sidebar-accent-foreground: #2f3a34;
+  --sidebar-border: #b3ab88;
+  --sidebar-ring: #3a7451;
+  --radius: 0.875rem;
+}
+/* ghibli theme tokens: end */
+
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,

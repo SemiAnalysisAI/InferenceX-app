@@ -237,7 +237,7 @@ export const Header = () => {
             </span>
             <SiteSearchButton />
             <LanguageToggle pathname={pathname} router={router} />
-            <span className="hidden items-center gap-2 sm:flex">
+            <span data-theme-toggles className="hidden items-center gap-2 sm:flex">
               <MinecraftTogglesLazy />
               <HaloTogglesLazy />
             </span>
@@ -352,7 +352,10 @@ export const Header = () => {
                       <span>{label}</span>
                     </IntentPrefetchLink>
                   ))}
-                  <span className="mt-1 flex items-center gap-2 border-t border-border/30 px-3 pt-2 pb-1 empty:hidden sm:hidden">
+                  <span
+                    data-theme-toggles
+                    className="mt-1 flex items-center gap-2 border-t border-border/30 px-3 pt-2 pb-1 empty:hidden sm:hidden"
+                  >
                     <MinecraftTogglesLazy />
                     <HaloTogglesLazy />
                   </span>
