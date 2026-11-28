@@ -1,0 +1,684 @@
+.south-park .sp-atlas {
+  position: relative;
+  height: 68px;
+  margin: 5px 0;
+  background: #d6e0c7;
+  border: 1px solid #748a76;
+  overflow: hidden;
+}
+.south-park .sp-atlas svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.south-park .sp-atlas :is(button, span) {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  line-height: 1;
+  font-size: 11px;
+  padding: 4px;
+  min-width: 21px;
+  text-align: center;
+}
+.south-park .sp-route-hud {
+  flex: 0 0 clamp(74px, 14vw, 112px);
+  pointer-events: none;
+}
+.south-park .sp-live-board {
+  flex: none;
+}
+.south-park .sp-atlas-mini {
+  height: 30px;
+  margin: 0;
+  border: 1px solid #4e6853;
+  opacity: 0.94;
+}
+.south-park .sp-atlas-mini span {
+  font-size: 8px;
+  padding: 1px;
+  min-width: 8px;
+  background: #f9f3d9;
+  color: #34533b;
+}
+.south-park .sp-atlas-mini span[data-here] {
+  color: white;
+  background: #8c4528;
+  outline: 1px solid white;
+}
+.south-park .sp-blueprint {
+  padding: 7px;
+  border: 1px dashed #778d78;
+  font-size: 12px;
+}
+.south-park .sp-blueprint legend {
+  font-weight: bold;
+}
+.south-park .sp-blueprint > div {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.south-park .sp-blueprint label,
+.south-park .sp-precision {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.south-park .sp-blueprint p {
+  margin: 4px 0;
+}
+.south-park .sp-precision {
+  font-size: 12px;
+}
+.south-park .sp-dispatch-risk {
+  position: relative;
+  margin-left: auto;
+  padding-left: 24px;
+  color: #804934;
+  font-weight: bold;
+}
+.south-park .sp-dispatch-risk .sp-prop {
+  animation: none;
+  position: absolute;
+  inset: 0 auto auto 0;
+  margin: 0;
+  width: 20px;
+  height: 20px;
+}
+@media (pointer: coarse) {
+  .south-park .sp-desk :is(button, select, summary) {
+    min-height: 36px;
+  }
+  .south-park .sp-channel-row button {
+    min-height: 42px;
+  }
+}
+.south-park [role='dialog'].sp-arcade {
+  width: min(96vw, 760px);
+  max-width: none;
+  max-height: 92dvh;
+  overflow: hidden;
+  padding: 0;
+  display: block;
+  border: 2px solid #213e32;
+  border-radius: 4px 7px 3px 5px;
+  background: #fff9e5;
+  color: #243b32;
+  box-shadow: 6px 6px 0 #172f2b72;
+}
+.south-park .sp-arcade > button:last-child {
+  color: #fff6d7;
+  top: 10px;
+  right: 8px;
+}
+.south-park .sp-desk:focus {
+  outline: none;
+}
+.south-park .sp-desk {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(92dvh - 4px);
+  min-height: 0;
+}
+.south-park .sp-depot-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 48px 13px 17px;
+  background: #204a3d;
+  color: #fff6d8;
+  border-bottom: 4px solid #e4b04f;
+}
+.south-park .sp-office-code {
+  border: 1px solid #e6d6a1;
+  border-radius: 3px;
+  padding: 7px 6px;
+  color: #ffe2a1;
+  font-weight: bold;
+  font-size: 12px;
+}
+.south-park .sp-depot-head small,
+.south-park .sp-game-intro small,
+.south-park .sp-dispatch-meta,
+.south-park .sp-hud small {
+  font: bold 10px/1.3 var(--font-dm-sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.south-park .sp-depot-head h2 {
+  margin: 0;
+  font:
+    400 clamp(26px, 4vw, 39px)/1.05 SouthParkDisplay,
+    var(--font-dm-sans);
+  color: inherit;
+}
+.south-park .sp-depot-head > span {
+  margin-left: auto;
+  font-size: 13px;
+  color: #e4efd1;
+}
+.south-park .sp-desk-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 13px 16px 14px;
+}
+.south-park .sp-desk button:not(:disabled),
+.south-park .sp-workshop summary {
+  cursor: pointer;
+}
+.south-park .sp-desk button,
+.south-park .sp-desk select,
+.south-park .sp-desk input[type='number'] {
+  background: #fcf3d5;
+  color: #263c32;
+  border: 1px solid #586758;
+  border-radius: 3px 4px 2px 3px;
+  padding: 5px 8px;
+  font: 600 13px/1.2 var(--font-dm-sans);
+}
+.south-park .sp-desk button:is(:hover, :focus-visible) {
+  outline: 2px solid #ac6d2a;
+  outline-offset: 1px;
+}
+.south-park .sp-desk button:disabled {
+  opacity: 0.56;
+}
+.south-park .sp-desk button[aria-pressed='true'],
+.south-park .sp-desk button[data-sp-start] {
+  color: #fff9d8;
+  background: #205040;
+}
+.south-park .sp-mode-row,
+.south-park .sp-channel-row,
+.south-park .sp-hud {
+  display: grid;
+  gap: 5px;
+}
+.south-park .sp-mode-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+.south-park .sp-mode-row button {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.south-park .sp-mode-row small {
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.south-park .sp-chartroom {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #3e5548;
+  border-radius: 4px;
+  background: #bddae4;
+}
+.south-park .sp-dispatch-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 9px;
+  background: #eee0ba;
+  border-bottom: 1px dashed #6b735b;
+  gap: 6px;
+}
+.south-park .sp-chartroom canvas {
+  display: block;
+  width: 100%;
+  height: 253px;
+  touch-action: manipulation;
+  cursor: crosshair;
+}
+.south-park .sp-game-intro {
+  position: absolute;
+  inset: 35% auto auto 50%;
+  transform: translateX(-50%) rotate(-1deg);
+  width: max-content;
+  max-width: 84%;
+  text-align: center;
+  background: #fff3cd;
+  color: #28392f;
+  border: 2px solid #514c3e;
+  box-shadow: 4px 4px 0 #263e3555;
+  padding: 9px 18px;
+}
+.south-park .sp-game-intro strong {
+  display: block;
+  font:
+    400 clamp(22px, 3vw, 30px)/1.12 SouthParkDisplay,
+    var(--font-dm-sans);
+}
+.south-park .sp-game-intro p {
+  font-size: 13px;
+  line-height: 1.22;
+  margin: 4px 0;
+}
+.south-park .sp-result-prop {
+  display: inline-block;
+  position: relative;
+  width: 30px;
+  height: 30px;
+  vertical-align: middle;
+  --kid-size: 29px;
+}
+.south-park .sp-result-prop .sp-prop {
+  animation: none !important;
+}
+.south-park .sp-setup {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.south-park .sp-setup > div {
+  padding: 8px;
+  border: 1px dashed #aab19b;
+}
+.south-park .sp-setup ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  list-style: none;
+  margin: 4px 0 0;
+}
+.south-park .sp-setup li {
+  color: #525d53;
+}
+.south-park .sp-setup li[data-visited] {
+  color: #24543b;
+  font-weight: bold;
+}
+.south-park .sp-setup label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+.south-park .sp-setup input[type='number'] {
+  width: 74px;
+}
+.south-park .sp-hud {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 7px;
+  border: 1px solid #798575;
+  background: #edeedd;
+}
+.south-park .sp-hud > div {
+  padding: 5px 9px;
+  border-right: 1px dashed #a4ad94;
+}
+.south-park .sp-hud strong,
+.south-park .sp-hud small {
+  display: block;
+}
+.south-park .sp-hud strong {
+  font:
+    400 clamp(14px, 2.2vw, 22px)/1.2 SouthParkDisplay,
+    var(--font-dm-sans);
+}
+.south-park .sp-runline,
+.south-park .sp-transmission,
+.south-park .sp-game-footer,
+.south-park .sp-game-footer > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.south-park .sp-runline {
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 5px 0;
+}
+.south-park .sp-transmission {
+  margin: 7px 0;
+  font-size: 12px;
+}
+.south-park .sp-transmission > button:last-child {
+  margin-left: auto;
+}
+.south-park .sp-channel-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.south-park .sp-channel-row b {
+  border-bottom: 2px solid #d99143;
+}
+.south-park .sp-brief {
+  font-size: 14px;
+  line-height: 1.25;
+  border-left: 3px solid #c78835;
+  background: #f8eac3;
+  padding: 5px 8px;
+  margin: 6px 0;
+}
+.south-park .sp-hints,
+.south-park .sp-workshop,
+.south-park .sp-manual {
+  font-size: 13px;
+  line-height: 1.3;
+}
+.south-park .sp-workshop {
+  margin: 7px 0;
+  border-block: 1px dashed #949e86;
+  padding: 5px 0;
+}
+.south-park .sp-workshop summary {
+  font-weight: bold;
+}
+.south-park .sp-workshop > div {
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+}
+.south-park .sp-workshop button {
+  flex: 1;
+  text-align: left;
+}
+.south-park .sp-workshop button span,
+.south-park .sp-game-footer small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+}
+.south-park .sp-game-footer {
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.south-park .sp-manual {
+  border: 1px dashed #8e9176;
+  padding: 6px;
+  margin-top: 7px;
+}
+@media (max-width: 530px) {
+  .south-park [role='dialog'].sp-arcade {
+    width: calc(100vw - 12px);
+    max-height: 96dvh;
+  }
+  .south-park .sp-desk-body {
+    padding: 8px;
+  }
+  .south-park .sp-desk {
+    max-height: calc(96dvh - 4px);
+  }
+  .south-park .sp-chartroom canvas {
+    height: 216px;
+  }
+  .south-park .sp-depot-head {
+    padding: 9px 40px 8px 10px;
+    gap: 7px;
+  }
+  .south-park .sp-depot-head > span {
+    display: none;
+  }
+  .south-park .sp-mode-row button {
+    display: block;
+    font-size: 12px;
+  }
+  .south-park .sp-mode-row small {
+    display: block;
+  }
+  .south-park .sp-setup {
+    grid-template-columns: 1fr;
+  }
+  .south-park .sp-dispatch-meta,
+  .south-park .sp-hud small {
+    font-size: 8px;
+  }
+  .south-park .sp-hud > div {
+    padding: 4px;
+  }
+  .south-park .sp-channel-row {
+    gap: 3px;
+  }
+  .south-park .sp-channel-row button {
+    padding: 6px 1px;
+    font-size: 11px;
+  }
+  .south-park .sp-transmission > button:last-child {
+    margin-left: 0;
+  }
+  .south-park .sp-game-footer {
+    align-items: flex-start;
+  }
+}
+@media (pointer: coarse) {
+  .south-park .sp-desk :where(button, select, summary, input[type='number']) {
+    min-height: 38px;
+    touch-action: manipulation;
+  }
+  .south-park .sp-channel-row button {
+    min-height: 44px;
+  }
+  .south-park .sp-atlas button {
+    min-height: 28px;
+    min-width: 28px;
+  }
+}
+@media (forced-colors: active) {
+  .south-park .sp-chartroom {
+    forced-color-adjust: none;
+  }
+  .south-park .sp-desk button[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+}
+.south-park .sp-chartroom canvas {
+  touch-action: manipulation;
+  cursor: crosshair;
+}
+.south-park .sp-aim-panel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+  padding: 4px 7px;
+  background: #e9eaca;
+  border-left: 3px solid #73844b;
+  font-size: 11px;
+}
+.south-park .sp-aim-panel small {
+  flex-basis: 100%;
+  font-size: 10px;
+}
+.south-park .sp-channel-row .sp-lane-reason {
+  display: block;
+  padding-top: 1px;
+  color: #742d23;
+  font:
+    800 10px/1.1 SouthParkBody,
+    system-ui,
+    sans-serif;
+}
+.south-park .sp-channel-row button[data-sp-blocked]:not([data-sp-blocked='early']) {
+  border-style: dashed;
+}
+.south-park .sp-aim-panel button {
+  padding: 2px 6px;
+}
+.south-park
+  .sp-desk-body[data-transfer]
+  :is(.sp-channel-row, .sp-aim-panel, .sp-transmission, .sp-precision, .sp-brief, .sp-hints) {
+  display: none;
+}
+.south-park .sp-desk-body[data-transfer] .sp-workshop > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.south-park .sp-desk .sp-depart {
+  background: #285642;
+  color: #fffae5;
+  padding: 8px 14px;
+}
+.south-park .sp-desk button.sp-friend-invite {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 12px;
+  text-align: start;
+  color: #ffefb9;
+  background: #31493a;
+  border: 2px solid #68512b;
+}
+.south-park .sp-friend-invite img {
+  object-fit: contain;
+}
+.south-park .sp-friend-invite small,
+.south-park .sp-friend-invite b {
+  display: block;
+}
+.south-park .sp-friend-invite > span:last-child {
+  margin-inline-start: auto;
+}
+.south-park .sp-profiler-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 10px;
+  border-block: 2px solid #302443;
+  background: #473c5f;
+  color: #fff8d8;
+}
+.south-park .sp-rig-bay {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-block-start: 1px dashed #798578;
+  margin-block: 8px;
+  font-size: 12px;
+}
+.south-park .sp-rig-bay legend {
+  padding-inline-end: 6px;
+  font-weight: 700;
+}
+.south-park .sp-rig-bay button {
+  flex: 1 1 130px;
+  text-align: start;
+  min-height: 40px;
+}
+.south-park .sp-rig-bay button span {
+  display: block;
+}
+.south-park .sp-profiler-panel img {
+  width: 16px;
+  height: 48px;
+  object-fit: contain;
+}
+.south-park .sp-profiler-panel span {
+  display: block;
+}
+.south-park .sp-profiler-panel i {
+  margin-left: auto;
+  color: #a8e7d1;
+}
+.south-park .sp-dispatch-bell,
+.south-park .sp-code-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  color: #344735;
+}
+.south-park .sp-dispatch-bell {
+  background: #f5e7bf;
+  border-left: 3px solid #8d6435;
+  margin: 5px 0;
+  padding: 5px 7px;
+}
+.south-park .sp-dispatch-bell small {
+  flex: 1;
+  min-width: 95px;
+}
+.south-park .sp-dispatch-bell button,
+.south-park .sp-code-actions button {
+  background: #305343;
+  color: #fff1c9;
+  border: 1px solid #213d31;
+  padding: 4px 7px;
+  border-radius: 2px;
+}
+.south-park .sp-dispatch-bell button:disabled {
+  background: #e8ddbd;
+  color: #685d44;
+}
+.south-park .sp-blueprint .sp-code-actions {
+  display: flex;
+  margin-top: 5px;
+}
+.south-park [data-sp-code] {
+  font:
+    600 14px/1.4 ui-monospace,
+    monospace;
+  letter-spacing: 0.05em;
+}
+.south-park .sp-hud strong,
+.south-park .sp-dispatch-meta {
+  font-variant-numeric: tabular-nums;
+}
+.south-park .sp-transfer-title::before {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: 4px 8px;
+  pointer-events: none;
+  background:
+    linear-gradient(31deg, transparent 42%, #d4ae57 44% 65%, transparent 67%) 3% 26%/9px 8px,
+    linear-gradient(111deg, transparent 40%, #579980 43% 66%, transparent 68%) 91% 23%/9px 12px,
+    linear-gradient(64deg, transparent 29%, #a85544 32% 56%, transparent 58%) 85% 80%/7px 9px,
+    linear-gradient(64deg, transparent 29%, #587f9d 32% 56%, transparent 58%) 11% 83%/7px 9px;
+  background-repeat: no-repeat;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .south-park .sp-transfer-title::before {
+    animation: sp-transfer-scatter 0.75s steps(6, end) both;
+  }
+  @keyframes sp-transfer-scatter {
+    from {
+      background-position:
+        44% 70%,
+        58% 68%,
+        56% 70%,
+        46% 75%;
+      opacity: 0.35;
+    }
+    50% {
+      background-position:
+        12% 15%,
+        85% 12%,
+        71% 62%,
+        21% 64%;
+      opacity: 1;
+    }
+    to {
+      background-position:
+        3% 26%,
+        91% 23%,
+        85% 80%,
+        11% 83%;
+      opacity: 1;
+    }
+  }
+}
+.south-park .sp-randy-ticket {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 3px;
+  font-weight: 500;
+}
+.south-park .sp-randy-ticket img {
+  width: 29px;
+  height: 31px;
+  object-fit: contain;
+}
+.south-park .sp-randy-ticket b {
+  display: block;
+}

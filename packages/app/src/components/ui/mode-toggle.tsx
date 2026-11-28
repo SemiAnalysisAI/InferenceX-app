@@ -5,6 +5,7 @@ import {
   Car,
   Crosshair,
   Moon,
+  MountainSnow,
   PencilLine,
   Pickaxe,
   Shield,
@@ -31,9 +32,14 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   halo: Shield,
   'orange-chicken': UtensilsCrossed,
   excalidraw: PencilLine,
+  'south-park': MountainSnow,
 };
 
-const ZH_THEME_NAMES: Record<string, string> = { light: '浅色', dark: '深色' };
+const ZH_THEME_NAMES: Record<string, string> = {
+  light: '浅色',
+  dark: '深色',
+  'south-park': '南方公园',
+};
 
 const STRINGS = {
   en: {

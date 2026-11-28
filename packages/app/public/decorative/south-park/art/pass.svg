@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="280" viewBox="0 0 1600 280" preserveAspectRatio="none">
+  <defs>
+    <g id="pine"><path d="m0 0-13 25 6-1-15 23 12-2-18 23 19-3-4 6h29l-7-8 18 4-16-24 8 1-13-21 5 1z" fill="#194f3f"/><path d="m0 1-9 17 7-2 4 4 4-2 4 1zM-10 30l-9 13 10-3 2 2 3-3 8 2-6-10-5 3zM8 47l-5 6 7 1 3-2 5 1-7-10z" fill="#f1f2dc"/></g>
+    <g id="fir"><path d="m0 0-9 16 4-1-10 17 7-1-11 18 14-4-1 8h13l-5-8 14 3-11-17 6 1-9-14 4 1z" fill="#37785f"/><path fill="#fffceb" d="m0 0-6 11 6-2 4 3zm-7 22-5 7 7-2 2 2 2-4z"/></g>
+    <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence baseFrequency=".57" numOctaves="2" stitchTiles="stitch"/></filter>
+  </defs>
+  <path fill="#91d5df" d="M0 0h1600v280H0z"/>
+  <circle cx="1136" cy="47" r="24" fill="#f8e4a0"/>
+  <path fill="#bbd9cd" d="m0 110 87-48 46 19 81-45 51 36 103-64 73 56 44-12 77 43 59-32 89 24L825 16l69 40 56-34 66 38 85-50 105 70 39-16 70 40 95-77 88 48 102-38v243H0z"/>
+  <path fill="#699d8b" d="M0 96 70 72l51 33 50-6 109-59 43 26 56-32 125 71 114-36 84 31 78-66 92 51 74-24 56 29 99-56 80 45 61-28 120 65 123-68 115 48v184H0z"/>
+  <path fill="#f3f4e8" d="m241 62 39-22 43 26-21-3-12 6-16-10-17 6zM339 56l40-22 38 22-16-1-10 6-12-8-17 7-10-4zM748 62l32-28 44 24-17-3-12 6-17-8-14 10zM1067 55l34-21 27 15-12 2-7-3-8 7-13-4zM1438 68l47-20 37 15-20-1-10 6-15-6-12 6z"/>
+  <path fill="#3e795f" d="m0 138 95-25 130 26 88-28 100 24 124-52 93 34 74-7 85 32 91-42 101 28 139-37 94 35 94-19 126 30 114-36 52 16v163H0z"/>
+  <path fill="#2b604d" d="m0 157 123-20 82 20 122-11 102 15 105-18 99 22 146-23 123 9 99-23 108 20 125-32 130 31 86-10 150 12v131H0z"/>
+  <g><use href="#fir" transform="translate(1 84) scale(1.4)"/><use href="#pine" transform="translate(54 93) scale(1.1)"/><use href="#fir" transform="translate(91 110)"/><use href="#pine" transform="translate(145 118) scale(.8)"/><use href="#fir" transform="translate(181 128) scale(.8)"/>
+    <use href="#pine" transform="translate(421 102) scale(1.03)"/><use href="#fir" transform="translate(449 115)"/><use href="#fir" transform="translate(504 125) scale(.8)"/><use href="#pine" transform="translate(541 113) scale(.8)"/><use href="#fir" transform="translate(572 118) scale(.8)"/>
+    <use href="#fir" transform="translate(833 120)"/><use href="#pine" transform="translate(863 97)"/><use href="#pine" transform="translate(915 110) scale(.95)"/><use href="#fir" transform="translate(943 134) scale(.7)"/><use href="#fir" transform="translate(984 126) scale(.75)"/>
+    <use href="#fir" transform="translate(1284 110)"/><use href="#pine" transform="translate(1331 87) scale(1.2)"/><use href="#fir" transform="translate(1362 106) scale(1.02)"/><use href="#pine" transform="translate(1512 91) scale(1.1)"/><use href="#pine" transform="translate(1575 54) scale(1.65)"/></g>
+  <path fill="#d3e7dd" d="m0 160 92 6 119-2 117 8 86-8 128 7 129-9 134 12 138-10 104 5 108-8 114 11 114-14 96 3 121-7v126H0z"/>
+  <path fill="#fffcee" d="m0 176 111-4 132 6 131-3 139 8 124-9 104 6 125-5 154 4 118-8 128 7 150-6 184 5v103H0z"/>
+  <path d="m0 229 190 1 243-4 187 5 229-7 211 5 246-6 171 7 123-5v55H0z" fill="#ceded5"/>
+  <path d="m0 235 248-2 193-3 179 5 224-7 206 5 262-7 170 6 118-4v52H0z" fill="#465254"/>
+  <path d="m0 257 1600-4" stroke="#f0d681" stroke-width="3" stroke-dasharray="57 70"/>
+  <path fill="#888" opacity=".09" filter="url(#grain)" d="M0 0h1600v280H0z"/>
+</svg>
