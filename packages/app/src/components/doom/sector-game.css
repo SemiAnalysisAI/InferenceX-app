@@ -1,0 +1,385 @@
+.doom .uac-sector-cover {
+  /* The closed bulkhead is opaque: the compositor can skip the page behind play. */
+  background: radial-gradient(ellipse at center, #353c35 0%, #1c211f 56%, #101413 100%);
+}
+html.doom.uac-cartridge-open
+  :is(.doom-scene, .doom-scene *, .uac-wrap, .uac-wrap *, .uac-chart-hud *) {
+  animation-play-state: paused;
+}
+.doom .uac-view {
+  contain: layout paint;
+}
+.doom [role='dialog'].uac-game {
+  display: block;
+  width: min(710px, calc(100vw - 24px));
+  max-width: none;
+  max-height: 93dvh;
+  overflow: auto;
+  padding: 0;
+  color: #ecebdc;
+  background: #222925;
+  border: 2px solid #777967;
+  border-top: 4px solid var(--uac-d);
+  border-radius: 3px;
+  box-shadow: 0 16px 80px #020500ae;
+  font-family: var(--uac-type);
+  outline: none;
+}
+.uac-game-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 54px 9px 16px;
+  color: #f4efdd;
+  background: linear-gradient(108deg, #3c4338, #2a322a 62%, #364032);
+  border-bottom: 1px solid #72745c;
+}
+.uac-game-head small,
+.uac-game-foot,
+.uac-sector-title span,
+.uac-readouts small,
+.uac-intermission small {
+  font: bold 9px/1.2 var(--uac-type);
+  letter-spacing: 0.14em;
+}
+.uac-game-head small {
+  color: var(--uac-sun);
+}
+.uac-game-head h2 {
+  font: 650 44px/0.94 var(--uac-display);
+  margin: 4px 0 0;
+}
+.uac-game-head p {
+  font-size: 11px;
+  color: #d4d2bd;
+}
+.uac-stamp {
+  font: 600 37px/1 var(--uac-display);
+  color: #aaaa91;
+  letter-spacing: -0.04em;
+}
+.uac-stamp span {
+  color: var(--uac-d);
+  margin: 0 3px;
+}
+.uac-game button:not([class*='absolute']),
+.uac-game select {
+  min-height: 29px;
+  padding: 3px 9px;
+  font: 600 12px/1.15 var(--uac-type);
+  color: #e8eadd;
+  border: 1px solid #71745f;
+  border-radius: 2px;
+  background: linear-gradient(#454d42, #373e34);
+  box-shadow: inset 0 1px #aeb99633;
+}
+.uac-game button:disabled {
+  opacity: 0.43;
+}
+.uac-game button[aria-pressed='true'] {
+  border-color: var(--uac-sun);
+  color: var(--uac-sun);
+  background: #3e4334;
+}
+.uac-game .uac-primary,
+.uac-game .uac-fire {
+  background: var(--uac-sun);
+  color: #23271d;
+  border-color: #cfb489;
+}
+.uac-game .uac-primary {
+  font: 650 23px/0.95 var(--uac-display);
+  padding: 6px 18px;
+}
+.uac-modes,
+.uac-route,
+.uac-pack,
+.uac-commands,
+.uac-lab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.uac-modes {
+  padding: 7px 12px;
+  border-bottom: 1px solid #575d4d;
+}
+.uac-modes button {
+  flex: 1;
+}
+.uac-sector-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: #181f1b;
+  padding: 5px 12px;
+  color: #e5e6cf;
+}
+.uac-sector-title b {
+  font: 600 18px/1.1 var(--uac-display);
+}
+.uac-sector-title span {
+  font-size: 8px;
+  color: #bcc7ad;
+}
+.uac-view {
+  position: relative;
+  border-block: 1px solid #777e65;
+  background: #282b25;
+  overflow: hidden;
+}
+.uac-view canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  touch-action: none;
+  outline-offset: -3px !important;
+}
+.uac-intermission {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  background: #131b18be;
+  color: #fff4d3;
+  text-align: center;
+}
+.uac-intermission strong {
+  font: 600 44px/1 var(--uac-display);
+}
+.uac-intermission span {
+  font-size: 11px;
+}
+.uac-readouts {
+  display: grid;
+  grid-template-columns: clamp(24px, 5vw, 46px) repeat(5, minmax(0, 1fr));
+  background: linear-gradient(#4b5144, #353d33);
+  border-bottom: 1px solid #69705a;
+}
+.uac-readouts > div {
+  padding: 6px 10px;
+  border-right: 1px solid #777a64;
+}
+.uac-readouts small {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: #d5d9c5;
+}
+.uac-readouts b {
+  font: 600 24px/1 var(--uac-display);
+  color: #ffcca0;
+}
+.uac-readouts .uac-combat-face {
+  background: #35382d url('/decorative/doom/marine.webp') 20% bottom/600% 100% no-repeat;
+  image-rendering: pixelated;
+}
+.uac-condition {
+  color: #f6d59f;
+  border-left: 3px solid #bd773c;
+  background: #262922;
+  padding: 3px 8px;
+  font: 700 12px/1.4 var(--uac-type);
+  font-variant-numeric: tabular-nums;
+}
+.uac-condition[data-phase='2'] {
+  color: #fff1d9;
+  background: #673225;
+}
+.uac-condition[data-phase='3'],
+.uac-pay {
+  color: #caeaa9;
+}
+.uac-prep,
+.uac-flight {
+  padding: 10px 13px;
+  display: grid;
+  gap: 7px;
+}
+.uac-prep p,
+.uac-objective,
+.uac-prep details,
+.uac-route span,
+.uac-status,
+.uac-pack label {
+  font-size: 11px;
+  color: #d6dcc9;
+}
+.uac-prep details {
+  padding: 3px 7px;
+  background: #2d342b;
+  border: 1px solid #49533f;
+}
+.uac-prep details summary {
+  cursor: pointer;
+}
+.uac-prep details[open] .uac-pack {
+  margin: 6px 0;
+}
+.uac-route button {
+  min-width: 40px;
+}
+.uac-objective {
+  border-left: 3px solid var(--uac-d);
+  padding-left: 8px;
+}
+.uac-objective strong {
+  color: var(--uac-sun);
+}
+.uac-game-foot {
+  display: flex;
+  justify-content: space-between;
+  background: #191f19;
+  color: #c2c5ab;
+  padding: 4px 11px;
+  border-top: 1px solid #575b4c;
+  font-size: 8px;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.uac-game-foot .uac-game-mix {
+  display: inline-flex;
+  gap: 4px;
+}
+.uac-game-foot .uac-game-mix button:not([class*='absolute']) {
+  font-size: 9px;
+  min-height: 21px;
+  padding: 2px 5px;
+}
+.uac-game > .absolute {
+  top: 8px;
+  color: #edead8;
+}
+@media (max-width: 640px) {
+  .doom [role='dialog'].uac-game {
+    width: calc(100vw - 10px);
+    max-height: 94dvh;
+  }
+  .uac-game-head {
+    padding: 9px 42px 7px 10px;
+  }
+  .uac-game-head h2 {
+    font-size: 34px;
+  }
+  .uac-stamp {
+    font-size: 25px;
+  }
+  .uac-game-head small {
+    font-size: 7px;
+  }
+  .uac-view canvas {
+    aspect-ratio: 1.72;
+    object-fit: fill;
+  }
+  .uac-modes,
+  .uac-prep,
+  .uac-flight {
+    padding: 6px;
+  }
+  .uac-readouts > div {
+    padding: 4px;
+  }
+  .uac-readouts small {
+    font-size: 7px;
+  }
+  .uac-readouts b {
+    font-size: 19px;
+  }
+  .uac-game button:not([class*='absolute']),
+  .uac-game select {
+    font-size: 10px;
+    min-height: 31px;
+    padding: 3px 7px;
+  }
+  .uac-sector-title {
+    padding: 4px 7px;
+  }
+  .uac-sector-title b {
+    font-size: 15px;
+  }
+  .uac-section-title span {
+    font-size: 7px;
+  }
+  .uac-commands {
+    gap: 3px;
+  }
+  .uac-game .uac-primary {
+    font-size: 19px;
+  }
+  .uac-prep details {
+    font-size: 10px;
+  }
+}
+@media (forced-colors: active) {
+  .uac-game canvas {
+    forced-color-adjust: none;
+  }
+  .uac-game button[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+  .uac-intermission,
+  .uac-game-head,
+  .uac-game-foot {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+.uac-run-plot {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 8px 0;
+  border: 1px solid #66765b;
+  padding: 5px 8px;
+  background: #20291f;
+  color: #d6eab9;
+}
+.uac-run-plot svg {
+  width: 31%;
+  max-width: 146px;
+  height: 50px;
+  flex: none;
+}
+.uac-run-plot figcaption {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.uac-run-plot figcaption :is(strong, span) {
+  display: block;
+}
+@media (max-width: 640px) {
+  .doom [role='dialog'].uac-game :is(button, select, summary) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .uac-game summary {
+    align-content: center;
+  }
+  .uac-commands {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(44px, 1fr));
+    gap: 4px;
+  }
+  .uac-commands button:nth-child(n + 7) {
+    grid-column: span 1;
+    padding-inline: 2px;
+  }
+  .uac-commands button:nth-child(7),
+  .uac-commands button:nth-child(10) {
+    grid-column: span 2;
+  }
+}
+@media (forced-colors: active) {
+  .uac-run-plot {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
