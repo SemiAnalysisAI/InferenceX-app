@@ -6,9 +6,9 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { JsonLd } from '@/components/seo/json-ld';
 import { AGENTIC_SCENARIO_INTRO_ZH } from '@/lib/compare/compare-ssr-zh';
 import {
-  isAgenticSequence,
+  isAgenticScenario,
   type ScenarioSegment,
-  sequenceForScenarioSegment,
+  scenarioForSegment,
 } from '@/lib/compare/compare-scenario-route';
 import { getCachedBenchmarks } from '@/lib/compare/compare-ssr';
 import {
@@ -125,7 +125,7 @@ export async function renderPrecisionPageZh(slug: string, { scenarioSegment }: S
   const sideA = { precision: parsed.precA };
   const sideB = { precision: parsed.precB };
 
-  const { sequence: pickedSequence } = pickVariantPairDefaults(
+  const { sequence: pickedScenario } = pickVariantPairDefaults(
     'precision',
     rows,
     parsed.gpu,
@@ -133,13 +133,13 @@ export async function renderPrecisionPageZh(slug: string, { scenarioSegment }: S
     sideB,
   );
 
-  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const effectiveSequence = pathSequence ?? pickedSequence;
+  const pathScenario = scenarioSegment ? scenarioForSegment(scenarioSegment) : null;
+  const effectiveScenario = pathScenario ?? pickedScenario;
 
   const { defaultTargets, ssrRows, interactivityRange } = computeVariantCompareTableData(
     rows,
     parsed.gpu,
-    effectiveSequence,
+    effectiveScenario,
     sideA,
     sideB,
   );
@@ -190,12 +190,12 @@ export async function renderPrecisionPageZh(slug: string, { scenarioSegment }: S
         slug={canonical}
         modelLabel={parsed.model.label}
         defaultModel={parsed.model.displayName}
-        defaultSequence={effectiveSequence}
+        defaultScenario={effectiveScenario}
         precA={parsed.precA}
         precB={parsed.precB}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
-        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}
+        agenticIntro={isAgenticScenario(effectiveScenario) ? AGENTIC_SCENARIO_INTRO_ZH : null}
         gpuLabel={gpuLabel}
         gpuVendor={gpuMeta?.vendor ?? ''}
         gpuArch={gpuMeta?.arch ?? ''}

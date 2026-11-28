@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test'
 import type { AvailabilityRow } from '@/lib/api/api';
 import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 const mocks = {
   availability: {
@@ -40,7 +40,7 @@ mock.module('@/lib/routing/url-state', () => ({
   refreshUrlParams: () => ({}),
 }));
 mock.module('@/providers/unofficial-run-provider', () => ({
-  useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
+  useUnofficialRun: () => ({ availableModelsAndScenarios: [] }),
 }));
 
 import {
@@ -66,15 +66,15 @@ const KIMI_K3_DATED_ROWS = [
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
-let observedSequence: Sequence | undefined;
+let observedScenario: Scenario | undefined;
 let observedResolved: boolean | undefined;
 let observedRunDate: string | undefined;
 let observedPrecisions: string[] | undefined;
 
-const SequenceProbe = memo(() => {
+const ScenarioProbe = memo(() => {
   const selection = useGlobalFilterSelection();
-  observedSequence = selection.effectiveSequence;
-  observedResolved = selection.sequenceResolved;
+  observedScenario = selection.effectiveScenario;
+  observedResolved = selection.scenarioResolved;
   observedRunDate = useGlobalFilterRun().effectiveRunDate;
   observedPrecisions = selection.effectivePrecisions;
   return null;
@@ -86,7 +86,7 @@ function mountProvider(): void {
   act(() =>
     root?.render(
       <GlobalFilterProvider initialModel={Model.Kimi_K3}>
-        <SequenceProbe />
+        <ScenarioProbe />
       </GlobalFilterProvider>,
     ),
   );
@@ -97,7 +97,7 @@ beforeEach(() => {
   mocks.getUrlParam.mockClear();
   mocks.setUrlParams.mockClear();
   mocks.hasExplicitUrlParam.mockClear();
-  observedSequence = undefined;
+  observedScenario = undefined;
   observedResolved = undefined;
   observedRunDate = undefined;
   observedPrecisions = undefined;
@@ -115,14 +115,14 @@ describe('GlobalFilterProvider stale i_seq snapshot', () => {
     mocks.hasExplicitUrlParam.mockReturnValue(false);
     mountProvider();
     expect(observedResolved).toBe(true);
-    expect(observedSequence).toBe(Sequence.AgenticTraces);
+    expect(observedScenario).toBe(Scenario.AgenticTraces);
   });
 
   it('still honors an i_seq explicitly present in the current URL', () => {
     mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'i_seq');
     mountProvider();
     expect(observedResolved).toBe(true);
-    expect(observedSequence).toBe(Sequence.EightK_OneK);
+    expect(observedScenario).toBe(Scenario.EightK_OneK);
   });
 });
 

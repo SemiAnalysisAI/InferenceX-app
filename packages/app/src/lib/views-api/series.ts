@@ -1,4 +1,4 @@
-import { GPU_VENDORS, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { GPU_VENDORS, rowToScenario } from '@semianalysisai/inferencex-constants';
 
 import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
@@ -59,7 +59,7 @@ import {
   hardwareKeyMatchesBase,
 } from '@/lib/catalog/constants';
 
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
@@ -76,7 +76,7 @@ import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
 export type SeriesXMode = 'interactivity' | 'ttft' | 'e2e' | 'e2e-normalized-interactivity';
 
 export interface InferenceSeriesOptions {
-  readonly sequence: Sequence;
+  readonly sequence: Scenario;
   /** Latency percentile for agentic x fields (`p75` | `p90`). */
   readonly percentile: string;
   /** Resolved precisions (already defaulted by the route). */
@@ -232,7 +232,7 @@ export function buildInferenceSeries(
   options: InferenceSeriesOptions,
 ): InferenceSeriesResult {
   const {
-    sequence,
+    sequence: scenario,
     percentile,
     precisions,
     metricConfigKey,
@@ -246,10 +246,10 @@ export function buildInferenceSeries(
 
   const metricKey = metricConfigKey.slice(2) as MetricKey;
   const registryEntry = METRIC_REGISTRY[metricKey];
-  const isAgentic = sequence === Sequence.AgenticTraces;
+  const isAgentic = scenario === Scenario.AgenticTraces;
 
   // 1. Scope rows to the sequence and keep only each series' newest run.
-  const seqRows = rows.filter((row) => rowToSequence(row) === sequence);
+  const seqRows = rows.filter((row) => rowToScenario(row) === scenario);
   const deduped = dedupeRowsToLatestPerConfig([...seqRows]);
 
   // 3. Pick the chart definition for the x mode (index order matches

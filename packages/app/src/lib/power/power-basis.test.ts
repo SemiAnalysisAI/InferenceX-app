@@ -16,7 +16,7 @@ import {
 } from '@/lib/power/power-basis';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-categories';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { rowToLightweightPoint } from '@/components/inference/hooks/interpolated-trend-core';
 import { processOverlayChartDataWithClipping } from '@/components/inference/utils';
@@ -142,7 +142,7 @@ describe('power boundaries through the derived-field builder', () => {
       );
       expect(chartData[0][0].utilityModeledWatts).toEqual(fields.utilityModeledWatts);
       const result = buildInferenceSeries([source], {
-        sequence: Sequence.AgenticTraces,
+        sequence: Scenario.AgenticTraces,
         percentile: 'p90',
         precisions: ['fp4'],
         metricConfigKey: 'y_utilityModeledWatts',

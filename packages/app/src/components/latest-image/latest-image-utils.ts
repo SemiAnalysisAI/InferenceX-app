@@ -1,17 +1,17 @@
 import type { CSSProperties } from 'react';
 
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToScenario } from '@semianalysisai/inferencex-constants';
 
 import type { FrameworkRelease, FrameworkReleases, LatestImageRow } from '@/lib/api/api';
 import {
   Model,
-  Sequence,
+  Scenario,
   getModelCategory,
-  getSequenceCategoryForModel,
+  getScenarioCategoryForModel,
 } from '@/lib/catalog/data-mappings';
 
 const MODEL_VALUES = new Set<string>(Object.values(Model));
-const SEQUENCE_VALUES = new Set<string>(Object.values(Sequence));
+const SCENARIO_VALUES = new Set<string>(Object.values(Scenario));
 
 export function imageRowDisplayModel(row: Pick<LatestImageRow, 'model'>): string {
   return DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
@@ -22,10 +22,10 @@ export function imageRowModel(row: Pick<LatestImageRow, 'model'>): Model | null 
   return MODEL_VALUES.has(display) ? (display as Model) : null;
 }
 
-export function imageRowSequence(
+export function imageRowScenario(
   row: Pick<LatestImageRow, 'isl' | 'osl' | 'benchmark_type'>,
 ): string {
-  return rowToSequence(row) ?? `${row.isl}/${row.osl}`;
+  return rowToScenario(row) ?? `${row.isl}/${row.osl}`;
 }
 
 export function isActiveImageRow(
@@ -36,24 +36,24 @@ export function isActiveImageRow(
     const category = getModelCategory(model);
     if (category === 'deprecated' || category === 'hidden') return false;
   }
-  const sequence = imageRowSequence(row);
-  if (!SEQUENCE_VALUES.has(sequence)) return true;
-  return getSequenceCategoryForModel(sequence as Sequence, model) !== 'deprecated';
+  const sequence = imageRowScenario(row);
+  if (!SCENARIO_VALUES.has(sequence)) return true;
+  return getScenarioCategoryForModel(sequence as Scenario, model) !== 'deprecated';
 }
 
-export function sequenceOptionsForModel(
+export function scenarioOptionsForModel(
   rows: readonly Pick<LatestImageRow, 'model' | 'isl' | 'osl' | 'benchmark_type'>[],
   selectedModel: string,
 ): string[] {
   const sequences = new Set<string>();
   for (const row of rows) {
     if (selectedModel !== 'all' && imageRowDisplayModel(row) !== selectedModel) continue;
-    sequences.add(imageRowSequence(row));
+    sequences.add(imageRowScenario(row));
   }
   return [...sequences].toSorted();
 }
 
-export function resolveSelectedSequence(options: readonly string[], selected: string): string {
+export function resolveSelectedScenario(options: readonly string[], selected: string): string {
   if (options.includes(selected)) return selected;
   return options[0] ?? selected;
 }

@@ -13,7 +13,7 @@ import {
 } from '@/lib/benchmarks/availability-index';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
-import { type Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { type Percentile, Scenario } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
 import { interpolateProfitForGPU, type ProfitPowerBasis } from './profit-power';
@@ -59,7 +59,7 @@ export function profitHistoryChipOptions(
   if (!availability) return [];
   const hwKeys = new Set<string>();
   for (const line of linesForModels(availability, dbModelKeys)) {
-    if (line.sequence !== Sequence.AgenticTraces) continue;
+    if (line.sequence !== Scenario.AgenticTraces) continue;
     if (!precisions.includes(line.precision)) continue;
     if (line.hwKey !== null && isKnownGpu(line.hwKey)) hwKeys.add(line.hwKey);
   }
@@ -80,7 +80,7 @@ export function profitHistoryAvailableDates(
     availability,
     linesForModels(availability, dbModelKeys).filter(
       (line) =>
-        line.sequence === Sequence.AgenticTraces &&
+        line.sequence === Scenario.AgenticTraces &&
         precisions.includes(line.precision) &&
         line.hwKey !== null &&
         selectedGPUs.includes(line.hwKey),
@@ -124,7 +124,7 @@ export function buildProfitHistoryResults(
     const { grouped, groupMeta } = buildGpuGroups<HistoryGroupMeta>(
       dedupeAgenticHistoryRuns([...rows]),
       {
-        sequence: Sequence.AgenticTraces,
+        sequence: Scenario.AgenticTraces,
         precisions,
         percentile,
         tokenType: 'total',

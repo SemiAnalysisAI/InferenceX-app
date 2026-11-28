@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 const mockFetchBenchmarks = vi.fn();
 const actual = { ...(await import('@/lib/api/api')) };
@@ -66,22 +66,22 @@ function row(id: number, isl: number, osl: number, conc: number): BenchmarkRow {
 }
 
 // The latest key holds every sequence. 8k/1k is the provisional default, 1k/1k the resolved one.
-const DEFAULT_SEQUENCE_CONC = 64;
-const RESOLVED_SEQUENCE_CONC = 8;
+const DEFAULT_SCENARIO_CONC = 64;
+const RESOLVED_SCENARIO_CONC = 8;
 const LATEST_ROWS = [
-  row(1, 8192, 1024, DEFAULT_SEQUENCE_CONC),
-  row(2, 1024, 1024, RESOLVED_SEQUENCE_CONC),
+  row(1, 8192, 1024, DEFAULT_SCENARIO_CONC),
+  row(2, 1024, 1024, RESOLVED_SCENARIO_CONC),
 ];
 
 type ChartDataResult = ReturnType<typeof useChartData>;
 const renders: ChartDataResult[] = [];
 
 /** Mirrors InferenceProvider's wiring before and after availability resolves the sequence. */
-function Probe({ sequenceResolved }: { sequenceResolved: boolean }) {
+function Probe({ scenarioResolved }: { scenarioResolved: boolean }) {
   renders.push(
     useChartData(
       Model.DeepSeek_R1,
-      sequenceResolved ? Sequence.OneK_OneK : Sequence.EightK_OneK,
+      scenarioResolved ? Scenario.OneK_OneK : Scenario.EightK_OneK,
       ['fp8'],
       'y_tpPerGpu',
       null,
@@ -94,7 +94,7 @@ function Probe({ sequenceResolved }: { sequenceResolved: boolean }) {
       null,
       'normalized',
       undefined,
-      sequenceResolved,
+      scenarioResolved,
       undefined,
       'p90',
       null,
@@ -110,7 +110,7 @@ function Probe({ sequenceResolved }: { sequenceResolved: boolean }) {
       undefined,
       undefined,
       undefined,
-      !sequenceResolved,
+      !scenarioResolved,
     ),
   );
   return null;
@@ -119,9 +119,9 @@ function Probe({ sequenceResolved }: { sequenceResolved: boolean }) {
 let root: Root;
 let client: QueryClient;
 
-function render(sequenceResolved: boolean) {
+function render(scenarioResolved: boolean) {
   root.render(
-    createElement(QueryClientProvider, { client }, createElement(Probe, { sequenceResolved })),
+    createElement(QueryClientProvider, { client }, createElement(Probe, { scenarioResolved })),
   );
 }
 
@@ -154,6 +154,6 @@ describe('useChartData while the sequence is unresolved', () => {
     const resolved = renders.at(-1)!;
     expect(mockFetchBenchmarks).toHaveBeenCalledOnce();
     expect(resolved.loading).toBe(false);
-    expect(resolved.selectionPoints.map((point) => point.conc)).toEqual([RESOLVED_SEQUENCE_CONC]);
+    expect(resolved.selectionPoints.map((point) => point.conc)).toEqual([RESOLVED_SCENARIO_CONC]);
   });
 });

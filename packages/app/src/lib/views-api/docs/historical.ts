@@ -1,4 +1,4 @@
-import { SEQUENCE_KEYS } from '@semianalysisai/inferencex-constants';
+import { SCENARIO_KEYS } from '@semianalysisai/inferencex-constants';
 
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
 import { API_BASE_URL, MODEL_PARAM_FORMS } from '@/lib/api/api-documentation-base';
@@ -72,7 +72,7 @@ const parameters: readonly ApiParameter[] = [
     ),
     schema: {
       type: 'string',
-      enum: SEQUENCE_KEYS,
+      enum: SCENARIO_KEYS,
       default: '8k/1k',
     },
     example: 'agentic-traces',

@@ -6,9 +6,9 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { compareChipPageLink } from '@/lib/compare/compare-chip-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import {
-  isAgenticSequence,
+  isAgenticScenario,
   type ScenarioSegment,
-  sequenceForScenarioSegment,
+  scenarioForSegment,
 } from '@/lib/compare/compare-scenario-route';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import {
@@ -138,10 +138,10 @@ async function CompareDetailZh({
   canonical: string;
   scenarioSegment?: ScenarioSegment;
 }) {
-  const fallbackSequence = comparisonScenarioForModel(parsed.model).sequence;
-  const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
+  const fallbackScenario = comparisonScenarioForModel(parsed.model).sequence;
+  const pathScenario = scenarioSegment ? scenarioForSegment(scenarioSegment) : null;
   const {
-    sequence: effectiveSequence,
+    sequence: effectiveScenario,
     precision: effectivePrecision,
     summaryA,
     summaryB,
@@ -155,9 +155,9 @@ async function CompareDetailZh({
     parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    pathSequence,
+    pathScenario,
     null,
-    fallbackSequence,
+    fallbackScenario,
   );
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
@@ -201,15 +201,15 @@ async function CompareDetailZh({
         label={label}
         modelLabel={parsed.model.label}
         defaultModel={parsed.model.displayName}
-        defaultSequence={effectiveSequence}
+        defaultScenario={effectiveScenario}
         defaultPrecision={effectivePrecision}
         initialBenchmarkRows={initialCompareBenchmarkRows(
           initialPairBenchmarkRows,
-          effectiveSequence,
+          effectiveScenario,
         )}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}
-        agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}
+        agenticIntro={isAgenticScenario(effectiveScenario) ? AGENTIC_SCENARIO_INTRO_ZH : null}
         aLabel={aLabel}
         bLabel={bLabel}
         aVendor={aMeta?.vendor ?? ''}

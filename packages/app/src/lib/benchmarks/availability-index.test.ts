@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
-import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, rowToScenario } from '@semianalysisai/inferencex-constants';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
-import { SEQUENCE_OPTIONS } from '@/lib/catalog/data-mappings';
+import { SCENARIO_OPTIONS } from '@/lib/catalog/data-mappings';
 
 import availabilityFixture from '../../../cypress/fixtures/api/availability.json';
 import {
@@ -32,7 +32,7 @@ const hwKeyOf = (r: AvailabilityRow) =>
 
 function fromRows(rows: readonly AvailabilityRow[], s: Selection) {
   const modelRows = rows.filter((r) => s.keys.includes(r.model));
-  const seqRows = modelRows.filter((r) => rowToSequence(r) === s.sequence);
+  const seqRows = modelRows.filter((r) => rowToScenario(r) === s.sequence);
   const precRows = seqRows.filter((r) => s.precisions.includes(r.precision));
   const gpuRows = precRows.filter((r) => r.hardware && s.gpus.includes(hwKeyOf(r)));
   const hwKeys = new Set<string>();
@@ -46,7 +46,7 @@ function fromRows(rows: readonly AvailabilityRow[], s: Selection) {
   }
   return {
     hasModel: rows.some((r) => s.keys.includes(r.model)),
-    sequences: [...new Set(modelRows.map((r) => rowToSequence(r)))],
+    sequences: [...new Set(modelRows.map((r) => rowToScenario(r)))],
     precisions: [...new Set(seqRows.map((r) => r.precision))].toSorted(),
     curveCounts: Object.entries(countCurvesByPrecision(seqRows)),
     dates: [...new Set((precRows.length > 0 ? precRows : seqRows).map((r) => r.date))].toSorted(),
@@ -83,20 +83,20 @@ function fromIndex(index: AvailabilityIndex, s: Selection) {
 function* selections(rows: readonly AvailabilityRow[]): Generator<Selection> {
   const precisions = [...new Set(rows.map((r) => r.precision))];
   for (const keys of [...Object.values(DISPLAY_MODEL_TO_DB), ['dsr1', 'kimik3'], ['absent']]) {
-    for (const sequence of SEQUENCE_OPTIONS) {
+    for (const scenario of SCENARIO_OPTIONS) {
       const gpus = [
         ...new Set(
           rows
-            .filter((r) => keys.includes(r.model) && r.hardware && rowToSequence(r) === sequence)
+            .filter((r) => keys.includes(r.model) && r.hardware && rowToScenario(r) === scenario)
             .map(hwKeyOf),
         ),
       ];
       for (const precs of [[], ...precisions.map((p) => [p]), precisions]) {
         for (const frameworkLock of [null, ['vllm'], ['sglang', 'trt']]) {
-          yield { keys, sequence, precisions: precs, gpus, frameworkLock };
+          yield { keys, sequence: scenario, precisions: precs, gpus, frameworkLock };
         }
         for (const gpu of gpus) {
-          yield { keys, sequence, precisions: precs, gpus: [gpu], frameworkLock: null };
+          yield { keys, sequence: scenario, precisions: precs, gpus: [gpu], frameworkLock: null };
         }
       }
     }

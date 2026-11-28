@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 
 import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { trendMetricDependencies } from '@/components/inference/hooks/interpolated-trend-core';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing, YAxisMetricKey } from '@/components/inference/types';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import type { TcoBasis } from '@/lib/catalog/constants';
-import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { Scenario, type Model } from '@/lib/catalog/data-mappings';
 
 import {
   buildFrontierHistory,
@@ -20,7 +20,7 @@ import {
 
 interface UseFrontierHistoryParams {
   selectedModel: Model;
-  selectedSequence: Sequence;
+  selectedScenario: Scenario;
   selectedPrecisions: string[];
   selectedYAxisMetric: string;
   higherIsBetter: boolean;
@@ -36,7 +36,7 @@ interface UseFrontierHistoryParams {
 /** Frontier history for the dashboard's current selection; shares the history query cache. */
 export function useFrontierHistory({
   selectedModel,
-  selectedSequence,
+  selectedScenario,
   selectedPrecisions,
   selectedYAxisMetric,
   higherIsBetter,
@@ -53,12 +53,12 @@ export function useFrontierHistory({
   loading: boolean;
   error: Error | null;
 } {
-  const islOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
+  const islOsl = useMemo(() => scenarioToIslOsl(selectedScenario), [selectedScenario]);
   const { data, isLoading, error } = useBenchmarkHistory(
     enabled ? selectedModel : '',
     islOsl?.isl ?? 0,
     islOsl?.osl ?? 0,
-    selectedSequence === Sequence.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
+    selectedScenario === Scenario.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
   );
   const metricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
 

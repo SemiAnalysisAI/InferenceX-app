@@ -1,11 +1,11 @@
 import {
-  ALT_SEQUENCE_LABEL,
+  ALT_SCENARIO_LABEL,
   interceptOverlayRun,
   interceptCalculatorMultiRunOverlay,
   interceptCalculatorOverlayRun,
   OVERLAY_ONLY_HARDWARE,
   OVERLAY_RUN_BRANCH,
-  OVERLAY_ONLY_SEQUENCE_LABEL,
+  OVERLAY_ONLY_SCENARIO_LABEL,
   OVERLAY_RUN_ID,
   SECOND_OFFICIAL_HARDWARE,
   SECOND_OVERLAY_RUN_BRANCH,
@@ -16,11 +16,11 @@ const TOTAL_BARS = 4;
 const OVERLAY_BARS = 2;
 
 const SEQUENCE = '1k/1k';
-const SEQUENCE_LABEL = '1K / 1K';
+const SCENARIO_LABEL = '1K / 1K';
 const BARS = '[data-testid="calculator-bar-chart"] svg .bar';
 const Y_TICKS = '[data-testid="calculator-bar-chart"] svg .y-axis .tick text';
 
-const selectSequence = (label: string) => {
+const selectScenario = (label: string) => {
   cy.get('[data-testid="calc-sequence-selector"]').click('right');
   cy.contains('[data-select-option]', label).click();
 };
@@ -81,9 +81,9 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get(BARS).should('have.length', 1);
       cy.get(Y_TICKS).should('not.contain.text', 'B300');
 
-      selectSequence(ALT_SEQUENCE_LABEL);
+      selectScenario(ALT_SCENARIO_LABEL);
       cy.get(BARS).should('have.length', 1);
-      selectSequence(SEQUENCE_LABEL);
+      selectScenario(SCENARIO_LABEL);
 
       cy.get(BARS).should('have.length', TOTAL_BARS);
     });
@@ -128,7 +128,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     beforeEach(visitCalculatorWithOverlay);
 
     it('drops stale official hardware from the legend selection', () => {
-      selectSequence(OVERLAY_ONLY_SEQUENCE_LABEL);
+      selectScenario(OVERLAY_ONLY_SCENARIO_LABEL);
       cy.get(BARS).should('have.length', 2);
       cy.get(Y_TICKS).should('not.contain.text', SECOND_OFFICIAL_HARDWARE.toUpperCase());
 

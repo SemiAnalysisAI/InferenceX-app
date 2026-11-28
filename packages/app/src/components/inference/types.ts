@@ -2,7 +2,7 @@ import type React from 'react';
 import type { PowerAudit, WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import type { HardwareEntry } from '@/lib/catalog/constants';
-import type { Model, Sequence } from '@/lib/catalog/data-mappings';
+import type { Model, Scenario } from '@/lib/catalog/data-mappings';
 import type { PowerTier } from '@/lib/power/power-tier';
 import type { SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import type { MetricKey } from './metric-registry';
@@ -386,7 +386,7 @@ export interface InferenceDataContextType {
   isCheckingAvailableDates: boolean;
   availableRuns: Record<string, RunInfo>;
   availablePrecisions: string[];
-  availableSequences: Sequence[];
+  availableScenarios: Scenario[];
   availableModels: string[];
 }
 
@@ -406,7 +406,7 @@ export interface InferenceFiltersContextType {
    */
   scopePickPending: boolean;
   selectedModel: Model;
-  selectedSequence: Sequence;
+  selectedScenario: Scenario;
   selectedPrecisions: string[];
   quickFilters: QuickFilters;
   selectedGPUs: string[];
@@ -473,7 +473,7 @@ export interface InferenceActionsContextType {
     allItems: Set<string>,
   ) => Set<string> | null;
   setSelectedModel: (model: Model) => void;
-  setSelectedSequence: (sequence: Sequence) => void;
+  setSelectedScenario: (scenario: Scenario) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedYAxisMetric: (metric: string) => void;
   setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;

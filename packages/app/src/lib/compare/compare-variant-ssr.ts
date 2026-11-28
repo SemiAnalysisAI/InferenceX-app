@@ -3,8 +3,8 @@ import {
   AUTHOR_URL,
   HW_REGISTRY,
   SITE_URL,
-  islOslToSequence,
-  sequenceToIslOsl,
+  islOslToScenario,
+  scenarioToIslOsl,
 } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
@@ -63,7 +63,7 @@ export function pickVariantPairDefaults(
     const seenB = new Map<string, Set<string>>();
     for (const row of hwRows) {
       if (row.isl === null || row.osl === null) continue;
-      const seq = islOslToSequence(row.isl, row.osl);
+      const seq = islOslToScenario(row.isl, row.osl);
       if (!seq) continue;
       const variantId = `${row.framework}|${row.spec_method}|${row.conc}`;
       if (row.precision === sideA.precision) {
@@ -97,7 +97,7 @@ export function pickVariantPairDefaults(
   for (const row of hwRows) {
     if (row.isl === null || row.osl === null) continue;
     if (fixedPrecision !== undefined && row.precision !== fixedPrecision) continue;
-    const seq = islOslToSequence(row.isl, row.osl);
+    const seq = islOslToScenario(row.isl, row.osl);
     if (!seq) continue;
     const variantId = `${row.framework}|${row.conc}`;
     if (row.spec_method === sideA.specMethod) {
@@ -134,7 +134,7 @@ export function computeVariantCompareTableData(
 ): CompareTableData {
   if (!sequence) return emptyCompareTableData();
 
-  const islOsl = sequenceToIslOsl(sequence);
+  const islOsl = scenarioToIslOsl(sequence);
   if (!islOsl) return emptyCompareTableData();
 
   return compareTableDataFromPoints(
@@ -154,7 +154,7 @@ export function computeVariantCompareImageRows(
 ): SsrInterpolatedRow[] {
   if (!sequence || interactivityRange.max <= interactivityRange.min) return [];
 
-  const islOsl = sequenceToIslOsl(sequence);
+  const islOsl = scenarioToIslOsl(sequence);
   if (!islOsl) return [];
 
   const pointsA = buildSidePoints(rows, hw, islOsl.isl, islOsl.osl, sideA);

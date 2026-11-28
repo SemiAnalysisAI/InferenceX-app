@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { track } from '@/lib/analytics/analytics';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { Label } from '@/components/ui/label';
@@ -154,9 +154,9 @@ export function QuickFiltersDialog({
     setQuickFilterPower,
     setQuickFilterTopologies,
   } = useInferenceActions();
-  const { selectedSequence, quickFilters, lockedFrameworks } = useInferenceFilters();
+  const { selectedScenario, quickFilters, lockedFrameworks } = useInferenceFilters();
   const { availableQuickFilters } = useInferenceData();
-  const isAgentic = selectedSequence === Sequence.AgenticTraces;
+  const isAgentic = selectedScenario === Scenario.AgenticTraces;
   const help = {
     vendor: <p>{t.vendorHelp}</p>,
     framework: <p>{t.frameworkHelp}</p>,

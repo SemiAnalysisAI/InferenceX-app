@@ -29,7 +29,7 @@ import {
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { getInferenceHardwareConfig, getOverlayLineLabel } from '@/lib/benchmarks/inference-labels';
-import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
+import { getChartWatermark, Scenario } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
@@ -256,7 +256,7 @@ const GPUGraph = React.memo(
       selectedGPUs,
       selectedDateRange,
       selectedDates,
-      selectedSequence,
+      selectedScenario,
       quickFilters,
       activeDates,
       lockedFrameworks,
@@ -324,7 +324,7 @@ const GPUGraph = React.memo(
       quickFilters.deployment.length +
       quickFilters.power.length +
       (quickFilters.topologies?.length ?? 0) +
-      (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
+      (selectedScenario === Scenario.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
       setQuickFilterFrameworks([]);

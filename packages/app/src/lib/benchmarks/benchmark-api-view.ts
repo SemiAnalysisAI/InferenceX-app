@@ -1,4 +1,4 @@
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { rowToScenario } from '@semianalysisai/inferencex-constants';
 
 const CALCULATOR_METRIC_KEYS = new Set([
   'tput_per_gpu',
@@ -32,7 +32,7 @@ export function toCalculatorBenchmarkRows<T extends BenchmarkViewRow>(
   sequence: string,
 ): T[] {
   return rows
-    .filter((row) => rowToSequence(row) === sequence)
+    .filter((row) => rowToScenario(row) === sequence)
     .map((row) => {
       const {
         workers: _workers,

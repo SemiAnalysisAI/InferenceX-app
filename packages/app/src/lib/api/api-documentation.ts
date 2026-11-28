@@ -2,7 +2,7 @@ import {
   DB_MODEL_TO_DISPLAY,
   DISPLAY_MODEL_TO_DB,
   POWER_METRIC_KEYS,
-  SEQUENCE_KEYS,
+  SCENARIO_KEYS,
 } from '@semianalysisai/inferencex-constants';
 import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/types';
 
@@ -410,7 +410,7 @@ const paretoResponseSchema = objectSchema({
   selection: objectSchema({
     model: stringSchema,
     rawModel: stringSchema,
-    sequence: { type: 'string', enum: SEQUENCE_KEYS },
+    sequence: { type: 'string', enum: SCENARIO_KEYS },
     xMetric: stringSchema,
     yMetric: stringSchema,
     xDirection: { type: 'string', enum: PARETO_DIRECTIONS },
@@ -896,7 +896,7 @@ export const apiOperations: readonly ApiOperation[] = [
         'enum',
         'Exact workload. AgentX uses benchmark_type=agentic_traces; fixed workloads use single_turn and matching ISL/OSL.',
         '精确工作负载。AgentX 对应 benchmark_type=agentic_traces；固定长度工作负载对应 single_turn 和匹配的 ISL/OSL。',
-        { type: 'string', enum: SEQUENCE_KEYS },
+        { type: 'string', enum: SCENARIO_KEYS },
         '1k/1k',
       ),
       ...(['xMetric', 'yMetric'] as const).map((key) =>
@@ -1144,7 +1144,7 @@ export const apiOperations: readonly ApiOperation[] = [
         'enum',
         'Required when view=calculator and ignored otherwise. Unknown values yield 400 Unknown calculator sequence.',
         '当 view=calculator 时必填，其余情况会被忽略。未知值返回 400 Unknown calculator sequence。',
-        { type: 'string', enum: SEQUENCE_KEYS },
+        { type: 'string', enum: SCENARIO_KEYS },
         '1k/1k',
       ),
       parameter(

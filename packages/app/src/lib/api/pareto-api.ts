@@ -1,8 +1,8 @@
 import {
   DISPLAY_MODEL_TO_DB,
   POWER_METRIC_KEYS,
-  isSequenceKey,
-  rowToSequence,
+  isScenarioKey,
+  rowToScenario,
 } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
@@ -61,7 +61,7 @@ export function parseParetoRequest(params: URLSearchParams): {
   if (!Object.hasOwn(DISPLAY_MODEL_TO_DB, model)) throw new Error('Unknown model');
   if (!DISPLAY_MODEL_TO_DB[model].includes(rawModel)) throw new Error('Unknown rawModel for model');
   const sequence = params.get('sequence') ?? '';
-  if (!isSequenceKey(sequence)) throw new Error('Unknown sequence');
+  if (!isScenarioKey(sequence)) throw new Error('Unknown sequence');
   const xMetric = params.get('xMetric') ?? '';
   const yMetric = params.get('yMetric') ?? '';
   if (!metricPattern.test(xMetric) || !metricPattern.test(yMetric))
@@ -126,7 +126,7 @@ export function computeParetoResponse(
   const selected = rows.filter(
     (row) =>
       row.model === selection.rawModel &&
-      rowToSequence(row) === selection.sequence &&
+      rowToScenario(row) === selection.sequence &&
       row.benchmark_type ===
         (selection.sequence === 'agentic-traces' ? 'agentic_traces' : 'single_turn') &&
       (!selection.hardware || row.hardware === selection.hardware) &&

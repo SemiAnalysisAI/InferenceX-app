@@ -1,4 +1,4 @@
-import { Model, Sequence, Precision } from '@/lib/catalog/data-mappings';
+import { Model, Scenario, Precision } from '@/lib/catalog/data-mappings';
 import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
 import type { Locale } from '@/lib/i18n/i18n';
 import { isMetricKey, METRIC_REGISTRY } from '@/components/inference/metric-registry';
@@ -50,7 +50,7 @@ export interface AiChartBarPoint {
 const VALID_CHART_TYPES = new Set<string>(['bar', 'scatter', 'line', 'radar']);
 const VALID_DATA_SOURCES = new Set<string>(['benchmarks', 'evaluations', 'reliability', 'history']);
 const VALID_MODELS = new Set<string>(Object.values(Model));
-const VALID_SEQUENCES = new Set<string>(Object.values(Sequence));
+const VALID_SCENARIOS = new Set<string>(Object.values(Scenario));
 const VALID_PRECISIONS = new Set<string>(Object.values(Precision));
 const VALID_GPU_BASES = new Set<string>(Object.keys(HW_REGISTRY));
 const VALID_FRAMEWORKS = new Set<string>(FRAMEWORK_KEYS);
@@ -83,9 +83,9 @@ export function validateSpec(raw: Record<string, unknown>, locale: Locale = 'en'
 
   const model = VALID_MODELS.has(raw.model as string) ? (raw.model as string) : Model.DeepSeek_R1;
 
-  const sequence = VALID_SEQUENCES.has(raw.sequence as string)
+  const sequence = VALID_SCENARIOS.has(raw.sequence as string)
     ? (raw.sequence as string)
-    : Sequence.EightK_OneK;
+    : Scenario.EightK_OneK;
 
   const rawPrecisions = Array.isArray(raw.precisions) ? (raw.precisions as string[]) : [];
   const precisions = rawPrecisions

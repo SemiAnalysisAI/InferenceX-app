@@ -68,7 +68,7 @@ Per-tab hardware visibility is already how the calculator treats official data â
 - **Escaping.** The tooltip is a hand-built HTML string injected with `.html()`, and branch names and run URLs come from the GitHub API for whatever run id the user pasted. Everything untrusted goes through `escapeHtml` (`lib/shared/utils`). The y-axis tick labels render the same branch but go through d3 `.text()`, and the legend entry is React â€” both already safe.
 
 The calculator supports both fixed-sequence and Agentic scenarios through
-the shared `rowToSequence` classifier. Agentic rows carry null `isl`/`osl`, so
+the shared `rowToScenario` classifier. Agentic rows carry null `isl`/`osl`, so
 filtering them by numeric sequence lengths would silently drop every point.
 
 Agentic interactivity follows the same definition as the main inference chart:

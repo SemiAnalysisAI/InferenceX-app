@@ -1,4 +1,4 @@
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToScenario } from '@semianalysisai/inferencex-constants';
 
 import {
   DEFAULT_CHIP_BASIS,
@@ -18,7 +18,7 @@ import {
   getHardwareConfig,
   type TcoBasis,
 } from '@/lib/catalog/constants';
-import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario } from '@/lib/catalog/data-mappings';
 import { supportsTokenMetric } from '@/lib/benchmarks/token-metric-support';
 
 import {
@@ -86,11 +86,11 @@ function getAgenticMetric(
  */
 function firstTokenSeconds(
   row: BenchmarkRow,
-  sequence: Sequence,
+  scenario: Scenario,
   percentile: Percentile,
 ): number | undefined {
   const value =
-    sequence === Sequence.AgenticTraces
+    scenario === Scenario.AgenticTraces
       ? getAgenticMetric(row, percentile, 'ttft')
       : rowLatencyMetric(row, 'median', 'ttft');
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
@@ -193,7 +193,7 @@ function inputTokenShare(row: ChipBasisRow): number | null {
 export function buildGpuGroups<M extends GroupMeta>(
   rows: BenchmarkRow[],
   options: {
-    sequence: Sequence;
+    sequence: Scenario;
     precisions: string[];
     /** Agentic x/e2e latency percentile. Fixed-sequence rows keep the median. */
     percentile?: Percentile;
@@ -211,7 +211,7 @@ export function buildGpuGroups<M extends GroupMeta>(
   hwConfigMap: HardwareConfig;
 } {
   const {
-    sequence,
+    sequence: scenario,
     precisions,
     percentile = Percentile.P90,
     tokenType = 'total',
@@ -224,7 +224,7 @@ export function buildGpuGroups<M extends GroupMeta>(
   const hwConfigMap: HardwareConfig = {};
 
   for (const row of rows) {
-    if (rowToSequence(row) !== sequence) continue;
+    if (rowToScenario(row) !== scenario) continue;
     if (!precisions.includes(row.precision)) continue;
     if (!supportsTokenMetric(row, tokenType)) continue;
 
@@ -271,17 +271,17 @@ export function buildGpuGroups<M extends GroupMeta>(
     if (!grouped[groupKey]) grouped[groupKey] = [];
     groupMeta[groupKey] = meta;
 
-    const ttft = firstTokenSeconds(row, sequence, percentile);
+    const ttft = firstTokenSeconds(row, scenario, percentile);
 
     grouped[groupKey].push({
       sourceRow: row,
       hwKey,
       interactivity:
-        sequence === Sequence.AgenticTraces
+        scenario === Scenario.AgenticTraces
           ? getAgenticMetric(row, percentile, 'intvty')
           : rowLatencyMetric(row, 'median', 'intvty'),
       ...(ttft === undefined ? {} : { ttft }),
-      ...(sequence === Sequence.AgenticTraces
+      ...(scenario === Scenario.AgenticTraces
         ? {
             e2eLatency: getAgenticMetric(row, percentile, 'e2el'),
             date: row.date,
@@ -327,21 +327,21 @@ export function buildGpuGroups<M extends GroupMeta>(
  */
 export function resolveRowPrecisions(
   rows: BenchmarkRow[],
-  sequence: Sequence,
+  scenario: Scenario,
   requested: readonly string[],
   overlayRows: BenchmarkRow[] = [],
 ): string[] {
-  const forSequence = rows.filter((row) => rowToSequence(row) === sequence);
+  const forScenario = rows.filter((row) => rowToScenario(row) === scenario);
   const unofficialPrecisions = overlayRows
-    .filter((row) => rowToSequence(row) === sequence)
+    .filter((row) => rowToScenario(row) === scenario)
     .map((row) => row.precision);
   const available = [
-    ...new Set([...forSequence.map((row) => row.precision), ...unofficialPrecisions]),
+    ...new Set([...forScenario.map((row) => row.precision), ...unofficialPrecisions]),
   ].toSorted();
   return resolveEffectivePrecisions({
     selectedPrecisions: [...requested],
     availablePrecisions: available.length > 0 ? available : ['fp4'],
-    curveCounts: countCurvesByPrecision(forSequence),
+    curveCounts: countCurvesByPrecision(forScenario),
     unofficialPrecisions,
     explicit: requested.length > 0,
   });

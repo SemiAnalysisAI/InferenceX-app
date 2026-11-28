@@ -3,7 +3,7 @@ import {
   baseFramework,
   daysSince,
   imageRowDisplayModel,
-  imageRowSequence,
+  imageRowScenario,
   isActiveImageRow,
 } from './latest-image-utils';
 
@@ -30,7 +30,7 @@ export function matchesImageFilters(row: ImageAgeObservation, filters: ImageFilt
     isActiveImageRow(row) &&
     (filters.model === 'all' || imageRowDisplayModel(row) === filters.model) &&
     (filters.precision === 'all' || row.precision === filters.precision) &&
-    imageRowSequence(row) === filters.sequence &&
+    imageRowScenario(row) === filters.sequence &&
     (filters.spec === 'all' || row.spec_method === filters.spec) &&
     (filters.hardware === 'all' || row.hardware === filters.hardware) &&
     (filters.nodeType === 'all' || (filters.nodeType === 'disagg' ? row.disagg : !row.disagg)) &&

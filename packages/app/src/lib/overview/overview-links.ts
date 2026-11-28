@@ -54,7 +54,7 @@ export function mergeOverviewControlHref(
 import type { UrlStateParams } from '../routing/url-state';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-function overviewSequence(model: OverviewModelSummary): '8k/1k' | 'agentic-traces' {
+function overviewScenario(model: OverviewModelSummary): '8k/1k' | 'agentic-traces' {
   return model.scenario === 'agentx' ? 'agentic-traces' : '8k/1k';
 }
 
@@ -85,7 +85,7 @@ export function buildOverviewDashboardHref(
     g_model: model.model,
     g_rundate: config.latestDate,
     g_runid: soleSourceRun(config)?.id,
-    i_seq: overviewSequence(model),
+    i_seq: overviewScenario(model),
     i_prec: config.precision,
     i_metric: 'y_costh',
     i_gpus: config.hwKey,
@@ -118,7 +118,7 @@ export function buildOverviewHistoryDashboardHref(
     g_model: model.model,
     g_rundate: current.latestDate,
     g_runid: currentRun?.id,
-    i_seq: overviewSequence(model),
+    i_seq: overviewScenario(model),
     i_prec: uniqueValues([current.precision, baseline.precision]),
     i_metric: 'y_costh',
     i_xmode: 'interactivity',
@@ -143,7 +143,7 @@ export function buildOverviewHistoryDashboardHref(
 export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): string {
   const query = new URLSearchParams({
     g_model: model.model,
-    i_seq: overviewSequence(model),
+    i_seq: overviewScenario(model),
     i_metric: 'y_costh',
     i_optimal: '1',
   });

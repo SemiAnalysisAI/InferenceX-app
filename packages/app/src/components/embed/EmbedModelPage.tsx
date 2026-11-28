@@ -19,13 +19,13 @@ export default function EmbedModelPage({
   if (!entry) notFound();
 
   const options = parseEmbedOptions(searchParams);
-  const sequence = options.sequence ?? comparisonScenarioForModel(entry).sequence;
+  const scenario = options.sequence ?? comparisonScenarioForModel(entry).sequence;
 
   return (
     <EmbedFrame theme={options.theme} skin={options.skin}>
       <EmbeddedModelDashboard
         displayName={entry.displayName}
-        sequence={sequence}
+        sequence={scenario}
         yAxisMetric={options.yAxisMetric}
         chipBasis={options.chipBasis}
         lockedFrameworks={options.frameworks.length > 0 ? options.frameworks : undefined}

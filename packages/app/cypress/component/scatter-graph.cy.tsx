@@ -26,7 +26,7 @@ import {
   createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
-import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Precision, Scenario } from '@/lib/catalog/data-mappings';
 import { buildExclusion, resolveExclusionGroups } from '@/lib/benchmarks/exclusion';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
@@ -605,7 +605,7 @@ describe('ScatterGraph', () => {
         {
           inference: {
             selectedModel: Model.Qwen3_5,
-            selectedSequence: Sequence.AgenticTraces,
+            selectedScenario: Scenario.AgenticTraces,
             selectedRunId: '33219708211',
             selectedPrecisions: [Precision.FP4],
             activeHwTypes: new Set(['gb300_dynamo-trt']),
@@ -855,7 +855,7 @@ describe('ScatterGraph', () => {
         activeHwTypes,
         hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
         selectedModel,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedPrecisions: [Precision.FP4],
       };
 
@@ -959,7 +959,7 @@ describe('ScatterGraph', () => {
         hwTypesWithData: new Set(visibleOfficialKeys),
         loading: secondScope && !secondScopeLoaded,
         selectedModel: model,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedPrecisions: [Precision.FP4],
       };
       const unofficial = {
@@ -1598,7 +1598,7 @@ describe('ScatterGraph', () => {
           activeHwTypes: new Set(['b200_sglang']),
           hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
           selectedModel: Model.DeepSeek_V4_Pro,
-          selectedSequence: Sequence.AgenticTraces,
+          selectedScenario: Scenario.AgenticTraces,
           selectedPrecisions: [Precision.FP4],
           showLineLabels: true,
           resolveComparisonSelection: (proposed, prev = new Set()) =>
@@ -1675,7 +1675,7 @@ describe('ScatterGraph', () => {
           activeHwTypes: new Set(['b200_sglang', 'h100_vllm']),
           hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
           selectedModel: Model.DeepSeek_V4_Pro,
-          selectedSequence: Sequence.AgenticTraces,
+          selectedScenario: Scenario.AgenticTraces,
           selectedPrecisions: [Precision.FP4],
         },
         unofficial: {
@@ -1757,7 +1757,7 @@ describe('ScatterGraph', () => {
           activeHwTypes: new Set(['b200_vllm']),
           hwTypesWithData: new Set(['b200_vllm']),
           selectedModel: Model.DeepSeek_V4_Pro,
-          selectedSequence: Sequence.AgenticTraces,
+          selectedScenario: Scenario.AgenticTraces,
           selectedPrecisions: [Precision.FP4],
           showLineLabels: true,
           resolveComparisonSelection: (proposed, prev = new Set()) =>
@@ -1833,7 +1833,7 @@ describe('ScatterGraph', () => {
         activeHwTypes: new Set(['b200_sglang']),
         hwTypesWithData: new Set(['b200_sglang']),
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedPrecisions: [Precision.FP4],
       },
       unofficial: {
@@ -1881,7 +1881,7 @@ describe('ScatterGraph', () => {
         activeHwTypes: new Set(['b200_sglang', 'h100_vllm']),
         hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedPrecisions: [Precision.FP4],
         selectedYAxisMetric: yMetric,
       };
@@ -1980,7 +1980,7 @@ describe('ChartDisplay modeled power disclosures', () => {
             graphs: [
               {
                 model: Model.Qwen3_5,
-                sequence: Sequence.EightK_OneK,
+                sequence: Scenario.EightK_OneK,
                 chartDefinition: chartDefinitions[0],
                 data: [point],
               },
@@ -2091,19 +2091,19 @@ describe('ChartDisplay responsive status notes', () => {
           </PathnameContext.Provider>,
           {
             inference: {
-              selectedSequence: Sequence.AgenticTraces,
+              selectedScenario: Scenario.AgenticTraces,
               graphs: [
                 {
                   model: Model.DeepSeek_R1,
-                  sequence: Sequence.AgenticTraces,
+                  sequence: Scenario.AgenticTraces,
                   chartDefinition: defaultChartDef,
                   data: [point],
                 },
               ],
             },
             globalFilters: {
-              selectedSequence: Sequence.AgenticTraces,
-              effectiveSequence: Sequence.AgenticTraces,
+              selectedScenario: Scenario.AgenticTraces,
+              effectiveScenario: Scenario.AgenticTraces,
             },
             unofficial: {},
           },
@@ -2185,7 +2185,7 @@ describe('ChartDisplay responsive status notes', () => {
         graphs: [
           {
             model: Model.DeepSeek_R1,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition: defaultChartDef,
             data: [createMockInferenceData({ framework: 'atom' })],
           },
@@ -2204,7 +2204,7 @@ describe('ChartDisplay responsive status notes', () => {
         graphs: [
           {
             model: Model.DeepSeek_R1,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition: defaultChartDef,
             data: [
               createMockInferenceData(),
@@ -2237,7 +2237,7 @@ describe('ChartDisplay responsive status notes', () => {
             graphs: [
               {
                 model: Model.DeepSeek_R1,
-                sequence: Sequence.AgenticTraces,
+                sequence: Scenario.AgenticTraces,
                 chartDefinition: defaultChartDef,
                 data: [createMockInferenceData({ framework: 'atom' })],
               },
@@ -2330,7 +2330,7 @@ describe('ChartDisplay engine comparison guard', () => {
         graphs: [
           {
             model: Model.DeepSeek_R1,
-            sequence: Sequence.EightK_OneK,
+            sequence: Scenario.EightK_OneK,
             chartDefinition,
             data: [officialVisible],
             clippedData: [{ point: officialClipped, reasons: ['cost'] }],
@@ -2343,8 +2343,8 @@ describe('ChartDisplay engine comparison guard', () => {
       },
       globalFilters: {
         selectedModel: Model.DeepSeek_R1,
-        selectedSequence: Sequence.EightK_OneK,
-        effectiveSequence: Sequence.EightK_OneK,
+        selectedScenario: Scenario.EightK_OneK,
+        effectiveScenario: Scenario.EightK_OneK,
       },
       unofficial: {
         isUnofficialRun: true,
@@ -2399,13 +2399,13 @@ describe('ChartDisplay engine comparison guard', () => {
         graphs: [
           {
             model,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition,
             data: rows,
           },
         ],
         selectedModel: model,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedXAxisMode: 'interactivity' as const,
         activeHwTypes: activeKeys,
         hwTypesWithData: new Set(rows.map((row) => String(row.hwKey))),
@@ -2413,8 +2413,8 @@ describe('ChartDisplay engine comparison guard', () => {
       const globalFilters = {
         ...baseGlobalFilters,
         selectedModel: model,
-        selectedSequence: Sequence.AgenticTraces,
-        effectiveSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
+        effectiveScenario: Scenario.AgenticTraces,
       };
 
       return (
@@ -2478,21 +2478,21 @@ describe('ChartDisplay engine comparison guard', () => {
         graphs: [
           {
             model: Model.DeepSeek_V4_Pro,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition,
             data: [row],
           },
         ],
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedXAxisMode: 'interactivity',
         activeHwTypes: new Set(['b200_sglang']),
         hwTypesWithData: new Set(['b200_sglang']),
       },
       globalFilters: {
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
-        effectiveSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
+        effectiveScenario: Scenario.AgenticTraces,
       },
       unofficial: {},
     });
@@ -2536,13 +2536,13 @@ describe('ChartDisplay engine comparison guard', () => {
         graphs: [
           {
             model: Model.DeepSeek_V4_Pro,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition,
             data: [sglangRow, vllmRow],
           },
         ],
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedXAxisMode: 'interactivity',
         activeHwTypes: new Set(['b200_sglang']),
         hwTypesWithData: new Set(['b200_sglang', 'b200_vllm']),
@@ -2550,8 +2550,8 @@ describe('ChartDisplay engine comparison guard', () => {
       },
       globalFilters: {
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
-        effectiveSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
+        effectiveScenario: Scenario.AgenticTraces,
       },
       unofficial: {},
     });
@@ -2610,13 +2610,13 @@ describe('ChartDisplay engine comparison guard', () => {
         graphs: [
           {
             model: Model.DeepSeek_V4_Pro,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition,
             data: [sglangRow],
           },
         ],
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedXAxisMode: 'interactivity',
         activeHwTypes: new Set(['b200_sglang']),
         hwTypesWithData: new Set(['b200_sglang']),
@@ -2624,8 +2624,8 @@ describe('ChartDisplay engine comparison guard', () => {
       },
       globalFilters: {
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
-        effectiveSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
+        effectiveScenario: Scenario.AgenticTraces,
       },
       unofficial: {
         isUnofficialRun: true,
@@ -2661,21 +2661,21 @@ describe('ChartDisplay engine comparison guard', () => {
         graphs: [
           {
             model: Model.DeepSeek_V4_Pro,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition,
             data: [row],
           },
         ],
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedXAxisMode: 'interactivity',
         activeHwTypes: new Set(['b200_sglang']),
         hwTypesWithData: new Set(['b200_sglang']),
       },
       globalFilters: {
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.AgenticTraces,
-        effectiveSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
+        effectiveScenario: Scenario.AgenticTraces,
       },
       unofficial: { isUnofficialRun: true, localOfficialOverride: new Set() },
     });
@@ -2728,7 +2728,7 @@ describe('ChartDisplay engine comparison guard', () => {
         activeOverlayHwTypes: new Set(['h100_sglang']),
         availableOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang', 'b200_vllm']),
         localOfficialOverride: null,
-        scopeKey: `${Model.DeepSeek_V4_Pro}|${Sequence.AgenticTraces}|${Precision.FP4}|${runInfo.url}|official:b200_sglang|overlay:h100_sglang,h200_sglang`,
+        scopeKey: `${Model.DeepSeek_V4_Pro}|${Scenario.AgenticTraces}|${Precision.FP4}|${runInfo.url}|official:b200_sglang|overlay:h100_sglang,h200_sglang`,
         scopeOverlayHwTypes: new Set(['h100_sglang', 'h200_sglang']),
         scopeReady: true,
         bestSelectionKey: '',
@@ -2765,14 +2765,14 @@ describe('ChartDisplay engine comparison guard', () => {
         graphs: [
           {
             model,
-            sequence: Sequence.AgenticTraces,
+            sequence: Scenario.AgenticTraces,
             chartDefinition,
             data: officialRows,
           },
         ],
         loading: secondScope && !secondScopeLoaded,
         selectedModel: model,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
         selectedXAxisMode: 'interactivity' as const,
         selectedXAxisMetric: 'p90_ttft',
         bestPerSku: false,
@@ -2783,8 +2783,8 @@ describe('ChartDisplay engine comparison guard', () => {
       const globalFilters = {
         ...baseGlobalFilters,
         selectedModel: model,
-        selectedSequence: Sequence.AgenticTraces,
-        effectiveSequence: Sequence.AgenticTraces,
+        selectedScenario: Scenario.AgenticTraces,
+        effectiveScenario: Scenario.AgenticTraces,
       };
       const unofficial = {
         ...baseUnofficial,
@@ -3378,7 +3378,7 @@ describe('Power envelopes', () => {
           hideNonOptimal: optimal,
           setHideNonOptimal: setOptimal,
           selectedModel: Model.Qwen3_5,
-          selectedSequence: Sequence.EightK_OneK,
+          selectedScenario: Scenario.EightK_OneK,
           selectedPrecisions: [Precision.FP8],
           hardwareConfig: hwConfig,
           activeHwTypes: new Set(['h100']),

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, mock } from 'bun:test'
 import type { AvailabilityRow } from '@/lib/api/api';
 import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Precision, Scenario } from '@/lib/catalog/data-mappings';
 
 const indexRows = (rows: readonly object[]) =>
   indexAvailability(compactAvailability(rows as AvailabilityRow[]));
@@ -72,7 +72,7 @@ mock.module('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: mocks.getUrlParam, setUrlParams: mocks.setUrlParams }),
 }));
 mock.module('@/providers/unofficial-run-provider', () => ({
-  useUnofficialRun: () => ({ availableModelsAndSequences: mocks.unofficialAvailable }),
+  useUnofficialRun: () => ({ availableModelsAndScenarios: mocks.unofficialAvailable }),
 }));
 
 import {
@@ -147,7 +147,7 @@ function ProviderHarness({
     <GlobalFilterProvider
       initialModel={initialModel}
       initialRunDate={initialRunDate}
-      initialSequence={Sequence.EightK_OneK}
+      initialScenario={Scenario.EightK_OneK}
       initialPrecisions={[Precision.FP4]}
     >
       <SelectionProbe />
@@ -299,7 +299,7 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(actionSnapshots).toHaveLength(2);
     expect(actionSnapshots[1]).toBe(initialActions);
     expect(actionSnapshots[1].setSelectedModel).toBe(initialActions.setSelectedModel);
-    expect(actionSnapshots[1].setSelectedSequence).toBe(initialActions.setSelectedSequence);
+    expect(actionSnapshots[1].setSelectedScenario).toBe(initialActions.setSelectedScenario);
     expect(actionSnapshots[1].setSelectedPrecisions).toBe(initialActions.setSelectedPrecisions);
     expect(actionSnapshots[1].setSelectedRunDate).toBe(initialActions.setSelectedRunDate);
     expect(actionSnapshots[1].setSelectedRunId).toBe(initialActions.setSelectedRunId);
@@ -342,21 +342,21 @@ describe('GlobalFilterProvider context isolation', () => {
 
   it('offers Muse from an unofficial AgentX run without a special selector exception', () => {
     mocks.unofficialAvailable = [
-      { model: Model.Muse_Spark_Open, sequence: Sequence.AgenticTraces, precision: Precision.FP4 },
+      { model: Model.Muse_Spark_Open, sequence: Scenario.AgenticTraces, precision: Precision.FP4 },
     ];
     mountProvider();
     act(() => selectModel?.(Model.Muse_Spark_Open));
 
     expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
-    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
-    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
-    expect(selectionSnapshot?.sequenceResolved).toBe(true);
+    expect(availabilitySnapshot?.availableScenarios).toEqual([Scenario.AgenticTraces]);
+    expect(selectionSnapshot?.effectiveScenario).toBe(Scenario.AgenticTraces);
+    expect(selectionSnapshot?.scenarioResolved).toBe(true);
   });
 
   it('keeps the no-data Muse sequence fallback AgentX-only', () => {
     mountProvider();
     act(() => selectModel?.(Model.Muse_Spark_Open));
-    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+    expect(availabilitySnapshot?.availableScenarios).toEqual([Scenario.AgenticTraces]);
   });
 
   it('keeps Flash out of shared selectors while availability is loading or failed', () => {
@@ -370,9 +370,9 @@ describe('GlobalFilterProvider context isolation', () => {
     });
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
     act(() => selectModel?.(Model.GLM_5_3_Flash));
-    expect(availabilitySnapshot?.availableSequences).toEqual([
-      Sequence.EightK_OneK,
-      Sequence.AgenticTraces,
+    expect(availabilitySnapshot?.availableScenarios).toEqual([
+      Scenario.EightK_OneK,
+      Scenario.AgenticTraces,
     ]);
   });
 
@@ -392,19 +392,19 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_2);
   });
 
-  it.each([Sequence.EightK_OneK, Sequence.AgenticTraces])(
+  it.each([Scenario.EightK_OneK, Scenario.AgenticTraces])(
     'offers an unofficial Flash %s run while published availability is still loading',
-    (sequence) => {
+    (scenario) => {
       mocks.featureGateUnlocked = true;
       mocks.availability.data = undefined;
       mocks.unofficialAvailable = [
-        { model: Model.GLM_5_3_Flash, sequence, precision: Precision.FP8 },
+        { model: Model.GLM_5_3_Flash, sequence: scenario, precision: Precision.FP8 },
       ];
       mountProvider();
       act(() => selectModel?.(Model.GLM_5_3_Flash));
       expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
-      expect(availabilitySnapshot?.availableSequences).toEqual([sequence]);
-      expect(selectionSnapshot?.effectiveSequence).toBe(sequence);
+      expect(availabilitySnapshot?.availableScenarios).toEqual([scenario]);
+      expect(selectionSnapshot?.effectiveScenario).toBe(scenario);
     },
   );
 
@@ -413,7 +413,7 @@ describe('GlobalFilterProvider context isolation', () => {
       { model: 'glm5.3flash', precision: 'fp8', sequence: 'agentic-traces' },
     ]);
     mocks.unofficialAvailable = [
-      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
+      { model: Model.GLM_5_3_Flash, sequence: Scenario.AgenticTraces, precision: Precision.FP8 },
     ];
     mountProvider();
     act(() => selectModel?.(Model.GLM_5_3_Flash));
@@ -424,7 +424,7 @@ describe('GlobalFilterProvider context isolation', () => {
   it('removes the active Flash selection and availability immediately on relock', () => {
     mocks.featureGateUnlocked = true;
     mocks.unofficialAvailable = [
-      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
+      { model: Model.GLM_5_3_Flash, sequence: Scenario.AgenticTraces, precision: Precision.FP8 },
     ];
     mountProvider();
     act(() => selectModel?.(Model.GLM_5_3_Flash));
@@ -439,7 +439,7 @@ describe('GlobalFilterProvider context isolation', () => {
 
   it('auto-selects a previously locked unofficial Flash run when the gate is enabled', () => {
     mocks.unofficialAvailable = [
-      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
+      { model: Model.GLM_5_3_Flash, sequence: Scenario.AgenticTraces, precision: Precision.FP8 },
     ];
     mountProvider();
     expect(selectionSnapshot?.selectedModel).not.toBe(Model.GLM_5_3_Flash);
@@ -448,6 +448,6 @@ describe('GlobalFilterProvider context isolation', () => {
       rerenderProvider?.();
     });
     expect(selectionSnapshot?.selectedModel).toBe(Model.GLM_5_3_Flash);
-    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
+    expect(selectionSnapshot?.effectiveScenario).toBe(Scenario.AgenticTraces);
   });
 });

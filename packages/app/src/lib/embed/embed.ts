@@ -2,9 +2,9 @@ import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { isKnownGpu } from '@/lib/catalog/constants';
 import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
-import { toSequence } from '@/lib/compare/compare-enum-coerce';
-import { sequenceForScenarioSegment } from '@/lib/compare/compare-scenario-route';
-import type { Sequence } from '@/lib/catalog/data-mappings';
+import { toScenario } from '@/lib/compare/compare-enum-coerce';
+import { scenarioForSegment } from '@/lib/compare/compare-scenario-route';
+import type { Scenario } from '@/lib/catalog/data-mappings';
 import { APP_THEMES } from '@/lib/themes/themes';
 
 export {
@@ -39,7 +39,7 @@ export interface EmbedOptions {
   frameworks: string[];
   theme: EmbedTheme;
   skin: EmbedSkin | undefined;
-  sequence: Sequence | undefined;
+  sequence: Scenario | undefined;
   yAxisMetric: string;
   /** Disaggregated throughput denominator; `chips` or the dashboard's `g_chips`. */
   chipBasis: ChipBasis;
@@ -76,8 +76,8 @@ export function parseEmbedOptions(
     parsedTheme.skin ?? (rawSkin && SKIN_KEYS.has(rawSkin) ? (rawSkin as EmbedSkin) : undefined);
 
   const rawScenario = first(searchParams.scenario) ?? first(searchParams.i_seq);
-  const sequence = rawScenario
-    ? (sequenceForScenarioSegment(rawScenario) ?? toSequence(rawScenario))
+  const scenario = rawScenario
+    ? (scenarioForSegment(rawScenario) ?? toScenario(rawScenario))
     : undefined;
 
   const rawMetric = first(searchParams.metric) ?? first(searchParams.i_metric);
@@ -97,7 +97,7 @@ export function parseEmbedOptions(
     ),
   ];
 
-  return { frameworks, theme, skin, sequence, yAxisMetric, chipBasis, hwTypes };
+  return { frameworks, theme, skin, sequence: scenario, yAxisMetric, chipBasis, hwTypes };
 }
 
 export const EMBED_RESIZE_MESSAGE_TYPE = 'inferencex:embed-resize';

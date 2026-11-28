@@ -1,6 +1,6 @@
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import { fetchOpenRouterPricing } from '@/lib/calculator/openrouter-pricing.server';
-import { getOpenRouterModelId, type Model, Sequence } from '@/lib/catalog/data-mappings';
+import { getOpenRouterModelId, type Model, Scenario } from '@/lib/catalog/data-mappings';
 import {
   validateParams as validateViewParams,
   matchesHardware,
@@ -22,7 +22,7 @@ import {
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
-import { rowToSequence, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { rowToScenario, scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
@@ -114,7 +114,7 @@ export function GET(request: NextRequest) {
     const search = request.nextUrl.searchParams;
 
     const { displayName, dbModelKeys } = resolveModelParam(search.get('model'));
-    const sequence = parseSequenceParam(search.get('sequence'), Sequence.EightK_OneK);
+    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
     const metricConfigKey = parseMetricParam(search.get('metric'));
     const target = parseNumberParam(search.get('target'), 'target', DEFAULT_TARGET_INTERACTIVITY, {
       min: 1,
@@ -170,11 +170,11 @@ export function GET(request: NextRequest) {
         ? await fetchOpenRouterPricing(pricingId!)
         : NORMALIZED_TOKEN_REVENUE_PRICING;
 
-    const isAgentic = sequence === Sequence.AgenticTraces;
+    const isAgentic = scenario === Scenario.AgenticTraces;
     const interactivity = historicalInteractivityAxis(isAgentic);
-    const islOsl = sequenceToIslOsl(sequence);
+    const islOsl = scenarioToIslOsl(scenario);
     const allRows: BenchmarkRow[] = FIXTURES_MODE
-      ? loadFixture<BenchmarkRow[]>('benchmarks').filter((row) => rowToSequence(row) === sequence)
+      ? loadFixture<BenchmarkRow[]>('benchmarks').filter((row) => rowToScenario(row) === scenario)
       : isAgentic
         ? await getCachedAgenticBenchmarkHistory([...dbModelKeys])
         : await getCachedBenchmarkHistory([...dbModelKeys], islOsl?.isl ?? 0, islOsl?.osl ?? 0);
@@ -250,7 +250,7 @@ export function GET(request: NextRequest) {
       };
       const params = {
         model: displayName,
-        sequence: sequence as string,
+        sequence: scenario as string,
         metric: metricConfigKey,
         precisions: resolvedPrecisions,
         gpus,
@@ -452,7 +452,7 @@ export function GET(request: NextRequest) {
 
     const resolvedParams = {
       model: displayName,
-      sequence: sequence as string,
+      sequence: scenario as string,
       metric: metricConfigKey,
       target,
       precisions: resolvedPrecisions,

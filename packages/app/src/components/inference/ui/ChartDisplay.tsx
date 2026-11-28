@@ -107,13 +107,13 @@ import {
 import {
   type Model,
   type Precision,
-  Sequence,
+  Scenario,
   getModelLabel,
   getPrecisionLabel,
-  getSequenceLabel,
+  getScenarioLabel,
   isModelDeprecated,
   isRegisteredModel,
-  sequenceKind,
+  scenarioKind,
 } from '@/lib/catalog/data-mappings';
 import {
   shouldFetchComparisonChangelogs,
@@ -334,7 +334,7 @@ export default function ChartDisplay({
     selectedDates,
     selectedDateRange,
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedRunDate,
     activeHwTypes,
     bestPerSku,
@@ -420,9 +420,9 @@ export default function ChartDisplay({
   const isPowerTimeline =
     selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
-    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
+    selectedScenario === Scenario.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =
-    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
+    selectedScenario === Scenario.AgenticTraces ? 'agentic_traces' : undefined;
 
   const [changelogOpened, setChangelogOpened] = useState(false);
   const changelogsEnabled = shouldFetchComparisonChangelogs({
@@ -546,14 +546,14 @@ export default function ChartDisplay({
     const overlayTokenBasis = tokenBasisForMetric(selectedYAxisMetric, tokenBasis);
     const e2eRaw = getOverlayData(
       selectedModel,
-      selectedSequence,
+      selectedScenario,
       'e2e',
       overlayTokenBasis,
       chipBasis,
     );
     const interactivityRaw = getOverlayData(
       selectedModel,
-      selectedSequence,
+      selectedScenario,
       'interactivity',
       overlayTokenBasis,
       chipBasis,
@@ -581,7 +581,7 @@ export default function ChartDisplay({
       if (!rawData || rawData.data.length === 0) return null;
 
       const effectiveXMetric = chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
-      const isAgentic = sequenceKind(selectedSequence) === 'agentic';
+      const isAgentic = scenarioKind(selectedScenario) === 'agentic';
       const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
       const pricedData = usesTokenSalePricing(selectedYAxisMetric)
         ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
@@ -653,7 +653,7 @@ export default function ChartDisplay({
     runIndexByUrl,
     getOverlayData,
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedYAxisMetric,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
@@ -750,7 +750,7 @@ export default function ChartDisplay({
     selectedYAxisMetric,
     selectedPrecisions,
   ]);
-  const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
+  const overlayRowsScopeKey = `${selectedModel}|${selectedScenario}|${selectedPrecisions.join(
     ',',
   )}|${unofficialRunInfos.map((run) => run.url).join(',')}|official:${[...officialScope]
     .toSorted()
@@ -855,13 +855,13 @@ export default function ChartDisplay({
     if (!hasOverlay) return graphs;
     return (chartDefinitions as ChartDefinition[]).map((chartDefinition) => ({
       model: selectedModel,
-      sequence: selectedSequence,
+      sequence: selectedScenario,
       chartDefinition,
       data: [] as InferenceData[],
       clippedData: [],
       tableData: undefined,
     }));
-  }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
+  }, [graphs, overlayDataByChartType, selectedModel, selectedScenario]);
 
   const visibleGraphs = useMemo(() => {
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
@@ -869,9 +869,9 @@ export default function ChartDisplay({
     return filtered.length > 0 ? filtered : effectiveGraphs;
   }, [effectiveGraphs, selectedXAxisMode]);
 
-  const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
+  const isAgenticScenario = scenarioKind(selectedScenario) === 'agentic';
   const residentPointIds = useMemo(() => {
-    if (!isAgenticSequence) return [] as number[];
+    if (!isAgenticScenario) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
       const points = graph.tableData ?? [
@@ -889,19 +889,19 @@ export default function ChartDisplay({
       }
     }
     return [...ids];
-  }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
+  }, [isAgenticScenario, selectedPrecisions, visibleGraphs]);
   // PowerX drops the ISL/OSL footer line, so it never asks for the sketches either. The overlay
   // gate uses the requested flag: official chart data can land before the overlay run's.
   const residentSequenceLengthsQuery = useResidentSequenceLengths(
     residentPointIds,
-    isAgenticSequence && !isUnofficialRunRequested && !powerXSurface,
+    isAgenticScenario && !isUnofficialRunRequested && !powerXSurface,
   );
   const residentSequenceLengths =
     residentSequenceLengthsQuery.data?.coveredPoints ===
     residentSequenceLengthsQuery.data?.requestedPoints
       ? residentSequenceLengthsQuery.data
       : null;
-  const useDerivedXAxis = isAgenticSequence && isAgenticOnlyXAxisMode(selectedXAxisMode);
+  const useDerivedXAxis = isAgenticScenario && isAgenticOnlyXAxisMode(selectedXAxisMode);
   const derivedTargetIds = useMemo(() => {
     if (!useDerivedXAxis) return [] as number[];
     const ids = new Set<number>();
@@ -918,7 +918,7 @@ export default function ChartDisplay({
     }
     return [...ids];
   }, [useDerivedXAxis, visibleGraphs]);
-  const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, isAgenticSequence);
+  const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, isAgenticScenario);
   const derivedMetrics = derivedQuery.data;
   const isDerivedXAxisLoading =
     useDerivedXAxis &&
@@ -928,7 +928,7 @@ export default function ChartDisplay({
   const derivedSpec = useDerivedXAxis ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
 
   const renderableGraphs = useMemo(() => {
-    if (!isAgenticSequence) return visibleGraphs;
+    if (!isAgenticScenario) return visibleGraphs;
     if (!derivedMetrics) {
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
       return visibleGraphs.map((graph) => ({
@@ -981,7 +981,7 @@ export default function ChartDisplay({
       return { ...graph, chartDefinition, data, clippedData, tableData };
     });
   }, [
-    isAgenticSequence,
+    isAgenticScenario,
     derivedSpec,
     derivedTargetIds.length,
     selectedXAxisMode,
@@ -1037,7 +1037,7 @@ export default function ChartDisplay({
         chartId={`chart-${graphIndex}`}
         analyticsContext={selectionAnalyticsContext({
           model: selectedModel,
-          sequence: selectedSequence,
+          sequence: selectedScenario,
           precisions: selectedPrecisions,
           gpuCount: selectedOfficialHwTypes.size,
         })}
@@ -1270,12 +1270,12 @@ export default function ChartDisplay({
                                   {t.unregisteredModel}
                                 </span>
                               )}
-                              {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
+                              {getScenarioLabel(graph.sequence as Scenario, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}
                               <HeadingQualifier>
                                 {(() => {
                                   if (isPowerTimeline) return null;
-                                  if (!isAgenticSequence) {
+                                  if (!isAgenticScenario) {
                                     const heading = String(graph.chartDefinition.heading);
                                     return locale === 'zh' ? zhHeading(heading) : heading;
                                   }
@@ -1296,7 +1296,7 @@ export default function ChartDisplay({
                                           : modeSpec.heading;
                                       return heading(selectedPercentile.toUpperCase());
                                     }
-                                    return isAgenticSequence
+                                    return isAgenticScenario
                                       ? t.vsE2eLatency(selectedPercentile.toUpperCase())
                                       : t.vsE2eLatency();
                                   }
@@ -1402,7 +1402,7 @@ export default function ChartDisplay({
                               usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing
                                 ? t.revenuePrices(
                                     formatTokenPriceLabel(tokenRevenuePricing.inputPerMillion),
-                                    graph.sequence === Sequence.AgenticTraces
+                                    graph.sequence === Scenario.AgenticTraces
                                       ? formatTokenPriceLabel(
                                           cachedInputPricePerMillion(tokenRevenuePricing),
                                         )
@@ -1488,7 +1488,7 @@ export default function ChartDisplay({
                                           {ALL_IN_MEASURED_NOTE[locale]}{' '}
                                         </span>
                                       )}
-                                    {isAgenticSequence &&
+                                    {isAgenticScenario &&
                                       (selectedPowerBasis === 'utility-modeled' ||
                                         powerCompare === 'boundaries' ||
                                         powerCompare === 'all') && (
@@ -1624,7 +1624,7 @@ export default function ChartDisplay({
                             <PowerXHeadroomTable
                               points={officialRows}
                               overlayPoints={overlayRows}
-                              contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
+                              contextLabel={`${getModelLabel(selectedModel)} · ${getScenarioLabel(selectedScenario)}`}
                             />
                           </>
                         );
@@ -1664,7 +1664,7 @@ export default function ChartDisplay({
                             )}
                             <PowerAnalysisPanels
                               chartId={`chart-${graphIndex}`}
-                              contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
+                              contextLabel={`${getModelLabel(selectedModel)} · ${getScenarioLabel(selectedScenario)}`}
                               data={[...officialRows, ...overlayRows]}
                               overlayData={overlayRows}
                               xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
@@ -1767,7 +1767,7 @@ export default function ChartDisplay({
                   selectedGPUs={selectedGPUs}
                   selectedPrecisions={selectedPrecisions}
                   modelDbKeys={modelDbKeys}
-                  selectedSequence={selectedSequence}
+                  selectedScenario={selectedScenario}
                   defaultExpanded={!embedded}
                   loading={changelogsLoading}
                   deferred={!changelogsEnabled}

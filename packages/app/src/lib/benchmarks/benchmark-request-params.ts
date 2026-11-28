@@ -1,4 +1,4 @@
-import { isSequenceKey } from '@semianalysisai/inferencex-constants';
+import { isScenarioKey } from '@semianalysisai/inferencex-constants';
 
 import {
   parsePowerValidityFilter,
@@ -113,7 +113,7 @@ export function parseBenchmarkRequest(search: URLSearchParams): BenchmarkRequest
   const view = viewParam ?? undefined;
 
   const sequence = search.get('sequence') ?? '';
-  if (view === 'calculator' && !isSequenceKey(sequence)) {
+  if (view === 'calculator' && !isScenarioKey(sequence)) {
     return fail(BENCHMARK_REQUEST_ERRORS.unknownSequence);
   }
 

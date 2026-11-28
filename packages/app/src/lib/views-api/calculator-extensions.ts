@@ -20,7 +20,7 @@ import type { TokenRevenuePricing } from '@/components/inference/types';
 import { fetchOpenRouterPricing } from '@/lib/calculator/openrouter-pricing.server';
 import { cachedJson } from '@/lib/cache/api-cache';
 import { getGpuSpecs } from '@/lib/catalog/constants';
-import { getOpenRouterModelId, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { getOpenRouterModelId, Scenario, type Model } from '@/lib/catalog/data-mappings';
 import { POWER_BASIS_LABELS } from '@/lib/power/power-basis';
 import type { NextRequest } from 'next/server';
 import { runViewsRoute, ViewsApiParamError } from './errors';
@@ -50,7 +50,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       view === 'first-token'
         ? { ...selection(search), chipBasis: parseChipBasisParam(search.get('chipBasis')) }
         : selection(search);
-    if (view !== 'first-token' && params.sequence !== Sequence.AgenticTraces)
+    if (view !== 'first-token' && params.sequence !== Scenario.AgenticTraces)
       throw new ViewsApiParamError('sequence', 'This view requires agentic-traces', [
         'agentic-traces',
       ]);
@@ -78,7 +78,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       const minInteractivity = parseNumberParam(
         search.get('minInteractivity'),
         'minInteractivity',
-        params.sequence === Sequence.AgenticTraces ? 150 : 35,
+        params.sequence === Scenario.AgenticTraces ? 150 : 35,
         { min: 0 },
       );
       const costProvider = parseCostProviderParam(search.get('costProvider'));

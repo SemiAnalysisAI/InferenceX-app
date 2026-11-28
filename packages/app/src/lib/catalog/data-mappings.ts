@@ -10,9 +10,9 @@ import {
   type PrecisionEntry,
   type PrecisionKey,
   type ScenarioKind,
-  SEQUENCE_REGISTRY,
-  type SequenceEntry,
-  type SequenceKey,
+  SCENARIO_REGISTRY,
+  type ScenarioEntry,
+  type ScenarioKey,
 } from '@semianalysisai/inferencex-constants';
 
 import type { ExclusionConflictPolicy, ExclusionSpec } from '../benchmarks/exclusion';
@@ -190,67 +190,67 @@ const MODEL_PREFIXES_LONGEST_FIRST = Object.keys(MODEL_PREFIX_MAPPING).toSorted(
   (a, b) => b.length - a.length,
 );
 
-export enum Sequence {
+export enum Scenario {
   OneK_OneK = '1k/1k',
   OneK_EightK = '1k/8k',
   EightK_OneK = '8k/1k',
   AgenticTraces = 'agentic-traces',
 }
 
-const SEQUENCE_CONFIG: EnumKeyed<Sequence, SequenceKey, SequenceEntry> = SEQUENCE_REGISTRY;
+const SCENARIO_CONFIG: EnumKeyed<Scenario, ScenarioKey, ScenarioEntry> = SCENARIO_REGISTRY;
 
-export function sequenceKind(seq: Sequence): ScenarioKind {
-  return SEQUENCE_CONFIG[seq].kind;
+export function scenarioKind(scenario: Scenario): ScenarioKind {
+  return SCENARIO_CONFIG[scenario].kind;
 }
 
-interface SequenceExclusionConfig {
+interface ScenarioExclusionConfig {
   exclusion: ExclusionSpec[];
   exclusionPolicy: ExclusionConflictPolicy;
   defaultExclusionGroup: string;
   exclusionFamilies: readonly string[];
 }
 
-const GUARDED_ENGINE_EXCLUSION: SequenceExclusionConfig = {
+const GUARDED_ENGINE_EXCLUSION: ScenarioExclusionConfig = {
   exclusion: STP_ENGINE_EXCLUSION,
   exclusionPolicy: 'keep-sticky',
   defaultExclusionGroup: 'vllm',
   exclusionFamilies: GUARDED_ENGINE_FAMILIES,
 };
 
-const SEQUENCE_EXCLUSIONS: Partial<Record<Sequence, SequenceExclusionConfig>> = {
-  [Sequence.EightK_OneK]: GUARDED_ENGINE_EXCLUSION,
-  [Sequence.AgenticTraces]: GUARDED_ENGINE_EXCLUSION,
+const SCENARIO_EXCLUSIONS: Partial<Record<Scenario, ScenarioExclusionConfig>> = {
+  [Scenario.EightK_OneK]: GUARDED_ENGINE_EXCLUSION,
+  [Scenario.AgenticTraces]: GUARDED_ENGINE_EXCLUSION,
 };
 
-export function getSequenceExclusion(
-  sequence: Sequence | string | null | undefined,
+export function getScenarioExclusion(
+  scenario: Scenario | string | null | undefined,
 ): ExclusionSpec[] {
-  if (!sequence) return [];
-  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.exclusion ?? [];
+  if (!scenario) return [];
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.exclusion ?? [];
 }
 
-export function getSequenceExclusionPolicy(
-  sequence: Sequence | string | null | undefined,
+export function getScenarioExclusionPolicy(
+  scenario: Scenario | string | null | undefined,
 ): ExclusionConflictPolicy {
-  if (!sequence) return 'clear-all';
-  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.exclusionPolicy ?? 'clear-all';
+  if (!scenario) return 'clear-all';
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.exclusionPolicy ?? 'clear-all';
 }
 
-export function getSequenceDefaultExclusionGroup(
-  sequence: Sequence | string | null | undefined,
+export function getScenarioDefaultExclusionGroup(
+  scenario: Scenario | string | null | undefined,
 ): string | null {
-  if (!sequence) return null;
-  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.defaultExclusionGroup ?? null;
+  if (!scenario) return null;
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.defaultExclusionGroup ?? null;
 }
 
-export function getSequenceExclusionFamilies(
-  sequence: Sequence | string | null | undefined,
+export function getScenarioExclusionFamilies(
+  scenario: Scenario | string | null | undefined,
 ): readonly string[] | null {
-  if (!sequence) return null;
-  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.exclusionFamilies ?? null;
+  if (!scenario) return null;
+  return SCENARIO_EXCLUSIONS[scenario as Scenario]?.exclusionFamilies ?? null;
 }
 
-export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
+export const SCENARIO_OPTIONS = Object.keys(SCENARIO_CONFIG) as Scenario[];
 
 export enum Percentile {
   P75 = 'p75',
@@ -268,88 +268,88 @@ export function getPercentileLabel(p: Percentile): string {
   return PERCENTILE_CONFIG[p]?.label ?? p;
 }
 
-export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
-  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][])
+export const DEPRECATED_SCENARIOS: ReadonlySet<Scenario> = new Set(
+  (Object.entries(SCENARIO_CONFIG) as [Scenario, (typeof SCENARIO_CONFIG)[Scenario]][])
     .filter(([, c]) => c.category === 'deprecated')
     .map(([s]) => s),
 );
 
-export function isSequenceDeprecated(sequence: Sequence): boolean {
-  return DEPRECATED_SEQUENCES.has(sequence);
+export function isScenarioDeprecated(scenario: Scenario): boolean {
+  return DEPRECATED_SCENARIOS.has(scenario);
 }
 
-export function getSequenceCategory(sequence: Sequence): CategoryTag {
-  return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
+export function getScenarioCategory(scenario: Scenario): CategoryTag {
+  return SCENARIO_CONFIG[scenario]?.category ?? 'default';
 }
 
-const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
-  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
-  [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
-  [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
+const MODEL_DEPRECATED_SCENARIOS: Partial<Record<Model, ReadonlySet<Scenario>>> = {
+  [Model.Qwen3_5]: new Set([Scenario.EightK_OneK]),
+  [Model.MiniMax_M3]: new Set([Scenario.EightK_OneK]),
+  [Model.DeepSeek_V4_Pro]: new Set([Scenario.EightK_OneK]),
 };
 
-export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
-  return MODEL_DEPRECATED_SEQUENCES[model]?.has(sequence) ?? false;
+export function isScenarioDeprecatedForModel(model: Model, scenario: Scenario): boolean {
+  return MODEL_DEPRECATED_SCENARIOS[model]?.has(scenario) ?? false;
 }
 
-const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+const MODEL_HIDDEN_SCENARIOS: Partial<Record<Model, ReadonlySet<Scenario>>> = {
   [Model.GLM_5_3_Flash]: new Set(
-    SEQUENCE_OPTIONS.filter(
-      (sequence) => sequence !== Sequence.AgenticTraces && sequence !== Sequence.EightK_OneK,
+    SCENARIO_OPTIONS.filter(
+      (scenario) => scenario !== Scenario.AgenticTraces && scenario !== Scenario.EightK_OneK,
     ),
   ),
   [Model.Muse_Spark_Open]: new Set(
-    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+    SCENARIO_OPTIONS.filter((scenario) => scenario !== Scenario.AgenticTraces),
   ),
 };
 
-export function isSequenceHiddenForModel(model: Model, sequence: Sequence): boolean {
-  return MODEL_HIDDEN_SEQUENCES[model]?.has(sequence) ?? false;
+export function isScenarioHiddenForModel(model: Model, scenario: Scenario): boolean {
+  return MODEL_HIDDEN_SCENARIOS[model]?.has(scenario) ?? false;
 }
 
-export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | null): CategoryTag {
-  if (model && isSequenceDeprecatedForModel(model, sequence)) return 'deprecated';
-  return getSequenceCategory(sequence);
+export function getScenarioCategoryForModel(scenario: Scenario, model?: Model | null): CategoryTag {
+  if (model && isScenarioDeprecatedForModel(model, scenario)) return 'deprecated';
+  return getScenarioCategory(scenario);
 }
 
-const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Sequence>>> = {};
+const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Scenario>>> = {};
 
 export function isBestPerSkuDefaultOff(
   model: Model | null | undefined,
-  sequence: Sequence | null | undefined,
+  scenario: Scenario | null | undefined,
 ): boolean {
-  if (!model || !sequence) return false;
-  return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(sequence) ?? false;
+  if (!model || !scenario) return false;
+  return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(scenario) ?? false;
 }
 
-const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
-  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
-  [Model.Kimi_K3]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
+const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Scenario>>> = {
+  [Model.Qwen3_5]: new Set([Scenario.EightK_OneK, Scenario.AgenticTraces]),
+  [Model.Kimi_K3]: new Set([Scenario.EightK_OneK, Scenario.AgenticTraces]),
   // Muse Spark Open exposes only Agentic Traces, where its TPUv7 results live.
-  [Model.Muse_Spark_Open]: new Set([Sequence.AgenticTraces]),
+  [Model.Muse_Spark_Open]: new Set([Scenario.AgenticTraces]),
   // GLM-5.2 and GLM-5.3 Flash have TPUv7 results on Agentic Traces only.
-  [Model.GLM_5_2]: new Set([Sequence.AgenticTraces]),
-  [Model.GLM_5_3_Flash]: new Set([Sequence.AgenticTraces]),
+  [Model.GLM_5_2]: new Set([Scenario.AgenticTraces]),
+  [Model.GLM_5_3_Flash]: new Set([Scenario.AgenticTraces]),
   // Qwen3.8 Flash Next has TPUv7 results on Agentic Traces only.
-  [Model.Qwen3_8_Flash_Next]: new Set([Sequence.AgenticTraces]),
+  [Model.Qwen3_8_Flash_Next]: new Set([Scenario.AgenticTraces]),
 };
 
 export function showsTcoBasisSelector(
   model: Model | null | undefined,
-  sequence: Sequence | null | undefined,
+  scenario: Scenario | null | undefined,
 ): boolean {
-  if (!model || !sequence) return false;
-  return MODEL_TCO_BASIS_SELECTOR[model]?.has(sequence) ?? false;
+  if (!model || !scenario) return false;
+  return MODEL_TCO_BASIS_SELECTOR[model]?.has(scenario) ?? false;
 }
 
-export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
-  const config = SEQUENCE_CONFIG[sequence];
-  if (!config) return sequence;
+export function getScenarioLabel(scenario: Scenario, locale: 'en' | 'zh' = 'en'): string {
+  const config = SCENARIO_CONFIG[scenario];
+  if (!config) return scenario;
   return locale === 'zh' ? config.labelZh : config.label;
 }
 
-const SEQUENCE_PREFIX_MAPPING: Record<string, Sequence> = Object.fromEntries(
-  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][]).map(
+const SCENARIO_PREFIX_MAPPING: Record<string, Scenario> = Object.fromEntries(
+  (Object.entries(SCENARIO_CONFIG) as [Scenario, (typeof SCENARIO_CONFIG)[Scenario]][]).map(
     ([s, c]) => [c.compact, s],
   ),
 );
@@ -371,17 +371,17 @@ export function getPrecisionLabel(precision: Precision): string {
 }
 
 const MODEL_DEFAULT_PRECISIONS: Partial<
-  Record<Model, Partial<Record<Sequence, readonly Precision[]>>>
+  Record<Model, Partial<Record<Scenario, readonly Precision[]>>>
 > = {
-  [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
-  [Model.Qwen3_5]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+  [Model.GLM_5_2]: { [Scenario.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+  [Model.Qwen3_5]: { [Scenario.AgenticTraces]: [Precision.FP4, Precision.FP8] },
 };
 
 export function getModelDefaultPrecisions(
   model: Model,
-  sequence: Sequence,
+  scenario: Scenario,
 ): readonly Precision[] | undefined {
-  return MODEL_DEFAULT_PRECISIONS[model]?.[sequence];
+  return MODEL_DEFAULT_PRECISIONS[model]?.[scenario];
 }
 
 export enum EvalBenchmark {
@@ -396,11 +396,11 @@ export function getEvalBenchmarkLabel(benchmark: EvalBenchmark): string {
   return EVAL_BENCHMARK_CONFIG[benchmark]?.label ?? benchmark;
 }
 
-export function getModelAndSequence(
+export function getModelAndScenario(
   artifactName: string,
-): { model: Model; sequence: Sequence } | undefined {
+): { model: Model; sequence: Scenario } | undefined {
   let model: Model | undefined;
-  let sequence: Sequence | undefined;
+  let scenario: Scenario | undefined;
 
   for (const key of MODEL_PREFIXES_LONGEST_FIRST) {
     if (artifactName.includes(key)) {
@@ -409,31 +409,31 @@ export function getModelAndSequence(
     }
   }
 
-  for (const key in SEQUENCE_PREFIX_MAPPING) {
+  for (const key in SCENARIO_PREFIX_MAPPING) {
     if (artifactName.includes(key)) {
-      sequence = SEQUENCE_PREFIX_MAPPING[key];
+      scenario = SCENARIO_PREFIX_MAPPING[key];
       break;
     }
   }
 
-  if (model && sequence) {
-    return { model, sequence };
+  if (model && scenario) {
+    return { model, sequence: scenario };
   }
 
   return undefined;
 }
 
-export function getModelAndSequenceFromArtifact(
+export function getModelAndScenarioFromArtifact(
   artifact: any,
-): { model: Model; sequence: Sequence } | undefined {
+): { model: Model; sequence: Scenario } | undefined {
   let seq = '';
   seq += artifact.isl === 1024 ? '1k' : '8k';
   seq += artifact.osl === 1024 ? '1k' : '8k';
 
   const model = MODEL_PREFIX_MAPPING[artifact.infmax_model_prefix as string];
-  const sequence = SEQUENCE_PREFIX_MAPPING[seq];
-  if (model && sequence) {
-    return { model, sequence };
+  const scenario = SCENARIO_PREFIX_MAPPING[seq];
+  if (model && scenario) {
+    return { model, sequence: scenario };
   }
 
   return undefined;

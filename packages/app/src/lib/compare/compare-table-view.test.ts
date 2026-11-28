@@ -63,12 +63,12 @@ const SSR_TABLE: CompareTableData = {
 function input(overrides: Partial<CompareTableViewInput> = {}): CompareTableViewInput {
   return {
     ssrTableData: SSR_TABLE,
-    ssrSequence: '1k1k',
+    ssrScenario: '1k1k',
     ssrModel: 'dsr1',
     ssrPrecisions: ['fp8'],
-    selectedSequence: '1k1k',
-    effectiveSequence: '1k1k',
-    sequenceResolved: true,
+    selectedScenario: '1k1k',
+    effectiveScenario: '1k1k',
+    scenarioResolved: true,
     selectedModel: 'dsr1',
     selectedPrecisions: ['fp8'],
     effectivePrecisions: ['fp8'],
@@ -112,8 +112,8 @@ describe('resolveCompareTableView', () => {
   it('keeps the server table during hydration, before availability resolves', () => {
     const view = resolveCompareTableView(
       input({
-        effectiveSequence: '8k1k',
-        sequenceResolved: false,
+        effectiveScenario: '8k1k',
+        scenarioResolved: false,
         pointsA: CLIENT_A,
         clientInteractivityRange: { min: 40, max: 90 },
       }),
@@ -135,8 +135,8 @@ describe('resolveCompareTableView', () => {
       resolveCompareTableView(
         input({
           ssrTableData: empty,
-          selectedSequence: '8k1k',
-          effectiveSequence: '8k1k',
+          selectedScenario: '8k1k',
+          effectiveScenario: '8k1k',
           pointsA: CLIENT_A,
           pointsB: CLIENT_B,
         }),
@@ -147,12 +147,12 @@ describe('resolveCompareTableView', () => {
   it('shows loading instead of server cells while a shared sequence is pending', () => {
     expect(
       resolveCompareTableView(
-        input({ selectedSequence: '8k1k', effectiveSequence: '8k1k', sequenceResolved: false }),
+        input({ selectedScenario: '8k1k', effectiveScenario: '8k1k', scenarioResolved: false }),
       ).status,
     ).toBe('loading');
     expect(
       resolveCompareTableView(
-        input({ selectedSequence: '8k1k', effectiveSequence: '8k1k', loading: true }),
+        input({ selectedScenario: '8k1k', effectiveScenario: '8k1k', loading: true }),
       ).status,
     ).toBe('loading');
   });
@@ -161,8 +161,8 @@ describe('resolveCompareTableView', () => {
     expect(
       resolveCompareTableView(
         input({
-          selectedSequence: '8k1k',
-          effectiveSequence: '8k1k',
+          selectedScenario: '8k1k',
+          effectiveScenario: '8k1k',
           loading: true,
           error: 'HTTP 500',
         }),
@@ -172,7 +172,7 @@ describe('resolveCompareTableView', () => {
 
   it('shows the selection empty state when the selected sequence has no rows for the pair', () => {
     expect(
-      resolveCompareTableView(input({ selectedSequence: '8k1k', effectiveSequence: '8k1k' }))
+      resolveCompareTableView(input({ selectedScenario: '8k1k', effectiveScenario: '8k1k' }))
         .status,
     ).toBe('empty');
   });
@@ -180,8 +180,8 @@ describe('resolveCompareTableView', () => {
   it('builds the table from client rows for another sequence', () => {
     const view = resolveCompareTableView(
       input({
-        selectedSequence: '8k1k',
-        effectiveSequence: '8k1k',
+        selectedScenario: '8k1k',
+        effectiveScenario: '8k1k',
         pointsA: CLIENT_A,
         pointsB: CLIENT_B,
         clientInteractivityRange: { min: 40, max: 90 },
@@ -197,14 +197,14 @@ describe('resolveCompareTableView', () => {
 
   it('follows availability when it resolves a shared sequence to another one', () => {
     expect(
-      resolveCompareTableView(input({ selectedSequence: '8k1k', effectiveSequence: '1k1k' }))
+      resolveCompareTableView(input({ selectedScenario: '8k1k', effectiveScenario: '1k1k' }))
         .status,
     ).toBe('table');
   });
 
   it('uses client state instead of server cells when the model differs from the server model', () => {
     expect(
-      resolveCompareTableView(input({ selectedModel: 'gptoss', sequenceResolved: false })).status,
+      resolveCompareTableView(input({ selectedModel: 'gptoss', scenarioResolved: false })).status,
     ).toBe('loading');
     expect(resolveCompareTableView(input({ selectedModel: 'gptoss', loading: true })).status).toBe(
       'loading',
@@ -226,7 +226,7 @@ describe('resolveCompareTableView', () => {
         input({
           selectedPrecisions: ['fp4'],
           effectivePrecisions: ['fp4'],
-          sequenceResolved: false,
+          scenarioResolved: false,
         }),
       ).status,
     ).toBe('loading');
@@ -252,11 +252,11 @@ describe('resolveCompareTableView', () => {
     const empty = { defaultTargets: [], ssrRows: [], interactivityRange: { min: 0, max: 100 } };
     expect(
       resolveCompareTableView(
-        input({ ssrTableData: empty, ssrSequence: null, sequenceResolved: false }),
+        input({ ssrTableData: empty, ssrScenario: null, scenarioResolved: false }),
       ).status,
     ).toBe('ssr-empty');
     expect(
-      resolveCompareTableView(input({ ssrTableData: empty, ssrSequence: null, loading: true }))
+      resolveCompareTableView(input({ ssrTableData: empty, ssrScenario: null, loading: true }))
         .status,
     ).toBe('loading');
   });

@@ -1,6 +1,6 @@
 import { cache } from 'react';
 
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { rowToScenario } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -39,7 +39,7 @@ export function initialCompareBenchmarkRows(
   sequence: string | null,
 ): BenchmarkRow[] {
   if (!sequence) return pairRows;
-  return pairRows.filter((row) => rowToSequence(row) === sequence);
+  return pairRows.filter((row) => rowToScenario(row) === sequence);
 }
 
 async function loadComparePairRows(
@@ -57,18 +57,18 @@ function buildComparePageDerivedData(
   rows: BenchmarkRow[],
   a: string,
   b: string,
-  requestedSequence: string | null,
+  requestedScenario: string | null,
   requestedPrecision: string | null,
-  fallbackSequence: string | null,
+  fallbackScenario: string | null,
 ): Omit<ComparePageDerivedData, 'initialPairBenchmarkRows'> {
   const defaults = pickPairDefaults(
     rows,
     a,
     b,
-    fallbackSequence ?? undefined,
-    requestedSequence ?? undefined,
+    fallbackScenario ?? undefined,
+    requestedScenario ?? undefined,
   );
-  const sequence = requestedSequence ?? defaults.sequence;
+  const sequence = requestedScenario ?? defaults.sequence;
   const precision = requestedPrecision ?? defaults.precision;
   const { defaultTargets, ssrRows, interactivityRange } = computeCompareTableData(
     rows,
@@ -101,9 +101,9 @@ export const getComparePageDerivedData = cache(
     dbModelKeys: readonly string[],
     a: string,
     b: string,
-    requestedSequence?: string | null,
+    requestedScenario?: string | null,
     requestedPrecision?: string | null,
-    fallbackSequence?: string | null,
+    fallbackScenario?: string | null,
   ): Promise<ComparePageDerivedData> => {
     const initialPairBenchmarkRows = await readPagePairRows(dbModelKeys, a, b);
     return {
@@ -111,9 +111,9 @@ export const getComparePageDerivedData = cache(
         initialPairBenchmarkRows,
         a,
         b,
-        requestedSequence ?? null,
+        requestedScenario ?? null,
         requestedPrecision ?? null,
-        fallbackSequence ?? null,
+        fallbackScenario ?? null,
       ),
       initialPairBenchmarkRows,
     };

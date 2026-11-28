@@ -8,7 +8,7 @@ import {
   upstreamRackWattsPerGpu,
 } from '@/lib/power/nvl72-power.fixture';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-categories';
-import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario } from '@/lib/catalog/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
 import { estimateProfitRows } from './profit-estimator';
 import {
@@ -308,7 +308,7 @@ describe('profit power basis preview', () => {
       };
       for (const suffix of ['', '__run1']) {
         const { grouped } = buildGpuGroups([row], {
-          sequence: Sequence.AgenticTraces,
+          sequence: Scenario.AgenticTraces,
           precisions: ['fp4'],
           percentile: Percentile.P90,
           classify: (hwKey) => ({ key: `${hwKey}${suffix}`, meta: { hwKey } }),

@@ -1,23 +1,21 @@
-import { SEQUENCE_REGISTRY, type SequenceKey } from '@semianalysisai/inferencex-constants';
+import { SCENARIO_REGISTRY, type ScenarioKey } from '@semianalysisai/inferencex-constants';
 
-import { Sequence, SEQUENCE_OPTIONS } from '@/lib/catalog/data-mappings';
+import { Scenario, SCENARIO_OPTIONS } from '@/lib/catalog/data-mappings';
 
-export type ScenarioSegment = (typeof SEQUENCE_REGISTRY)[SequenceKey]['segment'];
+export type ScenarioSegment = (typeof SCENARIO_REGISTRY)[ScenarioKey]['segment'];
 
-export const SCENARIO_SEGMENT_TO_SEQUENCE = Object.fromEntries(
-  SEQUENCE_OPTIONS.map((sequence) => [SEQUENCE_REGISTRY[sequence].segment, sequence]),
-) as Record<ScenarioSegment, Sequence>;
+export const SCENARIO_BY_SEGMENT = Object.fromEntries(
+  SCENARIO_OPTIONS.map((scenario) => [SCENARIO_REGISTRY[scenario].segment, scenario]),
+) as Record<ScenarioSegment, Scenario>;
 
-const SEQUENCE_TO_SCENARIO_SEGMENT = new Map<string, ScenarioSegment>(
-  Object.entries(SCENARIO_SEGMENT_TO_SEQUENCE).map(([segment, sequence]) => [
-    sequence,
+const SEGMENT_BY_SCENARIO = new Map<string, ScenarioSegment>(
+  Object.entries(SCENARIO_BY_SEGMENT).map(([segment, scenario]) => [
+    scenario,
     segment as ScenarioSegment,
   ]),
 );
 
-export const SCENARIO_SEGMENTS = Object.keys(
-  SCENARIO_SEGMENT_TO_SEQUENCE,
-) as readonly ScenarioSegment[];
+export const SCENARIO_SEGMENTS = Object.keys(SCENARIO_BY_SEGMENT) as readonly ScenarioSegment[];
 
 /**
  * The scenario children built at deploy time under each prerendered `/compare` and
@@ -37,29 +35,29 @@ export function prerenderedScenarioParams(
   );
 }
 
-export function sequenceForScenarioSegment(segment: string): Sequence | null {
+export function scenarioForSegment(segment: string): Scenario | null {
   return (
-    SCENARIO_SEGMENT_TO_SEQUENCE[segment as ScenarioSegment] ??
-    SCENARIO_SEGMENT_TO_SEQUENCE[segment.toLowerCase() as ScenarioSegment] ??
+    SCENARIO_BY_SEGMENT[segment as ScenarioSegment] ??
+    SCENARIO_BY_SEGMENT[segment.toLowerCase() as ScenarioSegment] ??
     null
   );
 }
 
-export function scenarioSegmentForSequence(sequence: string): ScenarioSegment | null {
-  return SEQUENCE_TO_SCENARIO_SEGMENT.get(sequence) ?? null;
+export function segmentForScenario(scenario: string): ScenarioSegment | null {
+  return SEGMENT_BY_SCENARIO.get(scenario) ?? null;
 }
 
-export function isAgenticSequence(sequence: string | null | undefined): boolean {
-  return sequence === Sequence.AgenticTraces;
+export function isAgenticScenario(scenario: string | null | undefined): boolean {
+  return scenario === Scenario.AgenticTraces;
 }
 
 export function compareScenarioPath(
   basePath: string,
   slug: string,
-  sequence: string,
-  defaultSequence: string,
+  scenario: string,
+  defaultScenario: string,
 ): string {
-  const segment = scenarioSegmentForSequence(sequence);
-  if (!segment || sequence === defaultSequence) return `${basePath}/${slug}`;
+  const segment = segmentForScenario(scenario);
+  if (!segment || scenario === defaultScenario) return `${basePath}/${slug}`;
   return `${basePath}/${slug}/${segment}`;
 }

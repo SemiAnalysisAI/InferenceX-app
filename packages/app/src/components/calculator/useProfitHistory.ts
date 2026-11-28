@@ -6,7 +6,7 @@ import { useMemo } from 'react';
 import { buildComparisonDates } from '@/components/inference/hooks/useChartData';
 import { parseComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
-import type { Model, Sequence } from '@/lib/catalog/data-mappings';
+import type { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 import { dropCurrentRunEntries, type ProfitHistoryDateRows } from './profit-history';
 
@@ -14,7 +14,7 @@ const EMPTY_RUN_IDS: Readonly<Record<string, string>> = {};
 
 export function useProfitHistory(options: {
   model: Model;
-  sequence: Sequence;
+  sequence: Scenario;
   selectedGPUs: readonly string[];
   selectedDates: readonly string[];
   dateRange: { startDate: string; endDate: string };
@@ -30,7 +30,7 @@ export function useProfitHistory(options: {
 } {
   const {
     model,
-    sequence,
+    sequence: scenario,
     selectedGPUs,
     selectedDates,
     dateRange,
@@ -51,8 +51,8 @@ export function useProfitHistory(options: {
   );
 
   const view = useMemo(
-    () => (includePower ? undefined : { type: 'calculator' as const, sequence }),
-    [sequence, includePower],
+    () => (includePower ? undefined : { type: 'calculator' as const, sequence: scenario }),
+    [scenario, includePower],
   );
 
   const queries = useQueries({

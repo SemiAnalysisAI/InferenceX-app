@@ -48,9 +48,9 @@ import { getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
-  getSequenceLabel,
+  getScenarioLabel,
   Percentile,
-  Sequence,
+  Scenario,
   type Model,
 } from '@/lib/catalog/data-mappings';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -161,7 +161,7 @@ export default function CacheReuseDisplay() {
       {(urlSeed) => (
         <GlobalFilterProvider
           initialModel={urlSeed.model}
-          initialSequence={urlSeed.sequence}
+          initialScenario={urlSeed.sequence}
           initialPrecisions={urlSeed.precisions}
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
@@ -182,13 +182,13 @@ function CacheReuseInner() {
   const {
     tcoBasis,
     selectedModel,
-    effectiveSequence: selectedSequence,
+    effectiveScenario: selectedScenario,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedScenario, setSelectedPrecisions } = useGlobalFilterActions();
   const warmThroughputChange = useWarmThroughputChange();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availablePrecisions, availableSequences, availableModels } =
+  const { availablePrecisions, availableScenarios, availableModels } =
     useGlobalFilterAvailability();
 
   const [configInput, setConfigInput] = useState<string>(() => readUrlParams().c_cfg ?? '');
@@ -217,7 +217,7 @@ function CacheReuseInner() {
     overlayAvailableHwKeys,
   } = useThroughputData(
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedPrecisions,
     selectedRunDate,
     overlayInput,
@@ -228,7 +228,7 @@ function CacheReuseInner() {
     tcoBasis,
   );
 
-  const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
+  const isAgenticScenario = selectedScenario === Scenario.AgenticTraces;
 
   const configOptions = useMemo<ConfigOption[]>(() => {
     const label = (meta: GroupMeta) =>
@@ -320,12 +320,12 @@ function CacheReuseInner() {
     },
     [setSelectedModel],
   );
-  const handleSequenceChange = useCallback(
+  const handleScenarioChange = useCallback(
     (value: string) => {
-      setSelectedSequence(value as Sequence);
+      setSelectedScenario(value as Scenario);
       track('cache_reuse_sequence_selected', { sequence: value });
     },
-    [setSelectedSequence],
+    [setSelectedScenario],
   );
   const handlePrecisionChange = useCallback(
     (value: string[]) => {
@@ -485,12 +485,12 @@ function CacheReuseInner() {
       r.runUrl ?? '',
     ]);
     exportToCsv(`InferenceX_cache_reuse_${selectedModel}.csv`, headers, body, [
-      `${getModelLabel(selectedModel)} • ${getSequenceLabel(selectedSequence, locale)}`,
+      `${getModelLabel(selectedModel)} • ${getScenarioLabel(selectedScenario, locale)}`,
       selectedConfig?.label ?? '',
       plottedRecipeLabel,
     ]);
     track('cache_reuse_csv_exported', { model: selectedModel });
-  }, [t, tableRows, selectedModel, selectedSequence, locale, selectedConfig, plottedRecipeLabel]);
+  }, [t, tableRows, selectedModel, selectedScenario, locale, selectedConfig, plottedRecipeLabel]);
 
   const legendHwKeys = useMemo(
     () => [...new Set([...availableHwKeys, ...(isUnofficialRun ? overlayAvailableHwKeys : [])])],
@@ -508,7 +508,7 @@ function CacheReuseInner() {
           {t.title}
         </Heading>
         <p className="text-sm text-muted-foreground mb-2">
-          {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)}
+          {getModelLabel(selectedModel)} · {getScenarioLabel(selectedScenario, locale)}
           {selectedConfig ? ` · ${selectedConfig.label}` : ''}
           {plottedRecipeLabel ? ` · ${plottedRecipeLabel}` : ''}
         </p>
@@ -598,12 +598,12 @@ function CacheReuseInner() {
                 <ScenarioSelector
                   id="cache-reuse-sequence"
                   data-testid="cache-reuse-sequence-selector"
-                  value={selectedSequence}
-                  onChange={handleSequenceChange}
+                  value={selectedScenario}
+                  onChange={handleScenarioChange}
                   open={openDropdown === 'sequence'}
                   onOpenChange={handleDropdownOpenChange('sequence')}
-                  onOptionIntent={(sequence) => warmThroughputChange({ sequence })}
-                  availableSequences={availableSequences}
+                  onOptionIntent={(scenario) => warmThroughputChange({ sequence: scenario })}
+                  availableScenarios={availableScenarios}
                   model={selectedModel}
                 />
                 <PrecisionSelector
@@ -706,7 +706,7 @@ function CacheReuseInner() {
               analyticsPrefix="cache_reuse"
               analyticsContext={selectionAnalyticsContext({
                 model: selectedModel,
-                sequence: selectedSequence,
+                sequence: selectedScenario,
                 precisions: selectedPrecisions,
               })}
               className="md:absolute md:right-0 md:top-0 md:z-10 md:mb-0"
@@ -728,7 +728,7 @@ function CacheReuseInner() {
               <>
                 <figcaption>{caption}</figcaption>
                 <EmptyState bare className="h-48 px-6" data-testid="cache-reuse-no-tiers">
-                  {isAgenticSequence ? t.noTiers : t.noTiersFixed}
+                  {isAgenticScenario ? t.noTiers : t.noTiersFixed}
                 </EmptyState>
                 {footer}
               </>

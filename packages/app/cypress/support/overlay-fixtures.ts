@@ -121,16 +121,16 @@ export const countVisible = ($els: JQuery<HTMLElement>): number =>
 export const SINGLE_TURN_DATE = '2026-07-19';
 export const SINGLE_TURN_ISL = 1024;
 export const SINGLE_TURN_OSL = 1024;
-export const ALT_SEQUENCE_ISL = 8192;
-export const ALT_SEQUENCE_OSL = 1024;
-export const ALT_SEQUENCE_LABEL = '8K / 1K';
-export const ALT_SEQUENCE_HARDWARE = 'h100';
+export const ALT_SCENARIO_ISL = 8192;
+export const ALT_SCENARIO_OSL = 1024;
+export const ALT_SCENARIO_LABEL = '8K / 1K';
+export const ALT_SCENARIO_HARDWARE = 'h100';
 export const OTHER_MODEL_DB_KEY = 'glm5';
 export const OVERLAY_ONLY_HARDWARE = 'mi355x';
 export const SECOND_OFFICIAL_HARDWARE = 'b200';
 export const OVERLAY_ONLY_ISL = 1024;
 export const OVERLAY_ONLY_OSL = 8192;
-export const OVERLAY_ONLY_SEQUENCE_LABEL = '1K / 8K';
+export const OVERLAY_ONLY_SCENARIO_LABEL = '1K / 8K';
 
 export const SINGLE_TURN_CONFIGS: [number, number, number][] = [
   [48, 10.6, 17199],
@@ -219,10 +219,10 @@ export const singleTurnAvailability = [
   },
   {
     model: DEFAULT_MODEL_DB_KEY,
-    isl: ALT_SEQUENCE_ISL,
-    osl: ALT_SEQUENCE_OSL,
+    isl: ALT_SCENARIO_ISL,
+    osl: ALT_SCENARIO_OSL,
     precision: 'fp4',
-    hardware: ALT_SEQUENCE_HARDWARE,
+    hardware: ALT_SCENARIO_HARDWARE,
     framework: 'sglang',
     spec_method: 'none',
     disagg: false,
@@ -242,9 +242,9 @@ export const interceptCalculatorOverlayRun = ({ holdRun = false }: { holdRun?: b
       ...singleTurnRows(null),
       ...singleTurnRows(null, { hardware: SECOND_OFFICIAL_HARDWARE, tputScale: 0.6 }),
       ...singleTurnRows(null, {
-        hardware: ALT_SEQUENCE_HARDWARE,
-        isl: ALT_SEQUENCE_ISL,
-        osl: ALT_SEQUENCE_OSL,
+        hardware: ALT_SCENARIO_HARDWARE,
+        isl: ALT_SCENARIO_ISL,
+        osl: ALT_SCENARIO_OSL,
       }),
     ],
   }).as('benchmarks');

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useInferenceActions, useInferenceDisplay, useInferenceFilters } from '../InferenceContext';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { track } from '@/lib/analytics/analytics';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -55,8 +55,8 @@ export function XAxisModeSelector({ className }: { className?: string } = {}) {
     fixedSequenceStatistic,
   } = useInferenceDisplay();
   const { setSelectedXAxisMode, setFixedSequenceStatistic } = useInferenceActions();
-  const { selectedSequence } = useInferenceFilters();
-  const isAgentic = selectedSequence === Sequence.AgenticTraces;
+  const { selectedScenario } = useInferenceFilters();
+  const isAgentic = selectedScenario === Scenario.AgenticTraces;
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const locale = useLocale();

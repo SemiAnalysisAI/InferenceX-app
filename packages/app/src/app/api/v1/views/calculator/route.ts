@@ -49,7 +49,7 @@ import {
   getCachedCalculatorBenchmarks,
 } from '@/lib/benchmarks/benchmark-query-cache.server';
 import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/catalog/constants';
-import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario } from '@/lib/catalog/data-mappings';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 import { getDisplayLabel } from '@/lib/shared/utils';
 import { csvResponse } from '@/lib/views-api/csv';
@@ -64,16 +64,16 @@ export const dynamic = 'force-dynamic';
  */
 async function calculatorRows(
   dbModelKeys: string[],
-  sequence: Sequence,
+  scenario: Scenario,
   date: string | undefined,
   runId: string | undefined,
 ): Promise<BenchmarkRow[]> {
   if (FIXTURES_MODE) {
-    return toCalculatorBenchmarkRows(loadFixture<BenchmarkRow[]>('benchmarks'), sequence);
+    return toCalculatorBenchmarkRows(loadFixture<BenchmarkRow[]>('benchmarks'), scenario);
   }
   return runId
-    ? toCalculatorBenchmarkRows(await getCachedBenchmarksForRun(dbModelKeys, runId), sequence)
-    : getCachedCalculatorBenchmarks(dbModelKeys, sequence, date);
+    ? toCalculatorBenchmarkRows(await getCachedBenchmarksForRun(dbModelKeys, runId), scenario)
+    : getCachedCalculatorBenchmarks(dbModelKeys, scenario, date);
 }
 
 /**
@@ -172,7 +172,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const search = request.nextUrl.searchParams;
 
     const model = resolveModelParam(search.get('model'));
-    const sequence = parseSequenceParam(search.get('sequence'), Sequence.EightK_OneK);
+    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
     const requestedPrecisions = parsePrecisionsParam(search.get('precisions'));
     const target = parseNumberParam(search.get('target'), 'target', CALCULATOR_DEFAULT_TARGET, {
       min: 0,
@@ -220,10 +220,10 @@ export function GET(request: NextRequest): Promise<Response> {
     );
     const format = parseFormatParam(search.get('format'));
 
-    const rows = await calculatorRows([...model.dbModelKeys], sequence, date, runId);
+    const rows = await calculatorRows([...model.dbModelKeys], scenario, date, runId);
 
     const overlayRows = await unofficialRows(request);
-    const precisions = resolveRowPrecisions(rows, sequence, requestedPrecisions, overlayRows);
+    const precisions = resolveRowPrecisions(rows, scenario, requestedPrecisions, overlayRows);
     const multiPrecision = precisions.length > 1;
 
     // Same group identity as the dashboard's official path in
@@ -232,7 +232,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const { grouped, groupMeta, hwConfigMap } = buildGpuGroups<GroupMeta>(
       [...rows, ...overlayRows],
       {
-        sequence,
+        sequence: scenario,
         precisions,
         percentile,
         tokenType: costType,
@@ -358,7 +358,7 @@ export function GET(request: NextRequest): Promise<Response> {
 
     const resolvedParams = {
       model: model.displayName,
-      sequence,
+      sequence: scenario,
       precisions,
       target,
       mode: modeParam,

@@ -116,7 +116,7 @@ describe('ScatterGraph toggle decoration', () => {
 
     inferenceState.current = {
       ...baseInferenceState(),
-      selectedSequence: 'agentic-traces',
+      selectedScenario: 'agentic-traces',
     };
     const { container, rerender, unmount } = mountChart({
       data: [standard, mtp, mtpWithOffload, fixedMtp],
@@ -157,7 +157,7 @@ describe('ScatterGraph toggle decoration', () => {
     } as InferenceData;
     inferenceState.current = {
       ...baseInferenceState(),
-      selectedSequence: 'agentic-traces',
+      selectedScenario: 'agentic-traces',
     };
     const { container, rerender, unmount } = mountChart({ data: [agenticPoint] });
     const buildsAfterMount = rebuildCount();

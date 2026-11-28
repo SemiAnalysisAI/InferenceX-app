@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 import {
   AGE_MAX_RED_DAYS,
@@ -14,13 +14,13 @@ import {
   getActualLatestRelease,
   imageRowDisplayModel,
   imageRowModel,
-  imageRowSequence,
+  imageRowScenario,
   isActiveImageRow,
   isOutdated,
   isStaleAgentx,
   nightlyCommit,
-  resolveSelectedSequence,
-  sequenceOptionsForModel,
+  resolveSelectedScenario,
+  scenarioOptionsForModel,
 } from './latest-image-utils';
 
 describe('daysSince', () => {
@@ -292,15 +292,15 @@ describe('imageRowDisplayModel / imageRowModel', () => {
   });
 });
 
-describe('imageRowSequence', () => {
+describe('imageRowScenario', () => {
   it('classifies agentic rows regardless of isl/osl and maps fixed sequences', () => {
-    expect(imageRowSequence(imageRow('dsv4', 'agentic'))).toBe(Sequence.AgenticTraces);
-    expect(imageRowSequence(imageRow('dsv4', '8k/1k'))).toBe(Sequence.EightK_OneK);
-    expect(imageRowSequence(imageRow('dsv4', '1k/1k'))).toBe(Sequence.OneK_OneK);
+    expect(imageRowScenario(imageRow('dsv4', 'agentic'))).toBe(Scenario.AgenticTraces);
+    expect(imageRowScenario(imageRow('dsv4', '8k/1k'))).toBe(Scenario.EightK_OneK);
+    expect(imageRowScenario(imageRow('dsv4', '1k/1k'))).toBe(Scenario.OneK_OneK);
   });
 
   it('falls back to the raw isl/osl pair for unmapped fixed-sequence combos', () => {
-    expect(imageRowSequence(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe('4096/512');
+    expect(imageRowScenario(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe('4096/512');
   });
 });
 
@@ -354,7 +354,7 @@ describe('isActiveImageRow', () => {
   });
 });
 
-describe('sequenceOptionsForModel', () => {
+describe('scenarioOptionsForModel', () => {
   const rows = [
     imageRow('dsv4', '8k/1k'),
     imageRow('dsv4', 'agentic'),
@@ -364,44 +364,44 @@ describe('sequenceOptionsForModel', () => {
   ];
 
   it('unions every scenario across models for the all-models filter', () => {
-    expect(sequenceOptionsForModel(rows, 'all')).toEqual([
-      Sequence.EightK_OneK,
-      Sequence.AgenticTraces,
+    expect(scenarioOptionsForModel(rows, 'all')).toEqual([
+      Scenario.EightK_OneK,
+      Scenario.AgenticTraces,
     ]);
   });
 
   it('narrows to the scenarios the selected model runs', () => {
-    expect(sequenceOptionsForModel(rows, 'MiniMax-M3')).toEqual([Sequence.AgenticTraces]);
-    expect(sequenceOptionsForModel(rows, 'Kimi-K3')).toEqual([Sequence.AgenticTraces]);
-    expect(sequenceOptionsForModel(rows, 'DeepSeek-V4-Pro')).toEqual([
-      Sequence.EightK_OneK,
-      Sequence.AgenticTraces,
+    expect(scenarioOptionsForModel(rows, 'MiniMax-M3')).toEqual([Scenario.AgenticTraces]);
+    expect(scenarioOptionsForModel(rows, 'Kimi-K3')).toEqual([Scenario.AgenticTraces]);
+    expect(scenarioOptionsForModel(rows, 'DeepSeek-V4-Pro')).toEqual([
+      Scenario.EightK_OneK,
+      Scenario.AgenticTraces,
     ]);
   });
 
   it('returns no options for a model with no rows', () => {
-    expect(sequenceOptionsForModel(rows, 'Qwen3.8-Flash-Next')).toEqual([]);
-    expect(sequenceOptionsForModel([], 'all')).toEqual([]);
+    expect(scenarioOptionsForModel(rows, 'Qwen3.8-Flash-Next')).toEqual([]);
+    expect(scenarioOptionsForModel([], 'all')).toEqual([]);
   });
 });
 
-describe('resolveSelectedSequence', () => {
+describe('resolveSelectedScenario', () => {
   it('honours the selection when the model still offers it', () => {
     expect(
-      resolveSelectedSequence(
-        [Sequence.EightK_OneK, Sequence.AgenticTraces],
-        Sequence.AgenticTraces,
+      resolveSelectedScenario(
+        [Scenario.EightK_OneK, Scenario.AgenticTraces],
+        Scenario.AgenticTraces,
       ),
-    ).toBe(Sequence.AgenticTraces);
+    ).toBe(Scenario.AgenticTraces);
   });
 
   it('falls back to the first offered scenario when the selection is retired for the model', () => {
-    expect(resolveSelectedSequence([Sequence.AgenticTraces], Sequence.EightK_OneK)).toBe(
-      Sequence.AgenticTraces,
+    expect(resolveSelectedScenario([Scenario.AgenticTraces], Scenario.EightK_OneK)).toBe(
+      Scenario.AgenticTraces,
     );
   });
 
   it('returns the selection unchanged when nothing is offered so the empty state renders', () => {
-    expect(resolveSelectedSequence([], Sequence.EightK_OneK)).toBe(Sequence.EightK_OneK);
+    expect(resolveSelectedScenario([], Scenario.EightK_OneK)).toBe(Scenario.EightK_OneK);
   });
 });

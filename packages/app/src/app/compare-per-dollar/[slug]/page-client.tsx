@@ -19,7 +19,7 @@ import { Card } from '@/components/ui/card';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import { toModel, toPrecisions, toScenario } from '@/lib/compare/compare-enum-coerce';
 import type { CompareChipPageLink } from '@/lib/compare/compare-chip-link';
 import {
   HERO_IMAGE_HEIGHT,
@@ -77,7 +77,7 @@ interface ComparePerDollarPageClientProps {
   label: string;
   modelLabel: string;
   defaultModel: string;
-  defaultSequence: string | null;
+  defaultScenario: string | null;
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
   initialBenchmarkRows?: BenchmarkRow[];
@@ -105,7 +105,7 @@ export default function ComparePerDollarPageClient({
   label,
   modelLabel,
   defaultModel,
-  defaultSequence,
+  defaultScenario,
   defaultPrecision,
   ssrTableData,
   initialBenchmarkRows,
@@ -134,15 +134,15 @@ export default function ComparePerDollarPageClient({
 
   const compareGpuPair = useMemo(() => [a, b] as const, [a, b]);
   const initialModel = toModel(defaultModel);
-  const initialSequence = toSequence(defaultSequence);
+  const initialScenario = toScenario(defaultScenario);
   const initialPrecisions = toPrecisions(defaultPrecision);
   const benchmarkQueryScope = `compare-pair:${a}:${b}`;
   const initialCalculatorRows = useMemo(
     () =>
-      initialBenchmarkRows && defaultSequence
-        ? toCalculatorBenchmarkRows(initialBenchmarkRows, defaultSequence)
+      initialBenchmarkRows && defaultScenario
+        ? toCalculatorBenchmarkRows(initialBenchmarkRows, defaultScenario)
         : undefined,
-    [defaultSequence, initialBenchmarkRows],
+    [defaultScenario, initialBenchmarkRows],
   );
   const t = STRINGS[locale];
   const heroSrcSet = heroImageSrcSet(heroImageSrc, heroImageVersion);
@@ -151,7 +151,7 @@ export default function ComparePerDollarPageClient({
   return (
     <GlobalFilterProvider
       initialModel={initialModel}
-      initialSequence={initialSequence}
+      initialScenario={initialScenario}
       initialPrecisions={initialPrecisions}
     >
       <div className="flex flex-col gap-4">
@@ -217,8 +217,8 @@ export default function ComparePerDollarPageClient({
                         {' '}
                         <span className="text-muted-foreground">
                           {isZh
-                            ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
-                            : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
+                            ? `（以上数据基于此 URL 对应的默认 ${defaultScenario ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
+                            : `(Numbers reflect the default ${defaultScenario ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
                         </span>
                       </>
                     )}
@@ -280,10 +280,10 @@ export default function ComparePerDollarPageClient({
             aLabel={aLabel}
             bLabel={bLabel}
             ssrTableData={ssrTableData}
-            ssrSequence={defaultSequence}
+            ssrScenario={defaultScenario}
             ssrPrecisions={initialPrecisions}
             initialModel={initialModel}
-            initialSequence={initialSequence}
+            initialScenario={initialScenario}
             initialCalculatorRows={initialCalculatorRows}
             emptyStateText={t.emptyState}
             isZh={isZh}
@@ -334,7 +334,7 @@ export default function ComparePerDollarPageClient({
           benchmarkQueryScope={benchmarkQueryScope}
           initialBenchmarkModel={initialModel}
           initialBenchmarkRows={initialBenchmarkRows}
-          initialBenchmarkSequence={defaultSequence ?? undefined}
+          initialBenchmarkScenario={defaultScenario ?? undefined}
         />
       </div>
     </GlobalFilterProvider>
@@ -347,9 +347,9 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
-  ssrSequence,
+  ssrScenario,
   initialModel,
-  initialSequence,
+  initialScenario,
   initialCalculatorRows,
   ssrPrecisions,
   emptyStateText,
@@ -360,21 +360,21 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
-  ssrSequence: string | null;
+  ssrScenario: string | null;
   ssrPrecisions: string[] | undefined;
   initialModel: ReturnType<typeof toModel>;
-  initialSequence: ReturnType<typeof toSequence>;
+  initialScenario: ReturnType<typeof toScenario>;
   initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
   isZh: boolean;
 }) {
   const {
-    selectedSequence,
-    effectiveSequence,
+    selectedScenario,
+    effectiveScenario,
     effectivePrecisions,
     selectedModel,
     selectedPrecisions,
-    sequenceResolved,
+    scenarioResolved,
   } = useGlobalFilterSelection();
   const { availableDates } = useGlobalFilterAvailability();
   const { selectedRunDate } = useGlobalFilterRun();
@@ -383,22 +383,22 @@ function CompareTableSection({
     selectedRunDate && selectedRunDate === latestAvailableDate ? '' : selectedRunDate;
   const initialRows =
     initialCalculatorRows &&
-    sequenceResolved &&
+    scenarioResolved &&
     selectedModel === initialModel &&
-    effectiveSequence === initialSequence &&
+    effectiveScenario === initialScenario &&
     calculatorRunDate === ''
       ? initialCalculatorRows
       : undefined;
 
   const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
-    effectiveSequence,
+    effectiveScenario,
     effectivePrecisions,
     calculatorRunDate,
     undefined,
     undefined,
     initialRows,
-    sequenceResolved,
+    scenarioResolved,
   );
 
   const { pointsA, pointsB } = useMemo(() => {
@@ -417,12 +417,12 @@ function CompareTableSection({
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      ssrSequence={ssrSequence}
+      ssrScenario={ssrScenario}
       ssrModel={initialModel}
       ssrPrecisions={ssrPrecisions ?? []}
-      selectedSequence={selectedSequence}
-      effectiveSequence={effectiveSequence}
-      sequenceResolved={sequenceResolved}
+      selectedScenario={selectedScenario}
+      effectiveScenario={effectiveScenario}
+      scenarioResolved={scenarioResolved}
       selectedModel={selectedModel}
       selectedPrecisions={selectedPrecisions}
       effectivePrecisions={effectivePrecisions}

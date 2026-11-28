@@ -1,5 +1,5 @@
 import type { BenchmarkRow } from '@/lib/api/api';
-import { getModelExclusion, Model, Sequence } from '@/lib/catalog/data-mappings';
+import { getModelExclusion, Model, Scenario } from '@/lib/catalog/data-mappings';
 
 export interface FavoritePreset {
   id: string;
@@ -13,7 +13,7 @@ export interface FavoritePreset {
   hidden?: boolean;
   config: {
     model: Model;
-    sequence: Sequence;
+    sequence: Scenario;
     precisions: string[];
     yAxisMetric: string;
     gpus?: string[];
@@ -127,7 +127,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     wide: true,
     config: {
       model: Model.Kimi_K3,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp4', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
@@ -146,7 +146,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     hidden: true,
     config: {
       model: Model.MiniMax_M3,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp4', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
@@ -163,7 +163,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     hidden: true,
     config: {
       model: Model.DeepSeek_V4_Pro,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp4', 'fp4fp8', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
@@ -180,7 +180,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     hidden: true,
     config: {
       model: Model.DeepSeek_V4_Pro,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp4', 'fp4fp8', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300'],
@@ -197,7 +197,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp4'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['gb200_dynamo-trt', 'b200_dynamo-trt'],
@@ -215,7 +215,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['b200_dynamo-trt', 'h200_dynamo-trt'],
@@ -233,7 +233,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['mi300x_sglang', 'mi325x_sglang', 'mi355x_sglang'],
@@ -250,7 +250,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp4', 'fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['h100_dynamo-trt_mtp', 'gb300_dynamo-trt_mtp'],
@@ -268,7 +268,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     category: 'comparison',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
       hwFilter: ['b200_dynamo-sglang', 'mi355x_mori-sglang', 'b200_dynamo-trt'],
@@ -286,7 +286,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
     category: 'improvements',
     config: {
       model: Model.DeepSeek_R1,
-      sequence: Sequence.EightK_OneK,
+      sequence: Scenario.EightK_OneK,
       precisions: ['fp8'],
       yAxisMetric: 'y_tpPerGpu',
       gpus: ['mi355x_mori-sglang'],

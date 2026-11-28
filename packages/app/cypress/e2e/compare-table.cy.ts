@@ -125,7 +125,7 @@ describe('Compare Interpolated Table', () => {
 describe('Compare table with a shared sequence', () => {
   // The server renders this page's table for 8k/1k; the shared URL asks for 1k/1k.
   const SHARED_URL = '/compare/deepseek-r1-b200-vs-h200/8k-1k?i_seq=1k%2F1k';
-  const SHARED_SEQUENCE_ROWS = {
+  const SHARED_SCENARIO_ROWS = {
     method: 'GET',
     pathname: '/api/v1/benchmarks',
     query: { view: 'calculator', sequence: '1k/1k' },
@@ -138,7 +138,7 @@ describe('Compare table with a shared sequence', () => {
   });
 
   it('drops the server cells when the shared sequence fails to load', () => {
-    cy.intercept(SHARED_SEQUENCE_ROWS, { statusCode: 500, body: { error: 'unavailable' } });
+    cy.intercept(SHARED_SCENARIO_ROWS, { statusCode: 500, body: { error: 'unavailable' } });
     cy.visit(SHARED_URL);
     cy.get('[data-testid="compare-table-status"]').should('have.attr', 'data-status', 'error');
     cy.get('[data-testid="compare-interpolated-table"]').should('not.exist');

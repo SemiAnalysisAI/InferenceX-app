@@ -1,11 +1,11 @@
 import type { BenchmarkRow } from '@/lib/api/api';
 import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 
 export const VR_DEFAULT_RUN = {
   enabled: true,
   model: Model.DeepSeek_V4_Pro,
-  sequence: Sequence.AgenticTraces,
+  sequence: Scenario.AgenticTraces,
   date: '2026-09-09',
 } as const;
 

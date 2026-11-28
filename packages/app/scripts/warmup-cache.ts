@@ -1,8 +1,8 @@
-import { MODEL_OPTIONS, SEQUENCE_OPTIONS } from '@/lib/catalog/data-mappings';
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { MODEL_OPTIONS, SCENARIO_OPTIONS } from '@/lib/catalog/data-mappings';
+import { scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 
 const MODELS = MODEL_OPTIONS;
-const SEQUENCES = SEQUENCE_OPTIONS.map((s) => sequenceToIslOsl(s)).filter(
+const SEQUENCES = SCENARIO_OPTIONS.map((s) => scenarioToIslOsl(s)).filter(
   (s): s is { isl: number; osl: number } => s !== null,
 );
 

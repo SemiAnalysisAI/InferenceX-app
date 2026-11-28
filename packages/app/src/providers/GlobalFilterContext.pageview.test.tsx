@@ -45,7 +45,7 @@ mock.module('@/lib/routing/url-state', () => ({
   refreshUrlParams: () => ({}),
 }));
 mock.module('@/providers/unofficial-run-provider', () => ({
-  useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
+  useUnofficialRun: () => ({ availableModelsAndScenarios: [] }),
 }));
 
 import {
@@ -65,13 +65,13 @@ const AVAILABILITY = indexAvailability(
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 let actions: GlobalFilterActionsContextType | undefined;
-let sequenceResolved: boolean | undefined;
+let scenarioResolved: boolean | undefined;
 let pathnameEvents: Event[] = [];
 const recordPathnameEvent = (event: Event) => pathnameEvents.push(event);
 
 const Probe = memo(() => {
   actions = useGlobalFilterActions();
-  sequenceResolved = useGlobalFilterSelection().sequenceResolved;
+  scenarioResolved = useGlobalFilterSelection().scenarioResolved;
   return null;
 });
 
@@ -106,7 +106,7 @@ beforeEach(() => {
   mocks.availability.isPending = true;
   mocks.setUrlParams.mockReset();
   actions = undefined;
-  sequenceResolved = undefined;
+  scenarioResolved = undefined;
   pathnameEvents = [];
   window.addEventListener(CLIENT_PATHNAME_CHANGE_EVENT, recordPathnameEvent);
 });
@@ -122,10 +122,10 @@ afterEach(() => {
 describe('GlobalFilterProvider model path sync pageviews', () => {
   it('canonicalizes a bare route without a pageview as flags settle and non-model filters change', () => {
     mountAt('/infx/calculator', Model.Kimi_K3);
-    expect(sequenceResolved).toBe(false);
+    expect(scenarioResolved).toBe(false);
 
     settleAvailability(Model.Kimi_K3);
-    expect(sequenceResolved).toBe(true);
+    expect(scenarioResolved).toBe(true);
     act(() => actions?.setTcoBasis('external'));
 
     expect(window.location.pathname).toBe('/infx/calculator/kimi-k3');

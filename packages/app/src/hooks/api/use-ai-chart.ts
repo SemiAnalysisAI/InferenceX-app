@@ -138,7 +138,7 @@ function parseSeqPart(s: string): number {
   return s.includes('8k') ? 8192 : 1024;
 }
 
-function sequenceToIslOsl(seq: string): { isl: number; osl: number } {
+function scenarioToIslOsl(seq: string): { isl: number; osl: number } {
   const parts = seq.split('/');
   return { isl: parseSeqPart(parts[0] ?? '1k'), osl: parseSeqPart(parts[1] ?? '1k') };
 }
@@ -328,7 +328,7 @@ async function resolveSpec(spec: AiChartSpec, locale: Locale): Promise<AiSingleC
   }
 
   const isAgentic = spec.sequence === 'agentic-traces';
-  const { isl, osl } = isAgentic ? { isl: 0, osl: 0 } : sequenceToIslOsl(spec.sequence);
+  const { isl, osl } = isAgentic ? { isl: 0, osl: 0 } : scenarioToIslOsl(spec.sequence);
   const fetchedRows =
     spec.dataSource === 'history'
       ? await fetchBenchmarkHistory(

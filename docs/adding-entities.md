@@ -6,7 +6,7 @@ Instructions for Claude agents implementing new entity additions.
 >
 > If data for a new model or GPU is ingested before the normalizer mappings exist, those rows are **silently skipped** — `resolveModelKey()` / `hwToGpuKey()` returns `null`, the skip tracker logs them, but nothing is written to the DB. The data isn't lost (source artifacts remain in GCS), but recovering requires a full re-ingest after adding the mappings.
 >
-> **Always warn the user:** the `packages/constants` registry entry (`MODEL_REGISTRY`, `HW_REGISTRY`) must be merged and deployed before the first benchmark run containing the new entity. Models, precisions and sequences pair that entry with an enum member in the app, and the typecheck fails until both exist, so the two land in one PR.
+> **Always warn the user:** the `packages/constants` registry entry (`MODEL_REGISTRY`, `HW_REGISTRY`) must be merged and deployed before the first benchmark run containing the new entity. Models, precisions and scenarios pair that entry with an enum member in the app, and the typecheck fails until both exist, so the two land in one PR.
 >
 > Unofficial-run overlays (`?unofficialrun=`) are the one exception. `/api/unofficial-run` calls `mapBenchmarkRow` with `allowUnregistered: true`, so a run with an unregistered model or GPU still plots. The model keeps its raw prefix (`infmax_model_prefix`, falling back to the HF model id) as both DB key and display name, and the GPU keeps its runner base (`cluster:zx9-lab` becomes `zx9`). The inference model selector lists such a model under "Unregistered models", the chart heading marks it "(unregistered model)", and a line under the heading names unregistered hardware. The official ETL never passes the option, so ingest still skips these rows. Overlays are a preview, not a substitute for the registry entries.
 
@@ -27,7 +27,7 @@ When asked to add a new model, GPU, or other entity:
 
 > **Agent tips:**
 >
-> - **TypeScript catches a half-added entity.** Models, precisions and sequences each have one registry in `packages/constants` and one enum in `data-mappings.ts`. The enum-keyed view of the registry (`EnumKeyed`) fails to compile unless both name exactly the same keys, so a missing registry entry or a missing enum member is a type error that names the key.
+> - **TypeScript catches a half-added entity.** Models, precisions and scenarios each have one registry in `packages/constants` and one enum in `data-mappings.ts`. The enum-keyed view of the registry (`EnumKeyed`) fails to compile unless both name exactly the same keys, so a missing registry entry or a missing enum member is a type error that names the key.
 > - **No DB schema or ingest pipeline changes are needed** for any entity type. The schema is open-ended and the ingest is fully parameterized. Don't waste time reading ingest files.
 
 ---
@@ -169,9 +169,11 @@ Chart shapes need no change. `getShapeKeyForPrecision()` in `packages/app/src/li
 
 ## Adding a New Sequence Length
 
+A sequence length is a fixed-length scenario. The code calls every workload, fixed or agentic, a scenario.
+
 ### Infer from artifacts
 
-Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the sequence from the `{n}k{m}k` segment (e.g. `16k8k` from `bmk_dsr1_16k8k_fp8_sglang_...`).
+Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the scenario from the `{n}k{m}k` segment (e.g. `16k8k` from `bmk_dsr1_16k8k_fp8_sglang_...`).
 
 ### Ask the user to confirm
 
@@ -182,15 +184,15 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 ### Then apply
 
-**`packages/constants/src/sequences.ts`**:
+**`packages/constants/src/scenarios.ts`**:
 
-- Add one entry to `SEQUENCE_REGISTRY` with `{ label, labelZh, compact, segment, category, kind, isl, osl }`. `segment` is the URL form (`8k-1k`).
+- Add one entry to `SCENARIO_REGISTRY` with `{ label, labelZh, compact, segment, category, kind, isl, osl }`. `segment` is the URL form (`8k-1k`).
 
 **`packages/app/src/lib/catalog/data-mappings.ts`**:
 
-- `Sequence` enum: add the member.
+- `Scenario` enum: add the member.
 
-Everything else (`SEQUENCE_OPTIONS`, `getSequenceLabel()`, the ISL/OSL conversions, the compare scenario segments, and the sequence values and aliases the API accepts) is derived automatically.
+Everything else (`SCENARIO_OPTIONS`, `getScenarioLabel()`, the ISL/OSL conversions, the compare scenario segments, and the `sequence` values and aliases the API accepts) is derived automatically.
 
 No ingest changes needed — `parseIslOsl()` regex handles any `{n}k{m}k` pattern.
 

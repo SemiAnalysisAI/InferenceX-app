@@ -31,7 +31,7 @@ import { interpolateForGPU } from '@/components/calculator/interpolation';
 import { buildGpuGroups } from '@/components/calculator/throughput-data';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
-import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario } from '@/lib/catalog/data-mappings';
 
 import { GET } from './route';
 
@@ -147,7 +147,7 @@ describe('GET /api/v1/views/calculator', () => {
     expect(entry.fleet).toBeUndefined();
 
     const { grouped } = buildGpuGroups(toCalculatorBenchmarkRows(FIXTURE_ROWS, '1k/1k'), {
-      sequence: Sequence.OneK_OneK,
+      sequence: Scenario.OneK_OneK,
       precisions: ['fp4'],
       percentile: Percentile.P90,
       tokenType: 'total',
@@ -212,7 +212,7 @@ describe('GET /api/v1/views/calculator', () => {
         expect(body.params.chipBasis).toBe(chipBasis);
         const [entry] = body.hardware;
         const { grouped } = buildGpuGroups(toCalculatorBenchmarkRows(DISAGG_ROWS, '1k/1k'), {
-          sequence: Sequence.OneK_OneK,
+          sequence: Scenario.OneK_OneK,
           precisions: ['fp4'],
           percentile: Percentile.P90,
           tokenType: 'output',

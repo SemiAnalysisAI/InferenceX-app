@@ -60,7 +60,7 @@ export function resetCrossTabSelection(): void {
   profitHardwareSeed = null;
 }
 
-const AGENTIC_SEQUENCE = 'agentic-traces';
+const AGENTIC_SCENARIO = 'agentic-traces';
 
 const INFERENCE_SHARED_TO_PROFIT = ['i_prec', 'g_rundate'] as const;
 
@@ -114,7 +114,7 @@ export function crossTabParams(
     if (livePrecision) next.set('i_prec', livePrecision);
     else next.delete('i_prec');
     // The profit estimator only shows agentic data.
-    next.set('i_seq', AGENTIC_SEQUENCE);
+    next.set('i_seq', AGENTIC_SCENARIO);
   }
   if (profitPicks.i_prec !== undefined) next.set('i_prec', profitPicks.i_prec);
   if (profitPicks.i_active !== undefined) {

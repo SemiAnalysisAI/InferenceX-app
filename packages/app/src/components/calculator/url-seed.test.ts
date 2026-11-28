@@ -7,7 +7,7 @@ import {
   profitTargetUrlValue,
   resolveCalculatorUrlSeed,
 } from './url-seed';
-import { Model, Percentile, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Percentile, Precision, Scenario } from '@/lib/catalog/data-mappings';
 
 const seedOf = (query: ConstructorParameters<typeof URLSearchParams>[0]) =>
   resolveCalculatorUrlSeed(new URLSearchParams(query));
@@ -25,7 +25,7 @@ describe('resolveCalculatorUrlSeed', () => {
 
   it('returns the sequence when i_seq is a known enum value', () => {
     expect(seedOf({ i_seq: '1k/1k' })).toEqual({
-      sequence: Sequence.OneK_OneK,
+      sequence: Scenario.OneK_OneK,
     });
   });
 
@@ -59,7 +59,7 @@ describe('resolveCalculatorUrlSeed', () => {
       }),
     ).toEqual({
       model: Model.DeepSeek_V4_Pro,
-      sequence: Sequence.OneK_EightK,
+      sequence: Scenario.OneK_EightK,
       precisions: [Precision.FP4, Precision.FP8],
       percentile: Percentile.P75,
     });

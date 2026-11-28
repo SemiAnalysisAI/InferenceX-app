@@ -7,8 +7,8 @@ import {
   PERCENTILE_OPTIONS,
   Precision,
   PRECISION_OPTIONS,
-  Sequence,
-  SEQUENCE_OPTIONS,
+  Scenario,
+  SCENARIO_OPTIONS,
 } from '@/lib/catalog/data-mappings';
 import { profitRouteParams, profitRouteSearch } from '@/lib/routing/profit-estimator-routes';
 
@@ -27,7 +27,7 @@ export interface ProfitUrlSeed {
 
 export interface CalculatorUrlSeed {
   model?: Model;
-  sequence?: Sequence;
+  sequence?: Scenario;
   precisions?: string[];
   percentile?: Percentile;
   runDate?: string;
@@ -57,8 +57,8 @@ export function resolveCalculatorUrlSeed(params: URLSearchParams): CalculatorUrl
   }
 
   const seqParam = params.get('i_seq');
-  if (seqParam && (SEQUENCE_OPTIONS as readonly string[]).includes(seqParam)) {
-    seed.sequence = seqParam as Sequence;
+  if (seqParam && (SCENARIO_OPTIONS as readonly string[]).includes(seqParam)) {
+    seed.sequence = seqParam as Scenario;
   }
 
   const precParam = params.get('i_prec');
@@ -117,4 +117,4 @@ export function calculatorUrlSeed(
   return { ...seed, model: seed.model ?? routeModel, ...(profit && { profit }) };
 }
 
-export { Model, Percentile, Precision, Sequence };
+export { Model, Percentile, Precision, Scenario };

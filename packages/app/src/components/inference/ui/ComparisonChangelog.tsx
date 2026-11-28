@@ -16,7 +16,7 @@ import {
 import { makeRunComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { getHardwareConfig } from '@/lib/catalog/constants';
-import { Sequence, type Sequence as SequenceType } from '@/lib/catalog/data-mappings';
+import { Scenario, type Scenario as ScenarioType } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -118,7 +118,7 @@ interface ComparisonChangelogProps {
   selectedGPUs: string[];
   selectedPrecisions: string[];
   modelDbKeys: string[];
-  selectedSequence: SequenceType;
+  selectedScenario: ScenarioType;
   loading?: boolean;
   /** Changelog data has not been requested yet; the label shows no count. */
   deferred?: boolean;
@@ -140,7 +140,7 @@ export default function ComparisonChangelog({
   selectedGPUs,
   selectedPrecisions,
   modelDbKeys,
-  selectedSequence,
+  selectedScenario,
   loading,
   deferred = false,
   onExpandedChange,
@@ -158,9 +158,9 @@ export default function ComparisonChangelog({
   const t = COMPARISON_CHANGELOG_STRINGS[locale];
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const benchmarkType =
-    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
+    selectedScenario === Scenario.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const changelogBenchmarkType =
-    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
+    selectedScenario === Scenario.AgenticTraces ? 'agentic_traces' : undefined;
 
   const pinnedDates = useMemo(() => {
     const set = new Set<string>();

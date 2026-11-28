@@ -5,7 +5,7 @@ import { useInferenceActions, useInferenceFilters } from '../InferenceContext';
 import { quickFilterSummary } from '../utils/quick-filter-summary';
 import type { DeploymentMode, SpecMode } from '../types';
 import type { PowerTier } from '@/lib/power/power-tier';
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { Scenario } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,12 @@ const STRINGS = {
 export function ActiveQuickFilters() {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { quickFilters, selectedSequence, lockedFrameworks } = useInferenceFilters();
+  const { quickFilters, selectedScenario, lockedFrameworks } = useInferenceFilters();
   const actions = useInferenceActions();
   const filters = quickFilterSummary(
     quickFilters,
     locale,
-    selectedSequence === Sequence.AgenticTraces,
+    selectedScenario === Scenario.AgenticTraces,
   ).filter((filter) => !(lockedFrameworks && filter.category === 'frameworks'));
   if (filters.length === 0) return null;
 

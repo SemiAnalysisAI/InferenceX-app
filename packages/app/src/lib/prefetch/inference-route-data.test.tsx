@@ -1,5 +1,5 @@
 // @test-environment jsdom
-import { DISPLAY_MODEL_TO_DB, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 import { hashKey, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { act, type ReactNode } from 'react';
@@ -21,7 +21,7 @@ import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 import { EphemeralUrlStateContext } from '@/hooks/useUrlState';
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import { DEFAULT_INFERENCE_MODEL_SLUG } from '@/lib/routing/dashboard-routes';
 import {
   getInferenceModelBySlug,
@@ -48,14 +48,14 @@ mock.module('next/navigation', () => ({
 const actual2 = { ...(await import('@/providers/unofficial-run-provider')) };
 mock.module('@/providers/unofficial-run-provider', () => ({
   ...actual2,
-  useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
+  useUnofficialRun: () => ({ availableModelsAndScenarios: [] }),
 }));
 
 // In the fixture, DeepSeek-V4-Pro runs 8k/1k on two dates and Kimi-K3 runs agentic traces.
 const EARLIER_DATE = '2026-06-10';
 const LATEST_DATE = '2026-06-12';
 const AGENTIC_DATE = '2026-10-23';
-const FIXED = sequenceToIslOsl(Sequence.EightK_OneK)!;
+const FIXED = scenarioToIslOsl(Scenario.EightK_OneK)!;
 
 function availabilityRow(
   model: Model,
@@ -184,9 +184,9 @@ function EvaluationProbe() {
 
 /** Calls `useThroughputData` with the selection `ThroughputCalculatorInner` passes it. */
 function ThroughputProbe() {
-  const { selectedModel, effectiveSequence, effectivePrecisions } = useGlobalFilterSelection();
+  const { selectedModel, effectiveScenario, effectivePrecisions } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
-  useThroughputData(selectedModel, effectiveSequence, effectivePrecisions, selectedRunDate);
+  useThroughputData(selectedModel, effectiveScenario, effectivePrecisions, selectedRunDate);
   return null;
 }
 
@@ -279,7 +279,7 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
       '/infx/calculator',
       <GlobalFilterProvider
         initialModel={seed.model}
-        initialSequence={seed.sequence}
+        initialScenario={seed.sequence}
         initialPrecisions={seed.precisions}
         initialRunDate={seed.runDate}
         initialRunId={seed.runId}
@@ -293,7 +293,7 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     expect(cachedHashes(warmed)).toEqual(
       hashes(
         availabilityKey,
-        throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, LATEST_DATE).queryKey,
+        throughputQueryOptions(Model.DeepSeek_V4_Pro, Scenario.EightK_OneK, LATEST_DATE).queryKey,
         workflowInfoQueryOptions(LATEST_DATE).queryKey,
       ),
     );
@@ -347,7 +347,7 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     expect(cachedHashes(warmed)).toEqual(
       hashes(
         availabilityKey,
-        throughputQueryOptions(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK, LATEST_DATE).queryKey,
+        throughputQueryOptions(Model.DeepSeek_V4_Pro, Scenario.EightK_OneK, LATEST_DATE).queryKey,
         workflowInfoQueryOptions(LATEST_DATE).queryKey,
         benchmarkHistoryQueryOptions(Model.DeepSeek_V4_Pro, FIXED.isl, FIXED.osl, {
           view: 'calculator',
@@ -361,7 +361,7 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     expect(cachedHashes(warmed)).toEqual(
       hashes(
         availabilityKey,
-        throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey,
+        throughputQueryOptions(Model.Kimi_K3, Scenario.AgenticTraces, AGENTIC_DATE).queryKey,
         workflowInfoQueryOptions(AGENTIC_DATE).queryKey,
       ),
     );
@@ -380,7 +380,7 @@ describe('warmInferenceRoute on a fresh dashboard mount', () => {
     // Profit routes drop remembered params, so the estimator keeps its route default.
     const profit = await warm('/infx/profit-estimator');
     expect(cachedHashes(profit)).toContain(
-      hashKey(throughputQueryOptions(Model.Kimi_K3, Sequence.AgenticTraces, AGENTIC_DATE).queryKey),
+      hashKey(throughputQueryOptions(Model.Kimi_K3, Scenario.AgenticTraces, AGENTIC_DATE).queryKey),
     );
   });
 

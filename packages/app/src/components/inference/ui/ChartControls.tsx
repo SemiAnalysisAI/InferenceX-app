@@ -71,7 +71,7 @@ import {
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { TokenBasisToggle } from './TokenBasisToggle';
 import {
-  Sequence,
+  Scenario,
   type Model,
   MODEL_OPTIONS,
   isModelVisible,
@@ -217,7 +217,7 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-  const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
+  const { selectedModel, selectedScenario, selectedPrecisions, selectedGPUs, selectedDateRange } =
     useInferenceFilters();
   const {
     graphs,
@@ -225,7 +225,7 @@ export default function ChartControls({
     dateRangeAvailableDates,
     isCheckingAvailableDates,
     availablePrecisions,
-    availableSequences,
+    availableScenarios,
     availableModels,
   } = useInferenceData();
   const {
@@ -243,7 +243,7 @@ export default function ChartControls({
   } = useInferenceDisplay();
   const {
     setSelectedModel,
-    setSelectedSequence,
+    setSelectedScenario,
     setSelectedPrecisions,
     setSelectedYAxisMetric,
     setTokenRevenuePriceSource,
@@ -383,10 +383,10 @@ export default function ChartControls({
   }, [pickerYAxisOptions, selectedYAxisMetric, t]);
 
   const trackCombinedFilters = () => {
-    if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
+    if (selectedModel && selectedScenario && selectedPrecisions.length > 0 && selectedYAxisMetric) {
       track('inference_filters_changed', {
         model: selectedModel,
-        sequence: selectedSequence,
+        sequence: selectedScenario,
         precision: selectedPrecisions.join(','),
         metric: selectedYAxisMetric,
         metric_label: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
@@ -425,8 +425,8 @@ export default function ChartControls({
     });
   };
 
-  const handleSequenceChange = (value: Sequence) => {
-    setSelectedSequence(value);
+  const handleScenarioChange = (value: Scenario) => {
+    setSelectedScenario(value);
     track('inference_sequence_selected', {
       ...analyticsContext,
       sequence: value,
@@ -510,14 +510,14 @@ export default function ChartControls({
     mounted &&
     featureGateUnlocked &&
     tcoSource === 'inference' &&
-    selectedSequence === Sequence.AgenticTraces &&
+    selectedScenario === Scenario.AgenticTraces &&
     countsInputTokens(selectedYAxisMetric);
   // Chart Config columns: PowerX keeps an X-Axis Metric column of 11rem, or 18rem on agentic
   // traces where its options are longer, and splits the rest in two, so its Count toggle (two
   // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one cell
   // each) flow left to right in rows of three. Elsewhere the X and Y pickers share the row
   // evenly. Below sm every cell is a row.
-  const xAxisWide = selectedSequence === Sequence.AgenticTraces;
+  const xAxisWide = selectedScenario === Scenario.AgenticTraces;
   const chartConfigGridClass = powerXSurface
     ? xAxisWide
       ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
@@ -527,12 +527,12 @@ export default function ChartControls({
   const scenarioSelector = !scenarioInFooter && (
     <div className="min-w-0">
       <ScenarioSelector
-        value={selectedSequence}
-        onChange={handleSequenceChange}
+        value={selectedScenario}
+        onChange={handleScenarioChange}
         open={openDropdown === 'sequence'}
         onOpenChange={handleDropdownOpenChange('sequence')}
-        onOptionIntent={(sequence) => warmFilterChange({ sequence })}
-        availableSequences={availableSequences}
+        onOptionIntent={(scenario) => warmFilterChange({ sequence: scenario })}
+        availableScenarios={availableScenarios}
         model={selectedModel}
         data-testid="scenario-selector"
       />
@@ -705,7 +705,7 @@ export default function ChartControls({
                           ? t.openRouterUnavailable
                           : t.openRouterSummary(
                               formatTokenPriceLabel(tokenRevenuePricing.inputPerMillion),
-                              selectedSequence === Sequence.AgenticTraces
+                              selectedScenario === Scenario.AgenticTraces
                                 ? formatTokenPriceLabel(
                                     cachedInputPricePerMillion(tokenRevenuePricing),
                                   )
@@ -737,7 +737,7 @@ export default function ChartControls({
               {!showXAxisMode &&
                 graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
                 selectedIsInputMetric &&
-                selectedSequence !== Sequence.AgenticTraces && (
+                selectedScenario !== Scenario.AgenticTraces && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
                       htmlFor="x-axis-select"

@@ -5,7 +5,7 @@ import { getPrerenderedCompareParams } from '@/lib/compare/compare-availability'
 import {
   prerenderedScenarioParams,
   type ScenarioSegment,
-  sequenceForScenarioSegment,
+  scenarioForSegment,
 } from '@/lib/compare/compare-scenario-route';
 
 import { buildCompareMetadata, renderComparePage } from '../page';
@@ -22,7 +22,7 @@ interface Props {
 }
 
 function assertScenario(scenario: string): ScenarioSegment {
-  if (!sequenceForScenarioSegment(scenario)) notFound();
+  if (!scenarioForSegment(scenario)) notFound();
   return scenario.toLowerCase() as ScenarioSegment;
 }
 

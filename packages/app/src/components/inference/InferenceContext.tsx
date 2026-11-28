@@ -102,8 +102,8 @@ import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
   Model,
-  Sequence,
-  sequenceKind,
+  Scenario,
+  scenarioKind,
 } from '@/lib/catalog/data-mappings';
 import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -269,11 +269,11 @@ export function InferenceContextsProvider({
 
 export function resolveEffectiveXAxisMode(
   requestedMode: XAxisMode,
-  sequence: Parameters<typeof sequenceKind>[0],
-  sequenceResolved: boolean,
+  scenario: Parameters<typeof scenarioKind>[0],
+  scenarioResolved: boolean,
 ): XAxisMode {
-  if (!sequenceResolved) return requestedMode;
-  return sequenceKind(sequence) === 'fixed-seq' && isAgenticOnlyXAxisMode(requestedMode)
+  if (!scenarioResolved) return requestedMode;
+  return scenarioKind(scenario) === 'fixed-seq' && isAgenticOnlyXAxisMode(requestedMode)
     ? 'interactivity'
     : requestedMode;
 }
@@ -281,12 +281,12 @@ export function resolveEffectiveXAxisMode(
 export function resolveE2eXAxisMetric(
   requestedMetric: string | null,
   mode: XAxisMode,
-  sequence: Parameters<typeof sequenceKind>[0],
+  scenario: Parameters<typeof scenarioKind>[0],
   percentile: string,
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
 ): string | null {
   if (mode === 'ttft') {
-    return sequenceKind(sequence) === 'agentic'
+    return scenarioKind(scenario) === 'agentic'
       ? `${percentile}_ttft`
       : `${fixedSequenceStatistic}_ttft`;
   }
@@ -302,7 +302,7 @@ export function InferenceProvider({
   benchmarkQueryScope,
   initialBenchmarkModel,
   initialBenchmarkRows,
-  initialBenchmarkSequence,
+  initialBenchmarkScenario,
   initialYAxisMetric,
   autoSelectAllGpus = false,
   lockedFrameworks,
@@ -317,7 +317,7 @@ export function InferenceProvider({
   initialBenchmarkModel?: string;
   initialBenchmarkRows?: BenchmarkRow[];
   /** Sequence the seed rows cover; omit when they cover every sequence. */
-  initialBenchmarkSequence?: string;
+  initialBenchmarkScenario?: string;
   initialYAxisMetric?: string;
   autoSelectAllGpus?: boolean;
   lockedFrameworks?: readonly string[];
@@ -331,15 +331,15 @@ export function InferenceProvider({
 
   const {
     selectedModel,
-    effectiveSequence,
-    sequenceResolved,
+    effectiveScenario,
+    scenarioResolved,
     effectivePrecisions,
     tcoBasis,
     chipBasis,
   } = useGlobalFilterSelection();
   const {
     setSelectedModel,
-    setSelectedSequence,
+    setSelectedScenario,
     setSelectedPrecisions,
     setSelectedRunDate,
     setSelectedRunId,
@@ -348,7 +348,7 @@ export function InferenceProvider({
     useGlobalFilterRun();
   const {
     availableModels,
-    availableSequences,
+    availableScenarios,
     availablePrecisions,
     availableDates,
     availability,
@@ -362,9 +362,9 @@ export function InferenceProvider({
   const featureGateUnlocked = useFeatureGate();
   const engineGuardLifted = isEngineGuardLifted(isUnofficialRunRequested, featureGateUnlocked);
   const engineConsent = useEngineComparisonConsent(
-    `${selectedModel}|${effectiveSequence}|${effectivePrecisions.join(',')}`,
+    `${selectedModel}|${effectiveScenario}|${effectivePrecisions.join(',')}`,
   );
-  const consentSupported = supportsEngineComparisonConsent(effectiveSequence);
+  const consentSupported = supportsEngineComparisonConsent(effectiveScenario);
   const comparisonGuardLifted = engineGuardLifted || (consentSupported && engineConsent.accepted);
 
   const { getUrlParam, setUrlParams } = useUrlState();
@@ -396,11 +396,11 @@ export function InferenceProvider({
     () =>
       resolveComparisonExclusion(
         selectedModel,
-        effectiveSequence,
+        effectiveScenario,
         comparisonGuardLifted,
         overviewHistoryPair !== undefined,
       ),
-    [selectedModel, effectiveSequence, comparisonGuardLifted, overviewHistoryPair],
+    [selectedModel, effectiveScenario, comparisonGuardLifted, overviewHistoryPair],
   );
   const requestEngineComparison = useCallback(
     (keys: Iterable<string>, apply: () => void): boolean => {
@@ -412,10 +412,10 @@ export function InferenceProvider({
     [consentSupported, exclusion, engineConsent.request],
   );
   const defaultExclusionGroup = useMemo(
-    () => comparisonDefaultGroup(effectiveSequence, engineGuardLifted),
-    [effectiveSequence, engineGuardLifted],
+    () => comparisonDefaultGroup(effectiveScenario, engineGuardLifted),
+    [effectiveScenario, engineGuardLifted],
   );
-  const exclusionPolicy: ExclusionConflictPolicy = comparisonExclusionPolicy(effectiveSequence);
+  const exclusionPolicy: ExclusionConflictPolicy = comparisonExclusionPolicy(effectiveScenario);
 
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
     const urlDates = getUrlParam('i_dates');
@@ -450,7 +450,7 @@ export function InferenceProvider({
     setGpuUrlHydrated(true);
   }, [getUrlParam]);
   const selectedGpuResolution = useMemo(() => {
-    if (!sequenceResolved || !exclusion || selectedGpuState.length < 2) return null;
+    if (!scenarioResolved || !exclusion || selectedGpuState.length < 2) return null;
     const resolution = resolveExclusionGroups(
       new Set(selectedGpuState),
       new Set(),
@@ -469,7 +469,7 @@ export function InferenceProvider({
       selection,
       ...exclusionResolutionFamilies(selectedGpuState, resolution.result, exclusion),
     };
-  }, [selectedGpuState, sequenceResolved, exclusion, exclusionPolicy, defaultExclusionGroup]);
+  }, [selectedGpuState, scenarioResolved, exclusion, exclusionPolicy, defaultExclusionGroup]);
   const selectedGPUs = selectedGpuResolution?.selection ?? selectedGpuState;
   const notifiedGpuResolutionRef = useRef('');
   useEffect(() => {
@@ -537,8 +537,8 @@ export function InferenceProvider({
     activeTab === 'inference' ? defaultInferenceXAxisMode(selectedModel) : 'interactivity';
   const selectedXAxisMode = resolveEffectiveXAxisMode(
     requestedXAxisMode ?? defaultXAxisMode,
-    effectiveSequence,
-    sequenceResolved,
+    effectiveScenario,
+    scenarioResolved,
   );
   const handleSetXAxisMode = useCallback((mode: XAxisMode) => {
     xAxisModeFromUrlRef.current = true;
@@ -562,7 +562,7 @@ export function InferenceProvider({
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
     requestedE2eXAxisMetric,
     selectedXAxisMode,
-    effectiveSequence,
+    effectiveScenario,
     selectedPercentile,
     fixedSequenceStatistic,
   );
@@ -629,10 +629,10 @@ export function InferenceProvider({
     () =>
       activeTab === 'historical'
         ? EMPTY_QUICK_FILTERS
-        : effectiveSequence === Sequence.AgenticTraces
+        : effectiveScenario === Scenario.AgenticTraces
           ? { ...quickFilters, spec: [] }
           : quickFilters,
-    [activeTab, effectiveSequence, quickFilters],
+    [activeTab, effectiveScenario, quickFilters],
   );
   const { highContrast, setHighContrast, isLegendExpanded, setIsLegendExpanded } = useChartUIState({
     urlPrefix: 'i_',
@@ -646,9 +646,9 @@ export function InferenceProvider({
     // An explicit hardware request would otherwise be replaced by the best-per-SKU set.
     return getUrlParam('i_active') || initialActiveHwTypes?.length ? false : null;
   });
-  const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
+  const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveScenario);
   const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
-  const labelScenarioKind = sequenceKind(effectiveSequence);
+  const labelScenarioKind = scenarioKind(effectiveScenario);
   const initialLabelState = useMemo(
     () =>
       resolveLabelState('fixed-seq', {
@@ -730,9 +730,9 @@ export function InferenceProvider({
     scope: benchmarkQueryScope,
     seedRows: initialBenchmarkRows,
     seedModel: initialBenchmarkModel,
-    seedSequence: initialBenchmarkSequence,
+    seedScenario: initialBenchmarkScenario,
     selectedModel,
-    selectedSequence: effectiveSequence,
+    selectedScenario: effectiveScenario,
   });
   const warmFilterChange = useWarmFilterChange((preview, queryClient) =>
     warmInferenceSelection(queryClient, preview, {
@@ -741,7 +741,7 @@ export function InferenceProvider({
       scope: benchmarkQueryScope,
       seedRows: initialBenchmarkRows,
       seedModel: initialBenchmarkModel,
-      seedSequence: initialBenchmarkSequence,
+      seedScenario: initialBenchmarkScenario,
     }),
   );
 
@@ -755,7 +755,7 @@ export function InferenceProvider({
     availableQuickFilters,
   } = useChartData(
     selectedModel,
-    effectiveSequence,
+    effectiveScenario,
     effectivePrecisions,
     selectedYAxisMetric,
     selectedXAxisMetric,
@@ -768,7 +768,7 @@ export function InferenceProvider({
     tokenRevenuePricing,
     tokenRevenuePriceSource,
     effectiveRunDate,
-    isActive && sequenceResolved,
+    isActive && scenarioResolved,
     latestDate,
     selectedPercentile,
     compareGpuPair ?? null,
@@ -788,7 +788,7 @@ export function InferenceProvider({
     powerCompare,
     fixedSequenceStatistic,
     tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
-    isActive && !sequenceResolved && !effectiveRunDate && !seedRows,
+    isActive && !scenarioResolved && !effectiveRunDate && !seedRows,
     chipBasis,
   );
 
@@ -802,7 +802,7 @@ export function InferenceProvider({
     if (!availability) return availableDates;
     const lines = linesForModels(availability, dbModelKeys).filter(
       (line) =>
-        line.sequence === effectiveSequence &&
+        line.sequence === effectiveScenario &&
         effectivePrecisions.includes(line.precision) &&
         line.hwKey !== null &&
         selectedGPUs.includes(line.hwKey),
@@ -812,7 +812,7 @@ export function InferenceProvider({
   }, [
     availability,
     dbModelKeys,
-    effectiveSequence,
+    effectiveScenario,
     effectivePrecisions,
     selectedGPUs,
     availableDates,
@@ -822,7 +822,7 @@ export function InferenceProvider({
     if (!availability) return [];
     const hwKeys = new Set<string>();
     for (const line of linesForModels(availability, dbModelKeys)) {
-      if (line.sequence !== effectiveSequence) continue;
+      if (line.sequence !== effectiveScenario) continue;
       if (!effectivePrecisions.includes(line.precision)) continue;
       if (line.hwKey === null) continue;
       if (frameworkLock) {
@@ -840,7 +840,7 @@ export function InferenceProvider({
   }, [
     availability,
     dbModelKeys,
-    effectiveSequence,
+    effectiveScenario,
     effectivePrecisions,
     selectedModel,
     frameworkLock,
@@ -849,7 +849,7 @@ export function InferenceProvider({
   const autoSelectedGpusRef = useRef(false);
   useEffect(() => {
     if (!autoSelectAllGpus || autoSelectedGpusRef.current) return;
-    if (!gpuUrlHydrated || !availabilitySettled || !sequenceResolved) return;
+    if (!gpuUrlHydrated || !availabilitySettled || !scenarioResolved) return;
     if (getUrlParam('i_gpus') || selectedGpuState.length > 0) {
       autoSelectedGpusRef.current = true;
       return;
@@ -873,7 +873,7 @@ export function InferenceProvider({
     autoSelectAllGpus,
     gpuUrlHydrated,
     availabilitySettled,
-    sequenceResolved,
+    scenarioResolved,
     exclusion,
     exclusionPolicy,
     defaultExclusionGroup,
@@ -883,7 +883,7 @@ export function InferenceProvider({
   ]);
 
   useEffect(() => {
-    if (!sequenceResolved) return;
+    if (!scenarioResolved) return;
     const labelState = resolveLabelState(labelScenarioKind, {
       i_label: getUrlParam('i_label'),
       i_nolabel: getUrlParam('i_nolabel'),
@@ -893,7 +893,7 @@ export function InferenceProvider({
     setShowPointLabels(labelState.showPointLabels);
     setUseAdvancedLabels(labelState.useAdvancedLabels);
     setShowLineLabels(labelState.showLineLabels);
-  }, [labelScenarioKind, sequenceResolved, getUrlParam]);
+  }, [labelScenarioKind, scenarioResolved, getUrlParam]);
 
   const presetGuardRef = useRef(false);
   const clearPresetOnChange = useCallback(() => {
@@ -932,13 +932,13 @@ export function InferenceProvider({
       autoSelectAllGpus,
     ],
   );
-  const setSelectedSequenceAndClear = useCallback(
-    (v: typeof effectiveSequence) => {
+  const setSelectedScenarioAndClear = useCallback(
+    (v: typeof effectiveScenario) => {
       markScopePick();
-      setSelectedSequence(v);
+      setSelectedScenario(v);
       clearScopedSelectionOnChange();
     },
-    [markScopePick, setSelectedSequence, clearScopedSelectionOnChange],
+    [markScopePick, setSelectedScenario, clearScopedSelectionOnChange],
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
@@ -1394,7 +1394,7 @@ export function InferenceProvider({
   );
 
   const precisionsKey = effectivePrecisions.join(',');
-  const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
+  const hwResetKey = `${selectedModel}|${effectiveScenario}|${precisionsKey}|${
     engineGuardLifted ? 'preview' : 'official'
   }`;
   const lastHwResetKeyRef = useRef('');
@@ -1452,7 +1452,7 @@ export function InferenceProvider({
     chartDataLoading,
     exclusion,
     selectedModel,
-    effectiveSequence,
+    effectiveScenario,
     precisionsKey,
     hwResetKey,
     resolveHwSelection,
@@ -1515,7 +1515,7 @@ export function InferenceProvider({
     setActiveHwTypes(automaticSelection);
   }, [
     selectedModel,
-    effectiveSequence,
+    effectiveScenario,
     precisionsKey,
     hwResetKey,
     selectableHwTypes,
@@ -1530,11 +1530,11 @@ export function InferenceProvider({
   ]);
 
   useEffect(() => {
-    if (!availabilitySettled || !sequenceResolved || selectedGPUs.length === 0) return;
+    if (!availabilitySettled || !scenarioResolved || selectedGPUs.length === 0) return;
     const validKeys = new Set(availableGPUs.map((gpu) => gpu.value));
     const valid = selectedGPUs.filter((gpu) => validKeys.has(gpu));
     if (valid.length !== selectedGPUs.length) setSelectedGpuState(valid);
-  }, [availabilitySettled, sequenceResolved, availableGPUs, selectedGPUs]);
+  }, [availabilitySettled, scenarioResolved, availableGPUs, selectedGPUs]);
 
   useEffect(() => {
     if (!gpuUrlHydrated) return;
@@ -1566,7 +1566,7 @@ export function InferenceProvider({
     }
     if (selectedYAxisMetric !== 'y_powerUser')
       setUserPowers((prev) => (prev === null ? prev : null));
-  }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
+  }, [selectedModel, effectiveScenario, effectivePrecisions, selectedYAxisMetric]);
 
   const scatterTrackMounted = useRef(false);
   useEffect(() => {
@@ -1581,7 +1581,7 @@ export function InferenceProvider({
         gpus,
         gpu_count: gpus.length,
         model: selectedModel,
-        sequence: effectiveSequence,
+        sequence: effectiveScenario,
         preset_id: activePresetId,
         metric: selectedYAxisMetric,
       });
@@ -1603,7 +1603,7 @@ export function InferenceProvider({
         pair_count: pairs.length,
         gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].toSorted(),
         model: selectedModel,
-        sequence: effectiveSequence,
+        sequence: effectiveScenario,
         metric: selectedYAxisMetric,
       });
     }, 3000);
@@ -1661,7 +1661,7 @@ export function InferenceProvider({
   // overrides pass through unchanged. Serializing against the provisional kind would drop an
   // override that matches its defaults (e.g. `i_label=0` while the kind still reads fixed-seq)
   // before the effect above applies it to the resolved agentic scenario.
-  const serializedLabelState = sequenceResolved
+  const serializedLabelState = scenarioResolved
     ? serializeLabelState(labelScenarioKind, {
         showPointLabels,
         useAdvancedLabels,
@@ -1788,7 +1788,7 @@ export function InferenceProvider({
       const { config } = preset;
       presetGuardRef.current = true;
       setSelectedModel(config.model, { userSelection: false });
-      setSelectedSequence(config.sequence);
+      setSelectedScenario(config.sequence);
       setSelectedPrecisions(config.precisions);
       setSelectedYAxisMetric(config.yAxisMetric);
       setPendingHwFilter(config.hwFilter ?? null);
@@ -1820,7 +1820,7 @@ export function InferenceProvider({
     },
     [
       setSelectedModel,
-      setSelectedSequence,
+      setSelectedScenario,
       setSelectedPrecisions,
       setSelectedYAxisMetric,
       setSelectedGpuState,
@@ -1874,7 +1874,7 @@ export function InferenceProvider({
       isCheckingAvailableDates,
       availableRuns: filteredAvailableRuns,
       availablePrecisions,
-      availableSequences,
+      availableScenarios,
       availableModels,
     }),
     [
@@ -1892,7 +1892,7 @@ export function InferenceProvider({
       isCheckingAvailableDates,
       filteredAvailableRuns,
       availablePrecisions,
-      availableSequences,
+      availableScenarios,
       availableModels,
     ],
   );
@@ -1907,7 +1907,7 @@ export function InferenceProvider({
       blockedHwToggles,
       scopePickPending,
       selectedModel,
-      selectedSequence: effectiveSequence,
+      selectedScenario: effectiveScenario,
       selectedPrecisions: effectivePrecisions,
       quickFilters,
       selectedGPUs,
@@ -1931,7 +1931,7 @@ export function InferenceProvider({
       blockedHwToggles,
       scopePickPending,
       selectedModel,
-      effectiveSequence,
+      effectiveScenario,
       effectivePrecisions,
       quickFilters,
       selectedGPUs,
@@ -2023,7 +2023,7 @@ export function InferenceProvider({
     resolveComparisonSelection: resolveHwSelection,
     toggleComparisonSelection,
     setSelectedModel: setSelectedModelAndClear,
-    setSelectedSequence: setSelectedSequenceAndClear,
+    setSelectedScenario: setSelectedScenarioAndClear,
     setSelectedPrecisions: setSelectedPrecisionsAndClear,
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
     setTokenRevenuePriceSource,
@@ -2154,10 +2154,10 @@ export function useInferenceActions() {
 export function useInferenceAnalyticsContext(): SelectionAnalyticsContext {
   const filters = useContext(InferenceFiltersContext);
   const model = filters?.selectedModel;
-  const sequence = filters?.selectedSequence;
+  const scenario = filters?.selectedScenario;
   const precisions = filters?.selectedPrecisions;
   return useMemo(
-    () => selectionAnalyticsContext({ model, sequence, precisions }),
-    [model, sequence, precisions],
+    () => selectionAnalyticsContext({ model, sequence: scenario, precisions }),
+    [model, scenario, precisions],
   );
 }

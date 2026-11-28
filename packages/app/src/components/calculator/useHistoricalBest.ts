@@ -2,12 +2,12 @@
 
 import { useMemo } from 'react';
 
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 import { useStableValue } from '@/hooks/useStableValue';
-import { Percentile, type Model, type Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, type Model, type Scenario } from '@/lib/catalog/data-mappings';
 
 import {
   bestSoFarProgression,
@@ -23,7 +23,7 @@ const EMPTY: HistoricalBestOutcome = { best: [], unmeasured: [], datesSeen: 0 };
 
 export interface UseHistoricalBestOptions {
   model: Model;
-  sequence: Sequence;
+  sequence: Scenario;
   precisions: string[];
   targetValue: number;
   mode: CalculatorMode;
@@ -43,7 +43,7 @@ export interface UseHistoricalBestResult extends HistoricalBestOutcome {
 export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistoricalBestResult {
   const {
     model,
-    sequence,
+    sequence: scenario,
     targetValue,
     mode,
     costProvider,
@@ -58,7 +58,7 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
     (prev, next) => prev.length === next.length && prev.every((p, i) => p === next[i]),
   );
 
-  const islOsl = sequenceToIslOsl(sequence);
+  const islOsl = scenarioToIslOsl(scenario);
 
   const {
     data: rows,
@@ -74,13 +74,13 @@ export function useHistoricalBest(options: UseHistoricalBestOptions): UseHistori
     if (!rows) return null;
     return groupHistoryByHwKeyAndDate({
       rows,
-      sequence,
+      sequence: scenario,
       precisions,
       percentile,
       tokenType: costType,
       tcoBasis,
     });
-  }, [rows, sequence, precisions, percentile, costType, tcoBasis]);
+  }, [rows, scenario, precisions, percentile, costType, tcoBasis]);
 
   const selection = useMemo(() => {
     if (!groups) return { outcome: EMPTY, progressions: [] as HistoricalProgression[] };

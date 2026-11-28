@@ -1,4 +1,4 @@
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToScenario } from '@semianalysisai/inferencex-constants';
 import type { StagedChartScope } from '@semianalysisai/inferencex-db/queries/staged-chart-links';
 
 import { makeRunComparisonEntry } from '@/components/inference/utils/comparisonEntry';
@@ -19,7 +19,7 @@ export function buildStagedChartLinks(
   const links = new Map<string, StagedChartLink>();
   for (const scope of scopes) {
     const model = DB_MODEL_TO_DISPLAY[scope.model];
-    const sequence = rowToSequence(scope);
+    const sequence = rowToScenario(scope);
     if (!model || !sequence) {
       throw new Error(
         `Unsupported staged chart scope: ${scope.model}/${scope.benchmark_type}/${scope.isl}/${scope.osl}`,

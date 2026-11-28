@@ -51,10 +51,10 @@ import { getModelSortIndex } from '@/lib/catalog/constants';
 import {
   type Model,
   type Precision,
-  Sequence,
+  Scenario,
   getModelLabel,
   getPrecisionLabel,
-  getSequenceLabel,
+  getScenarioLabel,
 } from '@/lib/catalog/data-mappings';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -199,7 +199,7 @@ export default function HistoricalTrendsDisplay() {
   // A vendor narrows every chip view to that company's chips; null shows all vendors.
   const [frontierVendorFilter, setFrontierVendorFilter] = useState<string | null>(null);
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
-  const { tcoBasis, chipBasis, sequenceResolved } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis, scenarioResolved } = useGlobalFilterSelection();
   const modelDetails = useModelHistoryDetails();
   const { setChipBasis } = useGlobalFilterActions();
   const chipBasisControl = useMemo(
@@ -216,13 +216,13 @@ export default function HistoricalTrendsDisplay() {
     useInferenceData();
   const {
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedPrecisions,
     activeHwTypes,
     selectedRunDate,
     scopePickPending,
   } = useInferenceFilters();
-  const isAgentic = selectedSequence === Sequence.AgenticTraces;
+  const isAgentic = selectedScenario === Scenario.AgenticTraces;
   const targetLabel = isAgentic ? t.agenticTargetLabel : t.targetLabel;
   const { selectedYAxisMetric, tokenRevenuePricing, logScale, isLegendExpanded, highContrast } =
     useInferenceDisplay();
@@ -293,14 +293,14 @@ export default function HistoricalTrendsDisplay() {
     refetch: refetchTrendData,
   } = useInterpolatedTrendData({
     selectedModel: selectedModel as Model,
-    selectedSequence: selectedSequence as Sequence,
+    selectedScenario: selectedScenario as Scenario,
     selectedPrecisions,
     selectedYAxisMetric,
     targetInteractivity,
     availableDates,
     tokenRevenuePricing,
     enabled: shouldRequestTrendHistory({
-      sequenceResolved,
+      scenarioResolved,
       chartDataLoading: loading,
       hasInteractivityChart,
     }),
@@ -317,7 +317,7 @@ export default function HistoricalTrendsDisplay() {
     error: frontierError,
   } = useFrontierHistory({
     selectedModel: selectedModel as Model,
-    selectedSequence: selectedSequence as Sequence,
+    selectedScenario: selectedScenario as Scenario,
     selectedPrecisions,
     selectedYAxisMetric,
     higherIsBetter,
@@ -458,7 +458,7 @@ export default function HistoricalTrendsDisplay() {
           logo={<ModelLogo model={selectedModel as Model} className="size-6" />}
         >
           {getModelLabel(selectedModel as Model)}{' '}
-          {getSequenceLabel(selectedSequence as Sequence, locale)} {title}
+          {getScenarioLabel(selectedScenario as Scenario, locale)} {title}
           {qualifier && <HeadingQualifier>{qualifier}</HeadingQualifier>}
         </Heading>
       </div>
@@ -495,7 +495,7 @@ export default function HistoricalTrendsDisplay() {
       analyticsPrefix="historical"
       analyticsContext={selectionAnalyticsContext({
         model: selectedModel,
-        sequence: selectedSequence,
+        sequence: selectedScenario,
         precisions: selectedPrecisions,
         gpuCount: activeHwTypes.size,
       })}

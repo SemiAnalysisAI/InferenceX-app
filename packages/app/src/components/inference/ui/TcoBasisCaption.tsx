@@ -39,12 +39,12 @@ export function TcoBasisCaption({
   footer?: boolean;
 }) {
   const t = STRINGS[useLocale()];
-  const { selectedModel, selectedSequence } = useInferenceFilters();
+  const { selectedModel, selectedScenario } = useInferenceFilters();
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { tcoBasis } = useGlobalFilterSelection();
   if (
     !isCostMetric(selectedYAxisMetric) ||
-    !showsTcoBasisSelector(selectedModel, selectedSequence) ||
+    !showsTcoBasisSelector(selectedModel, selectedScenario) ||
     ![...hardwareKeys].some(hasInternalOwnerCost)
   ) {
     return null;

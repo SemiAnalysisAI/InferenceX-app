@@ -1,4 +1,4 @@
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 import type { QueryClient } from '@tanstack/react-query';
 
 import { fleetMegawatts } from '@/components/calculator/lifecycle';
@@ -13,7 +13,7 @@ import { evaluationsQueryOptions } from '@/hooks/api/use-evaluations';
 import { trendHistoryQueryOptions } from '@/hooks/api/use-trend-history';
 import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 import type { AvailabilityIndex } from '@/lib/benchmarks/availability-index';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Scenario } from '@/lib/catalog/data-mappings';
 import {
   dashboardRouteForPathname,
   dashboardShellCapabilitiesForPathname,
@@ -187,14 +187,14 @@ async function warmShellPage(
     void queryClient.prefetchQuery(inferenceChartQueryOptions(request.model, queryDate ?? ''));
   }
   if (page === 'historical') {
-    const islOsl = sequenceToIslOsl(selection.effectiveSequence);
+    const islOsl = scenarioToIslOsl(selection.effectiveScenario);
     prefetchEnabled(
       queryClient,
       trendHistoryQueryOptions(
         request.model,
         islOsl?.isl ?? 0,
         islOsl?.osl ?? 0,
-        selection.effectiveSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+        selection.effectiveScenario === Scenario.AgenticTraces ? 'agentic_traces' : undefined,
       ),
     );
   }
@@ -213,7 +213,7 @@ async function warmCalculatorPage(
   const request = resolveMountedFilterRequest({
     pathname,
     initialModel: seed.model,
-    initialSequence: profit ? Sequence.AgenticTraces : seed.sequence,
+    initialScenario: profit ? Scenario.AgenticTraces : seed.sequence,
     initialPrecisions: profit ? undefined : seed.precisions,
     initialRunDate: seed.runDate,
     initialRunId: seed.runId,
@@ -236,7 +236,7 @@ async function warmCalculatorPage(
     throughputQueryOptions(
       request.model,
       // The profit estimator always charts agentic traces.
-      profit ? Sequence.AgenticTraces : selection.effectiveSequence,
+      profit ? Scenario.AgenticTraces : selection.effectiveScenario,
       selection.effectiveRunDate,
     ),
   );
@@ -245,7 +245,7 @@ async function warmCalculatorPage(
     route.page === 'fleet' &&
     fleetMegawatts(state.getUrlParam('c_mw') ?? DEFAULT_FLEET_MW) !== null
   ) {
-    const islOsl = sequenceToIslOsl(selection.effectiveSequence);
+    const islOsl = scenarioToIslOsl(selection.effectiveScenario);
     prefetchEnabled(
       queryClient,
       benchmarkHistoryQueryOptions(request.model, islOsl?.isl ?? 0, islOsl?.osl ?? 0, {

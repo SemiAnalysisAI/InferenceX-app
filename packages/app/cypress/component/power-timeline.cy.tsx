@@ -7,7 +7,7 @@ import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
 import type { InferenceData } from '@/components/inference/types';
 import { traceKeyForPoint } from '@/components/inference/utils/powerTimeline';
-import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, Precision, Scenario } from '@/lib/catalog/data-mappings';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { computeToggle } from '@/lib/shared/toggle-set';
 
@@ -93,7 +93,7 @@ function providerOverrides(
   return {
     inference: {
       selectedModel: Model.DeepSeek_V4_Pro,
-      selectedSequence: Sequence.EightK_OneK,
+      selectedScenario: Scenario.EightK_OneK,
       selectedYAxisMetric: 'y_measuredPowerTimeline',
       hardwareConfig: hwConfig,
       activeHwTypes: new Set(activeHwTypes ?? HW_TYPES),
@@ -312,7 +312,7 @@ describe('PowerTimeline', () => {
       const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
       const value = createMockInferenceContextValues({
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.EightK_OneK,
+        selectedScenario: Scenario.EightK_OneK,
         selectedYAxisMetric: 'y_measuredPowerTimeline',
         hardwareConfig: hwConfig,
         activeHwTypes: new Set(HW_TYPES),
@@ -395,7 +395,7 @@ describe('PowerTimeline', () => {
       const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
       const value = createMockInferenceContextValues({
         selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.EightK_OneK,
+        selectedScenario: Scenario.EightK_OneK,
         selectedYAxisMetric: 'y_measuredPowerTimeline',
         hardwareConfig: hwConfig,
         activeHwTypes: new Set(HW_TYPES),

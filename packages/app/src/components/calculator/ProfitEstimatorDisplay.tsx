@@ -83,9 +83,9 @@ import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
   getOpenRouterModelId,
-  getSequenceLabel,
+  getScenarioLabel,
   Percentile,
-  Sequence,
+  Scenario,
   Model,
 } from '@/lib/catalog/data-mappings';
 import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
@@ -512,7 +512,7 @@ export default function ProfitEstimatorDisplay({
       {(urlSeed) => (
         <GlobalFilterProvider
           initialModel={urlSeed.model}
-          initialSequence={Sequence.AgenticTraces}
+          initialScenario={Scenario.AgenticTraces}
           initialPrecisions={urlSeed.precisions}
           initialRunDate={urlSeed.runDate}
           initialRunId={urlSeed.runId}
@@ -575,16 +575,16 @@ function ProfitEstimatorInner({
   const {
     tcoBasis,
     selectedModel,
-    effectiveSequence,
-    sequenceResolved,
+    effectiveScenario,
+    scenarioResolved,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedScenario, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availablePrecisions, availability, availabilitySettled } =
     useGlobalFilterAvailability();
-  const selectedSequence = Sequence.AgenticTraces;
+  const selectedScenario = Scenario.AgenticTraces;
   const agenticModels = useMemo(
     () => profitAgenticModels(PROFIT_BASIS_TAB[basis], availableModels, availability?.lines),
     [availableModels, availability, basis],
@@ -596,10 +596,10 @@ function ProfitEstimatorInner({
     }
   }, [modelAllowed, agenticModels, setSelectedModel]);
   useEffect(() => {
-    if (sequenceResolved && effectiveSequence !== Sequence.AgenticTraces) {
-      setSelectedSequence(Sequence.AgenticTraces);
+    if (scenarioResolved && effectiveScenario !== Scenario.AgenticTraces) {
+      setSelectedScenario(Scenario.AgenticTraces);
     }
-  }, [sequenceResolved, effectiveSequence, setSelectedSequence]);
+  }, [scenarioResolved, effectiveScenario, setSelectedScenario]);
   const mode = 'interactivity_to_throughput' as const;
 
   const [costProvider, setCostProvider] = useState<ProfitCostProvider>(
@@ -649,7 +649,7 @@ function ProfitEstimatorInner({
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const includePower = basis === 'gw-year' && powerBasis !== 'provisioned';
   const warmThroughputChange = useWarmThroughputChange({
-    sequence: selectedSequence,
+    sequence: selectedScenario,
     includePower,
   });
 
@@ -663,7 +663,7 @@ function ProfitEstimatorInner({
     availableHwKeys,
   } = useThroughputData(
     selectedModel,
-    selectedSequence,
+    selectedScenario,
     selectedPrecisions,
     selectedRunDate,
     undefined,
@@ -786,7 +786,7 @@ function ProfitEstimatorInner({
 
   const history = useProfitHistory({
     model: selectedModel,
-    sequence: selectedSequence,
+    sequence: selectedScenario,
     selectedGPUs,
     selectedDates,
     dateRange: selectedDateRange,
@@ -1040,7 +1040,7 @@ function ProfitEstimatorInner({
     [fullEstimate.rows, availableHwKeys, historyActive],
   );
 
-  const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
+  const selectionKey = `${selectedModel}|${selectedScenario}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...legendHwKeys].toSorted().join(',')}`;
 
@@ -1366,7 +1366,7 @@ function ProfitEstimatorInner({
             locale,
             basis,
             getModelLabel(selectedModel),
-            getSequenceLabel(Sequence.AgenticTraces, locale),
+            getScenarioLabel(Scenario.AgenticTraces, locale),
           )}
           <HeadingQualifier>
             {profitChartQualifier(locale, percentileLabel, chartTarget)}
@@ -1934,7 +1934,7 @@ function ProfitEstimatorInner({
                   selectedGPUs={selectedGPUs}
                   selectedPrecisions={selectedPrecisions}
                   modelDbKeys={dbModelKeys}
-                  selectedSequence={selectedSequence}
+                  selectedScenario={selectedScenario}
                   // Reserve the loading height until availability says which dates to query, so
                   // the list doesn't grow under the chart after hydration.
                   loading={historyChangelogs.loading || !availabilitySettled}
@@ -1976,7 +1976,7 @@ function ProfitEstimatorInner({
                 analyticsPrefix="profit_estimator"
                 analyticsContext={selectionAnalyticsContext({
                   model: selectedModel,
-                  sequence: selectedSequence,
+                  sequence: selectedScenario,
                   precisions: selectedPrecisions,
                   gpuCount: selectedGPUs.length,
                 })}

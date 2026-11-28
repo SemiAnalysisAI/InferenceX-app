@@ -1,4 +1,4 @@
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { rowToScenario } from '@semianalysisai/inferencex-constants';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
@@ -47,7 +47,7 @@ export function indexAvailability(compact: CompactAvailability): AvailabilityInd
         spec_method: specMethod,
         disagg,
         benchmark_type: benchmarkType,
-        sequence: rowToSequence({ isl, osl, benchmark_type: benchmarkType }),
+        sequence: rowToScenario({ isl, osl, benchmark_type: benchmarkType }),
         hwKey: lineHardware
           ? buildAvailabilityHwKey(lineHardware, framework, specMethod, disagg, benchmarkType)
           : null,

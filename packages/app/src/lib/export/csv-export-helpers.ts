@@ -7,7 +7,7 @@ import type { InferenceData, TrendDataPoint } from '@/components/inference/types
 import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
 
-import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { scenarioToIslOsl } from '@semianalysisai/inferencex-constants';
 
 interface CsvData {
   headers: string[];
@@ -43,7 +43,7 @@ export function inferenceChartToCsv(
   overlayData: InferenceData[] = [],
   displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
-  const islOsl = sequenceToIslOsl(sequence);
+  const islOsl = scenarioToIslOsl(sequence);
   const allPoints = [...data, ...overlayData];
   const powerCompare = inferPowerCompare(allPoints);
   const showPowerSeries = powerCompare !== 'none';

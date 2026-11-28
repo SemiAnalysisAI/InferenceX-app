@@ -112,19 +112,19 @@ export function compareTableDataFromPoints(
 }
 
 export interface CompareTableViewInput {
-  /** Table the server rendered for `ssrSequence`. */
+  /** Table the server rendered for `ssrScenario`. */
   ssrTableData: CompareTableData;
   /** Sequence the server computed `ssrTableData` for; null when it found no data. */
-  ssrSequence: string | null;
+  ssrScenario: string | null;
   /** Model the server computed `ssrTableData` for; undefined when it is not a known model. */
   ssrModel: string | undefined;
   /** Precisions the server computed `ssrTableData` for. */
   ssrPrecisions: readonly string[];
   /** Sequence requested by the controls, before availability resolves it. */
-  selectedSequence: string;
+  selectedScenario: string;
   /** Sequence the client fetches rows for. */
-  effectiveSequence: string;
-  sequenceResolved: boolean;
+  effectiveScenario: string;
+  scenarioResolved: boolean;
   /** Model the controls select, which the client fetches rows for. */
   selectedModel: string;
   /** Precisions requested by the controls, before availability resolves them. */
@@ -133,7 +133,7 @@ export interface CompareTableViewInput {
   effectivePrecisions: readonly string[];
   /** True while the controls show the latest run, which is the only run the server reads. */
   latestRun: boolean;
-  /** Client rows for `effectiveSequence`, split into the two compared sides. */
+  /** Client rows for `effectiveScenario`, split into the two compared sides. */
   pointsA: GPUDataPoint[];
   pointsB: GPUDataPoint[];
   /** Interactivity range of all client rows, or null before any rows load. */
@@ -175,12 +175,12 @@ export function pinTablePrecisions(list: string[], pinned: string | null): strin
  */
 export function resolveCompareTableView({
   ssrTableData,
-  ssrSequence,
+  ssrScenario,
   ssrModel,
   ssrPrecisions,
-  selectedSequence,
-  effectiveSequence,
-  sequenceResolved,
+  selectedScenario,
+  effectiveScenario,
+  scenarioResolved,
   selectedModel,
   selectedPrecisions,
   effectivePrecisions,
@@ -193,16 +193,16 @@ export function resolveCompareTableView({
 }: CompareTableViewInput): CompareTableView {
   // Before availability resolves, the client may still be fetching the app default sequence,
   // so its rows describe neither the controls nor the server table.
-  const clientSequence = sequenceResolved ? effectiveSequence : selectedSequence;
-  const clientPrecisions = sequenceResolved ? effectivePrecisions : selectedPrecisions;
+  const clientScenario = scenarioResolved ? effectiveScenario : selectedScenario;
+  const clientPrecisions = scenarioResolved ? effectivePrecisions : selectedPrecisions;
   // With no server sequence the server found no data for its model at all, so its empty
   // state holds for any precision of that model until the client resolves its sequence.
   const matchesSsr =
     latestRun &&
     selectedModel === ssrModel &&
-    (ssrSequence === null
-      ? !sequenceResolved
-      : clientSequence === ssrSequence &&
+    (ssrScenario === null
+      ? !scenarioResolved
+      : clientScenario === ssrScenario &&
         clientPrecisions.length === ssrPrecisions.length &&
         clientPrecisions.every((p) => ssrPrecisions.includes(p)));
 
@@ -213,20 +213,20 @@ export function resolveCompareTableView({
       key: 'ssr',
       data: ssrTableData,
       interactivityRange:
-        sequenceResolved && clientInteractivityRange
+        scenarioResolved && clientInteractivityRange
           ? clientInteractivityRange
           : ssrTableData.interactivityRange,
-      pointsA: sequenceResolved ? pointsA : NO_POINTS,
-      pointsB: sequenceResolved ? pointsB : NO_POINTS,
+      pointsA: scenarioResolved ? pointsA : NO_POINTS,
+      pointsB: scenarioResolved ? pointsB : NO_POINTS,
     };
   }
 
-  if (!sequenceResolved) return { status: 'loading' };
+  if (!scenarioResolved) return { status: 'loading' };
   if (pointsA.length > 0 || pointsB.length > 0) {
     const data = compareTableDataFromPoints(pointsA, pointsB);
     return {
       status: 'table',
-      key: `client:${selectedModel}:${effectiveSequence}:${effectivePrecisions.join(',')}`,
+      key: `client:${selectedModel}:${effectiveScenario}:${effectivePrecisions.join(',')}`,
       data,
       interactivityRange: data.interactivityRange,
       pointsA,

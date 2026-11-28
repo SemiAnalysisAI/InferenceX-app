@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'bun:test';
 
 import type { BenchmarkRow } from '@/lib/api/api';
-import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { Percentile, Scenario } from '@/lib/catalog/data-mappings';
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import previewSnapshots from '../../../cypress/fixtures/preview-snapshots.json';
 
@@ -79,7 +79,7 @@ describe('snapshot token-metric capabilities', () => {
     (row) => row.hardware === 'vr200',
   );
   const options = {
-    sequence: Sequence.EightK_OneK,
+    sequence: Scenario.EightK_OneK,
     precisions: ['fp4'],
     classify: classifyByHardware,
   };
@@ -1009,9 +1009,9 @@ const agenticRow = (
     },
   });
 
-const onlyRowFor = (row: BenchmarkRow, sequence = Sequence.OneK_OneK, percentile?: Percentile) => {
+const onlyRowFor = (row: BenchmarkRow, scenario = Scenario.OneK_OneK, percentile?: Percentile) => {
   const { grouped } = buildGpuGroups([row], {
-    sequence,
+    sequence: scenario,
     precisions: ['fp4'],
     percentile,
     classify: singlePrecisionClassify,
@@ -1036,12 +1036,12 @@ const agentic = (percentile: Percentile) =>
         p90_ttft: 3.1,
       },
     }),
-    Sequence.AgenticTraces,
+    Scenario.AgenticTraces,
     percentile,
   );
 
 describe('buildGpuGroups', () => {
-  const shared = { sequence: Sequence.OneK_OneK, precisions: ['fp4'] };
+  const shared = { sequence: Scenario.OneK_OneK, precisions: ['fp4'] };
 
   it('groups rows by the caller-supplied key and derives cost + power metrics', () => {
     const { grouped, groupMeta, hwConfigMap } = buildGpuGroups(
@@ -1297,7 +1297,7 @@ describe('buildGpuGroups', () => {
           }),
         ],
         {
-          sequence: Sequence.AgenticTraces,
+          sequence: Scenario.AgenticTraces,
           precisions: ['fp4'],
           classify: singlePrecisionClassify,
         },
@@ -1322,7 +1322,7 @@ describe('buildGpuGroups', () => {
           }),
         ],
         {
-          sequence: Sequence.AgenticTraces,
+          sequence: Scenario.AgenticTraces,
           precisions: ['fp4'],
           classify: singlePrecisionClassify,
         },
@@ -1345,7 +1345,7 @@ describe('buildGpuGroups', () => {
       },
     });
     const options = {
-      sequence: Sequence.OneK_OneK,
+      sequence: Scenario.OneK_OneK,
       precisions: ['fp8'],
       classify: singlePrecisionClassify,
     };
@@ -1390,7 +1390,7 @@ describe('buildGpuGroups', () => {
     const { grouped, groupMeta } = buildGpuGroups(
       [makeRow({ precision: 'fp4' }), makeRow({ precision: 'fp8' })],
       {
-        sequence: Sequence.OneK_OneK,
+        sequence: Scenario.OneK_OneK,
         precisions: ['fp4', 'fp8'],
         classify: (hwKey, row) => ({
           key: `${hwKey}__${row.precision}`,
@@ -1470,13 +1470,13 @@ describe('buildGpuGroups', () => {
     ];
 
     const p90 = buildGpuGroups(rows, {
-      sequence: Sequence.AgenticTraces,
+      sequence: Scenario.AgenticTraces,
       precisions: ['fp4'],
       percentile: Percentile.P90,
       classify: singlePrecisionClassify,
     });
     const p75 = buildGpuGroups(rows, {
-      sequence: Sequence.AgenticTraces,
+      sequence: Scenario.AgenticTraces,
       precisions: ['fp4'],
       percentile: Percentile.P75,
       classify: singlePrecisionClassify,
@@ -1501,7 +1501,7 @@ describe('buildGpuGroups', () => {
         agenticRow(8, 40, 50, 700, '2026-07-20'),
       ],
       {
-        sequence: Sequence.AgenticTraces,
+        sequence: Scenario.AgenticTraces,
         precisions: ['fp4'],
         percentile: Percentile.P90,
         classify: singlePrecisionClassify,
@@ -1533,7 +1533,7 @@ describe('buildGpuGroups', () => {
     ];
 
     const { grouped } = buildGpuGroups(rows, {
-      sequence: Sequence.AgenticTraces,
+      sequence: Scenario.AgenticTraces,
       precisions: ['fp4'],
       percentile: Percentile.P90,
       classify: (hwKey, row) => {

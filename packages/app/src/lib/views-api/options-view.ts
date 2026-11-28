@@ -2,7 +2,7 @@ import {
   FW_REGISTRY,
   getModelReleaseDate,
   HW_REGISTRY,
-  sequenceToIslOsl,
+  scenarioToIslOsl,
   SPEC_METHOD_KEYS,
 } from '@semianalysisai/inferencex-constants';
 
@@ -16,20 +16,20 @@ import {
 import { LIFECYCLE_DEFAULTS, LIFECYCLE_METRICS } from '@/components/calculator/lifecycle';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_RELIABILITY_RANGE, RELIABILITY_RANGES } from '@/components/reliability/aggregate';
-import { scenarioSegmentForSequence } from '@/lib/compare/compare-scenario-route';
+import { segmentForScenario } from '@/lib/compare/compare-scenario-route';
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import {
   getModelCategory,
-  getSequenceLabel,
-  getSequenceCategoryForModel,
-  isSequenceDeprecated,
+  getScenarioLabel,
+  getScenarioCategoryForModel,
+  isScenarioDeprecated,
   Model,
   MODEL_OPTIONS,
   PERCENTILE_OPTIONS,
   PRECISION_OPTIONS,
-  Sequence,
-  SEQUENCE_OPTIONS,
-  sequenceKind,
+  Scenario,
+  SCENARIO_OPTIONS,
+  scenarioKind,
 } from '@/lib/catalog/data-mappings';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
@@ -86,23 +86,23 @@ export function buildOptionsPayload() {
       category: getModelCategory(model),
       releaseDate: getModelReleaseDate(model),
       compareSlug: COMPARE_SLUG_BY_DISPLAY.get(model) ?? null,
-      deprecatedSequences: SEQUENCE_OPTIONS.filter(
-        (sequence) => getSequenceCategoryForModel(sequence, model) === 'deprecated',
+      deprecatedSequences: SCENARIO_OPTIONS.filter(
+        (scenario) => getScenarioCategoryForModel(scenario, model) === 'deprecated',
       ),
     };
   });
 
-  const sequences = SEQUENCE_OPTIONS.map((sequence) => {
-    const islOsl = sequenceToIslOsl(sequence);
+  const sequences = SCENARIO_OPTIONS.map((scenario) => {
+    const islOsl = scenarioToIslOsl(scenario);
     return {
-      key: sequence as string,
-      label: getSequenceLabel(sequence),
-      labelZh: getSequenceLabel(sequence, 'zh'),
-      urlSegment: scenarioSegmentForSequence(sequence),
+      key: scenario as string,
+      label: getScenarioLabel(scenario),
+      labelZh: getScenarioLabel(scenario, 'zh'),
+      urlSegment: segmentForScenario(scenario),
       isl: islOsl?.isl ?? null,
       osl: islOsl?.osl ?? null,
-      kind: sequenceKind(sequence),
-      deprecated: isSequenceDeprecated(sequence),
+      kind: scenarioKind(scenario),
+      deprecated: isScenarioDeprecated(scenario),
     };
   });
 
@@ -180,7 +180,7 @@ export function buildOptionsPayload() {
     },
     defaults: {
       model: Model.DeepSeek_V4_Pro as string,
-      sequence: Sequence.EightK_OneK as string,
+      sequence: Scenario.EightK_OneK as string,
       metric: DEFAULT_METRIC_CONFIG_KEY,
       percentile: 'p90',
       xmode: 'interactivity',
