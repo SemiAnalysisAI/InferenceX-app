@@ -816,6 +816,40 @@ describe('VideoGenX Results', () => {
     });
   });
 
+  it('names the precision the Compare row plays when BF16 and FP8 share a GPU', async () => {
+    intercept('GET', '/api/video-runs*', { status: 204 });
+    await mount({
+      search: '?r_y=videosPerGpuHour&r_prec=bf16,fp8',
+      editPage: (page) => {
+        for (const entry of page.entries) {
+          entry.publishedAt = '2026-11-01T00:00:00.000Z';
+          for (const source of entry.sources)
+            source.observations = source.observations.flatMap((observation) => [
+              { ...observation, results: evidence(observation) },
+              // Twice as fast, so FP8 opens each GPU.
+              {
+                ...observation,
+                id: `${observation.id}-fp8`,
+                wallSeconds: observation.wallSeconds === null ? null : observation.wallSeconds / 2,
+                results: { ...evidence(observation), precision: 'fp8' },
+              },
+            ]);
+        }
+      },
+    });
+    await eventually(() =>
+      expect([...config().options].map((option) => option.textContent)).toEqual(
+        expect.arrayContaining(['B200 · FP8', 'B200']),
+      ),
+    );
+    // Picking BF16 plays it, and the row names it rather than the FP8 opening.
+    select(config(), 'b200');
+    await eventually(() => expect(searchParam('r_clip')).toMatch(/^34341996789:(?!.*-fp8$)/u));
+    await eventually(() => expect(config().selectedOptions[0]?.textContent).toBe('B200'));
+    // The other GPUs open on FP8, and the second select says so.
+    expect([...against().options].map((option) => option.textContent)).toContain('H200 · FP8');
+  });
+
   it('pairs an unofficial run with the official cell of the same deployment', async () => {
     await mount({
       search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`,

@@ -114,7 +114,7 @@ function toPoint(
 
 /**
  * Newest published observation per (hardware, deployment, concurrency) cell,
- * where the deployment names the runtime (engine and optimizations) and server
+ * where the deployment names the runtime (engine, optimizations and precision) and server
  * layout. Points arrive newest publication first, so the first occurrence wins;
  * hardware without a registry key is kept as-is because nothing can be compared
  * against it. Two runtimes or two server layouts of one hardware are different

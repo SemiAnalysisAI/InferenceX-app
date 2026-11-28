@@ -37,4 +37,12 @@ describe('sealed results detail projection', () => {
     expect(invalid.peakPowerW).toBeNull();
     expect(invalid.workloadHash).toBe(at(cell.run, 'plan_sha256'));
   });
+
+  it('carries the precision InferenceX recorded in the cell aggregate, so FP8 rows never read as BF16', async () => {
+    const bundle = await read();
+    const cell = servingCells(bundle)[0];
+    expect(resultsEvidence(bundle, cell)).not.toHaveProperty('precision');
+    assign(bundle.documents.get('gpu/c1/aggregate.json')!, 'precision', 'FP8');
+    expect(resultsEvidence(bundle, cell).precision).toBe('fp8');
+  });
 });

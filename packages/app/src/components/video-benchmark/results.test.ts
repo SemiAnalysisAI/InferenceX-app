@@ -413,6 +413,30 @@ describe('VideoGenX results contract', () => {
       'vllm-omni',
     ]);
   });
+  it('shows BF16 by default, FP8 when picked or named, and never lets one precision replace the other', () => {
+    const bf16 = { ...eligible, id: 'bf16:c1', results: evidence({ engine: 'vllm-omni' }) };
+    // Published later and otherwise the same deployment: without precision it would replace BF16.
+    const fp8 = {
+      ...bf16,
+      id: 'fp8:c1',
+      runId: '200',
+      results: evidence({ engine: 'vllm-omni', precision: 'fp8' }),
+    };
+    const byDefault = resultProjection([fp8, bf16], state());
+    expect(ids(byDefault.cells)).toEqual(['bf16:c1']);
+    expect(byDefault.precisions).toEqual(['bf16']);
+    expect(byDefault.options.precisions).toEqual(['fp8', 'bf16']);
+    const picked = resultProjection([fp8, bf16], parseResultsState('r_prec=bf16,fp8'));
+    expect(ids(picked.cells)).toEqual(['bf16:c1', 'fp8:c1']);
+    expect(ids(resultProjection([fp8, bf16], parseResultsState('r_prec=fp8')).cells)).toEqual([
+      'fp8:c1',
+    ]);
+    // A named FP8 run joins the default view as its overlay, as AgentX merges unofficial precisions.
+    const named = resultProjection([bf16], { ...state(), unofficialRun: '200' }, [fp8]);
+    expect(named.precisions).toEqual(['fp8', 'bf16']);
+    expect(ids(named.overlayCells)).toEqual(['fp8:c1']);
+    expect(ids(named.cells)).toEqual(['bf16:c1']);
+  });
   it('keeps the workload and its engine choices when an engine is picked', () => {
     const plan = JSON.parse(eligible.workloadKey!);
     plan.plan.generation.height = 512;

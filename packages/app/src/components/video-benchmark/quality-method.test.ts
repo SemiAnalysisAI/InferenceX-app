@@ -76,7 +76,7 @@ const cell = (id: string, runId: string, lossy: boolean, publishedAt: string | n
   }) as unknown as VideoPoint;
 
 describe('quality method', () => {
-  it('scores and ranges reference PSNR over lossless CI clips with a finite score only', () => {
+  it('scores and ranges reference PSNR over lossless BF16 CI clips with a finite score only', () => {
     const rerun = {
       ...pair('measured', 50),
       scope: 'matched-noise-diagnostic',
@@ -99,6 +99,14 @@ describe('quality method', () => {
       { point: point('h100', true), side: side('h100', [[record('crane'), pair('measured', 5)]]) },
       { point: point('h200'), side: side('h200', [[record('crane'), pair('measured', 12.84)]]) },
       { point: point('mi355x'), side: undefined },
+      // FP8's gap to the BF16 reference also holds its quantization, not just engine and layout.
+      {
+        point: {
+          ...point('b300'),
+          results: { engine: 'vllm-omni', precision: 'fp8' },
+        } as VideoPoint,
+        side: side('b300', [[record('crane'), pair('measured', 8)]]),
+      },
     ];
     expect(referencePsnrRange(leads)).toEqual({
       min: 12.84,

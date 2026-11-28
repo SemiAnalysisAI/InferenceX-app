@@ -13,6 +13,8 @@ export interface ResultsEvidence {
   engine: string | null;
   /** Runtime optimization keys the run configuration declared; absent on older History. */
   optimizations?: string[];
+  /** Weight precision from the cell's InferenceX aggregate, such as `fp8`; absent before it was recorded. */
+  precision?: string;
   mode: string | null;
   attempted: number | null;
   notStarted: number | null;
@@ -90,6 +92,9 @@ export function resultsEvidence(
     valid.length === number(at(cell.run, 'summary', 'valid')) &&
     latencies.every((n): n is number => n !== null && n > 0);
   const { phase, valid: powerValid } = measuredPower(bundle, cell);
+  const precision = text(
+    at(bundle.documents.get(`gpu/${cell.id}/aggregate.json`) ?? null, 'precision'),
+  ).toLowerCase();
   const warmups = rows(at(cell.run, 'records')).filter((r) => at(r, 'phase') === 'warmup');
   const warmupTimes = warmups.map((r) => number(at(r, 'submit_to_media_seconds')));
   const failureRecords = measured.filter(
@@ -131,6 +136,7 @@ export function resultsEvidence(
           .filter(Boolean),
       ),
     ].toSorted(),
+    ...(precision ? { precision } : {}),
     mode:
       text(at(cell.run, 'plan', 'generation', 'mode')) ||
       text(at(cell.run, 'plan', 'mode')) ||

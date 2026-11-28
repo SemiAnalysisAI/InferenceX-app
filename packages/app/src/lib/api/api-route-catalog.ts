@@ -213,7 +213,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '41949ba9fc40dabcfd203b39d79d275b56f123b992c4436a5d21f70524ce5b35',
+    sourceSha256: '44f5414c560f12412bd868d6606b67c8319421b8fef9d78f99181b43571e9957',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -1590,7 +1590,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '86146308e0e886391d7e55b7d8a4d7176db63e89bd9b637a252df3852d271a28',
+    sourceSha256: '51b0864dfcb6021984bdc43fb0977284ff182aca29b69fd7e3832df2e32f1401',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission and dual GPU cost bases.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入及两种 GPU 成本口径。',
@@ -1598,7 +1598,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: 'a793b543dd0ccd3b5e79bef8408e7f49c9d40304d781f7d69af973d77002070c',
+    sourceSha256: 'ff5050340943e8f0ce009687b3bc2985f2e54aa3e638c3ad4591d38e78a1a951',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1606,7 +1606,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-csv.ts',
-    sourceSha256: '7adccb2fa000a26b68be9dcbba411ca2b1ef7dc8c7c5a2dc9dcf8ad965f18263',
+    sourceSha256: '530f8c80dc71d3f823197748b58635529177fd003115cb71dd6cca0b03031b49',
     reviewArea: {
       en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
       zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
@@ -1654,7 +1654,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-evidence.ts',
-    sourceSha256: '613a2f8d913ddbb3c463986a8193d1d0761c1dc594db96a95716208eaf4c69f4',
+    sourceSha256: '5c5f443084acf4e94735e7d54f748b709d436e1e55e2818db9c77d1755b08305',
     reviewArea: {
       en: 'Sealed video completion, client timing and valid power metadata; absent measurements remain null.',
       zh: '封印视频的完成数、客户端计时及有效功率元数据；缺失测量保留 null。',
@@ -1726,7 +1726,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: 'de3c22c5a2aca4a8696155e7a2843c74b719eef6f99ead968aa66b6070e8251a',
+    sourceSha256: 'b26cfe2969eed64b408540c15e020fca124deacb351b95f11236a0eb271cf8b8',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1742,7 +1742,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: '6cf184d20bc1eec7d261e364aec63cb6d1db74a725b0fad21fd0590b76cc60a5',
+    sourceSha256: '23652f0b023625fb67e69d0b1f2b2b431f29768846e5e9f4c5ba661a243ec8b7',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

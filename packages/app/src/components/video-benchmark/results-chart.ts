@@ -1,9 +1,11 @@
 import { frontierArea } from '@/components/inference/utils/best-series-per-sku';
+import { comparePrecisions } from '@/lib/benchmarks/default-precisions';
 import { globalParetoFrontier } from '@/lib/charts/pareto-frontier';
 import { chipConfigKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import { engineSort } from './engines';
 import { hardwareSort, type CostTier } from './hardware';
 import { isLossy, optimizationsOf } from './optimizations';
+import { precisionOf } from './precision';
 import type { VideoPoint } from './metrics';
 import type { ResultCell, ResultsState } from './results';
 
@@ -144,13 +146,15 @@ export interface ResultsChartPoint {
 }
 
 export interface ResultsChartSeries {
-  /** Unique per hardware, runtime (engine and optimizations) and run channel. */
+  /** Unique per hardware, runtime (engine, optimizations and precision) and run channel. */
   key: string;
   hardwareKey: string;
   /** Serving engine; null when the cells did not record one. */
   engine: string | null;
   /** Declared runtime optimizations, sorted. */
   optimizations: readonly string[];
+  /** Weight precision, such as `bf16`; each precision of a runtime is its own line, as in AgentX. */
+  precision: string;
   /** Any optimization changes the generated video, so the series never ranks against exact ones. */
   lossy: boolean;
   overlay: boolean;
@@ -182,16 +186,18 @@ export const resultsSelection = (state: ResultsState): ResultsChartSelection => 
   lossy: state.lossy,
 });
 
-/** Series order: hardware, then engine, lossless before lossy, the named run after the official one. */
+/** Series order: hardware, engine, precision, lossless before lossy, the named run after the official one. */
 const seriesOrder = (a: ResultsChartSeries, b: ResultsChartSeries) =>
   hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
   engineSort(a.engine) - engineSort(b.engine) ||
+  comparePrecisions(a.precision, b.precision) ||
   Number(a.lossy) - Number(b.lossy) ||
   Number(a.overlay) - Number(b.overlay);
 
 const seriesRuntime = (cell: ResultCell) => ({
   engine: cell.metadata.engine,
   optimizations: optimizationsOf(cell.point),
+  precision: precisionOf(cell.point),
   lossy: isLossy(cell.point),
 });
 
@@ -258,9 +264,11 @@ const seriesKey = ({ point, overlay }: Pick<ResultCell, 'point' | 'overlay'>) =>
   `${point.hardwareKey}:${runtimeKey(point)}${overlay ? '-overlay' : ''}`;
 
 /**
- * Each hardware's lossless series with the largest frontier area, per run channel:
+ * Each hardware's lossless runtime with the largest frontier area, per run channel:
  * InferenceX's best-series rule, so one engine is the default line per hardware.
- * Ties keep the earlier series in display order.
+ * As AgentX's Best per SKU, a runtime is scored on the frontier of its points in every
+ * shown precision, and the winner draws one line per precision. Ties keep the earlier
+ * runtime in display order.
  */
 function bestPerHardware(
   series: readonly ResultsChartSeries[],
@@ -268,13 +276,26 @@ function bestPerHardware(
 ): ResultsChartSeries[] {
   const maximizeX = RESULTS_X_METRICS[selection.x].better === 'higher',
     maximizeY = RESULTS_Y_METRICS[selection.y].better === 'higher';
-  const best = new Map<string, { item: ResultsChartSeries; area: number }>();
-  for (const item of series.toSorted(seriesOrder)) {
-    const channel = channelKey(item.hardwareKey, item.overlay);
-    const area = frontierArea(item.frontier, maximizeX, maximizeY);
-    if (area > (best.get(channel)?.area ?? -1)) best.set(channel, { item, area });
+  const runtimes = Map.groupBy(
+    series.toSorted(seriesOrder),
+    (item) =>
+      `${channelKey(item.hardwareKey, item.overlay)}:${[item.engine, ...item.optimizations].join('+')}`,
+  );
+  const best = new Map<string, { items: ResultsChartSeries[]; area: number }>();
+  for (const items of runtimes.values()) {
+    const channel = channelKey(items[0].hardwareKey, items[0].overlay);
+    const frontier =
+      items.length === 1
+        ? items[0].frontier
+        : globalParetoFrontier(
+            items.flatMap((item) => item.frontier),
+            maximizeX,
+            maximizeY,
+          );
+    const area = frontierArea(frontier, maximizeX, maximizeY);
+    if (area > (best.get(channel)?.area ?? -1)) best.set(channel, { items, area });
   }
-  return [...best.values()].map(({ item }) => item);
+  return [...best.values()].flatMap(({ items }) => items);
 }
 
 /**

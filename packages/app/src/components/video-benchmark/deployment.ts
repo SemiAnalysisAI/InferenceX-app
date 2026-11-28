@@ -2,14 +2,21 @@ import { engineSort } from './engines';
 import { hardwareSort } from './hardware';
 import { metricValue, type MetricOptions, type VideoPoint } from './metrics';
 import { isLossy, optimizationsOf } from './optimizations';
+import { precisionOf, REFERENCE_PRECISION } from './precision';
 
 type Layout = Pick<VideoPoint, 'participating' | 'server' | 'replicas'>;
 type Deployment = Pick<VideoPoint, 'participating' | 'server' | 'results'>;
 type HardwareDeployment = Deployment & Pick<VideoPoint, 'hardwareKey'>;
 
-/** "sglang", or "sol-engine+first-block-cache+sol-attn" when the run declared optimizations. */
+/**
+ * "sglang", "sol-engine+first-block-cache+sol-attn" when the run declared optimizations, and
+ * "vllm-omni@fp8" when it served another precision than BF16. BF16 keeps the bare key it had
+ * before precision was recorded, so shared Chip config links still resolve.
+ */
 export function runtimeKey(p: Pick<VideoPoint, 'results'>): string {
-  return [p.results?.engine ?? 'na', ...optimizationsOf(p)].join('+');
+  const precision = precisionOf(p);
+  const runtime = [p.results?.engine ?? 'na', ...optimizationsOf(p)].join('+');
+  return precision === REFERENCE_PRECISION ? runtime : `${runtime}@${precision}`;
 }
 
 /**
@@ -17,9 +24,9 @@ export function runtimeKey(p: Pick<VideoPoint, 'results'>): string {
  * which engine served with which optimizations, how many GPU boards served one
  * request and how they split the model (tensor parallel × Ulysses sequence
  * parallel). Cells that differ only in client concurrency belong to the same
- * deployment, so they share this key. Two engines, or one engine with and
- * without an optimization, are never one deployment, so neither replaces the
- * other's cell.
+ * deployment, so they share this key. Two engines, one engine with and
+ * without an optimization, or one engine in two precisions are never one
+ * deployment, so neither replaces the other's cell.
  */
 export function deploymentKey(p: Deployment): string {
   return `${runtimeKey(p)}:${p.participating ?? 'na'}g:tp${p.server?.tp ?? 'na'}:u${p.server?.ulysses ?? 'na'}`;
@@ -78,16 +85,19 @@ export function evidenceComparisonKey(p: VideoPoint): string | null {
   return known && JSON.stringify([runtimeKey(p), ...known]);
 }
 
-/** Run, hardware, engine, workload and layout: everything but the optimizations. */
+/** Run, hardware, engine, precision, workload and layout: everything but the optimizations. */
 function twinKey(p: VideoPoint): string | null {
   const known = workloadLayout(p);
-  return known && JSON.stringify([p.runId, p.hardwareKey, p.results?.engine ?? null, ...known]);
+  return (
+    known &&
+    JSON.stringify([p.runId, p.hardwareKey, p.results?.engine ?? null, precisionOf(p), ...known])
+  );
 }
 
 /**
- * The lossless cell a lossy cell is compared with: same run, hardware, engine, workload, GPU
- * count and server layout, with no lossy optimization. A cell from another run, workload or
- * layout differs in more than the optimization, so it never pairs. The same concurrency comes first, then
+ * The lossless cell a lossy cell is compared with: same run, hardware, engine, precision,
+ * workload, GPU count and server layout, with no lossy optimization. A cell from another run,
+ * precision, workload or layout differs in more than the optimization, so it never pairs. The same concurrency comes first, then
  * a cell whose optimizations the lossy cell also declares.
  */
 export function losslessTwin<T extends VideoPoint>(

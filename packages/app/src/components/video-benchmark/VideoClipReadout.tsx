@@ -9,7 +9,7 @@ import { layoutLabel } from './deployment';
 import { compareLower, cost as dollars, reading, type Comparison } from './format';
 import type { VideoPoint } from './metrics';
 import { lossyLabel, optimizationsOf } from './optimizations';
-import type { ResultCell } from './results';
+import { precisionTag, type ResultCell } from './results';
 import type { ResultsClip } from './results-clips';
 import { SideDot, type StageClip } from './VideoClipStage';
 
@@ -339,7 +339,7 @@ function cell(
   return { ...own, pair: words ? { words, value: theirs } : { value: `${b.name} ${theirs}` } };
 }
 
-/** The pill's name, the side's layout and lossy optimizations, and its unofficial tag. */
+/** The pill's name, the side's layout, precision and lossy optimizations, and its unofficial tag. */
 function PairSide({
   side,
   diagnostic,
@@ -354,7 +354,9 @@ function PairSide({
   // The matched-noise rerun has its own GPU count, which only the pill knows.
   const meta =
     point && !diagnostic
-      ? [layoutLabel(point, locale), lossyLabel(optimizationsOf(point))].filter(Boolean).join(' · ')
+      ? [layoutLabel(point, locale), precisionTag(point), lossyLabel(optimizationsOf(point))]
+          .filter(Boolean)
+          .join(' · ')
       : pill.meta;
   return (
     <span

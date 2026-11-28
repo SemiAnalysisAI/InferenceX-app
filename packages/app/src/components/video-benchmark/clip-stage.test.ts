@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  compareConfigs,
   pairedGroup,
   parseStage,
   promptKey,
@@ -39,6 +40,16 @@ const side = (hardwareKey: string, records: CaseRecord[], media = true): Results
 });
 const point = (hardwareKey: string, runId = 'official') =>
   ({ id: hardwareKey, hardwareKey, runId }) as VideoPoint;
+const b200Cell = (precision: string, runId: string, p50: number) =>
+  ({
+    id: `${runId}:${precision}`,
+    hardwareKey: 'b200',
+    runId,
+    publishedAt: '2026-11-28T00:00:00Z',
+    concurrency: 1,
+    p50,
+    results: { engine: 'vllm-omni', optimizations: [], precision },
+  }) as unknown as VideoPoint;
 
 describe('clip stage', () => {
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
@@ -95,6 +106,17 @@ describe('clip stage', () => {
       pending: true,
     });
     expect(stageSubject([clipless])?.groups).toHaveLength(1);
+  });
+
+  it('offers each drawn precision of a GPU as its own Compare-row config', () => {
+    const fp8 = b200Cell('fp8', 'fp8-run', 29);
+    const bf16 = b200Cell('bf16', 'bf16-run', 32);
+    // Whichever precision opens B200, the other is still offered.
+    expect(compareConfigs([fp8], [fp8, bf16])).toEqual([fp8, bf16]);
+    expect(compareConfigs([bf16], [fp8, bf16])).toEqual([bf16, fp8]);
+    // A named run's own row still stands for its GPU; the official line it overlays is not added.
+    const named = { ...fp8, runId: 'named' };
+    expect(compareConfigs([named], [named, bf16], 'named')).toEqual([named]);
   });
 
   it('reads speed from seconds per clip in the right direction and leaves a missing p50 unmeasured', () => {

@@ -28,6 +28,7 @@ import { ShareButton } from '@/components/ui/share-button';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ControlPanel } from '@/components/ui/control-panel';
+import { PrecisionSelector } from '@/components/ui/chart-selectors';
 import { InfoHelp } from '@/components/ui/option-info';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
@@ -52,6 +53,7 @@ import {
   isUnofficialRunParam,
   MAX_CHIP_CONFIGS,
   parseResultsState,
+  precisionTag,
   resultProjection,
   resultsSearch,
   resultMetadata,
@@ -751,6 +753,18 @@ export default function VideoDashboard({
                       });
                     }}
                   />
+                  <PrecisionSelector
+                    id="results-precision"
+                    data-testid="results-precision"
+                    value={projection.precisions}
+                    availablePrecisions={options.precisions}
+                    onChange={(precisions) => {
+                      track('video_results_precision_selected', {
+                        precision: precisions.join(','),
+                      });
+                      updateSeries({ precisions });
+                    }}
+                  />
                 </ControlPanel>
                 <MobileControlSection
                   label={s.secondaryControls}
@@ -856,6 +870,7 @@ export default function VideoDashboard({
                             label: [
                               hardwareLabel(point.hardwareKey ?? ''),
                               runtimeLabel(point.results?.engine ?? null, optimizationsOf(point)),
+                              precisionTag(point),
                               layoutLabel(point, locale),
                             ]
                               .filter(Boolean)
