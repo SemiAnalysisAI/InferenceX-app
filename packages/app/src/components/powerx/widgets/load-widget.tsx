@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
@@ -67,6 +67,20 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
     highContrast: false,
     activeKeys: [...LADDER_HARDWARE],
   });
+  const slider = useRef<HTMLInputElement>(null);
+  // A drag fires `input` on every step but `change` once, on release (or per key press). The URL
+  // write and the analytics event wait for `change`, so each step only re-renders the strip.
+  const commit = useEffectEvent((value: string) => {
+    setRaw(value);
+    track('powerx_tutorial_load_watts', { value: Number(value) });
+  });
+  useEffect(() => {
+    const input = slider.current;
+    if (!input) return undefined;
+    const onCommit = () => commit(input.value);
+    input.addEventListener('change', onCommit);
+    return () => input.removeEventListener('change', onCommit);
+  }, []);
   const hydrated = useHydrated();
   const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
   const names = SYSTEM_POWER_CATEGORY_LABELS[locale];
@@ -84,16 +98,14 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
         <label className="flex min-w-0 flex-1 basis-64 items-center gap-3">
           <span className="shrink-0 text-sm font-medium text-foreground">{t.slider}</span>
           <input
+            ref={slider}
             type="range"
             min={0}
             max={sweep.tdpWatts}
             step={10}
             value={gpuWatts}
             aria-valuetext={t.readout(formatWatts(gpuWatts), fraction * 100)}
-            onChange={(event) => {
-              setRaw(event.target.value);
-              track('powerx_tutorial_load_watts', { value: Number(event.target.value) });
-            }}
+            onChange={(event) => setRaw(event.target.value, { persist: false })}
             className="range-slider h-11 min-w-0 flex-1 md:h-9"
             style={rangeProgressStyle(gpuWatts, 0, sweep.tdpWatts)}
           />

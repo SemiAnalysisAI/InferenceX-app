@@ -36,12 +36,16 @@ const CHROME_STRINGS = {
   },
 } as const;
 
-/** Reads `key` from the URL hash on mount and writes every change back with replaceState. */
+/**
+ * Reads `key` from the URL hash on mount and writes every change back with replaceState. Pass
+ * `{ persist: false }` to update the state without touching the URL, e.g. on each step of a
+ * slider drag, and write the URL once the value is committed.
+ */
 export function useWidgetHash<T>(
   key: string,
   encode: (state: T) => string,
   decode: (raw: string | null) => T,
-): [T, (next: T) => void] {
+): [T, (next: T, options?: { persist?: boolean }) => void] {
   const [state, setState] = useState<T>(() => decode(null));
   useEffect(() => {
     const raw = readWidgetHash(window.location.hash, key);
@@ -50,8 +54,9 @@ export function useWidgetHash<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   const set = useCallback(
-    (next: T) => {
+    (next: T, { persist = true }: { persist?: boolean } = {}) => {
       setState(next);
+      if (!persist) return;
       const hash = writeWidgetHash(window.location.hash, key, encode(next));
       window.history.replaceState(window.history.state, '', `#${hash}`);
     },

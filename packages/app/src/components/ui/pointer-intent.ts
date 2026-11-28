@@ -119,6 +119,12 @@ function predict() {
 
 function onPointerMove(event: PointerEvent) {
   if (event.pointerType !== 'mouse') return;
+  // A held button is a drag (a slider, a chart brush), not an aim at a link. Predicting would
+  // measure every target on each frame of the drag for nothing.
+  if (event.buttons !== 0) {
+    samples = [];
+    return;
+  }
   const t = event.timeStamp;
   samples.push({ x: event.clientX, y: event.clientY, t });
   while (samples.length > 2 && t - samples[0]!.t > SAMPLE_WINDOW_MS) samples.shift();
