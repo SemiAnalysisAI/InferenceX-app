@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Music } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
-import { HALO_MUSIC_EVENT, HALO_MUSIC_KEY, haloMusicEnabled } from './halo-music';
+import { HALO_MUSIC_KEY } from './halo-music';
+import { haloWrite, useHaloValue } from './halo-state';
 
 const toggleClasses = cn(
   'inline-flex items-center justify-center rounded-md size-11',
@@ -14,51 +14,36 @@ const toggleClasses = cn(
   'focus-visible:outline-none',
 );
 
-const STRINGS = {
-  en: { mute: 'Mute Halo music', unmute: 'Play Halo music' },
-  zh: { mute: '关闭 Halo 音乐', unmute: '播放 Halo 音乐' },
-} as const;
+const MUTE_LABEL = { en: 'Mute Halo audio', zh: '静音光环音频' } as const;
 
 export function HaloToggles() {
-  const t = STRINGS[useLocale()];
-  const [musicOn, setMusicOn] = useState(true);
-
-  useEffect(() => {
-    const check = () => setMusicOn(haloMusicEnabled());
-    check();
-    window.addEventListener(HALO_MUSIC_EVENT, check);
-    return () => window.removeEventListener(HALO_MUSIC_EVENT, check);
-  }, []);
+  const locale = useLocale();
+  const musicOn = useHaloValue(HALO_MUSIC_KEY, 'true') !== 'false';
 
   function toggleMusic() {
     const next = !musicOn;
-    setMusicOn(next);
-    try {
-      localStorage.setItem(HALO_MUSIC_KEY, String(next));
-    } catch {}
-    window.dispatchEvent(new CustomEvent(HALO_MUSIC_EVENT));
+    haloWrite(HALO_MUSIC_KEY, String(next));
     track('halo_music_toggled', { enabled: next });
   }
 
-  const label = musicOn ? t.mute : t.unmute;
+  const label = MUTE_LABEL[locale];
   return (
-    <button
-      type="button"
-      data-testid="halo-music-toggle"
-      className={toggleClasses}
-      onClick={toggleMusic}
-      title={label}
-      aria-label={label}
-      aria-pressed={musicOn}
-    >
-      <span className="relative">
-        <Music className="w-[20px] h-[20px]" aria-hidden="true" />
-        {!musicOn && (
-          <span className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
-            <span className="block w-[22px] h-[2px] bg-current rotate-45" />
-          </span>
+    <span className="halo-audio-switches">
+      <button
+        type="button"
+        data-testid="halo-music-toggle"
+        className={toggleClasses}
+        onClick={toggleMusic}
+        title={label}
+        aria-label={label}
+        aria-pressed={!musicOn}
+      >
+        {musicOn ? (
+          <Volume2 size={18} aria-hidden="true" />
+        ) : (
+          <VolumeX size={18} aria-hidden="true" />
         )}
-      </span>
-    </button>
+      </button>
+    </span>
   );
 }
