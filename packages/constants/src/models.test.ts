@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'bun:test';
 import {
+  DB_MODEL_RELEASE_NAMES,
   DB_MODEL_TO_DISPLAY,
   DISPLAY_MODEL_TO_DB,
-  MODEL_RELEASE_DATES,
+  MODEL_REGISTRY,
   getModelReleaseDate,
-  sequenceToIslOsl,
-  islOslToSequence,
 } from './models';
 
 describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
@@ -68,9 +67,13 @@ describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
   });
 });
 
-describe('MODEL_RELEASE_DATES', () => {
+describe('MODEL_REGISTRY', () => {
+  const releaseDates = Object.entries(MODEL_REGISTRY).flatMap(([model, entry]) =>
+    entry.releaseDate ? [[model, entry.releaseDate] as const] : [],
+  );
+
   it('stores every date as a real calendar day in YYYY-MM-DD', () => {
-    for (const [model, date] of Object.entries(MODEL_RELEASE_DATES)) {
+    for (const [model, date] of releaseDates) {
       expect(date, model).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
       expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10), model).toBe(date);
     }
@@ -78,7 +81,7 @@ describe('MODEL_RELEASE_DATES', () => {
 
   it('has no model releasing in the future', () => {
     const today = new Date().toISOString().slice(0, 10);
-    for (const [model, date] of Object.entries(MODEL_RELEASE_DATES)) {
+    for (const [model, date] of releaseDates) {
       expect(
         date.localeCompare(today),
         `${model} released ${date}, after today`,
@@ -86,57 +89,28 @@ describe('MODEL_RELEASE_DATES', () => {
     }
   });
 
-  it('is keyed by display name, never by DB model key', () => {
-    const dbKeys = new Set(Object.keys(DB_MODEL_TO_DISPLAY));
-    for (const model of Object.keys(MODEL_RELEASE_DATES)) {
-      expect(dbKeys.has(model), `${model} is a DB key, not a display name`).toBe(false);
-    }
+  it('gives every model a slug no other model or slug alias uses', () => {
+    const slugs = Object.values(MODEL_REGISTRY).flatMap((entry) => [
+      entry.slug,
+      ...(entry.slugAliases ?? []),
+    ]);
+    expect(new Set(slugs).size).toBe(slugs.length);
+  });
+
+  it('stores each DB key under exactly one model', () => {
+    const dbKeys = Object.values(MODEL_REGISTRY).flatMap((entry) => entry.dbKeys);
+    expect(new Set(dbKeys).size).toBe(dbKeys.length);
+  });
+
+  it('names a point-release bucket by its own release and other buckets by their model', () => {
+    expect(DB_MODEL_RELEASE_NAMES['kimik2.6']).toBe('Kimi-K2.6');
+    expect(DB_MODEL_RELEASE_NAMES['glm5.3']).toBe('GLM-5.3');
+    expect(DB_MODEL_RELEASE_NAMES['kimik2.5']).toBe('Kimi-K2.5');
+    expect(DB_MODEL_RELEASE_NAMES.dsv4).toBe('DeepSeek-V4-Pro');
   });
 
   it('returns null rather than throwing for a model with no sourced date', () => {
     expect(getModelReleaseDate('not-a-model')).toBeNull();
     expect(getModelReleaseDate('')).toBeNull();
-  });
-});
-
-describe('sequenceToIslOsl', () => {
-  it('parses 1k/1k to 1024/1024', () => {
-    expect(sequenceToIslOsl('1k/1k')).toEqual({ isl: 1024, osl: 1024 });
-  });
-
-  it('parses 1k/8k to 1024/8192', () => {
-    expect(sequenceToIslOsl('1k/8k')).toEqual({ isl: 1024, osl: 8192 });
-  });
-
-  it('parses 8k/1k to 8192/1024', () => {
-    expect(sequenceToIslOsl('8k/1k')).toEqual({ isl: 8192, osl: 1024 });
-  });
-
-  it('returns null for unknown sequences', () => {
-    expect(sequenceToIslOsl('2k/2k')).toBeNull();
-    expect(sequenceToIslOsl('')).toBeNull();
-    expect(sequenceToIslOsl('invalid')).toBeNull();
-  });
-});
-
-describe('islOslToSequence', () => {
-  it('converts 1024/1024 to 1k/1k', () => {
-    expect(islOslToSequence(1024, 1024)).toBe('1k/1k');
-  });
-
-  it('converts 1024/8192 to 1k/8k', () => {
-    expect(islOslToSequence(1024, 8192)).toBe('1k/8k');
-  });
-
-  it('returns null for unmapped ISL/OSL pairs', () => {
-    expect(islOslToSequence(2048, 2048)).toBeNull();
-    expect(islOslToSequence(0, 0)).toBeNull();
-  });
-
-  it('round-trips with sequenceToIslOsl for all known sequences', () => {
-    for (const seq of ['1k/1k', '1k/8k', '8k/1k']) {
-      const parsed = sequenceToIslOsl(seq)!;
-      expect(islOslToSequence(parsed.isl, parsed.osl)).toBe(seq);
-    }
   });
 });

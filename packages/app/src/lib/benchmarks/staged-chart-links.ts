@@ -1,4 +1,4 @@
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants/models';
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { StagedChartScope } from '@semianalysisai/inferencex-db/queries/staged-chart-links';
 
 import { makeRunComparisonEntry } from '@/components/inference/utils/comparisonEntry';

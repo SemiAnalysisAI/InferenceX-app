@@ -1,4 +1,19 @@
-import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants/models';
+import {
+  type CategoryTag,
+  DB_MODEL_TO_DISPLAY,
+  type EnumKeyed,
+  MODEL_PREFIX_ALIASES,
+  MODEL_REGISTRY,
+  type ModelEntry,
+  type ModelName,
+  PRECISION_REGISTRY,
+  type PrecisionEntry,
+  type PrecisionKey,
+  type ScenarioKind,
+  SEQUENCE_REGISTRY,
+  type SequenceEntry,
+  type SequenceKey,
+} from '@semianalysisai/inferencex-constants';
 
 import type { ExclusionConflictPolicy, ExclusionSpec } from '../benchmarks/exclusion';
 
@@ -25,8 +40,6 @@ export enum Model {
   Muse_Spark_Open = 'Muse-Spark-Open',
 }
 
-export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
-
 export function groupByCategory<T>(
   items: T[],
   classify: (item: T) => CategoryTag,
@@ -42,19 +55,6 @@ export function groupByCategory<T>(
     groups[classify(item)].push(item);
   }
   return groups;
-}
-
-interface ModelConfig {
-  label: string;
-  prefix: string;
-  category: CategoryTag;
-  openRouterModelId?: string;
-  logo?: string;
-  exclusion?: ExclusionSpec[];
-  /** Pending registrations remain inference-selectable, but are not measured fallback choices. */
-  requiresObservations?: boolean;
-  /** UI visibility only; raw benchmark/API identities remain available. */
-  featureGated?: boolean;
 }
 
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
@@ -75,148 +75,10 @@ const STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
 
 const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
 
-const MODEL_CONFIG: Record<Model, ModelConfig> = {
-  [Model.Muse_Spark_Open]: {
-    label: 'Muse Spark 1.3/Open 816B',
-    prefix: 'musespark',
-    category: 'default',
-    logo: 'meta-color.svg',
-  },
-  [Model.DeepSeek_V4_Pro]: {
-    label: 'DeepSeek V4 Pro 0813 1.6T',
-    prefix: 'dsv4',
-    category: 'deprecated',
-    openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
-    logo: 'deepseek-color.svg',
-    exclusion: MTP_ENGINE_EXCLUSION,
-  },
-  [Model.DeepSeek_V4_1_Flash]: {
-    label: 'DeepSeek V4.1 Flash 552B',
-    prefix: 'dsv41flash',
-    category: 'default',
-    openRouterModelId: 'deepseek/deepseek-v4.1-flash',
-    logo: 'deepseek-color.svg',
-  },
-  [Model.Kimi_K3_1_Pro]: {
-    label: 'Kimi K3.1 Pro 2.8T',
-    prefix: 'kimik3.1',
-    category: 'default',
-    openRouterModelId: 'moonshotai/kimi-k3.1-pro',
-    logo: 'kimi-color.svg',
-  },
-  [Model.Kimi_K3]: {
-    label: 'Kimi K3 2.8T',
-    prefix: 'kimik3',
-    category: 'deprecated',
-    openRouterModelId: 'moonshotai/kimi-k3',
-    logo: 'kimi-color.svg',
-  },
-  [Model.Kimi_K2_5]: {
-    label: 'Kimi K2.5/2.6/2.7-Code 1T',
-    prefix: 'kimik2.5',
-    category: 'deprecated',
-    openRouterModelId: 'moonshotai/kimi-k2.7-code',
-    logo: 'kimi-color.svg',
-  },
-  [Model.MiniMax_M3]: {
-    label: 'MiniMax M3 428B',
-    prefix: 'minimaxm3',
-    category: 'deprecated',
-    openRouterModelId: 'minimax/minimax-m3',
-    logo: 'minimax-color.svg',
-  },
-  [Model.MiniMax_M3_1_Flash]: {
-    label: 'MiniMax M3.1 Flash 428B',
-    prefix: 'minimaxm31flash',
-    category: 'default',
-    openRouterModelId: 'minimax/minimax-m3.1-flash',
-    logo: 'minimax-color.svg',
-  },
-  [Model.DeepSeek_R1]: {
-    label: 'DeepSeek R1 0528 671B',
-    prefix: 'dsr1',
-    category: 'maintenance',
-    openRouterModelId: 'deepseek/deepseek-r1-0528',
-    logo: 'deepseek-color.svg',
-  },
-  [Model.GLM_5]: {
-    label: 'GLM5/5.1 744B',
-    prefix: 'glm5',
-    category: 'deprecated',
-    openRouterModelId: 'z-ai/glm-5.1',
-    logo: 'zai-color.svg',
-  },
-  [Model.GLM_5_2]: {
-    label: 'GLM5.2/GLM5.3 744B',
-    prefix: 'glm5.2',
-    category: 'default',
-    openRouterModelId: 'z-ai/glm-5.3',
-    logo: 'zai-color.svg',
-  },
-  [Model.Qwen3_5]: {
-    label: 'Qwen3.5 397B',
-    prefix: 'qwen3.5',
-    category: 'default',
-    openRouterModelId: 'qwen/qwen3.5-397b-a17b',
-    logo: 'qwen-color.svg',
-  },
-  [Model.GLM_5_3_Flash]: {
-    label: 'GLM 5.3 Flash',
-    prefix: 'glm5.3flash',
-    category: 'default',
-    logo: 'zai-color.svg',
-    requiresObservations: true,
-    featureGated: true,
-  },
-  [Model.Qwen3_8_Flash_Next]: {
-    label: 'Qwen3.8 Flash Next 176B',
-    prefix: 'qwen3.8next',
-    category: 'default',
-    openRouterModelId: 'qwen/qwen3.8-flash',
-    logo: 'qwen-color.svg',
-  },
-  [Model.Qwen3_8_27B]: {
-    label: 'Qwen3.8 27B',
-    prefix: 'qwen3.827b',
-    category: 'experimental',
-    openRouterModelId: 'qwen/qwen3.8-27b',
-    logo: 'qwen-color.svg',
-  },
-  [Model.Qwen3_8_27B_Eager]: {
-    label: 'Qwen3.8 27B (eager)',
-    prefix: 'qwen3.827beager',
-    category: 'experimental',
-    openRouterModelId: 'qwen/qwen3.8-27b',
-    logo: 'qwen-color.svg',
-  },
-  [Model.GptOss]: {
-    label: 'gpt-oss 120B',
-    prefix: 'gptoss',
-    category: 'deprecated',
-    openRouterModelId: 'openai/gpt-oss-120b',
-    logo: 'openai.svg',
-  },
-  [Model.MiniMax_M2_5]: {
-    label: 'MiniMax M2.5/2.7 230B',
-    prefix: 'minimaxm2.5',
-    category: 'deprecated',
-    openRouterModelId: 'minimax/minimax-m2.7',
-    logo: 'minimax-color.svg',
-  },
-  [Model.Llama3_3_70B]: {
-    label: 'Llama 3.3 70B Instruct',
-    prefix: '70b',
-    category: 'deprecated',
-    openRouterModelId: 'meta-llama/llama-3.3-70b-instruct',
-    logo: 'meta-color.svg',
-  },
-  [Model.Llama3_1_70B]: {
-    label: 'Llama 3.1 70B Instruct',
-    prefix: '',
-    category: 'hidden',
-    openRouterModelId: 'meta-llama/llama-3.1-70b-instruct',
-    logo: 'meta-color.svg',
-  },
+const MODEL_CONFIG: EnumKeyed<Model, ModelName, ModelEntry> = MODEL_REGISTRY;
+
+const MODEL_EXCLUSIONS: Partial<Record<Model, ExclusionSpec[]>> = {
+  [Model.DeepSeek_V4_Pro]: MTP_ENGINE_EXCLUSION,
 };
 
 function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
@@ -296,7 +158,7 @@ export function modelRequiresObservations(model: Model): boolean {
 
 export function getModelExclusion(model: Model | string | null | undefined): ExclusionSpec[] {
   if (!model) return [];
-  return MODEL_CONFIG[model as Model]?.exclusion ?? [];
+  return MODEL_EXCLUSIONS[model as Model] ?? [];
 }
 
 export function hasExclusion(model: Model | string | null | undefined): boolean {
@@ -312,13 +174,17 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 
-export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
-  (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
-    .filter(([, c]) => c.prefix)
-    .flatMap(([m, c]) =>
-      [...new Set([c.prefix, ...(DISPLAY_MODEL_TO_DB[m] ?? [])])].map((prefix) => [prefix, m]),
-    ),
-);
+export const MODEL_PREFIX_MAPPING: Record<string, Model> = {
+  ...(DB_MODEL_TO_DISPLAY as Record<string, Model>),
+  ...Object.fromEntries(
+    Object.entries(MODEL_PREFIX_ALIASES).map(([prefix, dbKey]) => [
+      prefix,
+      DB_MODEL_TO_DISPLAY[dbKey] as Model,
+    ]),
+  ),
+  // Llama 3.3 artifact names and changelog keys carry the bare `70b` prefix.
+  '70b': Model.Llama3_3_70B,
+};
 
 const MODEL_PREFIXES_LONGEST_FIRST = Object.keys(MODEL_PREFIX_MAPPING).toSorted(
   (a, b) => b.length - a.length,
@@ -331,89 +197,57 @@ export enum Sequence {
   AgenticTraces = 'agentic-traces',
 }
 
-export type ScenarioKind = 'fixed-seq' | 'agentic';
+const SEQUENCE_CONFIG: EnumKeyed<Sequence, SequenceKey, SequenceEntry> = SEQUENCE_REGISTRY;
 
 export function sequenceKind(seq: Sequence): ScenarioKind {
-  return seq === Sequence.AgenticTraces ? 'agentic' : 'fixed-seq';
+  return SEQUENCE_CONFIG[seq].kind;
 }
 
-interface SequenceConfig {
-  label: string;
-  labelZh: string;
-  compact: string;
-  category: CategoryTag;
-  kind: ScenarioKind;
-  exclusion?: ExclusionSpec[];
-  exclusionPolicy?: ExclusionConflictPolicy;
-  defaultExclusionGroup?: string;
-  exclusionFamilies?: readonly string[];
+interface SequenceExclusionConfig {
+  exclusion: ExclusionSpec[];
+  exclusionPolicy: ExclusionConflictPolicy;
+  defaultExclusionGroup: string;
+  exclusionFamilies: readonly string[];
 }
 
-const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
-  [Sequence.OneK_OneK]: {
-    label: '1K / 1K',
-    labelZh: '1K / 1K',
-    compact: '1k1k',
-    category: 'deprecated',
-    kind: 'fixed-seq',
-  },
-  [Sequence.OneK_EightK]: {
-    label: '1K / 8K',
-    labelZh: '1K / 8K',
-    compact: '1k8k',
-    category: 'deprecated',
-    kind: 'fixed-seq',
-  },
-  [Sequence.EightK_OneK]: {
-    label: '8K / 1K',
-    labelZh: '8K / 1K',
-    compact: '8k1k',
-    category: 'default',
-    kind: 'fixed-seq',
-    exclusion: STP_ENGINE_EXCLUSION,
-    exclusionPolicy: 'keep-sticky',
-    defaultExclusionGroup: 'vllm',
-    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
-  },
-  [Sequence.AgenticTraces]: {
-    label: 'Agentic',
-    labelZh: '智能体',
-    compact: 'agentic',
-    category: 'default',
-    kind: 'agentic',
-    exclusion: STP_ENGINE_EXCLUSION,
-    exclusionPolicy: 'keep-sticky',
-    defaultExclusionGroup: 'vllm',
-    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
-  },
+const GUARDED_ENGINE_EXCLUSION: SequenceExclusionConfig = {
+  exclusion: STP_ENGINE_EXCLUSION,
+  exclusionPolicy: 'keep-sticky',
+  defaultExclusionGroup: 'vllm',
+  exclusionFamilies: GUARDED_ENGINE_FAMILIES,
+};
+
+const SEQUENCE_EXCLUSIONS: Partial<Record<Sequence, SequenceExclusionConfig>> = {
+  [Sequence.EightK_OneK]: GUARDED_ENGINE_EXCLUSION,
+  [Sequence.AgenticTraces]: GUARDED_ENGINE_EXCLUSION,
 };
 
 export function getSequenceExclusion(
   sequence: Sequence | string | null | undefined,
 ): ExclusionSpec[] {
   if (!sequence) return [];
-  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusion ?? [];
+  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.exclusion ?? [];
 }
 
 export function getSequenceExclusionPolicy(
   sequence: Sequence | string | null | undefined,
 ): ExclusionConflictPolicy {
   if (!sequence) return 'clear-all';
-  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionPolicy ?? 'clear-all';
+  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.exclusionPolicy ?? 'clear-all';
 }
 
 export function getSequenceDefaultExclusionGroup(
   sequence: Sequence | string | null | undefined,
 ): string | null {
   if (!sequence) return null;
-  return SEQUENCE_CONFIG[sequence as Sequence]?.defaultExclusionGroup ?? null;
+  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.defaultExclusionGroup ?? null;
 }
 
 export function getSequenceExclusionFamilies(
   sequence: Sequence | string | null | undefined,
 ): readonly string[] | null {
   if (!sequence) return null;
-  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionFamilies ?? null;
+  return SEQUENCE_EXCLUSIONS[sequence as Sequence]?.exclusionFamilies ?? null;
 }
 
 export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
@@ -528,13 +362,7 @@ export enum Precision {
   INT4 = 'int4',
 }
 
-const PRECISION_CONFIG: Record<Precision, { label: string }> = {
-  [Precision.FP4]: { label: 'FP4' },
-  [Precision.FP4FP8]: { label: 'FP4+FP8' },
-  [Precision.FP8]: { label: 'FP8' },
-  [Precision.BF16]: { label: 'BF16' },
-  [Precision.INT4]: { label: 'INT4' },
-};
+const PRECISION_CONFIG: EnumKeyed<Precision, PrecisionKey, PrecisionEntry> = PRECISION_REGISTRY;
 
 export const PRECISION_OPTIONS = Object.keys(PRECISION_CONFIG) as Precision[];
 

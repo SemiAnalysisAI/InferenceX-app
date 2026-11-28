@@ -1,3 +1,5 @@
+import { SEQUENCE_KEYS } from '@semianalysisai/inferencex-constants';
+
 import type {
   ApiOperation,
   ApiParameter,
@@ -66,7 +68,7 @@ const parameters: readonly ApiParameter[] = [
       'Workload sequence. Aliases: 8k-1k, 1k-1k, 1k-8k, agentic. Default: the pair default the page picks (AgentX-featured models fall back to agentic-traces, others to 8k/1k).',
       '工作负载序列。别名：8k-1k、1k-1k、1k-8k、agentic。默认为页面选取的组合默认值（AgentX 精选模型回退到 agentic-traces，其余为 8k/1k）。',
     ),
-    schema: { type: 'string', enum: ['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'] },
+    schema: { type: 'string', enum: SEQUENCE_KEYS },
     example: '8k/1k',
   },
   {

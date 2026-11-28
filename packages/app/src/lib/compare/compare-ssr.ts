@@ -2,6 +2,8 @@ import {
   AUTHOR_NAME,
   AUTHOR_URL,
   HW_REGISTRY,
+  PRECISION_ALIASES,
+  PRECISION_KEYS,
   rowToSequence,
   SITE_NAME,
   SITE_URL,
@@ -36,7 +38,7 @@ import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export { getCachedBenchmarks };
 
-export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
+export const KNOWN_PRECISIONS = new Set([...PRECISION_KEYS, ...Object.keys(PRECISION_ALIASES)]);
 
 export interface AgenticScenarioIntro {
   paragraph: string;

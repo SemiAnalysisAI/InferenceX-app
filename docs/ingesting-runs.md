@@ -13,7 +13,7 @@ Every path below goes through the same ETL entry point, `packages/db/src/ingest-
 
 ## Set up a clean checkout
 
-Run ingest from current `origin/master`. Model and hardware mappings live in `packages/db/src/etl/normalizers.ts`, and a stale checkout can skip rows it cannot map.
+Run ingest from current `origin/master`. Model and hardware mappings live in `packages/constants/src/models.ts` and `gpu-keys.ts`, and a stale checkout can skip rows it cannot map.
 
 ```bash
 cd InferenceX-app
@@ -60,7 +60,7 @@ Things to check:
 - **Run attempt:** CI mode needs it as `INGEST_RUN_ATTEMPT`. Download mode reads it from the API.
 - **Framework and model:** Read them from the artifact names rather than assuming the requested framework produced the run.
 - **Server-log size:** Multinode `multinode_server_logs_*` artifacts can be large. Choose the download path below accordingly.
-- **Mappings:** Check `normalizers.ts` for the model prefix and hardware in the artifact names. Unmapped rows are skipped; `UNMAPPED_ENTITIES_OUTPUT=<path>` writes a report for review.
+- **Mappings:** Check `packages/constants/src/models.ts` and `gpu-keys.ts` for the model prefix and hardware in the artifact names. Unmapped rows are skipped; `UNMAPPED_ENTITIES_OUTPUT=<path>` writes a report for review.
 - **Artifact availability:** Confirm that the selected artifacts have not expired.
 
 ## Ingest
@@ -203,7 +203,7 @@ done | sort -n
 
 Compare matching configurations and units, accounting for rounding in the displayed query. Also check output throughput, E2EL, and TPOT where present. Agentic ITL and interactivity can differ from legacy artifact fields because ingest uses full-response metrics and can reconstruct them from the AIPerf profile; do not assume a fixed tolerance for that difference.
 
-Finally, open the target dashboard's model page in the AgentX view and verify the run's points. Model slugs live in `packages/app/src/lib/compare/compare-slug.ts`; use a model present in the approved run.
+Finally, open the target dashboard's model page in the AgentX view and verify the run's points. Model slugs live in `MODEL_REGISTRY` (`packages/constants/src/models.ts`); use a model present in the approved run.
 
 ## Preview a run from another repository
 

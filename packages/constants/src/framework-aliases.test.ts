@@ -3,7 +3,6 @@ import { describe, expect, it } from 'bun:test';
 import {
   FRAMEWORK_ALIASES,
   FRAMEWORK_LABELS,
-  MODEL_SPEC_METHOD_LABELS,
   resolveFrameworkAlias,
   resolveFrameworkAliasesInString,
   resolveFrameworkPartLabel,
@@ -31,17 +30,6 @@ describe('FRAMEWORK_LABELS', () => {
   });
 });
 
-describe('MODEL_SPEC_METHOD_LABELS', () => {
-  it('maps MiniMax-M3 mtp to "M3 EAGLE"', () => {
-    expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3']?.mtp).toBe('M3 EAGLE');
-    expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3.1-Flash']?.mtp).toBe('DSpark');
-  });
-
-  it('maps Kimi-K3 mtp to "DSpark"', () => {
-    expect(MODEL_SPEC_METHOD_LABELS['Kimi-K3']?.mtp).toBe('DSpark');
-  });
-});
-
 describe('resolveFrameworkPartLabel', () => {
   it('preserves TokenSpeed branding without renaming its data key', () => {
     expect(resolveFrameworkPartLabel(undefined, 'tokenspeed')).toBe('TokenSpeed');
@@ -59,8 +47,9 @@ describe('resolveFrameworkPartLabel', () => {
     expect(resolveFrameworkPartLabel('MiniMax-M3', 'mtp')).toBe('M3 EAGLE');
   });
 
-  it('renders K3 mtp as "DSpark"', () => {
+  it('renders K3 and M3.1 Flash mtp as "DSpark"', () => {
     expect(resolveFrameworkPartLabel('Kimi-K3', 'mtp')).toBe('DSpark');
+    expect(resolveFrameworkPartLabel('MiniMax-M3.1-Flash', 'mtp')).toBe('DSpark');
   });
 
   it('keeps the generic MTP label for other models', () => {

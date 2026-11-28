@@ -10,6 +10,7 @@ import {
   objectSchema,
   arraySchema,
 } from '@/lib/api/api-documentation-helpers';
+import { buildOptionsPayload } from '@/lib/views-api/options-view';
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
@@ -127,97 +128,19 @@ const responseSchema = objectSchema(
   ],
 );
 
+const payload = buildOptionsPayload();
+
+/** The live payload with its long lists cut to a few entries. */
 const responseExample = {
   view: 'options',
   apiVersion: 'v1',
   params: { format: 'json' },
-  models: [
-    {
-      name: 'Kimi-K3',
-      dbKeys: ['kimik3'],
-      category: 'deprecated',
-      releaseDate: '2026-07-27',
-      compareSlug: 'kimi-k3',
-      deprecatedSequences: ['1k/1k', '1k/8k'],
-    },
-    {
-      name: 'DeepSeek-V4-Pro',
-      dbKeys: ['dsv4'],
-      category: 'deprecated',
-      releaseDate: '2026-06-30',
-      compareSlug: 'deepseek-v4-pro',
-      deprecatedSequences: ['1k/1k', '1k/8k', '8k/1k'],
-    },
-    {
-      name: 'MiniMax-M3',
-      dbKeys: ['minimaxm3'],
-      category: 'deprecated',
-      releaseDate: '2026-06-07',
-      compareSlug: 'minimax-m3',
-      deprecatedSequences: ['1k/1k', '1k/8k', '8k/1k'],
-    },
-  ],
-  sequences: [
-    {
-      key: '8k/1k',
-      label: '8k/1k',
-      labelZh: '8k/1k',
-      urlSegment: '8k-1k',
-      isl: 8192,
-      osl: 1024,
-      kind: 'fixed',
-      deprecated: false,
-    },
-  ],
-  precisions: ['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4'],
-  hardware: [
-    {
-      key: 'h200',
-      label: 'H200',
-      vendor: 'NVIDIA',
-      arch: 'Hopper',
-      tdpW: 700,
-      costPerHour: { h: 2.29, n: 2.99, r: 3.11 },
-    },
-  ],
-  frameworks: [{ key: 'trt', label: 'TRTLLM', family: 'trt' }],
-  specMethods: ['mtp', 'none'],
-  percentiles: ['p75', 'p90'],
-  xAxisModes: ['interactivity', 'ttft', 'e2e', 'e2e-normalized-interactivity'],
-  fixedSequenceStatistics: ['median', 'mean'],
-  scaleModes: ['auto', 'linear', 'log'],
-  metrics: [
-    {
-      key: 'tokensPerDollarN',
-      configKey: 'y_tokensPerDollarN',
-      label: 'Tokens per Dollar (Neocloud)',
-      labelZh: '每美元 Token 数（Neocloud）',
-      unit: null,
-      polarity: 'higher',
-      group: 'Cost',
-      source: 'benchmark',
-    },
-  ],
-  quickFilters: {
-    vendors: ['NVIDIA', 'AMD'],
-    frameworkFamilies: ['vllm', 'sglang', 'trt', 'atom'],
-    deployments: ['single-node', 'multi-node', 'disagg'],
-    specModes: ['mtp', 'stp'],
-  },
-  reliabilityRanges: ['last-3-days', 'last-7-days', 'last-month', 'last-3-months', 'all-time'],
-  defaults: {
-    model: 'DeepSeek-V4-Pro',
-    sequence: '8k/1k',
-    metric: 'y_tokensPerDollarH',
-    percentile: 'p90',
-    xmode: 'interactivity',
-    xstat: 'median',
-    serviceCompare: false,
-    roleShare: false,
-    powerFit: false,
-    powerBreakdown: false,
-    headroom: false,
-  },
+  ...payload,
+  models: payload.models.slice(0, 3),
+  sequences: payload.sequences.slice(-2),
+  hardware: payload.hardware.slice(0, 2),
+  frameworks: payload.frameworks.slice(0, 2),
+  metrics: payload.metrics.slice(0, 2),
 };
 
 const responses: readonly ApiResponse[] = [

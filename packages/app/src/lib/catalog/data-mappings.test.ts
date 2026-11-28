@@ -106,6 +106,16 @@ describe('getModelAndSequence', () => {
     expect(result).toEqual({ model: Model.GptOss, sequence: Sequence.OneK_EightK });
   });
 
+  it('parses an ingest prefix alias as the model its bucket belongs to', () => {
+    expect(getModelAndSequence('results_kimik2.7_8k1k')).toEqual({
+      model: Model.Kimi_K2_5,
+      sequence: Sequence.EightK_OneK,
+    });
+    expect(
+      getModelAndSequenceFromArtifact({ infmax_model_prefix: 'dsv4pro', isl: 8192, osl: 1024 }),
+    ).toEqual({ model: Model.DeepSeek_V4_Pro, sequence: Sequence.EightK_OneK });
+  });
+
   it('parses artifact name with qwen3.5 model prefix', () => {
     const result = getModelAndSequence('results_qwen3.5_8k1k');
     expect(result).toEqual({ model: Model.Qwen3_5, sequence: Sequence.EightK_OneK });

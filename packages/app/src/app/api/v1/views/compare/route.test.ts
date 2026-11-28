@@ -149,7 +149,7 @@ describe('GET /api/v1/views/compare', () => {
     expect(body.model).toEqual({
       slug: 'deepseek-r1',
       displayName: 'DeepSeek-R1-0528',
-      label: 'DeepSeek R1',
+      label: 'DeepSeek R1 0528 671B',
     });
     expect(body.scenario).toBe('1k/1k');
     expect(body.precision).toBe('fp8');

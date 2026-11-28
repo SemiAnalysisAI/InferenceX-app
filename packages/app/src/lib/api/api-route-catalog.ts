@@ -157,7 +157,7 @@ export const apiRouteCatalog = [
     operationId: 'get-view-options',
     // Kimi K3.1 Pro leads MODEL_OPTIONS and the inference landing route;
     // explicit-model API requirements and defaults.model remain unchanged.
-    sourceSha256: '79f8765d704cef43d9c976fe2a40e1a4dd23a3de0b30c411dacbf8144a345327',
+    sourceSha256: 'b74c343f957fe3e57787b4e91b57058a6dcf8e1a1326e7bb7a720f1f51e4a848',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -1282,7 +1282,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: '2ef19d035a474778efaa90f74edafdd287b6aef39a2cdad3bed41bb9423be196',
+    sourceSha256: '368126e95fccb5a8c684eef1e8ffb5a335e3b05c70f2bd0db7737e0aaf8a60e5',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
@@ -1918,7 +1918,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: 'ee14df85ab82d9e917545a1ba4ca297d89353b6f2acae5ef378553d1bdb8a8e3',
+    sourceSha256: '45f3cdb3fbe805850ae77fa9b9d8ca381079ff5e93c67921da32cd0d9e7a0cef',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1927,7 +1927,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/api/pareto-api.ts',
-    sourceSha256: 'e42ab184f78ce81e322822a043a7e40d18bb97fb3da2c10b0bfb2528a26c9fca',
+    sourceSha256: '937ede169c91b2caae9ea2158dd5a6935e881e0d01e079989c280539af6fb9e9',
     reviewArea: {
       en: 'Pareto selectors, validation, source scope, missing-axis counts and boundary observations.',
       zh: 'Pareto 选择条件、验证、来源范围、缺失坐标计数和边界观测值。',
@@ -1951,7 +1951,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-request-params.ts',
-    sourceSha256: '876c31f250ec60274675f7adc05155b1e0e52771a6a0aea54ae1daa17ce1b3c2',
+    sourceSha256: '358a766790df2adb71ae74ddabc5e682a04aff246ef088186cdc2923cd5a794c',
     reviewArea: {
       en: '/api/v1/benchmarks query validation and 400 messages.',
       zh: '/api/v1/benchmarks 查询参数校验与 400 错误信息。',
@@ -1999,7 +1999,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/catalog/model-name-resolver.ts',
-    sourceSha256: 'e1ff58681093cbe5ba4ee18fea43d96cade58c330dc28bbf942dd6e24ff33a88',
+    sourceSha256: '51ef2cc94b76b44fa27666669f98ecf02297f6e046ce4812665f62b3fc117411',
     reviewArea: {
       en: 'Accepted model= forms (display names, DB keys, slugs, legacy names) for the benchmark reads and the views API.',
       zh: '基准读取接口与视图 API 接受的 model= 形式（展示名称、DB 键、slug、旧名称）。',
@@ -2082,7 +2082,7 @@ export const apiContractSourceDigests = [
     // Disaggregated rows now read the stored per-deployed-GPU tput_per_gpu without
     // a second decode ÷ total rescale. costPerMtok values change; parameters,
     // response shape and the documented cost formula are unchanged.
-    sourceSha256: '15d10533b96590ffc21208fbf7b4d7806757afff5bd467dd5d05598dd93fbdc7',
+    sourceSha256: '07d2955be215cefe2751bebaae45d6090518972b6be0068da4030ddbbcdb1d85',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -2116,10 +2116,34 @@ export const apiContractSourceDigests = [
     // Reviewed for the Kimi-K3.1-Pro addition (InferenceX#4803): one new DB key,
     // `kimik3.1`, with its own display name and release date. No endpoint or
     // parameter shape changes, so the docs stand.
-    sourceSha256: 'd331d67e91f5bf56eeee7c2d30c34448d498ddb33e21399bcb3854d5ed599c3d',
+    sourceSha256: '4fe42a82cffd45d6514117730558d1826b06408069d776ddfe1f7c467a163fa4',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
+    },
+  },
+  {
+    source: '../constants/src/sequences.ts',
+    sourceSha256: '5388d121b1d4c4254cc364c56fab8a4a8aa8501febdfa5f4cc4e21060a84217e',
+    reviewArea: {
+      en: 'Published sequence values, their URL-segment aliases, and ISL/OSL mappings.',
+      zh: '已发布的序列取值、对应的 URL 路径段别名，以及 ISL/OSL 映射。',
+    },
+  },
+  {
+    source: '../constants/src/precision-keys.ts',
+    sourceSha256: 'a7d23a7fd29a62608a600e4d999da7d3f7c2fafd48ddd5a9fb70f3916ce618e8',
+    reviewArea: {
+      en: 'Published precision values, labels, and the precisions compare views report.',
+      zh: '已发布的精度取值、标签，以及对比视图返回的精度。',
+    },
+  },
+  {
+    source: 'src/lib/views-api/options-view.ts',
+    sourceSha256: '15a53e87b3f2406765357aec76dd5a7650774d9845dce20297f2ae0b0c662039',
+    reviewArea: {
+      en: 'The /api/v1/views/options payload and the API reference example taken from it.',
+      zh: '/api/v1/views/options 的响应内容，以及取自该响应的 API 参考文档示例。',
     },
   },
   {

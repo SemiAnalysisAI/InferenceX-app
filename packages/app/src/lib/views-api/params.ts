@@ -19,6 +19,7 @@ import {
   Percentile,
   PRECISION_OPTIONS,
   Sequence,
+  SEQUENCE_OPTIONS,
   type Precision,
 } from '@/lib/catalog/data-mappings';
 import {
@@ -26,6 +27,7 @@ import {
   resolveModelName,
   type ResolvedModel,
 } from '@/lib/catalog/model-name-resolver';
+import { SCENARIO_SEGMENT_TO_SEQUENCE } from '@/lib/compare/compare-scenario-route';
 
 import { ViewsApiParamError } from './errors';
 
@@ -55,23 +57,11 @@ export function resolveModelParam(value: string | null, param = 'model'): Resolv
 }
 
 const SEQUENCE_ALIASES: Readonly<Record<string, Sequence>> = {
-  '1k/1k': Sequence.OneK_OneK,
-  '1k-1k': Sequence.OneK_OneK,
-  '1k/8k': Sequence.OneK_EightK,
-  '1k-8k': Sequence.OneK_EightK,
-  '8k/1k': Sequence.EightK_OneK,
-  '8k-1k': Sequence.EightK_OneK,
-  'agentic-traces': Sequence.AgenticTraces,
+  ...Object.fromEntries(SEQUENCE_OPTIONS.map((sequence) => [sequence, sequence])),
+  ...SCENARIO_SEGMENT_TO_SEQUENCE,
+  // The benchmark_type that agentic rows are stored under.
   agentic_traces: Sequence.AgenticTraces,
-  agentic: Sequence.AgenticTraces,
 };
-
-export const VIEWS_SEQUENCE_VALUES: readonly string[] = [
-  '1k/1k',
-  '1k/8k',
-  '8k/1k',
-  'agentic-traces',
-];
 
 export function parseSequenceParam(
   value: string | null,
@@ -81,7 +71,7 @@ export function parseSequenceParam(
   if (!value) return fallback;
   const alias = value.toLowerCase();
   if (!Object.hasOwn(SEQUENCE_ALIASES, alias)) {
-    throw new ViewsApiParamError(param, `Unknown sequence: ${value}`, VIEWS_SEQUENCE_VALUES);
+    throw new ViewsApiParamError(param, `Unknown sequence: ${value}`, SEQUENCE_OPTIONS);
   }
   return SEQUENCE_ALIASES[alias];
 }

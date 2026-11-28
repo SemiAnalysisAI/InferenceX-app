@@ -250,14 +250,17 @@ describe('compareDisplayLabel', () => {
 });
 
 describe('compareModelDisplayLabel', () => {
-  it('prepends the model label to the GPU pair label', () => {
+  it('prepends the selector label to the GPU pair label', () => {
     expect(compareModelDisplayLabel(DEEPSEEK_R1, 'h100', 'h200')).toBe(
-      'DeepSeek R1 — H100 vs H200',
+      'DeepSeek R1 0528 671B — H100 vs H200',
     );
     expect(compareModelDisplayLabel(KIMI_K26, 'gb200', 'mi355x')).toBe(
-      'Kimi K2.5/K2.6/K2.7-Code 1T — GB200 NVL72 vs MI355X',
+      'Kimi K2.5/2.6/2.7-Code 1T — GB200 NVL72 vs MI355X',
     );
-    expect(compareModelDisplayLabel(GLM_51, 'h100', 'h200')).toBe('GLM 5/5.1 — H100 vs H200');
+    expect(compareModelDisplayLabel(GLM_51, 'h100', 'h200')).toBe('GLM5/5.1 744B — H100 vs H200');
+  });
+
+  it('names only the current release of the GLM-5.2 bucket', () => {
     expect(compareModelDisplayLabel(GLM_53, 'h100', 'h200')).toBe('GLM 5.3 744B — H100 vs H200');
   });
 });

@@ -5,7 +5,6 @@ import {
   isAgenticSequence,
   PRERENDERED_SCENARIO_SEGMENTS,
   prerenderedScenarioParams,
-  SCENARIO_SEGMENT_TO_SEQUENCE,
   SCENARIO_SEGMENTS,
   scenarioSegmentForSequence,
   sequenceForScenarioSegment,
@@ -34,11 +33,6 @@ describe('prerenderedScenarioParams', () => {
 });
 
 describe('compare scenario segments', () => {
-  it('covers every sequence', () => {
-    const mapped = new Set<string>(Object.values(SCENARIO_SEGMENT_TO_SEQUENCE));
-    expect(mapped).toEqual(new Set(Object.values(Sequence)));
-  });
-
   it('round-trips every segment through its sequence', () => {
     for (const segment of SCENARIO_SEGMENTS) {
       const sequence = sequenceForScenarioSegment(segment);

@@ -9,10 +9,8 @@ import {
   parseNum,
   parseInt2,
   parseIslOsl,
-  MODEL_TO_KEY,
   GPU_KEYS,
 } from './normalizers';
-import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 describe('GLM-5.3-Flash ingestion', () => {
   it.each([
@@ -288,17 +286,6 @@ describe('resolveModelKey', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'minimaxm2.7' })).toBe('minimaxm2.7');
     expect(resolveModelKey({ model: 'amd/GLM-5.1-MXFP4' })).toBe('glm5.1');
     expect(resolveModelKey({ model: 'zai-org/GLM-5.2-FP8' })).toBe('glm5.2');
-  });
-});
-
-describe('MODEL_TO_KEY', () => {
-  it('all values point to valid DB model keys', () => {
-    const dbKeys = new Set(Object.keys(DB_MODEL_TO_DISPLAY));
-    for (const [path, key] of Object.entries(MODEL_TO_KEY)) {
-      expect(dbKeys.has(key), `MODEL_TO_KEY['${path}'] = '${key}' not in DB_MODEL_TO_DISPLAY`).toBe(
-        true,
-      );
-    }
   });
 });
 

@@ -1,13 +1,12 @@
-import { Sequence } from '@/lib/catalog/data-mappings';
+import { SEQUENCE_REGISTRY, type SequenceKey } from '@semianalysisai/inferencex-constants';
 
-export const SCENARIO_SEGMENT_TO_SEQUENCE = {
-  agentic: Sequence.AgenticTraces,
-  '8k-1k': Sequence.EightK_OneK,
-  '1k-1k': Sequence.OneK_OneK,
-  '1k-8k': Sequence.OneK_EightK,
-} as const satisfies Record<string, Sequence>;
+import { Sequence, SEQUENCE_OPTIONS } from '@/lib/catalog/data-mappings';
 
-export type ScenarioSegment = keyof typeof SCENARIO_SEGMENT_TO_SEQUENCE;
+export type ScenarioSegment = (typeof SEQUENCE_REGISTRY)[SequenceKey]['segment'];
+
+export const SCENARIO_SEGMENT_TO_SEQUENCE = Object.fromEntries(
+  SEQUENCE_OPTIONS.map((sequence) => [SEQUENCE_REGISTRY[sequence].segment, sequence]),
+) as Record<ScenarioSegment, Sequence>;
 
 const SEQUENCE_TO_SCENARIO_SEGMENT = new Map<string, ScenarioSegment>(
   Object.entries(SCENARIO_SEGMENT_TO_SEQUENCE).map(([segment, sequence]) => [

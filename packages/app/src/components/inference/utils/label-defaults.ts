@@ -1,4 +1,4 @@
-import type { ScenarioKind } from '@/lib/catalog/data-mappings';
+import type { ScenarioKind } from '@semianalysisai/inferencex-constants';
 
 export interface LabelState {
   /** GPU-count annotation only; parallelism is independently controlled. */

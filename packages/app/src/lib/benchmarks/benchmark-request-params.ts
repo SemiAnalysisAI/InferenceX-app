@@ -1,3 +1,5 @@
+import { isSequenceKey } from '@semianalysisai/inferencex-constants';
+
 import {
   parsePowerValidityFilter,
   type PowerValidityFilter,
@@ -10,8 +12,6 @@ export const UNKNOWN_MODEL_DETAIL: PublicApiErrorDetail = {
   param: 'model',
   allowed: MODEL_DISPLAY_NAMES,
 };
-
-export const CALCULATOR_SEQUENCES = ['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'] as const;
 
 /** Every 400 message `/api/v1/benchmarks` can return, in the order the route checks them. */
 export const BENCHMARK_REQUEST_ERRORS = {
@@ -113,7 +113,7 @@ export function parseBenchmarkRequest(search: URLSearchParams): BenchmarkRequest
   const view = viewParam ?? undefined;
 
   const sequence = search.get('sequence') ?? '';
-  if (view === 'calculator' && !(CALCULATOR_SEQUENCES as readonly string[]).includes(sequence)) {
+  if (view === 'calculator' && !isSequenceKey(sequence)) {
     return fail(BENCHMARK_REQUEST_ERRORS.unknownSequence);
   }
 

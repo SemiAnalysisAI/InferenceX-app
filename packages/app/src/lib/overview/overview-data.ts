@@ -1,4 +1,4 @@
-import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
+import { type CategoryTag, resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
 import type { BenchmarkRow } from '../api/api';
 import { rowToAggDataEntry } from '../benchmarks/benchmark-transform';
@@ -12,7 +12,6 @@ import {
   MAINTENANCE_MODELS,
   Model,
   Precision,
-  type CategoryTag,
 } from '../catalog/data-mappings';
 import { frameworkFamily } from '../catalog/framework-family';
 import {
@@ -127,7 +126,7 @@ export function resolveOverviewHardwareRowScope(
 }
 
 // Note (wenyao): row order is a contract — defaults, then maintenance, then
-// deprecated, each in MODEL_CONFIG declaration order; the overview e2e asserts
+// deprecated, each in MODEL_REGISTRY declaration order; the overview e2e asserts
 // inactive rows always sit below the default rows. Within each category band
 // the matrix additionally groups AgentX rows above 8K/1K rows (see
 // sortOverviewSummaries), which never reorders across bands.
@@ -972,7 +971,7 @@ const overviewScenarioRank = (scenario: OverviewScenario): number =>
 
 /** Category bands stay in place (defaults, then maintenance, then deprecated)
  *  while AgentX rows lead within each band — 8K/1K rows follow — and each
- *  (band, scenario) group keeps MODEL_CONFIG declaration order. The sort is
+ *  (band, scenario) group keeps MODEL_REGISTRY declaration order. The sort is
  *  stable, so ties never shuffle. */
 function sortOverviewSummaries<T extends Pick<OverviewModelSummary, 'category' | 'scenario'>>(
   summaries: T[],
