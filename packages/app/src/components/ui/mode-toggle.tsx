@@ -37,12 +37,12 @@ const ZH_THEME_NAMES: Record<string, string> = { light: '浅色', dark: '深色'
 
 const STRINGS = {
   en: {
-    orangeChicken: 'Switch theme (currently orange chicken mode)',
+    orangeChicken: 'Switch theme (currently Panda Express mode)',
     switchTheme: 'Switch theme',
     currentTheme: (theme: string) => `Switch theme (currently ${theme} mode)`,
   },
   zh: {
-    orangeChicken: '切换主题（当前为陈皮鸡主题）',
+    orangeChicken: '切换主题（当前为熊猫快餐主题）',
     switchTheme: '切换主题',
     currentTheme: (theme: string) =>
       `切换主题（当前为${ZH_THEME_NAMES[theme] ?? ` ${theme} `}主题）`,

@@ -1,4 +1,41 @@
 /* Everything in this file is loaded only after the optional theme is selected. */
+
+@font-face {
+  font-family: 'OrangeChickenDisplay';
+  src: url('../../app/fonts/OrangeChicken-LilitaOne.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OrangeChickenBody';
+  src: url('../../app/fonts/OrangeChicken-Baloo2.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* All-caps labels (plate card, fortune slip): the brand's lettering is a geometric sans. */
+@font-face {
+  font-family: 'OrangeChickenCaps';
+  src: url('../../app/fonts/OrangeChicken-Montserrat800.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Brush face for the Chinese wordmark and the chop seals; subset to the characters used. */
+@font-face {
+  font-family: 'OrangeChickenBrush';
+  src: url('../../app/fonts/OrangeChicken-MaShanZheng-subset.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------------ palette */
+/* Three sub-palettes, picked on the banner: glaze (default), jade tea and chili oil. */
 html.orange-chicken:not([data-inferencex-embed]) {
   color-scheme: light;
   --background: #fff8ed;
@@ -7,100 +44,3659 @@ html.orange-chicken:not([data-inferencex-embed]) {
   --primary: #ad360e;
   --primary-foreground: #fffaf2;
   --brand: var(--primary);
+  --brand-fill: var(--primary);
   --muted: #f1e5d3;
   --accent: #f8e6cc;
   --border: #a58b6e;
   --border-alt: #e4cfaf;
   --input: #a58b6e;
   --ring: #9b3510;
+  --oc-ink: #4a1e0a;
+  --oc-ink-soft: #7a4a2a;
+  --oc-lacquer: #a82a14;
+  --oc-lacquer-deep: #7d1d0e;
+  --oc-glaze: #e8731a;
+  --oc-gold: #f6b93b;
+  --oc-gold-deep: #c98a12;
+  --oc-jade: #2f7d4f;
+  --oc-paper: #fff8ed;
+  --oc-wash: #fff0d8;
+  --oc-line: #a58b6e;
+  --oc-shadow: rgb(74 30 10 / 0.22);
+  --oc-edge: var(--oc-ink);
+  --oc-hot: var(--oc-lacquer);
+  --oc-hi: #fff;
+  --oc-chit: #fffdf4;
+  --oc-note: #fff4cf;
+  --oc-display:
+    'OrangeChickenDisplay', 'OrangeChickenBody', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC',
+    system-ui, sans-serif;
+  --oc-text:
+    'OrangeChickenBody', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+  --oc-caps: 'OrangeChickenCaps', 'OrangeChickenBody', system-ui, sans-serif;
+  --oc-brush: 'OrangeChickenBrush', 'STKaiti', 'Kaiti SC', 'KaiTi', 'PingFang SC', serif;
+  --oc-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', 'Consolas', monospace;
+  --overlay-run-0: #ad360e;
+  --overlay-run-1: #2f7d4f;
+  --overlay-run-2: #a8431d;
+  --overlay-run-3: #1d6b8a;
+  --overlay-run-4: #8a5a00;
+  --overlay-run-5: #7a2f6b;
+  --overlay-run-6: #b0261f;
+  --overlay-run-7: #3d5a2a;
+}
+
+html.orange-chicken[data-oc-mode='jade']:not([data-inferencex-embed]) {
+  --background: #f2f7ec;
+  --card: #fbfdf7;
+  --popover: #fbfdf7;
+  --primary: #23623e;
+  --brand: var(--primary);
+  --muted: #e3eed9;
+  --accent: #dcebd0;
+  --border: #7b977a;
+  --border-alt: #c5dbb9;
+  --input: #7b977a;
+  --ring: #23623e;
+  --oc-ink: #173625;
+  --oc-ink-soft: #3d6650;
+  --oc-lacquer: #2a6b45;
+  --oc-lacquer-deep: #1b4a2e;
+  --oc-glaze: #5aa66a;
+  --oc-gold: #e9c64a;
+  --oc-gold-deep: #a98a12;
+  --oc-paper: #f7fbf0;
+  --oc-wash: #e8f2dd;
+  --oc-line: #7b977a;
+  --oc-shadow: rgb(23 54 37 / 0.22);
+}
+
+html.orange-chicken[data-oc-mode='chili']:not([data-inferencex-embed]) {
+  --background: #fdf1ee;
+  --card: #fffafa;
+  --popover: #fffafa;
+  --primary: #a0141c;
+  --brand: var(--primary);
+  --muted: #f6dfda;
+  --accent: #f9d9d3;
+  --border: #a8736c;
+  --border-alt: #ebc6bf;
+  --input: #a8736c;
+  --ring: #a0141c;
+  --oc-ink: #3b0d0d;
+  --oc-ink-soft: #7a3a36;
+  --oc-lacquer: #b3171f;
+  --oc-lacquer-deep: #7c0f15;
+  --oc-glaze: #e03b2c;
+  --oc-gold: #f2a93b;
+  --oc-gold-deep: #b9740d;
+  --oc-paper: #fff5f2;
+  --oc-wash: #fbe3de;
+  --oc-line: #a8736c;
+  --oc-shadow: rgb(59 13 13 / 0.24);
+}
+
+/* Night market: warm lacquer-dark paper under lantern light. */
+html.orange-chicken[data-oc-mode='night']:not([data-inferencex-embed]) {
+  color-scheme: dark;
+  --background: #1b110d;
+  --foreground: #fff3df;
+  --card: #271813;
+  --card-foreground: #fff3df;
+  --popover: #2b1a14;
+  --popover-foreground: #fff3df;
+  --primary: #f08a3c;
+  --primary-foreground: #2a0d04;
+  --brand: var(--primary);
+  --brand-fill: var(--primary);
+  --muted: #36231b;
+  --muted-foreground: #d6bca0;
+  --accent: #3b261c;
+  --accent-foreground: #fff3df;
+  --border: #8d6d57;
+  --border-alt: #4a3226;
+  --input: #8d6d57;
+  --ring: #ffc65b;
+  --chart-grid: color-mix(in oklab, #fff3df 16%, #271813);
+  --oc-ink: #fff0d8;
+  --oc-ink-soft: #dcc0a2;
+  --oc-lacquer: #bd3a22;
+  --oc-lacquer-deep: #8c2411;
+  --oc-glaze: #f08a3c;
+  --oc-gold: #f6b93b;
+  --oc-gold-deep: #d9a02a;
+  --oc-paper: #271813;
+  --oc-wash: #34211a;
+  --oc-line: #7d604d;
+  --oc-shadow: rgb(0 0 0 / 0.5);
+  --oc-edge: #f0b868;
+  --oc-hot: #ff8a62;
+  --oc-hi: #3b261c;
+  --oc-chit: #2f1d16;
+  --oc-note: #3d2a14;
+  --overlay-run-0: #f08a3c;
+  --overlay-run-1: #5fc48a;
+  --overlay-run-2: #ff8a5c;
+  --overlay-run-3: #5bb8dc;
+  --overlay-run-4: #e0b13c;
+  --overlay-run-5: #c77bd6;
+  --overlay-run-6: #ff6b5f;
+  --overlay-run-7: #9bc46a;
+}
+
+/* ---------------------------------------------------------------- typography */
+/* The body's next/font class defines --font-dm-sans. The body itself keeps that stock value (saved
+   as --oc-stock-sans); its children take the menu face, so every sans-serif surface follows the
+   theme. Chart plots go back to the stock face: the line-label placer sizes each badge from its
+   text, and a taller face made the badges reflow onto other series. */
+html.orange-chicken:not([data-inferencex-embed]) body > * {
+  --font-dm-sans:
+    'OrangeChickenBody', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  :is(.chart-root, [data-testid='chart-figure'] svg) {
+  --font-dm-sans: var(--oc-stock-sans);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) body {
+  --oc-stock-sans: var(--font-dm-sans);
+  font-family: var(--oc-text);
+  color: var(--oc-ink);
+  background-color: var(--background);
+  /* Paper placemat: a faint wave pattern over rice paper. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='28' viewBox='0 0 56 28' fill='none' stroke='%23a58b6e' stroke-opacity='.16' stroke-width='1.2'%3E%3Cpath d='M0 28a28 28 0 0 1 56 0M14 28a14 14 0 0 1 28 0M-14 28a14 14 0 0 1 28 0M42 28a14 14 0 0 1 28 0'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, var(--oc-wash) 0, transparent 360px);
+  background-size:
+    56px 28px,
+    100% 100%;
+  background-attachment: fixed, scroll;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--oc-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) main h1 {
+  color: var(--oc-hot);
+  text-shadow: 2px 2px 0 var(--oc-gold);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) :is(code, pre, kbd, samp) {
+  font-family: var(--oc-mono);
+}
+
+/* Inline code reads like a kitchen chit: dashed edge, order-pad paper. */
+html.orange-chicken:not([data-inferencex-embed]) main :not(pre) > code {
+  padding: 0.05em 0.4em;
+  background: var(--oc-chit);
+  border: 1px dashed var(--oc-line);
+  border-radius: 4px;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) main pre {
+  background: var(--oc-chit);
+  border: 1px solid var(--oc-line);
+  border-left: 6px solid var(--oc-lacquer);
+  border-radius: 6px;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) ::selection {
+  background: var(--oc-gold);
+  color: var(--oc-ink);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) :focus-visible {
+  outline: 3px solid var(--oc-lacquer);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) {
+  scrollbar-color: var(--oc-lacquer) var(--oc-wash);
+  /* A pair of chopsticks for a pointer; the browser's own cursor is the fallback. */
+  --oc-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M3 3 24 28' stroke='%234a1e0a' stroke-width='3.4' stroke-linecap='round'/%3E%3Cpath d='M3 3 24 28' stroke='%23f6b93b' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M9 2 29 24' stroke='%234a1e0a' stroke-width='3.4' stroke-linecap='round'/%3E%3Cpath d='M9 2 29 24' stroke='%23e8731a' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")
+    3 3;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html.orange-chicken:not([data-inferencex-embed]) body {
+    cursor: var(--oc-cursor), auto;
+  }
+
+  html.orange-chicken:not([data-inferencex-embed]) :is(a, button, [role='button'], summary) {
+    cursor: var(--oc-cursor), pointer;
+  }
 }
 
 html.orange-chicken:not([data-inferencex-embed]) .autumn-leaves {
   display: none;
 }
 
-.orange-chicken-theme-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
-  margin-block: 0.5rem 1.5rem;
-  padding: 1rem 1.5rem;
+/* ------------------------------------------------------------------- scene */
+.orange-chicken-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
   overflow: hidden;
-  border: 1px solid #d8b68a;
-  border-radius: var(--radius);
-  background: #fff0d8;
-  color: #54260f;
-}
-
-.orange-chicken-banner-art {
-  flex: 0 0 auto;
-  width: 15rem;
-  height: 9rem;
   pointer-events: none;
 }
 
-.orange-chicken-marker {
-  display: none;
-  pointer-events: none;
+.orange-chicken-scene > * {
+  position: absolute;
 }
 
-html.orange-chicken:not([data-inferencex-embed])
-  [data-orange-chicken-eligible='true']
-  .orange-chicken-marker {
-  display: inline;
+.oc-scene-low {
+  inset: 0;
+
+  /* Counter props and steam live in the side gutters only, so no line of text ever crosses them. */
+  mask-image: linear-gradient(
+    90deg,
+    #000 0,
+    #000 20%,
+    transparent 22%,
+    transparent 78%,
+    #000 80%,
+    #000
+  );
 }
 
-/* Opacity leaves the original precision shape and its pointer geometry intact.
-   Scope to decorated points, so an unloaded/failed theme never hides chart data. */
-html.orange-chicken:not([data-inferencex-embed])
-  [data-orange-chicken-eligible='true']
-  [data-orange-chicken-decorated]
-  > .visible-shape {
+@media (max-width: 1200px) {
+  .oc-scene-low {
+    display: none;
+  }
+}
+
+.oc-lanterns {
+  top: -6px;
+  left: 0;
+  right: 0;
+  height: 190px;
+  transform: translateY(calc(var(--oc-scroll, 0) * -0.08px));
+}
+
+.oc-lantern {
+  position: absolute;
+  top: 0;
+  width: 64px;
+  transform-origin: 50% 0;
+  animation: oc-sway 6s ease-in-out infinite;
+  filter: drop-shadow(0 6px 10px rgb(168 42 20 / 0.28));
+}
+
+.oc-lantern:nth-child(1) {
+  left: 2.5%;
+  animation-delay: -1s;
+}
+
+.oc-lantern:nth-child(2) {
+  left: 7.5%;
+  width: 48px;
+  animation-delay: -3.2s;
+  top: 18px;
+}
+
+.oc-lantern:nth-child(3) {
+  right: 2.5%;
+  animation-delay: -2s;
+}
+
+.oc-lantern:nth-child(4) {
+  right: 8%;
+  width: 46px;
+  animation-delay: -4.4s;
+  top: 24px;
+}
+
+@keyframes oc-sway {
+  0%,
+  100% {
+    transform: rotate(-3.5deg);
+  }
+
+  50% {
+    transform: rotate(3.5deg);
+  }
+}
+
+.oc-counter {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  opacity: 0.55;
+  transform: translateY(calc(var(--oc-scroll, 0) * 0.05px));
+}
+
+.oc-counter svg {
+  width: 100%;
+  height: 100%;
+}
+
+.oc-steam {
+  bottom: 40px;
+  width: 90px;
+  height: 220px;
   opacity: 0;
+  animation: oc-rise 9s ease-in infinite;
+}
+
+.oc-steam:nth-of-type(1) {
+  left: 14%;
+}
+
+.oc-steam:nth-of-type(2) {
+  left: 41%;
+  animation-delay: -3s;
+}
+
+.oc-steam:nth-of-type(3) {
+  left: 70%;
+  animation-delay: -6s;
+}
+
+.oc-steam:nth-of-type(4) {
+  left: 88%;
+  animation-delay: -1.5s;
+}
+
+@keyframes oc-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scaleX(0.8);
+  }
+
+  25% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-260px) scaleX(1.25);
+  }
+}
+
+.oc-flame {
+  transform-origin: 50% 100%;
+  animation: oc-flicker 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes oc-flicker {
+  from {
+    transform: scale(1, 0.9);
+  }
+
+  to {
+    transform: scale(1.06, 1.08);
+  }
+}
+
+html.orange-chicken[data-oc-mode='jade'] .oc-lantern {
+  filter: hue-rotate(95deg) drop-shadow(0 6px 10px rgb(35 98 62 / 0.28));
+}
+
+html.orange-chicken[data-oc-mode='chili'] .oc-lantern {
+  filter: saturate(1.3) drop-shadow(0 6px 10px rgb(160 20 28 / 0.35));
+}
+
+@media (max-width: 760px) {
+  .oc-lanterns {
+    height: 120px;
+    opacity: 0.8;
+  }
+
+  .oc-lantern {
+    width: 40px;
+  }
+
+  .oc-lantern:nth-child(2),
+  .oc-lantern:nth-child(4) {
+    display: none;
+  }
+
+  .oc-counter {
+    height: 90px;
+    opacity: 0.35;
+  }
+
+  .oc-steam {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ header */
+html.orange-chicken:not([data-inferencex-embed]) header[data-testid='header'] {
+  position: sticky;
+  background: var(--oc-paper);
+  backdrop-filter: none;
+  border-bottom: 3px solid var(--oc-lacquer);
+  box-shadow: 0 3px 0 var(--oc-gold);
+}
+
+/* A scalloped red valance runs along the bottom of the header's own box, so it never covers page content. */
+html.orange-chicken:not([data-inferencex-embed]) header[data-testid='header'] {
+  background-color: var(--oc-paper);
+  background-image: radial-gradient(circle at 50% 0, var(--oc-lacquer) 0 6.5px, transparent 7px);
+  background-position: 0 100%;
+  background-size: 26px 8px;
+  background-repeat: repeat-x;
 }
 
 html.orange-chicken:not([data-inferencex-embed])
-  [data-orange-chicken-decorated]:hover
-  > .orange-chicken-marker {
-  transform: scale(1.15);
+  header[data-testid='header']
+  .text-muted-foreground {
+  color: var(--oc-ink-soft);
 }
 
+html.orange-chicken:not([data-inferencex-embed])
+  header[data-testid='header']
+  [data-testid='inferencex-wordmark'] {
+  font-family: var(--oc-display);
+  font-weight: 400;
+  font-size: 1.2rem;
+  letter-spacing: 0.01em;
+  color: var(--oc-hot);
+  text-shadow: 1.5px 1.5px 0 var(--oc-gold);
+  padding-right: 0.5rem;
+}
+
+/* Chop seal after the wordmark: a red stamp with the brush character for chicken. */
+html.orange-chicken:not([data-inferencex-embed])
+  header[data-testid='header']
+  [data-testid='inferencex-wordmark']::after {
+  content: '鸡';
+  display: inline-block;
+  margin-left: 6px;
+  width: 1.15em;
+  height: 1.15em;
+  line-height: 1.15em;
+  text-align: center;
+  font-family: var(--oc-brush);
+  font-size: 0.95em;
+  color: #fff6e6;
+  text-shadow: none;
+  background: var(--oc-lacquer);
+  border-radius: 3px;
+  transform: rotate(-7deg) translateY(-1px);
+  box-shadow: 0 0 0 1.5px var(--oc-lacquer-deep) inset;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) header[data-testid='header'] nav a {
+  font-family: var(--oc-text);
+  font-weight: 700;
+  color: var(--oc-ink);
+  border-radius: 999px;
+  position: relative;
+  transition:
+    transform 120ms ease-out,
+    background-color 120ms,
+    color 120ms;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) header[data-testid='header'] nav a:hover {
+  background: var(--oc-wash);
+  color: var(--oc-hot);
+  transform: translateY(-1px);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) header[data-testid='header'] nav a:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  header[data-testid='header']
+  nav
+  a[aria-current='page'] {
+  background: var(--oc-lacquer);
+  color: #fff6e6;
+  box-shadow: 0 2px 0 var(--oc-lacquer-deep);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  header[data-testid='header']
+  :is(a, button):not(nav a):hover {
+  background-color: var(--oc-wash);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-toggle {
+  color: var(--oc-ink-soft);
+  border-radius: 999px;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-toggle[aria-pressed='true'] {
+  color: var(--oc-hot);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-toggle:active {
+  transform: scale(0.9);
+}
+
+/* Fortune counter: orders served in the kitchen game, always visible in the header. */
+html.orange-chicken:not([data-inferencex-embed]) .oc-counter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 2.25rem;
+  padding: 0 0.7rem 0 0.4rem;
+  font-family: var(--oc-display);
+  font-size: 0.9rem;
+  color: var(--oc-ink);
+  background: var(--oc-gold);
+  border: 2px solid var(--oc-edge);
+  border-radius: 999px;
+  box-shadow: 0 2px 0 var(--oc-edge);
+  transition:
+    transform 100ms,
+    box-shadow 100ms;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-counter-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 var(--oc-edge);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-counter-chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--oc-edge);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-counter-chip img {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-counter-chip[data-complete='true'] {
+  background: linear-gradient(135deg, #ffe08a, #f6b93b 55%, #ffd45c);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .oc-counter-found {
+  font-family: var(--oc-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  color: #fff6e6;
+  background: var(--oc-lacquer);
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  html.orange-chicken:not([data-inferencex-embed]) .oc-counter-found {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ cards */
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='card'] {
+  position: relative;
+  border: 2px solid var(--oc-line);
+  border-radius: 16px;
+  background-color: var(--card);
+  box-shadow: 4px 4px 0 var(--oc-shadow);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='card'] [data-slot='card'] {
+  box-shadow: none;
+  border-radius: 12px;
+}
+
+/* A paper tab clipped to the top of every top-level card, like a ticket on an order rail. */
+html.orange-chicken:not([data-inferencex-embed])
+  main
+  [data-slot='card']:not([data-slot='card'] [data-slot='card'])::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 22px;
+  width: 36px;
+  height: 9px;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg, var(--oc-lacquer) 0 6px, var(--oc-paper) 6px 12px);
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 1px 0 var(--oc-lacquer-deep);
+}
+
+/* The chart card carries the brand where the eye lands: the red roundel and the dish name sit in the
+   free stretch of the card header, left of the Chart / Table buttons, never over the plot. */
+@media (min-width: 1280px) {
+  html.orange-chicken:not([data-inferencex-embed]) main figure[data-testid='chart-figure']::after {
+    content: 'The Original Orange Chicken®';
+    position: absolute;
+    top: 0.95rem;
+    right: 19.5rem;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    height: 2.4rem;
+    padding: 0 0.9rem 0 2.9rem;
+    font-family: var(--oc-caps);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #fff;
+    pointer-events: none;
+    background:
+      url('/decorative/orange-chicken/oc-panda-express-logo.svg') 0.25rem 50% / 2rem 2rem no-repeat,
+      #c4161f;
+    border: 2px solid var(--oc-edge);
+    border-radius: 999px;
+    box-shadow: 2px 2px 0 var(--oc-shadow);
+  }
+
+  html.orange-chicken:not([data-inferencex-embed])
+    main
+    figure[data-testid='chart-figure']:lang(zh)::after {
+    content: '经典陈皮鸡';
+    letter-spacing: 0.1em;
+  }
+}
+
+html.orange-chicken:not([data-inferencex-embed]) main a:hover > [data-slot='card'] {
+  transform: translate(-1px, -2px);
+  box-shadow: 6px 7px 0 var(--oc-shadow);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) main a:active > [data-slot='card'] {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--oc-shadow);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) main a > [data-slot='card'] {
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='control-panel'] {
+  border: 2px dashed var(--oc-line);
+  border-radius: 14px;
+  background: var(--oc-paper);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='control-panel'] > legend {
+  font-family: var(--oc-display);
+  color: var(--oc-hot);
+  padding-inline: 0.5rem;
+}
+
+/* ----------------------------------------------------------------- buttons */
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='button'] {
+  font-family: var(--oc-text);
+  font-weight: 700;
+  border-radius: 999px;
+  transition:
+    transform 110ms cubic-bezier(0.3, 1.6, 0.5, 1),
+    box-shadow 110ms,
+    background-color 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+/* Filled buttons are glazed: orange-to-lacquer with a hard ink shadow that squashes on press. */
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='button']:is([class~='bg-primary'], [class~='bg-brand'], [class~='bg-brand-fill']):not(
+    :disabled
+  ) {
+  color: #fff6e6;
+  background: linear-gradient(180deg, var(--oc-glaze), var(--oc-lacquer) 92%);
+  border: 2px solid var(--oc-edge);
+  box-shadow:
+    0 3px 0 var(--oc-edge),
+    inset 0 2px 0 rgb(255 255 255 / 0.35);
+  text-shadow: 0 1px 0 rgb(74 30 10 / 0.5);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='button']:is([class~='bg-primary'], [class~='bg-brand'], [class~='bg-brand-fill']):not(
+    :disabled
+  ):hover {
+  transform: translateY(-2px) rotate(-0.4deg);
+  box-shadow:
+    0 5px 0 var(--oc-edge),
+    inset 0 2px 0 rgb(255 255 255 / 0.4);
+  filter: saturate(1.1) brightness(1.05);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='button']:is([class~='bg-primary'], [class~='bg-brand'], [class~='bg-brand-fill']):not(
+    :disabled
+  ):active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow:
+    0 1px 0 var(--oc-edge),
+    inset 0 2px 0 rgb(0 0 0 / 0.12);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='button']:is([class~='border'], [class~='bg-card'], [class~='bg-secondary']):not(
+    :disabled
+  ) {
+  background-color: var(--oc-paper);
+  border: 2px solid var(--oc-line);
+  box-shadow: 0 2px 0 var(--oc-shadow);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='button']:is([class~='border'], [class~='bg-card'], [class~='bg-secondary']):not(
+    :disabled
+  ):hover {
+  background-color: var(--oc-wash);
+  border-color: var(--oc-lacquer);
+  color: var(--oc-hot);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 var(--oc-shadow);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='button']:is([class~='border'], [class~='bg-card'], [class~='bg-secondary']):not(
+    :disabled
+  ):active {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 var(--oc-shadow);
+}
+
+/* Ghost and link buttons warm up under the pointer and the keyboard. */
+html.orange-chicken:not([data-inferencex-embed])
+  :where(
+    [data-slot='button']:not(
+      [class~='bg-primary'],
+      [class~='bg-brand-fill'],
+      [class~='bg-secondary'],
+      [class~='bg-destructive'],
+      [class~='bg-card'],
+      [class~='border'],
+      [class~='underline-offset-4']
+    ),
+    button:is(
+        [data-slot='popover-trigger'],
+        [data-slot='dialog-trigger'],
+        [data-slot='dropdown-menu-trigger']
+      )[class~='whitespace-nowrap']
+  ):is(:hover, :focus-visible):not(:disabled) {
+  color: var(--oc-hot);
+  background: var(--oc-wash);
+  box-shadow: inset 0 0 0 2px var(--oc-gold);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='button'][aria-pressed='true'] {
+  color: var(--oc-ink);
+  background: var(--oc-gold);
+  border: 2px solid var(--oc-edge);
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 var(--oc-edge),
+    inset 0 2px 0 rgb(0 0 0 / 0.1);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='button']:disabled {
+  filter: grayscale(0.5);
+}
+
+/* -------------------------------------------------------------------- tabs */
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='tabs-list'] {
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid var(--oc-line);
+  border-radius: 999px;
+  /* A bamboo mat under the tabs. */
+  background:
+    repeating-linear-gradient(90deg, rgb(165 139 110 / 0.18) 0 2px, transparent 2px 9px),
+    var(--oc-wash);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='tabs-trigger'] {
+  font-family: var(--oc-text);
+  font-weight: 700;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  transition:
+    transform 110ms cubic-bezier(0.3, 1.6, 0.5, 1),
+    background-color 120ms,
+    color 120ms;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='tabs-trigger']:hover {
+  color: var(--oc-hot);
+  background: var(--oc-paper);
+  transform: translateY(-1px);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='tabs-trigger'][data-state='active'] {
+  color: #fff6e6;
+  background: linear-gradient(180deg, var(--oc-glaze), var(--oc-lacquer) 92%);
+  border-color: var(--oc-edge);
+  box-shadow: 0 2px 0 var(--oc-edge);
+  text-shadow: 0 1px 0 rgb(74 30 10 / 0.45);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='dashboard-navigation'] nav {
+  gap: 4px;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='dashboard-navigation'] nav a {
+  font-family: var(--oc-text);
+  font-weight: 700;
+  border-radius: 999px;
+  transition:
+    transform 110ms,
+    background-color 120ms,
+    color 120ms;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='dashboard-navigation'] nav a:hover {
+  background: var(--oc-wash);
+  color: var(--oc-hot);
+  transform: translateY(-1px);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='dashboard-navigation']
+  nav
+  a:is([aria-current='page'], [data-tab-active='true']) {
+  color: #fff6e6;
+  background: linear-gradient(180deg, var(--oc-glaze), var(--oc-lacquer) 92%);
+  box-shadow: 0 2px 0 var(--oc-edge);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='dashboard-navigation'] .tab-indicator {
+  background: var(--oc-gold);
+  height: 3px;
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------ inputs and popovers */
+html.orange-chicken:not([data-inferencex-embed])
+  :is(
+    [data-slot='select-trigger'],
+    [data-slot='input-group'],
+    main input[type='text'],
+    main input[type='search'],
+    main input[type='number'],
+    main textarea
+  ) {
+  font-family: var(--oc-text);
+  background: var(--oc-chit);
+  border: 2px solid var(--oc-line);
+  border-radius: 12px;
+  box-shadow: inset 0 2px 0 rgb(74 30 10 / 0.07);
+  transition:
+    border-color 120ms,
+    box-shadow 120ms,
+    background-color 120ms;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  :is(
+    [data-slot='select-trigger'],
+    [data-slot='input-group'],
+    main input[type='text'],
+    main input[type='search'],
+    main input[type='number'],
+    main textarea
+  ):is(:hover, :focus-within, :focus) {
+  border-color: var(--oc-lacquer);
+  background: var(--oc-hi);
+  box-shadow: 0 0 0 3px rgb(246 185 59 / 0.55);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  :is(
+    [data-slot='select-content'],
+    [data-slot='popover-content'],
+    [data-slot='dropdown-menu-content'],
+    [role='menu'],
+    [role='listbox']
+  ) {
+  background: var(--oc-paper);
+  border: 2px solid var(--oc-edge);
+  border-radius: 14px;
+  box-shadow: 4px 5px 0 var(--oc-shadow);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  :is(
+    [data-slot='select-item'],
+    [data-slot='dropdown-menu-item'],
+    [role='option'],
+    [role='menuitem']
+  ):is(:hover, [data-highlighted], [aria-selected='true']) {
+  background: var(--oc-gold);
+  color: var(--oc-ink);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  :is([data-slot='select-chip'], [data-slot='badge']) {
+  font-family: var(--oc-text);
+  font-weight: 700;
+  border: 1.5px solid var(--oc-line);
+  border-radius: 999px;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='switch'] {
+  border: 2px solid var(--oc-edge);
+  background: var(--oc-wash);
+  box-shadow: inset 0 2px 0 rgb(74 30 10 / 0.14);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='switch'][data-state='checked'] {
+  background: var(--oc-lacquer);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='switch-thumb'] {
+  background:
+    radial-gradient(circle, transparent 0 34%, var(--oc-edge) 36% 44%, transparent 46%),
+    var(--oc-gold);
+  border: 1.5px solid var(--oc-edge);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='checkbox'] {
+  border: 2px solid var(--oc-edge);
+  border-radius: 6px;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='checkbox'][data-state='checked'] {
+  background: var(--oc-lacquer);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='dialog-content'] {
+  font-family: var(--oc-text);
+  background: var(--oc-paper);
+  border: 3px solid var(--oc-edge);
+  border-radius: 18px;
+  box-shadow: 6px 8px 0 var(--oc-shadow);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='dialog-overlay'] {
+  background: rgb(60 20 8 / 0.55);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='dialog-title'] {
+  font-family: var(--oc-display);
+  color: var(--oc-hot);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-testid='unofficial-domain-notice']
+  > [role='note'] {
+  background: var(--oc-note);
+  border: 2px dashed var(--oc-gold-deep);
+  border-radius: 12px;
+}
+
+/* ------------------------------------------------------------------ tables */
+/* Tables read like a printed order slip: header in red, rows ruled with dashes. */
+html.orange-chicken:not([data-inferencex-embed]) main table.w-full thead th {
+  font-family: var(--oc-display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: #fff6e6 !important;
+  background-color: var(--oc-lacquer) !important;
+  border-bottom: 3px solid var(--oc-gold);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) main table.w-full tbody tr {
+  border-bottom: 1px dashed var(--oc-line) !important;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  main
+  table.w-full
+  tbody
+  tr:nth-child(even)
+  > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: var(--oc-wash);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  main
+  table.w-full
+  tbody
+  tr:hover
+  > :is(td, th):is(.bg-card, :not([class*='bg-'])) {
+  background-color: #ffe9b8;
+}
+
+/* ------------------------------------------------- 404, empty and loading */
+html.orange-chicken:not([data-inferencex-embed])
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child {
+  margin-bottom: 14px;
+  padding: 0 22px 4px;
+  font-family: var(--oc-display);
+  font-size: 4rem;
+  line-height: 1.2;
+  color: #fff6e6;
+  background: var(--oc-lacquer);
+  border: 3px solid var(--oc-edge);
+  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%;
+  box-shadow: 0 5px 0 var(--oc-edge);
+  text-shadow: 3px 3px 0 var(--oc-edge);
+  transform: rotate(-4deg);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  div.items-center.justify-center.text-center
+  > [data-slot='eyebrow'].tabular-nums:first-child::after {
+  content: 'sold out';
+  display: block;
+  margin-top: -6px;
+  font-family: var(--oc-text);
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-shadow: none;
+  color: var(--oc-gold);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  :is([data-slot='empty-state'], [data-testid='scatter-empty-state']) {
+  font-family: var(--oc-text);
+  color: var(--oc-ink);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  :is([data-slot='empty-state'], [data-testid='scatter-empty-state'])::before {
+  content: '';
+  flex: none;
+  display: block;
+  width: 84px;
+  height: 56px;
+  margin: 0 auto 8px;
+  /* An empty takeout box, lid open. */
+  background: var(--oc-empty-box) center / contain no-repeat;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) {
+  --oc-empty-box: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 56'%3E%3Cpath d='M14 22h56l-6 28H20Z' fill='%23fff0d8' stroke='%234a1e0a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M14 22 24 6h36l10 16' fill='%23f6b93b' stroke='%234a1e0a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M24 6q18-14 36 0' fill='none' stroke='%234a1e0a' stroke-width='3'/%3E%3Cpath d='M30 34h24' stroke='%23a82a14' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='skeleton'] {
+  border-radius: 10px;
+  background-color: var(--oc-wash);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(246 185 59 / 0.55) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: oc-skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes oc-skeleton {
+  from {
+    background-position: 130% 0;
+  }
+
+  to {
+    background-position: -30% 0;
+  }
+}
+
+/* ------------------------------------------------------------------ charts */
+html.orange-chicken:not([data-inferencex-embed]) svg[data-testid='d3-chart-svg'] text {
+  font-family: var(--oc-text);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) svg[data-testid='d3-chart-svg'] .tick text {
+  fill: var(--oc-ink);
+  font-weight: 600;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .legend-container label {
+  font-weight: 600;
+  color: var(--oc-ink);
+}
+
+/* Legend swatches are small saucers: series colour on a rim. */
+html.orange-chicken:not([data-inferencex-embed])
+  .legend-container
+  label
+  > span:first-child
+  > span.rounded-full {
+  box-shadow:
+    0 0 0 1.5px var(--oc-edge),
+    0 0 0 3px var(--oc-paper);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  svg[data-testid='d3-chart-svg']
+  :is(.roofline-path, .overlay-roofline-path) {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  svg[data-testid='d3-chart-svg']
+  .global-pareto-frontier {
+  stroke: var(--oc-lacquer);
+  stroke-width: 2.5px;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  svg[data-testid='d3-chart-svg']
+  :is(.grid, .grid-h, .grid-v)
+  line {
+  stroke: var(--oc-line);
+  stroke-opacity: 0.4;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+  stroke-width: 1.4;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) svg[data-testid='d3-chart-svg'] .domain {
+  stroke: var(--oc-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) svg[data-testid='d3-chart-svg'] .tick line {
+  stroke: var(--oc-ink);
+  stroke-width: 1.5;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) svg[data-testid='d3-chart-svg'] rect.bar {
+  stroke: var(--oc-ink);
+  stroke-width: 1.5px;
+  stroke-opacity: 0.85;
+}
+
+.oc-bar-weave {
+  pointer-events: none;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) .canvas-point-surface {
+  filter: drop-shadow(0 1px 0 rgb(74 30 10 / 0.35));
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-chart-tooltip] > div {
+  font-family: var(--oc-text);
+  background: var(--oc-paper);
+  color: var(--oc-ink);
+  border: 2px solid var(--oc-edge);
+  border-radius: 12px;
+  box-shadow: 3px 4px 0 var(--oc-shadow);
+}
+
+/* Tooltips are order chits: a torn paper edge and an order number that climbs. */
+html.orange-chicken:not([data-inferencex-embed]) [data-chart-tooltip]:not([data-sheet])::before {
+  content: var(--oc-order, 'ORDER');
+  position: absolute;
+  z-index: 1;
+  top: -9px;
+  left: 10px;
+  padding: 0 7px;
+  font-family: var(--oc-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0.08em;
+  color: #fff6e6;
+  background: var(--oc-lacquer);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-chart-tooltip] {
+  position: relative;
+}
+
+/* ------------------------------------------------------------------ footer */
+html.orange-chicken:not([data-inferencex-embed]) footer[data-testid='footer'] {
+  position: relative;
+  margin-top: 28px;
+  color: #fff0d8;
+  background: var(--oc-lacquer-deep);
+  border-top: 4px solid var(--oc-gold);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  footer[data-testid='footer']
+  :is(a, p, span, h2, h3, h4, li, button) {
+  color: inherit;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) footer[data-testid='footer'] a:hover {
+  color: var(--oc-gold);
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  footer[data-testid='footer']
+  .text-muted-foreground {
+  color: #f1d3ae;
+}
+
+/* Footer sign-off: a receipt line under the links. */
+html.orange-chicken:not([data-inferencex-embed]) footer[data-testid='footer'] > .container::after {
+  content: '— thank you · 谢谢惠顾 · come again —';
+  display: block;
+  margin-top: 14px;
+  padding-top: 10px;
+  text-align: center;
+  font-family: var(--oc-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--oc-gold);
+  border-top: 1px dashed rgb(246 185 59 / 0.5);
+}
+
+/* ------------------------------------------------------------------ banner */
 html:not(.orange-chicken) [data-testid='orange-chicken-theme-banner'],
 html[data-inferencex-embed] [data-testid='orange-chicken-theme-banner'] {
   display: none;
 }
 
+.orange-chicken-theme-banner {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  margin-block: 0.5rem 1.5rem;
+  padding: 1rem 1.5rem 1.1rem;
+  overflow: hidden;
+  color: var(--oc-ink);
+  background:
+    radial-gradient(circle at 92% 20%, rgb(246 185 59 / 0.35), transparent 40%), var(--oc-wash);
+  border: 3px solid var(--oc-edge);
+  border-radius: 20px;
+  box-shadow: 5px 6px 0 var(--oc-shadow);
+}
+
+/* Menu-board border: a dashed gold line inside the frame. */
+.orange-chicken-theme-banner::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  border: 2px dashed var(--oc-gold-deep);
+  border-radius: 15px;
+  opacity: 0.7;
+}
+
+.oc-banner-copy {
+  position: relative;
+  align-self: start;
+  min-width: 0;
+}
+
+.oc-banner-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+  font-family: var(--oc-display);
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--oc-hot);
+  text-shadow: 2px 2px 0 var(--oc-gold);
+}
+
+.oc-seal {
+  display: inline-grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  font-family: var(--oc-brush);
+  font-size: 1.4rem;
+  line-height: 1;
+  color: #fff6e6;
+  text-shadow: none;
+  background: var(--oc-lacquer);
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 2px var(--oc-lacquer-deep);
+  transform: rotate(-6deg);
+  border: 0;
+  padding: 0;
+}
+
+button.oc-seal {
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+button.oc-seal:hover {
+  transform: rotate(4deg) scale(1.12);
+}
+
+button.oc-seal:active {
+  transform: rotate(-10deg) scale(0.9);
+}
+
+.oc-banner-desc {
+  margin: 0.5rem 0 0;
+  max-width: 38rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.oc-banner-tools {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.oc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0 0.9rem;
+  font-family: var(--oc-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--oc-ink);
+  background: var(--oc-paper);
+  border: 2px solid var(--oc-edge);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--oc-edge);
+  transition:
+    transform 110ms cubic-bezier(0.3, 1.6, 0.5, 1),
+    box-shadow 110ms,
+    background-color 120ms;
+}
+
+.oc-chip:hover {
+  background: var(--oc-hi);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--oc-edge);
+}
+
+.oc-chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--oc-edge);
+}
+
+.oc-chip[aria-pressed='true'] {
+  color: #2a1004;
+  background: var(--oc-gold);
+}
+
+.oc-chip-play {
+  color: #fff6e6;
+  background: linear-gradient(180deg, var(--oc-glaze), var(--oc-lacquer) 92%);
+  text-shadow: 0 1px 0 rgb(74 30 10 / 0.5);
+}
+
+.oc-chip-play:hover {
+  background: linear-gradient(180deg, #f58a30, var(--oc-lacquer) 92%);
+}
+
+.oc-swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--oc-edge);
+}
+
+.oc-swatch[data-mode='glaze'] {
+  background: linear-gradient(135deg, #e8731a 50%, #ad360e 50%);
+}
+
+.oc-swatch[data-mode='jade'] {
+  background: linear-gradient(135deg, #5aa66a 50%, #23623e 50%);
+}
+
+.oc-swatch[data-mode='night'] {
+  background: linear-gradient(135deg, #1b110d 50%, #f0b868 50%);
+}
+
+.oc-swatch[data-mode='chili'] {
+  background: linear-gradient(135deg, #e03b2c 50%, #a0141c 50%);
+}
+
+.oc-banner-trophies {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-trophy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.6rem 0.15rem 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--oc-paper);
+  border: 1.5px solid var(--oc-line);
+  border-radius: 999px;
+}
+
+.oc-trophy img {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.oc-trophy[data-earned='false'] {
+  border-style: dashed;
+}
+
+.oc-trophy[data-earned='false'] img {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+
+.oc-trophy[data-earned='true'] {
+  border-color: var(--oc-gold-deep);
+  background: var(--oc-note);
+}
+
+/* The right-hand column: photo of the dish, then the Bowl / Plate / Bigger Plate card. */
+.oc-banner-art-wrap {
+  position: relative;
+  width: 17rem;
+}
+
+.oc-plate-col {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.oc-photo {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  background: var(--oc-chit);
+  border: 2px solid var(--oc-edge);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--oc-shadow);
+}
+
+.oc-photo img {
+  display: block;
+  width: 100%;
+  height: 8.5rem;
+  object-fit: cover;
+}
+
+.oc-photo figcaption {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--oc-caps);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgb(214 25 39 / 0.94);
+}
+
+.oc-banner-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.45rem;
+}
+
+.oc-banner-kicker span {
+  display: grid;
+  line-height: 1.15;
+}
+
+.oc-banner-kicker strong {
+  font-family: var(--oc-caps);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c4161f;
+}
+
+.oc-banner-kicker small {
+  font-family: var(--oc-caps);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--oc-ink);
+  opacity: 0.8;
+}
+
+.oc-logo {
+  flex: 0 0 auto;
+  width: 3.6rem;
+  height: 3.6rem;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-logo {
+  width: 6.5rem;
+  height: 6.5rem;
+  border: 3px solid var(--oc-edge);
+  box-shadow: 3px 3px 0 var(--oc-shadow);
+}
+
+.orange-chicken-theme-banner[data-compact='true'] .oc-logo {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
 @media (max-width: 640px) {
-  .orange-chicken-theme-banner {
-    gap: 0.5rem;
-    padding: 1rem;
+  .orange-chicken-theme-banner:not([data-compact='true']) .oc-logo {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+}
+
+.oc-plate {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.55rem 0.65rem 0.6rem;
+  background: var(--oc-chit);
+  border: 2px solid var(--oc-edge);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--oc-shadow);
+}
+
+.oc-plate-title {
+  margin: 0;
+  font-family: var(--oc-caps);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c4161f;
+}
+
+.oc-plate-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.oc-chip-caps {
+  font-family: var(--oc-caps);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.oc-plate .oc-chip {
+  min-height: 1.7rem;
+  padding: 0.15rem 0.5rem;
+}
+
+.oc-plate-meter {
+  height: 0.55rem;
+  overflow: hidden;
+  background: #fff;
+  border: 1.5px solid var(--oc-edge);
+  border-radius: 99px;
+}
+
+.oc-plate-meter span {
+  display: block;
+  height: 100%;
+  background: #d61927;
+  transition: width 220ms ease-out;
+}
+
+.oc-plate-meter[data-full='true'] span {
+  background: repeating-linear-gradient(135deg, #d61927 0 6px, #7a0f16 6px 12px);
+}
+
+.oc-plate-status {
+  margin: 0;
+  min-height: 2.1em;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.oc-plate-note {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+
+.oc-banner-steam {
+  position: absolute;
+  left: 30%;
+  top: -8px;
+  width: 50%;
+  height: 48px;
+  opacity: 0.6;
+  animation: oc-steam-wiggle 3.2s ease-in-out infinite;
+}
+
+@keyframes oc-steam-wiggle {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.3;
   }
 
-  .orange-chicken-banner-art {
-    width: 6rem;
-    height: 5rem;
+  50% {
+    transform: translateY(-6px);
+    opacity: 0.7;
+  }
+}
+
+.orange-chicken-theme-banner[data-compact='true'] {
+  grid-template-columns: minmax(0, 1fr);
+  margin-block: 0 1rem;
+  padding: 0.55rem 1rem;
+  border-width: 2px;
+  box-shadow: 3px 3px 0 var(--oc-shadow);
+}
+
+.orange-chicken-theme-banner[data-compact='true']
+  :is(.oc-banner-desc, .oc-banner-trophies, .oc-banner-art-wrap, .oc-banner-kicker small) {
+  display: none;
+}
+
+.orange-chicken-theme-banner[data-compact='true'] .oc-banner-title {
+  font-size: 1.15rem;
+}
+
+.orange-chicken-theme-banner[data-compact='true'] .oc-banner-tools {
+  margin-top: 0.4rem;
+}
+
+.oc-pocket {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .orange-chicken-theme-banner {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0.9rem 1rem 1rem;
+  }
+
+  .oc-banner-art-wrap {
+    width: auto;
+  }
+
+  .oc-photo img {
+    height: 6rem;
+  }
+
+  .oc-pocket {
+    display: flex;
+  }
+
+  .oc-chip {
+    min-height: 2.75rem;
+  }
+}
+
+.oc-toasts {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: max-content;
+  max-width: min(92vw, 24rem);
+  pointer-events: none;
+}
+
+/* A reserved row under the banner's controls: toasts land here when no free spot exists on screen. */
+.oc-rail:empty {
+  display: none;
+}
+
+.oc-rail {
+  margin-top: 0.5rem;
+}
+
+.oc-rail-toasts {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.oc-rail .oc-toast {
+  text-align: left;
+  animation: none;
+}
+
+/* No free lane on this screen: the words stay in the live region for screen readers only. */
+.oc-toasts[data-lane='quiet'] > *,
+.oc-toasts[data-lane='rail'] > * {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.oc-toast {
+  padding: 0.55rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--oc-ink);
+  background: var(--oc-note);
+  border: 2px solid var(--oc-edge);
+  border-radius: 14px;
+  box-shadow: 0 4px 0 var(--oc-edge);
+  animation: oc-toast 4.2s ease-out forwards;
+}
+
+.oc-toast[data-tone='fortune'] {
+  background: var(--oc-lacquer);
+  color: #fff6e6;
+  font-family: var(--oc-brush);
+  font-size: 1.1rem;
+}
+
+/* A printed slip: white paper, red capitals, the cookie photo at the side. */
+.oc-toast[data-tone='slip'] {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  text-align: left;
+  font-family: var(--oc-caps);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  text-transform: uppercase;
+  color: #b4121c;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.oc-toast[data-tone='slip'] img {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 3rem;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.oc-toast[data-tone='slip']:lang(zh) {
+  font-family: var(--oc-text);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+@keyframes oc-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+
+  8%,
+  86% {
+    opacity: 1;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* ------------------------------------------------------- places, tabs, panels */
+.oc-plate[hidden] {
+  display: none;
+}
+
+.oc-places {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-place {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 6.8rem;
+  padding: 0;
+  overflow: hidden;
+  color: #fff;
+  text-align: left;
+  background: var(--oc-lacquer);
+  border: 2px solid var(--oc-edge);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--oc-shadow);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.oc-place:hover {
+  transform: translateY(-2px) rotate(-0.6deg);
+}
+
+.oc-place img {
+  display: block;
+  width: 100%;
+  height: 6.8rem;
+  object-fit: cover;
+  object-position: 50% 12%;
+}
+
+.oc-place-card {
+  display: grid;
+  place-content: center;
+  height: 6.8rem;
+  font-family: var(--oc-display);
+  font-size: 1.1rem;
+  line-height: 1.05;
+  text-align: center;
+  color: #fff6e6;
+  letter-spacing: 0.06em;
+  background: var(--oc-lacquer);
+}
+
+.oc-place-year,
+.oc-place-name {
+  position: absolute;
+  left: 0;
+  font-family: var(--oc-caps);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgb(150 12 22 / 0.92);
+}
+
+.oc-place-year {
+  top: 0;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.72rem;
+  border-radius: 0 0 8px 0;
+}
+
+.oc-place-name {
+  right: 0;
+  bottom: 0;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.6rem;
+  line-height: 1.2;
+}
+
+.oc-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  background: var(--oc-chit);
+  border: 2px solid var(--oc-edge);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--oc-shadow);
+}
+
+.oc-tab {
+  flex: 1 1 0;
+  min-height: 2rem;
+  padding: 0.2rem 0.3rem;
+  font-family: var(--oc-caps);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--oc-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.oc-tab[aria-selected='true'] {
+  color: #fff;
+  background: var(--oc-lacquer);
+}
+
+.oc-tab:focus-visible {
+  outline: 3px solid var(--oc-ink);
+  outline-offset: 1px;
+}
+
+.oc-panel-body {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.oc-wok-items {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  list-style: none;
+}
+
+.oc-wok-items strong {
+  margin-right: 0.35rem;
+  color: #a82a14;
+}
+
+.oc-wok-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-wok-steps li[data-state='done'] .oc-chip {
+  color: #2a1004;
+  background: var(--oc-gold);
+}
+
+.oc-wok-result {
+  display: block;
+  width: 100%;
+  height: 6.2rem;
+  object-fit: cover;
+  border: 2px solid var(--oc-edge);
+  border-radius: 8px;
+}
+
+.oc-orders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.oc-box-stage {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  min-height: 5.4rem;
+  padding: 0.5rem;
+  text-align: center;
+  background: var(--oc-note);
+  border: 2px dashed var(--oc-gold-deep);
+  border-radius: 10px;
+}
+
+.oc-box-stage[data-reveal='open'] img {
+  animation: oc-pop 520ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes oc-pop {
+  0% {
+    transform: scale(0.2) rotate(-20deg);
+  }
+
+  100% {
+    transform: none;
+  }
+}
+
+.oc-box-shelf {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-box-shelf li {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  background: #fff;
+  border: 2px solid var(--oc-edge);
+  border-radius: 50%;
+}
+
+.oc-box-shelf li[data-found='false'] img {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.45;
+}
+
+.oc-box-shelf img {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+}
+
+@media (max-width: 900px) {
+  .oc-places {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .oc-places {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-place,
+  .oc-box-stage[data-reveal='open'] img {
+    transition: none;
+    animation: none;
+  }
+
+  .oc-place:hover {
+    transform: none;
   }
 }
 
 @media (forced-colors: active) {
-  html.orange-chicken:not([data-inferencex-embed])
-    [data-orange-chicken-eligible='true']
-    .orange-chicken-marker,
-  .orange-chicken-banner-art {
+  .oc-place,
+  .oc-tab,
+  .oc-box-shelf li {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 2px solid ButtonText;
+    box-shadow: none;
+  }
+
+  .oc-place-year,
+  .oc-place-name,
+  .oc-place-card {
+    color: ButtonText;
+    background: ButtonFace;
+  }
+
+  .oc-tab[aria-selected='true'] {
+    color: HighlightText;
+    background: Highlight;
+  }
+}
+
+/* ----------------------------------------------------------------- effects */
+.oc-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.oc-fx-back {
+  position: fixed;
+  inset: 0;
+  z-index: -5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.oc-rain {
+  position: absolute;
+  top: -40px;
+  width: 34px;
+  height: 34px;
+  animation: oc-fall linear forwards;
+}
+
+@keyframes oc-fall {
+  to {
+    transform: translateY(calc(100vh + 80px)) rotate(var(--oc-spin, 360deg));
+  }
+}
+
+.oc-flames {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40vh;
+  background: linear-gradient(0deg, rgb(255 140 20 / 0.85), rgb(255 70 10 / 0.45) 40%, transparent);
+  animation: oc-burst 1.6s ease-out forwards;
+}
+
+@keyframes oc-burst {
+  0% {
+    opacity: 0;
+    transform: translateY(40%);
+  }
+
+  25% {
+    opacity: 1;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-6%);
+  }
+}
+
+.oc-stamp {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  aspect-ratio: 1;
+  font-family: var(--oc-brush);
+  font-size: 76px;
+  line-height: 1;
+  color: #fff6e6;
+  background: var(--oc-lacquer);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 0 0 8px var(--oc-lacquer-deep),
+    0 12px 0 var(--oc-shadow);
+  transform: rotate(-8deg);
+  animation: oc-stamp 1.6s cubic-bezier(0.3, 1.6, 0.5, 1) forwards;
+}
+
+@keyframes oc-stamp {
+  0% {
+    opacity: 0;
+    transform: translateY(-60px) rotate(-8deg) scale(1.6);
+  }
+
+  30% {
+    opacity: 1;
+    transform: rotate(-8deg) scale(1);
+  }
+
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: rotate(-8deg) scale(1.04);
+  }
+}
+
+.oc-cat {
+  position: absolute;
+  right: 16px;
+  bottom: 0;
+  width: 92px;
+  pointer-events: auto;
+  animation: oc-cat-up 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.oc-cat .oc-paw {
+  transform-origin: 80% 90%;
+  animation: oc-wave 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes oc-cat-up {
+  from {
+    transform: translateY(110%);
+  }
+}
+
+@keyframes oc-wave {
+  from {
+    transform: rotate(-14deg);
+  }
+
+  to {
+    transform: rotate(14deg);
+  }
+}
+
+/* ----------------------------------------------------- journal and the game */
+.oc-journal {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-journal li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.7rem;
+  align-items: center;
+  padding: 0.5rem 0.7rem;
+  background: var(--oc-wash);
+  border: 1.5px solid var(--oc-line);
+  border-radius: 12px;
+}
+
+.oc-journal li[data-found='false'] {
+  opacity: 0.6;
+}
+
+.oc-journal img {
+  width: 1.8rem;
+  height: 1.8rem;
+  grid-row: span 2;
+}
+
+.oc-journal strong {
+  font-family: var(--oc-display);
+  font-weight: 400;
+  color: var(--oc-hot);
+}
+
+.oc-journal span {
+  font-size: 0.85rem;
+}
+
+/* ------------------------------------------------------------------ motion */
+@media (prefers-reduced-motion: reduce) {
+  .oc-lantern,
+  .oc-steam,
+  .oc-flame,
+  .oc-banner-steam,
+  .oc-toast,
+  .oc-cat,
+  .oc-cat .oc-paw {
+    animation: none;
+  }
+
+  .oc-plate-meter span {
+    transition: none;
+  }
+
+  .oc-steam {
     display: none;
   }
 
+  html.orange-chicken:not([data-inferencex-embed]) * {
+    scroll-behavior: auto !important;
+  }
+
   html.orange-chicken:not([data-inferencex-embed])
-    [data-orange-chicken-eligible='true']
-    [data-orange-chicken-decorated]
-    > .visible-shape {
-    opacity: 1;
+    :is(
+      [data-slot='button'],
+      [data-slot='tabs-trigger'],
+      .oc-chip,
+      header nav a,
+      [data-slot='card']
+    ) {
+    transition: none;
+  }
+}
+
+html.orange-chicken[data-oc-still='true'] :is(.oc-lantern, .oc-steam, .oc-flame, .oc-banner-steam) {
+  animation: none;
+}
+
+@media print {
+  .orange-chicken-scene,
+  .oc-fx,
+  .oc-fx-back,
+  .oc-toasts {
+    display: none;
+  }
+
+  html.orange-chicken:not([data-inferencex-embed]) body {
+    background: var(--oc-hi);
+  }
+}
+
+/* ------------------------------------------------------------ forced colors */
+@media (forced-colors: active) {
+  .orange-chicken-scene,
+  .oc-photo,
+  .oc-fx,
+  .oc-fx-back,
+  html.orange-chicken:not([data-inferencex-embed]) main [data-slot='card']::before {
+    display: none;
+  }
+
+  html.orange-chicken:not([data-inferencex-embed]) header[data-testid='header'] {
+    background-image: none;
   }
 
   .orange-chicken-theme-banner {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;
+    box-shadow: none;
+  }
+
+  .oc-banner-title,
+  .oc-seal {
+    color: CanvasText;
+    text-shadow: none;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+
+  .oc-chip,
+  .oc-toast {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 2px solid ButtonText;
+    box-shadow: none;
+    text-shadow: none;
+  }
+
+  .oc-chip[aria-pressed='true'] {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+  }
+
+  html.orange-chicken:not([data-inferencex-embed]) [data-slot='button'][class~='bg-primary'],
+  html.orange-chicken:not([data-inferencex-embed]) [data-slot='button'][class~='bg-brand-fill'],
+  html.orange-chicken:not([data-inferencex-embed]) [data-slot='tabs-trigger'][data-state='active'] {
+    text-shadow: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  html.orange-chicken:not([data-inferencex-embed]) .oc-marker {
+    display: none;
+  }
+
+  html.orange-chicken:not([data-inferencex-embed]) [data-oc-decorated] > .visible-shape {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------- chart markers */
+.oc-marker {
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 120ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-oc-decorated] > .visible-shape {
+  opacity: 0;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-oc-decorated]:hover > .oc-marker {
+  transform: scale(1.18);
+}
+
+/* The PNG export measures a probe span appended to the body; keep it on the chart's own face. */
+html.orange-chicken:not([data-inferencex-embed]) body > span[style*='-9999px'] {
+  font-family: var(--oc-stock-sans), system-ui, sans-serif;
+}
+
+/* ------------------------------------------------------- banner stage (the serving line) */
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-banner-copy {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.oc-stage {
+  position: relative;
+  flex: 0 0 auto;
+  margin-top: 0.8rem;
+  overflow: hidden;
+  container-type: inline-size;
+  border: 2px solid var(--oc-edge);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff6e4, #f7dca8);
+}
+
+.oc-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: end;
+  padding: 0.35rem 0.5rem 0;
+}
+
+.oc-pans {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr) 2.2fr repeat(6, 1fr);
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0 0 0.5rem;
+  list-style: none;
+  border-bottom: 0.5rem solid #8a1a00;
+}
+
+/* The glass front of the counter: a pale sheet and a diagonal glint over the pans. */
+.oc-pans::after {
+  position: absolute;
+  inset: 0 0 0.5rem;
+  pointer-events: none;
+  content: '';
+  background:
+    linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 0.4) 36%, transparent 42%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.18), transparent 55%);
+}
+
+.oc-pan {
+  display: block;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: var(--oc-ink);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.oc-pan svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: transform 0.15s;
+}
+
+.oc-pan:hover svg {
+  transform: translateY(-2px);
+}
+
+.oc-pan:focus-visible,
+.oc-register:focus-visible,
+.oc-mascot:focus-visible {
+  outline: 3px solid var(--oc-hot);
+  outline-offset: 2px;
+  position: relative;
+  z-index: 2;
+}
+
+.oc-pan-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 2.5em;
+  padding: 0.12rem 0.1rem;
+  line-height: 1.1;
+  background: #fff8ed;
+  border: 1.5px solid var(--oc-edge);
+  border-radius: 4px;
+}
+
+.oc-pan-card strong {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.oc-pan-card small {
+  font-size: 0.62rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+li[data-big='true'] .oc-pan-card strong {
+  font-size: 0.78rem;
+}
+
+.oc-pan[data-empty='true'] .oc-pan-card {
+  background: #ffd9cf;
+}
+
+.oc-pan[data-fresh='true'] svg {
+  animation: oc-pan-in 0.6s ease-out;
+}
+
+.oc-line-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding-bottom: 0.35rem;
+}
+
+.oc-mascot {
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 12px;
+}
+
+.oc-mascot svg {
+  display: block;
+  height: 5.6rem;
+  width: auto;
+  overflow: visible;
+}
+
+.oc-register {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 7.4rem;
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+  line-height: 1.1;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--oc-ink);
+  cursor: pointer;
+  background: #fff8ed;
+  border: 2px solid var(--oc-edge);
+  border-radius: 14px;
+}
+
+.oc-register small {
+  min-width: 1.1rem;
+  padding: 0 0.25rem;
+  font-size: 0.65rem;
+  text-align: center;
+  color: #fff8ed;
+  background: #d62300;
+  border-radius: 999px;
+}
+
+.oc-register:hover svg,
+.oc-register:active svg {
+  animation: oc-bell-ring 0.5s ease-in-out 2;
+  transform-origin: 50% 10%;
+}
+
+.oc-pp-body,
+.oc-pp-head,
+.oc-pp-arm {
+  transform-box: fill-box;
+}
+
+.oc-pp-body {
+  transform-origin: 50% 100%;
+  animation: oc-pp-breathe 3.4s ease-in-out infinite;
+}
+
+.oc-pp-arm {
+  transform-origin: 0% 0%;
+}
+
+.oc-pp-eyes {
+  transform-origin: 50% 50%;
+  animation: oc-pp-blink 5s infinite;
+}
+
+/* Pei Pei: idle breathes and blinks, hover or focus waves, a click hops, the register bell cheers. */
+.oc-mascot-pei:is(:hover, :focus-visible) .oc-pp-arm {
+  animation: oc-pp-wave 0.7s ease-in-out infinite;
+}
+
+.oc-mascot-pei[data-state='hop'] {
+  animation: oc-pp-hop 0.5s ease-out 2;
+}
+
+.oc-mascot-pei[data-state='ring'] .oc-pp-arm {
+  animation: oc-pp-wave 0.25s ease-in-out infinite;
+}
+
+.oc-mascot-pei[data-state='ring'] .oc-pp-head {
+  transform-origin: 50% 100%;
+  animation: oc-pp-tilt 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes oc-pp-breathe {
+  50% {
+    transform: scaleY(1.025);
+  }
+}
+
+@keyframes oc-pp-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes oc-pp-wave {
+  50% {
+    transform: rotate(-28deg);
+  }
+}
+
+@keyframes oc-pp-hop {
+  40% {
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes oc-pp-tilt {
+  to {
+    transform: rotate(7deg);
+  }
+}
+
+@keyframes oc-pan-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes oc-bell-ring {
+  25% {
+    transform: rotate(18deg);
+  }
+  75% {
+    transform: rotate(-18deg);
+  }
+}
+
+/* A narrow banner keeps the pans and the big Orange Chicken card, and drops the small cards. */
+@container (max-width: 34rem) {
+  .oc-pan-card small,
+  li[data-big='false'] .oc-pan-card {
+    display: none;
+  }
+
+  .oc-mascot svg {
+    height: 4rem;
+  }
+
+  .oc-register span:not([aria-hidden]) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-stage * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+html.orange-chicken[data-oc-still='true'] .oc-stage * {
+  animation: none !important;
+}
+
+@media (forced-colors: active) {
+  .oc-stage,
+  .oc-line-note,
+  .oc-pan-card,
+  .oc-register {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .oc-line-sign {
+    forced-color-adjust: none;
+    color: Canvas;
+    background: CanvasText;
+  }
+}
+
+/* ---- home banner height pass: sign header with the logo, thin history strip, compact right column */
+.oc-line-sign {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.3rem 0.7rem;
+  color: #fff8ed;
+  background: #d62300;
+  border-bottom: 2px solid var(--oc-edge);
+}
+
+.orange-chicken-theme-banner .oc-line-sign .oc-logo {
+  width: 4.2rem;
+  height: 4.2rem;
+  margin-block: -0.1rem;
+  box-shadow: none;
+  border-width: 2px;
+}
+
+.oc-sign-text {
+  display: grid;
+  flex: 0 0 auto;
+  line-height: 1.15;
+}
+
+.oc-sign-text strong {
+  font-family: var(--oc-caps);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.oc-sign-text small {
+  font-family: var(--oc-caps);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.oc-line-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 0 0 auto;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--oc-ink);
+  background: #fff8ed;
+  border: 2px solid var(--oc-edge);
+  border-radius: 10px;
+}
+
+.oc-line-note[data-empty='true'] {
+  opacity: 0.85;
+}
+
+.oc-stage {
+  margin-top: 0.5rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) {
+  padding-block: 0.7rem 0.8rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-places {
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place {
+  min-height: 3.5rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place img,
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place-card {
+  height: 3.5rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place-card {
+  grid-auto-flow: column;
+  gap: 0.3rem;
+  place-content: center;
+  font-size: 0.85rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place-year {
+  padding: 0.05rem 0.4rem;
+  font-size: 0.62rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place-name {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.52rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-banner-title {
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-banner-desc {
+  max-width: 60rem;
+  margin-block: 0.2rem 0.4rem;
+  font-size: 0.9rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-banner-tools .oc-chip {
+  padding-block: 0.2rem;
+  font-size: 0.74rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-photo img {
+  height: 4.6rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-plate-col {
+  gap: 0.4rem;
+}
+
+.oc-mascot svg {
+  height: 8.4rem;
+}
+
+@container (max-width: 34rem) {
+  .oc-mascot svg {
+    height: 6rem;
+  }
+
+  .oc-line-note {
+    display: none;
+  }
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-banner-tools {
+  margin-top: 0.3rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place {
+  min-height: 3rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place img,
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-place-card {
+  height: 3rem;
+}
+
+.orange-chicken-theme-banner:not([data-compact='true']) .oc-banner-desc {
+  margin-block: 0 0.2rem;
+  line-height: 1.3;
+}
+
+.orange-chicken-theme-banner .oc-line-sign .oc-logo {
+  width: 3.8rem;
+  height: 3.8rem;
+}
+
+.oc-stage {
+  margin-top: 0.4rem;
+}
+
+@container (max-width: 34rem) {
+  .oc-line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oc-line-end {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .oc-pans {
+    grid-template-columns: repeat(2, 1fr) 2.6fr repeat(6, 1fr);
+  }
+}
+
+/* ======================================================================= round 4 banner
+   A short strip: name, buttons and photo on top; the serving line beside it on a wide screen and in
+   a drawer on a small one. Everything else (palettes, sound, plate card, places) opens from one button. */
+.oc-banner {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'id' 'hero' 'actions' 'line' 'rail' 'drawer';
+  gap: 0.5rem 0.9rem;
+  margin-block: 0.4rem 0.9rem;
+  padding: 0.6rem 0.8rem 0.7rem;
+  overflow: hidden;
+  color: var(--oc-ink);
+  background:
+    radial-gradient(circle at 92% 20%, rgb(246 185 59 / 0.35), transparent 40%), var(--oc-wash);
+  border: 3px solid var(--oc-edge);
+  border-radius: 16px;
+  box-shadow: 4px 5px 0 var(--oc-shadow);
+}
+
+html:not(.orange-chicken) .oc-banner {
+  display: none;
+}
+
+.oc-banner::before {
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  content: '';
+  border: 2px dashed var(--oc-gold-deep);
+  border-radius: 12px;
+  opacity: 0.6;
+}
+
+.oc-banner > * {
+  position: relative;
+  min-width: 0;
+}
+
+.oc-b-id {
+  grid-area: id;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.oc-b-actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.oc-b-hero {
+  position: relative;
+  grid-area: hero;
+  height: 6.5rem;
+}
+
+.oc-b-hero .oc-photo {
+  position: absolute;
+  inset: 0;
+}
+
+.oc-b-hero .oc-photo img {
+  width: 100%;
+  height: 100%;
+  object-position: 50% 60%;
+}
+
+.oc-b-line {
+  grid-area: line;
+}
+
+.oc-banner .oc-rail {
+  grid-area: rail;
+  margin-top: 0;
+}
+
+.oc-banner .oc-logo {
+  width: 3.6rem;
+  height: 3.6rem;
+  border: 2px solid var(--oc-edge);
+  box-shadow: 2px 2px 0 var(--oc-shadow);
+}
+
+.oc-banner[data-compact='true'] .oc-logo {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.oc-b-name {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.oc-b-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
+  margin: 0;
+  font-family: var(--oc-caps);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oc-b-kicker strong {
+  font-size: 0.72rem;
+  color: #c4161f;
+}
+
+.oc-b-kicker small {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  opacity: 0.85;
+}
+
+.oc-banner .oc-banner-title {
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+}
+
+.oc-banner .oc-seal {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.3rem;
+}
+
+.oc-banner[data-compact='true'] .oc-banner-title {
+  font-size: 1.15rem;
+}
+
+.oc-banner[data-compact='true'] .oc-b-kicker small {
+  display: none;
+}
+
+.oc-banner .oc-chip {
+  min-height: 2.75rem;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.8rem;
+  line-height: 1.1;
+}
+
+.oc-banner .oc-chip-play {
+  flex: 1 1 auto;
+}
+
+/* ---- the drawer */
+.oc-drawer {
+  grid-area: drawer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 2px dashed var(--oc-gold-deep);
+}
+
+.oc-drawer-col {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.oc-drawer-title {
+  margin: 0;
+  font-family: var(--oc-caps);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c4161f;
+}
+
+.oc-drawer .oc-banner-desc {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.oc-drawer .oc-banner-tools {
+  margin-top: 0;
+}
+
+.oc-drawer .oc-places {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.oc-drawer .oc-place,
+.oc-drawer .oc-place img,
+.oc-drawer .oc-place-card {
+  min-height: 4.2rem;
+  height: 4.2rem;
+}
+
+.oc-drawer .oc-place-card {
+  grid-auto-flow: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.oc-drawer .oc-place-year {
+  font-size: 0.64rem;
+}
+
+.oc-drawer .oc-place-name {
+  font-size: 0.56rem;
+}
+
+.oc-drawer .oc-plate .oc-chip {
+  min-height: 2.25rem;
+}
+
+/* The serving line inside a drawer: three pans across, every card readable, every pan big to tap. */
+.oc-drawer-line .oc-stage {
+  margin-top: 0;
+}
+
+.oc-drawer-line .oc-pans {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.4rem 0.35rem 0.6rem;
+}
+
+.oc-drawer-line .oc-pan {
+  min-height: 3.5rem;
+  padding: 0.1rem;
+}
+
+.oc-banner .oc-drawer-line .oc-pan-card,
+.oc-banner .oc-drawer-line li[data-big='false'] .oc-pan-card {
+  display: flex;
+  min-height: 2.4rem;
+}
+
+.oc-banner .oc-drawer-line .oc-pan-card small {
+  display: block;
+}
+
+.oc-banner .oc-drawer-line .oc-line-note {
+  display: block;
+}
+
+.oc-drawer-line .oc-pan-card strong {
+  font-size: 0.74rem;
+}
+
+.oc-drawer-line .oc-pan-card small {
+  font-size: 0.64rem;
+}
+
+.oc-drawer-line .oc-line {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.oc-drawer-line .oc-line-end {
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 0 0.5rem 0.4rem;
+}
+
+.oc-drawer-line .oc-mascot svg {
+  height: 5rem;
+}
+
+.oc-drawer-line .oc-register {
+  min-height: 2.75rem;
+}
+
+.oc-drawer-line .oc-line-sign {
+  flex-wrap: wrap;
+}
+
+/* ---- a phone: three equal buttons in one row */
+@media (max-width: 640px) {
+  .oc-banner .oc-b-actions {
+    flex-wrap: nowrap;
+  }
+
+  .oc-banner .oc-b-actions .oc-chip {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.76rem;
+    text-align: center;
+  }
+
+  .oc-banner .oc-b-actions .oc-chip-play {
+    flex: 1.5 1 0;
+  }
+
+  .oc-banner:not([data-compact='true']) .oc-logo {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .oc-banner .oc-b-kicker strong {
+    display: none;
+  }
+
+  .oc-banner[data-compact='true'] .oc-b-kicker {
+    display: none;
+  }
+
+  .oc-b-hero {
+    height: 6.5rem;
+  }
+}
+
+/* ---- a tablet: the photo sits beside the name and buttons; the line is a drawer */
+@media (min-width: 641px) {
+  .oc-banner:not([data-compact='true']) {
+    grid-template-columns: minmax(0, 1fr) 15rem;
+    grid-template-areas: 'id hero' 'actions hero' 'line line' 'rail rail' 'drawer drawer';
+  }
+
+  .oc-banner:not([data-compact='true']) .oc-b-hero {
+    height: auto;
+    min-height: 7rem;
+  }
+
+  .oc-banner .oc-chip {
+    min-height: 2.25rem;
+    padding-inline: 0.8rem;
+  }
+
+  .oc-banner .oc-chip-play {
+    flex: 0 0 auto;
+  }
+
+  .oc-drawer-more {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oc-drawer-more .oc-drawer-col:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .oc-drawer-line .oc-pans {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .oc-banner[data-compact='true'] {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'id actions' 'rail rail' 'drawer drawer';
+    align-items: center;
+  }
+
+  .oc-banner[data-compact='true'] .oc-b-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* ---- a wide screen: one strip, the serving line shown in place */
+@media (min-width: 1100px) {
+  .oc-banner:not([data-compact='true']) {
+    grid-template-columns: auto minmax(0, 1fr) 11.5rem;
+    grid-template-areas: 'id actions hero' 'line line hero' 'rail rail rail' 'drawer drawer drawer';
+    gap: 0.3rem 0.9rem;
+    margin-block: 0.25rem 0.5rem;
+    padding: 0.5rem 0.8rem 0.6rem;
+  }
+
+  .oc-banner:not([data-compact='true']) .oc-b-hero {
+    min-height: 0;
+  }
+
+  .oc-banner:not([data-compact='true']) .oc-b-actions {
+    justify-content: flex-end;
+  }
+
+  .oc-banner:not([data-compact='true']) .oc-logo {
+    width: 3.1rem;
+    height: 3.1rem;
+  }
+
+  .oc-banner:not([data-compact='true']) .oc-b-kicker strong {
+    display: none;
+  }
+
+  .oc-banner:not([data-compact='true']) .oc-banner-title {
+    font-size: 1.7rem;
+  }
+
+  .oc-drawer-more {
+    grid-template-columns: 1fr 1fr 1.1fr;
+  }
+
+  .oc-drawer-more .oc-drawer-col:first-child {
+    grid-column: auto;
+  }
+
+  .oc-b-line .oc-stage {
+    margin-top: 0;
+    border-width: 2px;
+  }
+
+  .oc-b-line .oc-line-sign {
+    gap: 0.6rem;
+    padding: 0.15rem 0.6rem;
+    border-bottom-width: 2px;
+  }
+
+  .oc-b-line .oc-sign-text {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .oc-b-line .oc-sign-text strong {
+    font-size: 0.78rem;
+  }
+
+  .oc-b-line .oc-sign-text small {
+    font-size: 0.66rem;
+  }
+
+  .oc-b-line .oc-line-note {
+    padding: 0.1rem 0.5rem;
+    overflow: hidden;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .oc-b-line .oc-line {
+    padding: 0.25rem 0.5rem 0;
+  }
+
+  .oc-b-line .oc-pans {
+    padding-bottom: 0.3rem;
+    border-bottom-width: 0.4rem;
+  }
+
+  .oc-b-line .oc-pans {
+    grid-template-columns: repeat(2, 1fr) 1.25fr repeat(6, 1fr);
+  }
+
+  .oc-b-line .oc-pan {
+    min-height: 3.5rem;
+  }
+
+  .oc-b-line .oc-pan svg {
+    width: auto;
+    height: 3.3rem;
+    margin-inline: auto;
+  }
+
+  .oc-b-line li[data-big='true'] .oc-pan svg {
+    height: 3.9rem;
+  }
+
+  .oc-b-line .oc-pan-card {
+    min-height: 1.9rem;
+  }
+
+  .oc-b-line .oc-line-end {
+    gap: 0.15rem;
+    padding-bottom: 0.2rem;
+  }
+
+  .oc-b-line .oc-mascot svg {
+    height: 3.8rem;
+  }
+
+  .oc-b-line .oc-register {
+    min-height: 2rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .oc-banner,
+  .oc-drawer {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+/* Serving-line labels sit on cream cards in every palette, so their ink is pinned dark. */
+.oc-pan-card,
+.oc-line-note,
+.oc-register {
+  color: #3a1608;
+}
+
+.oc-pan-card small {
+  color: #5a2a12;
+  opacity: 1;
+}
+
+.oc-line-note[data-empty='true'] {
+  opacity: 1;
+}
+
+.oc-banner-motto {
+  font-family: var(--oc-caps);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c4161f;
+}
+
+html[data-oc-mode='night'] :is(.oc-banner-motto, .oc-drawer-title, .oc-b-kicker strong) {
+  color: var(--oc-hot);
+}
+
+/* ------------------------------------------------ chart cards: menu key, sweep, states */
+html.orange-chicken:not([data-inferencex-embed]) {
+  --oc-pan-row: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 120'%3E%3Cpath d='M8 54h134l-10 46H18Z' fill='%23c9ced4' stroke='%234a1e0a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M4 54h142' stroke='%234a1e0a' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M30 52q10-16 26-8t26-6 28 6 6 8Z' fill='%23e8731a' stroke='%234a1e0a' stroke-width='2.5' stroke-linejoin='round'/%3E%3Ccircle cx='48' cy='47' r='4' fill='%23f6b93b'/%3E%3Ccircle cx='78' cy='43' r='4' fill='%23f6b93b'/%3E%3Ccircle cx='106' cy='47' r='4' fill='%23f6b93b'/%3E%3Cpath d='M58 80h34v14H58Z' fill='%23fff0d8' stroke='%234a1e0a' stroke-width='2'/%3E%3Cpath d='M64 87h22' stroke='%23a82a14' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+  --oc-empty-pan: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 56'%3E%3Cpath d='M8 26h68l-6 24H14Z' fill='%23c9ced4' stroke='%234a1e0a' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M4 26h76' stroke='%234a1e0a' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M22 34q20 8 40 0' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' opacity='.7'/%3E%3Cpath d='M30 14q-4-5 0-9M42 14q-4-5 0-9M54 14q-4-5 0-9' fill='none' stroke='%23a82a14' stroke-width='2.5' stroke-linecap='round' opacity='.55'/%3E%3C/svg%3E");
+  --oc-sold-text: 'SOLD OUT · 售罄';
+  --oc-warm-text: 'keeping the pans warm · 保温中';
+}
+
+html.orange-chicken[data-oc-lang='zh']:not([data-inferencex-embed]) {
+  --oc-sold-text: '售罄 · SOLD OUT';
+  --oc-warm-text: '保温中 · keeping the pans warm';
+}
+
+.oc-shape-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 4px 10px;
+  font-family: var(--oc-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--oc-ink);
+  background: var(--oc-paper);
+  border: 2px dashed var(--oc-edge);
+  border-radius: 10px;
+}
+
+.oc-shape-key-title {
+  font-family: var(--oc-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--oc-hot);
+}
+
+.oc-shape-key > span:not(.oc-shape-key-title) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.oc-sweep {
+  position: absolute;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgb(246 185 59 / 0) 35%,
+    rgb(246 185 59 / 0.32) 50%,
+    rgb(246 185 59 / 0) 65%,
+    transparent 100%
+  );
+  background-size: 60% 100%;
+  background-repeat: no-repeat;
+  background-position: -70% 0;
+  animation: oc-sweep 1.3s ease-in-out 1 forwards;
+}
+
+.oc-sweep[data-hold] {
+  animation-delay: -0.65s;
+  animation-play-state: paused;
+}
+
+@keyframes oc-sweep {
+  to {
+    background-position: 170% 0;
+  }
+}
+
+/* Loading: the steam table. Four steel pans under a heat lamp while the numbers arrive. */
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='skeleton'][class*='h-[600px]'] {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--oc-wash);
+  background-image:
+    var(--oc-pan-row), linear-gradient(0deg, var(--oc-lacquer-deep) 0 22%, transparent 22%);
+  background-size:
+    150px 120px,
+    100% 100%;
+  background-repeat: repeat-x, no-repeat;
+  background-position:
+    6px calc(100% - 22px),
+    0 0;
+  animation: none;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-slot='skeleton'][class*='h-[600px]']::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 150px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 30% 100%, rgb(255 255 255 / 0.65), transparent 55%),
+    radial-gradient(ellipse at 70% 100%, rgb(255 255 255 / 0.5), transparent 55%);
+  opacity: 0.6;
+  animation: oc-steam-rise 2.6s ease-in-out infinite;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-slot='skeleton'][class*='h-[600px]']::after {
+  content: var(--oc-warm-text);
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  padding: 4px 14px;
+  font-family: var(--oc-display);
+  font-size: 1.1rem;
+  white-space: nowrap;
+  color: #fff6e6;
+  background: var(--oc-lacquer);
+  border: 3px solid var(--oc-edge);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--oc-edge);
+  transform: translateX(-50%) rotate(-2deg);
+}
+
+@keyframes oc-steam-rise {
+  0%,
+  100% {
+    transform: translateY(14px);
+    opacity: 0.25;
+  }
+
+  50% {
+    transform: translateY(-10px);
+    opacity: 0.65;
+  }
+}
+
+/* Empty: the last pan is bare and the card says so. The stock message stays as it is. */
+html.orange-chicken:not([data-inferencex-embed]) [data-testid='scatter-empty-state']::before {
+  width: 96px;
+  height: 64px;
+  background: var(--oc-empty-pan) center / contain no-repeat;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) [data-testid='scatter-empty-state']::after {
+  content: var(--oc-sold-text);
+  display: block;
+  width: fit-content;
+  margin: 10px auto 0;
+  padding: 2px 12px;
+  font-family: var(--oc-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  color: var(--oc-hot);
+  border: 3px double var(--oc-hot);
+  border-radius: 6px;
+  transform: rotate(-5deg);
+}
+
+/* Tooltip: a menu card with a double frame, a dotted rule and a torn foot. */
+html.orange-chicken:not([data-inferencex-embed]) [data-chart-tooltip]:not([data-sheet]) > div {
+  outline: 2px solid var(--oc-edge);
+  outline-offset: -7px;
+  padding-bottom: 8px;
+  background-image: radial-gradient(circle at 6px 100%, transparent 4px, var(--oc-paper) 4.5px);
+  background-size: 12px 8px;
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-chart-tooltip]:not([data-sheet])
+  > div
+  > *
+  + * {
+  border-top: 1px dotted var(--oc-edge);
+}
+
+/* Lines from the menu board arrive as a ticket with a small caption under the line. */
+.oc-toast[data-tone='line'] {
+  display: grid;
+  gap: 2px;
+  font-family: var(--oc-display);
+  font-weight: 400;
+  font-size: 1.05rem;
+  color: var(--oc-ink);
+  background: var(--oc-paper);
+  border-style: dashed;
+}
+
+.oc-toast[data-tone='line'] .oc-toast-sub {
+  display: block;
+  font-family: var(--oc-text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--oc-hot);
+}
+
+.oc-toast:not([data-tone='line']) .oc-toast-sub {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--oc-text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--oc-hot);
+}
+
+.oc-logo-btn {
+  display: inline-grid;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.oc-lines {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-lines li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.4rem 0.7rem;
+  background: var(--oc-wash);
+  border: 1.5px dashed var(--oc-line);
+  border-radius: 10px;
+}
+
+.oc-lines li[data-found='false'] {
+  opacity: 0.55;
+}
+
+.oc-lines strong {
+  font-family: var(--oc-display);
+  font-weight: 400;
+  color: var(--oc-hot);
+}
+
+.oc-lines span {
+  font-size: 0.8rem;
+}
+
+.oc-journal-sub {
+  margin: 0 0 0.5rem;
+  font-family: var(--oc-display);
+  font-weight: 400;
+  font-size: 1.05rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-sweep,
+  html.orange-chicken [data-slot='skeleton'][class*='h-[600px]']::before {
+    animation: none;
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .oc-sweep {
+    display: none;
+  }
+
+  html.orange-chicken [data-testid='scatter-empty-state']::after,
+  html.orange-chicken [data-slot='skeleton'][class*='h-[600px]']::after {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
   }
 }

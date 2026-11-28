@@ -1,0 +1,611 @@
+/* The Wok Kitchen game: dialog, menu, HUD controls. Imported only by the lazy game chunk. */
+.oc-dialog-overlay {
+  background: rgb(74 30 10 / 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.oc-dialog.oc-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  width: min(1120px, 97vw);
+  max-width: none;
+  max-height: 94dvh;
+  overflow: hidden;
+  background: #fff8ed;
+  color: #4a1e0a;
+  border: 4px solid #4a1e0a;
+  border-radius: 18px;
+  box-shadow:
+    0 8px 0 #a82a14,
+    0 24px 60px rgb(74 30 10 / 0.45);
+  font-family: 'OrangeChickenBody', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+.oc-dialog-play.oc-dialog-play {
+  height: min(780px, 94dvh);
+}
+
+.oc-dialog-menu.oc-dialog-menu,
+.oc-dialog-howto.oc-dialog-howto,
+.oc-dialog-results.oc-dialog-results {
+  width: min(960px, 97vw);
+  overflow-y: auto;
+}
+
+.oc-dialog button {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #4a1e0a;
+  background: #fff1c4;
+  border: 2px solid #4a1e0a;
+  border-radius: 10px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  box-shadow: 0 3px 0 #4a1e0a;
+  transition:
+    transform 0.08s,
+    box-shadow 0.08s,
+    background 0.12s;
+  min-height: 36px;
+}
+
+.oc-dialog button:hover:not(:disabled) {
+  background: #ffe08a;
+}
+
+.oc-dialog button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 #4a1e0a;
+}
+
+.oc-dialog button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.oc-dialog button:focus-visible,
+.oc-dialog input:focus-visible {
+  outline: 3px solid #2f7d4f;
+  outline-offset: 2px;
+}
+
+.oc-dialog button[aria-pressed='true'] {
+  background: #e8731a;
+  color: #fff;
+}
+
+.oc-dialog .oc-game-primary {
+  background: #a82a14;
+  color: #fff;
+  font-family: 'OrangeChickenDisplay', 'OrangeChickenBody', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+.oc-dialog .oc-game-primary:hover:not(:disabled) {
+  background: #c8321c;
+}
+
+/* Menu */
+.oc-game-menu {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 0.9rem 1.4rem;
+  padding: 1.1rem 1.4rem 1.2rem;
+}
+
+.oc-game-menu-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding-right: 2.4rem;
+}
+
+.oc-game-menu-head h2,
+.oc-game-howto h2,
+.oc-game-results h2,
+.oc-game-pause h2 {
+  font-family: 'OrangeChickenDisplay', 'OrangeChickenBody', 'PingFang SC', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  color: #a82a14;
+  margin: 0;
+}
+
+.oc-game-menu-head p {
+  margin: 0.1rem 0 0;
+  font-size: 0.9rem;
+}
+
+.oc-game-wallet {
+  margin-left: auto;
+  background: #f6b93b;
+  border: 2px solid #4a1e0a;
+  border-radius: 999px;
+  padding: 0.2rem 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.oc-game-menu h3 {
+  font-family: 'OrangeChickenDisplay', 'OrangeChickenBody', 'PingFang SC', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 1.1rem;
+  margin: 0 0 0.4rem;
+  color: #b9400c;
+}
+
+.oc-game-route ol {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.oc-dialog .oc-game-act {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.5rem 0.2rem;
+  text-align: center;
+}
+
+.oc-game-act-num {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #4a1e0a;
+  background: #fff8ed;
+  color: #4a1e0a;
+  font-weight: 800;
+}
+
+.oc-game-act-name {
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+.oc-game-act-stars {
+  color: #b9400c;
+  letter-spacing: 1px;
+  font-size: 0.85rem;
+}
+
+.oc-game-act[aria-pressed='true'] .oc-game-act-stars {
+  color: #fff1c4;
+}
+
+.oc-game-brief {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.oc-game-brief small {
+  display: block;
+  opacity: 0.8;
+}
+
+.oc-game-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.oc-dialog .oc-game-mode {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  align-content: start;
+}
+
+.oc-game-mode span {
+  font-weight: 500;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.oc-game-mode em {
+  font-style: normal;
+  font-size: 0.75rem;
+}
+
+.oc-game-seg {
+  display: inline-flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.oc-dialog .oc-game-seg button {
+  padding: 0.25rem 0.55rem;
+  min-height: 30px;
+  font-size: 0.8rem;
+}
+
+.oc-game-range {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.oc-game-range input {
+  width: 100%;
+  accent-color: #e8731a;
+}
+
+.oc-game-preview {
+  font-size: 0.82rem;
+  margin: 0.5rem 0 0;
+  line-height: 1.35;
+}
+
+.oc-game-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.oc-game-checks input {
+  accent-color: #2f7d4f;
+  margin-right: 0.3rem;
+}
+
+.oc-game-shop ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.oc-game-shop li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.35rem 0.55rem;
+  border: 2px solid #4a1e0a;
+  border-radius: 10px;
+  background: #fffcf6;
+}
+
+.oc-game-shop li p {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.oc-game-menu-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+/* How to play and results */
+.oc-game-howto,
+.oc-game-results {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.3rem 1.6rem 1.5rem;
+}
+
+.oc-game-howto ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.oc-game-howto .oc-game-primary {
+  justify-self: end;
+}
+
+.oc-game-results dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.4rem 1rem;
+  margin: 0;
+}
+
+.oc-game-results dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.3rem 0.6rem;
+  background: #fffcf6;
+  border: 2px solid #4a1e0a;
+  border-radius: 10px;
+}
+
+.oc-game-results dt {
+  font-size: 0.85rem;
+}
+
+.oc-game-results dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.oc-game-result-stars {
+  margin: 0;
+  font-size: 2rem;
+  color: #e8731a;
+  letter-spacing: 4px;
+}
+
+.oc-game-results[data-win] h2 {
+  color: #2f7d4f;
+}
+
+.oc-game-finale {
+  font-family: 'OrangeChickenDisplay', 'OrangeChickenBody', 'PingFang SC', system-ui, sans-serif;
+  font-size: 1.3rem;
+  color: #a82a14;
+}
+
+/* Play */
+.oc-game-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  outline: none;
+}
+
+.oc-game-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 3rem 0.4rem 0.8rem;
+  background: #a82a14;
+  color: #fff8ed;
+  flex-wrap: wrap;
+}
+
+.oc-game-bar-title {
+  font-family: 'OrangeChickenDisplay', 'OrangeChickenBody', 'PingFang SC', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 1.1rem;
+}
+
+.oc-game-bar-keys {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.74rem;
+  opacity: 0.9;
+}
+
+.oc-dialog .oc-game-bar button {
+  min-height: 30px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.oc-game-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #fff0d8;
+}
+
+.oc-game-canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.oc-game-pause {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  background: rgb(255 248 237 / 0.88);
+  text-align: center;
+  padding: 1rem;
+}
+
+.oc-game-pause p {
+  max-width: 34rem;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.oc-game-woks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  background: #ffe3b5;
+  border-top: 3px solid #4a1e0a;
+}
+
+.oc-game-wok {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.oc-game-wok[data-busy] {
+  opacity: 0.7;
+}
+
+.oc-game-wok-name {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.oc-game-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.oc-dialog .oc-game-step button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.oc-game-step output {
+  min-width: 1.6rem;
+  text-align: center;
+  font-weight: 800;
+}
+
+.oc-game-wallet-mini {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+/* Touch controls */
+.oc-game-touch {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0.6rem;
+  pointer-events: none;
+}
+
+.oc-game-stick,
+.oc-game-touch-buttons {
+  pointer-events: auto;
+}
+
+/* Mouse play has no stick, only the Act and Dash buttons in the lower corner. */
+.oc-game-touch[data-coarse='false'] {
+  justify-content: flex-end;
+}
+
+.oc-game-touch[data-coarse='false'] .oc-game-touch-buttons {
+  grid-auto-flow: column;
+}
+
+.oc-game-stick {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: rgb(255 248 237 / 0.55);
+  border: 3px solid #4a1e0a;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+}
+
+.oc-game-stick-knob {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e8731a;
+  border: 3px solid #4a1e0a;
+}
+
+.oc-game-touch-buttons {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.oc-dialog .oc-game-touch-buttons button {
+  width: 76px;
+  height: 56px;
+  font-size: 1rem;
+  background: #f6b93b;
+  touch-action: none;
+}
+
+@media (max-width: 720px) {
+  .oc-dialog.oc-dialog {
+    width: 100vw;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-width: 3px;
+  }
+
+  .oc-dialog-play.oc-dialog-play {
+    height: 100dvh;
+  }
+
+  .oc-game-menu {
+    grid-template-columns: 1fr;
+    padding: 0.9rem;
+  }
+
+  .oc-game-bar-keys {
+    display: none;
+  }
+
+  .oc-game-modes {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-dialog button {
+    transition: none;
+  }
+}
+
+html[data-oc-still] .oc-dialog button {
+  transition: none;
+}
+
+@media (forced-colors: active) {
+  .oc-dialog.oc-dialog,
+  .oc-dialog button,
+  .oc-game-shop li,
+  .oc-game-results dl div {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+
+  .oc-dialog button[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+.oc-dialog > button.absolute {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  top: 0.55rem;
+  right: 0.6rem;
+  background: #fff1c4;
+  color: #4a1e0a;
+  z-index: 3;
+}
+
+.oc-dialog > button.absolute svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 3;
+}
