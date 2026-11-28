@@ -12,6 +12,7 @@ const themes = {
   halo: lazy(() => import('../halo/halo-theme')),
   'orange-chicken': lazy(() => import('../orange-chicken/orange-chicken-theme')),
   excalidraw: lazy(() => import('../excalidraw/excalidraw-theme')),
+  lego: lazy(() => import('../lego/lego-theme')),
 };
 
 export function EasterEggThemeLazy() {

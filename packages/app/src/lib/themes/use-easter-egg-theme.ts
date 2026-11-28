@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { isEmbedPathname } from '../embed/embed-route';
+import { APP_THEMES } from './themes';
 
 export type EasterEggTheme =
   | 'minecraft'
@@ -10,16 +11,11 @@ export type EasterEggTheme =
   | 'doom'
   | 'halo'
   | 'orange-chicken'
-  | 'excalidraw';
-const themes: EasterEggTheme[] = [
-  'minecraft',
-  'csgo',
-  'gta',
-  'doom',
-  'halo',
-  'orange-chicken',
-  'excalidraw',
-];
+  | 'excalidraw'
+  | 'lego';
+const themes = APP_THEMES.filter(
+  (theme) => theme !== 'light' && theme !== 'dark',
+) as EasterEggTheme[];
 const listeners = new Set<() => void>();
 let observer: MutationObserver | undefined;
 

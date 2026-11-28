@@ -10,6 +10,7 @@ import {
   Shield,
   Skull,
   Sun,
+  ToyBrick,
   UtensilsCrossed,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,9 +32,14 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   halo: Shield,
   'orange-chicken': UtensilsCrossed,
   excalidraw: PencilLine,
+  lego: ToyBrick,
 };
 
-const ZH_THEME_NAMES: Record<string, string> = { light: '浅色', dark: '深色' };
+const ZH_THEME_NAMES: Record<string, string> = {
+  light: '浅色',
+  dark: '深色',
+  lego: '乐高',
+};
 
 const STRINGS = {
   en: {
