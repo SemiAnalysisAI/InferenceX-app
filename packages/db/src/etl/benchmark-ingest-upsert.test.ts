@@ -84,6 +84,77 @@ describe('bulkIngestBenchmarkRows — power_audit on conflict', () => {
   });
 });
 
+describe('bulkIngestBenchmarkRows — linked trace metrics', () => {
+  it.each([true, false])('preserves only missing trace fields when linked=%s', async (linked) => {
+    await ingest(
+      row({
+        metrics: {
+          output_tput_tps: 0,
+          median_itl: 0.04,
+          p99_itl: 0.08,
+          server_gpu_cache_hit_rate: 0.75,
+          kv_cache_pool_tokens: 4096,
+          obsolete: 9,
+        },
+      }),
+    );
+    if (linked)
+      await db.exec(`
+      INSERT INTO agentic_trace_replay (id) VALUES (1);
+      UPDATE benchmark_results SET trace_replay_id=1;
+    `);
+    for (let replay = 0; replay < 2; replay++) {
+      await ingest(row({ metrics: { output_tput_tps: 689, median_itl: 0.02 } }));
+      const {
+        rows: [stored],
+      } = await db.query<{ metrics: Record<string, number>; trace_replay_id: number | null }>(
+        'SELECT metrics, trace_replay_id FROM benchmark_results',
+      );
+      expect(stored?.metrics).toEqual({
+        output_tput_tps: 689,
+        median_itl: 0.02,
+        kv_cache_pool_tokens: 4096,
+        ...(linked ? { p99_itl: 0.08, server_gpu_cache_hit_rate: 0.75 } : {}),
+      });
+      expect(stored?.trace_replay_id).toBe(linked ? 1 : null);
+    }
+  });
+
+  it('keeps the trace full-response family whole against runner-only stats', async () => {
+    await ingest(row({ metrics: { output_tput_tps: 1, median_itl: 0.04, median_intvty: 25 } }));
+    // The state persistPreparedTraceReplay leaves: *_itl mirrors *_full_response_itl.
+    const traced = {
+      median_full_response_itl: 0.05,
+      median_full_response_intvty: 20,
+      median_itl: 0.05,
+      median_intvty: 20,
+    };
+    await db.exec(`
+      INSERT INTO agentic_trace_replay (id) VALUES (2);
+      UPDATE benchmark_results SET trace_replay_id=2, metrics = metrics || '${JSON.stringify(traced)}';
+    `);
+    const stored = async () => {
+      const { rows } = await db.query<{ metrics: unknown }>(
+        'SELECT metrics FROM benchmark_results',
+      );
+      return rows[0]?.metrics;
+    };
+
+    await ingest(row({ metrics: { output_tput_tps: 689, median_itl: 0.04, median_intvty: 25 } }));
+    expect(await stored()).toEqual({ output_tput_tps: 689, ...traced });
+
+    const fresh = {
+      output_tput_tps: 700,
+      median_full_response_itl: 0.02,
+      median_full_response_intvty: 50,
+      median_itl: 0.02,
+      median_intvty: 50,
+    };
+    await ingest(row({ metrics: fresh }));
+    expect(await stored()).toEqual(fresh);
+  });
+});
+
 describe('insertServerLog', () => {
   it('publishes log presence for the rows it links', async () => {
     const { insertedIds } = await bulkIngestBenchmarkRows(

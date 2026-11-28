@@ -65,6 +65,7 @@ import {
   bulkUpsertAvailability,
   insertServerLogFilePaths,
 } from './etl/benchmark-ingest';
+import { selectBenchmarkMeasurements } from './etl/benchmark-candidates';
 import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
 import {
   resolveTraceReplayWorkerCount,
@@ -528,9 +529,28 @@ async function main(): Promise<void> {
     }
 
     const files = benchmarkFiles();
+    const perJobPoints = perJobPointKeys(files);
+    // Aggregate rows of a point that a per-job file holds are skipped below, so
+    // they are not candidates: the selected per-job copy wins.
+    const selected = selectBenchmarkMeasurements(
+      files.map((file) =>
+        file.path.startsWith('bmk_')
+          ? file
+          : {
+              ...file,
+              rows: file.rows.filter(
+                ({ mapped }) => !mapped || !perJobPoints.has(benchmarkPointKey(mapped)),
+              ),
+            },
+      ),
+    );
+    for (const decision of selected.decisions) {
+      console.log(`    AgentX selection: ${JSON.stringify(decision)}`);
+    }
     const expectedRunArtifacts = [
       ...new Set(
-        files.flatMap((file) => {
+        selected.sources.flatMap(({ file, rows }) => {
+          if (rows.length === 0) return [];
           const parentDir = path.posix.basename(path.posix.dirname(file.path));
           const artifact =
             gpuMetricsArtifacts.get(parentDir.replace(/^bmk_/u, '')) ??
@@ -542,9 +562,9 @@ async function main(): Promise<void> {
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${files.length} benchmark JSON file(s)`);
     report.detail.benchmarkFiles = files.length;
-    const perJobPoints = perJobPointKeys(files);
 
     for (const [fileIndex, file] of files.entries()) {
+      const selectedRows = selected.sources[fileIndex]!.rows;
       const fileStart = Date.now();
       const relativeFile = file.path;
       console.log(
@@ -563,7 +583,7 @@ async function main(): Promise<void> {
       report.detail.rawBenchmarkRows += file.rows.length + file.nonObjectRows;
       report.counts.benchmark.unmapped += file.nonObjectRows;
 
-      for (const { raw } of file.rows) {
+      for (const { raw } of selectedRows) {
         const datasetSlug = datasetSlugFromBenchmarkRow(raw);
         if (datasetSlug) datasetSlugs.add(datasetSlug);
       }
@@ -571,12 +591,11 @@ async function main(): Promise<void> {
       let fileExpectationsUnknown = file.nonObjectRows > 0;
       const aggregateFile = !file.path.startsWith('bmk_');
       let coveredRows = 0;
-      const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
-        if (mapped && aggregateFile && perJobPoints.has(benchmarkPointKey(mapped))) {
-          coveredRows++;
-          return [];
+      for (const { raw, mapped, failed } of file.rows) {
+        if (mapped) {
+          if (aggregateFile && perJobPoints.has(benchmarkPointKey(mapped))) coveredRows++;
+          continue;
         }
-        if (mapped) return [mapped];
         if (!failed) fileExpectationsUnknown = true;
         if (failed) {
           report.counts.benchmark.skipped++;
@@ -586,8 +605,8 @@ async function main(): Promise<void> {
         if (issue) report.counts.power.unmapped++;
         if (issue && 'error' in issue) powerPublicationErrors.push(issue.error);
         else if (issue) powerPublicationWarnings.push(issue.warning);
-        return [];
-      });
+      }
+      const rows = selectedRows.flatMap(({ mapped }) => (mapped ? [mapped] : []));
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 
       console.log(`    mapped rows: ${rows.length}`);
