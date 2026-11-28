@@ -69,7 +69,7 @@ operation.
 
 GLM-5.3-Flash uses display model `GLM-5.3-Flash`, raw DB key `glm5.3flash`,
 and dashboard route `/infx/inference/glm-5-3-flash` (also under `/zh`). Use
-`model=GLM-5.3-Flash&sequence=agentic-traces` for the inference view. Native
+`model=GLM-5.3-Flash&scenario=agentic-traces` for the inference view. Native
 `zai-org/GLM-5.3-Flash` and `nvidia/GLM-5.3-Flash-NVFP4` observations share
 this model bucket; precision remains a separate field. Registration does not
 publish experimental runs or establish hardware qualification. Preserve empty
@@ -93,7 +93,7 @@ The measured checkpoints remain Open, not Meta's hosted Muse Spark 1.3 service.
 It uses API display-model identifier `Muse-Spark-Open`, raw DB key
 `musespark`, and dashboard route `/infx/inference/muse-spark-open` (also under `/zh`).
 Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
-with `sequence=agentic-traces` for the latter. Comparison results links open the
+with `scenario=agentic-traces` for the latter. Comparison results links open the
 canonical dashboard without an `unofficialRun` parameter.
 Unofficial runs remain available through explicitly supplied overlay links; they
 do not populate the published benchmark API. Preserve empty API responses as no
@@ -104,7 +104,7 @@ MiniMax M3.1 Flash uses display model `MiniMax-M3.1-Flash`, raw DB key
 `/zh`). It is benchmarked on AgentX only, with the checkpoint's built-in DSpark
 drafter, which the API reports as spec method `mtp`. Use
 `model=MiniMax-M3.1-Flash` for benchmark reads and the inference view API, with
-`sequence=agentic-traces` for the latter. Its rows never fall back to `MiniMax-M3`.
+`scenario=agentic-traces` for the latter. Its rows never fall back to `MiniMax-M3`.
 
 Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
 request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or

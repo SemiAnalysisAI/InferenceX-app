@@ -24,7 +24,8 @@ import {
   parsePrecisionsParam,
   parseRunIdListParam,
   parseRunIdParam,
-  parseSequenceParam,
+  parseScenarioParam,
+  parseScenarioValue,
   parseTcoBasisParam,
   parseChipBasisParam,
   resolveModelParam,
@@ -67,21 +68,61 @@ describe('resolveModelParam', () => {
   });
 });
 
-describe('parseSequenceParam', () => {
-  it('accepts canonical and URL-segment forms', () => {
-    expect(parseSequenceParam('8k/1k', Scenario.EightK_OneK)).toBe(Scenario.EightK_OneK);
-    expect(parseSequenceParam('8k-1k', Scenario.EightK_OneK)).toBe(Scenario.EightK_OneK);
-    expect(parseSequenceParam('agentic', Scenario.EightK_OneK)).toBe(Scenario.AgenticTraces);
-    expect(parseSequenceParam('agentic_traces', Scenario.EightK_OneK)).toBe(Scenario.AgenticTraces);
+describe('parseScenarioValue', () => {
+  it.each([
+    ['8k/1k', Scenario.EightK_OneK],
+    ['8k-1k', Scenario.EightK_OneK],
+    ['agentic', Scenario.AgenticTraces],
+    ['agentic_traces', Scenario.AgenticTraces],
+  ])('accepts canonical or URL-segment form %s', (value, expected) => {
+    expect(parseScenarioValue(value, Scenario.OneK_OneK, 'scenario')).toBe(expected);
   });
 
   it('falls back when absent and rejects unknown values', () => {
-    expect(parseSequenceParam(null, Scenario.AgenticTraces)).toBe(Scenario.AgenticTraces);
-    expect(() => parseSequenceParam('16k/1k', Scenario.EightK_OneK)).toThrow(ViewsApiParamError);
+    expect(parseScenarioValue(null, Scenario.AgenticTraces, 'scenario')).toBe(
+      Scenario.AgenticTraces,
+    );
+    expect(() => parseScenarioValue('16k/1k', Scenario.EightK_OneK, 'scenario')).toThrow(
+      ViewsApiParamError,
+    );
   });
 
-  it.each(['__proto__', 'constructor'])('rejects inherited sequence name %s', (value) => {
-    expect(() => parseSequenceParam(value, Scenario.EightK_OneK)).toThrow(ViewsApiParamError);
+  it.each(['__proto__', 'constructor'])('rejects inherited scenario name %s', (value) => {
+    expect(() => parseScenarioValue(value, Scenario.EightK_OneK, 'scenario')).toThrow(
+      ViewsApiParamError,
+    );
+  });
+});
+
+const parseScenarioQuery = (query: string) =>
+  parseScenarioParam(new URLSearchParams(query), Scenario.EightK_OneK);
+
+const scenarioQueryError = (query: string) => {
+  try {
+    parseScenarioQuery(query);
+  } catch (error) {
+    return error as ViewsApiParamError;
+  }
+  throw new Error('expected a parameter error');
+};
+
+describe('parseScenarioParam', () => {
+  it('reads scenario, and the older sequence parameter when scenario is absent', () => {
+    expect(parseScenarioQuery('scenario=agentic')).toBe(Scenario.AgenticTraces);
+    expect(parseScenarioQuery('sequence=agentic')).toBe(Scenario.AgenticTraces);
+    expect(parseScenarioQuery('scenario=1k/1k&sequence=agentic')).toBe(Scenario.OneK_OneK);
+    expect(parseScenarioQuery('model=x')).toBe(Scenario.EightK_OneK);
+  });
+
+  it('names the parameter the client sent when the value is unknown', () => {
+    expect(scenarioQueryError('scenario=16k/1k')).toMatchObject({
+      param: 'scenario',
+      message: 'Unknown scenario: 16k/1k',
+    });
+    expect(scenarioQueryError('sequence=16k/1k')).toMatchObject({
+      param: 'sequence',
+      message: 'Unknown sequence: 16k/1k',
+    });
   });
 });
 

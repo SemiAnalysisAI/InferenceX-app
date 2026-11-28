@@ -63,7 +63,7 @@ import {
   parseMetricParam,
   parsePrecisionsParam,
   parseRunIdParam,
-  parseSequenceParam,
+  parseScenarioParam,
   parseTcoBasisParam,
   parseChipBasisParam,
   parseVendorsParam,
@@ -315,7 +315,7 @@ export function GET(request: NextRequest) {
     const search = request.nextUrl.searchParams;
 
     const { displayName, dbModelKeys } = resolveModelParam(search.get('model'));
-    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
+    const scenario = parseScenarioParam(search, Scenario.EightK_OneK);
     const precisions = parsePrecisionsParam(search.get('precisions'));
     const metric = parseMetricParam(search.get('metric'));
     const requestedXMode = parseEnumParam<XAxisMode>(
@@ -589,6 +589,7 @@ export function GET(request: NextRequest) {
 
     const resolvedParams = {
       model: displayName,
+      scenario: scenario as string,
       sequence: scenario as string,
       precisions: data.resolvedPrecisions,
       metric,

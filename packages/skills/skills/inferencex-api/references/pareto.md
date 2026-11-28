@@ -26,7 +26,7 @@ saved JSON is fuel for later presentation work.
 curl --fail-with-body --get 'https://inferencex.semianalysis.com/api/v1/pareto' \
   --data-urlencode 'model=DeepSeek-R1-0528' \
   --data-urlencode 'rawModel=dsr1' \
-  --data-urlencode 'sequence=1k/1k' \
+  --data-urlencode 'scenario=1k/1k' \
   --data-urlencode 'xMetric=median_intvty' \
   --data-urlencode 'yMetric=output_tput_per_gpu' \
   --data-urlencode 'xDirection=max' \
@@ -38,9 +38,10 @@ curl --fail-with-body --get 'https://inferencex.semianalysis.com/api/v1/pareto' 
    Completion means both boundaries, their source evidence and exclusions have
    been accounted for, including a valid empty result.
 
-`model`, `rawModel`, `sequence`, `xMetric`, `yMetric`, `xDirection` and `yDirection`
-are required. `sequence` accepts `1k/1k`, `1k/8k`, `8k/1k` (single-turn) or
-`agentic-traces`. `min` means lower is better; `max` means higher is better.
+`model`, `rawModel`, `scenario`, `xMetric`, `yMetric`, `xDirection` and `yDirection`
+are required. `scenario` accepts `1k/1k`, `1k/8k`, `8k/1k` (single-turn) or
+`agentic-traces`, and its older name `sequence` still works in its place. `min`
+means lower is better; `max` means higher is better.
 For latency versus throughput use `min/max`; for interactivity versus energy per
 output token use `max/min` and `powerValid=strictV2`. Registered power/energy axes
 require strictV2; other axes may also opt into it.

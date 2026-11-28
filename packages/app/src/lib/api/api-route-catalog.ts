@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '6c4fd1dabbff4625e8e8552b06f7aa29f9237adbc580db031d79d10d9a617197',
+    sourceSha256: '360f18a82c4cdeee979324cae3e18bd1326825988070d5a471b88c51ad815155',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -83,7 +83,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-compare-view',
-    sourceSha256: '8054b40e62dbd96f33351e7f6e3fa9dd7d377902ac98353b6cdd6f841b44a869',
+    sourceSha256: '93c9df2c3503607166beeb69bae000f67284335750abaef3864b4f8508c3a255',
   },
   {
     source: 'src/app/api/v1/views/current-inferencex-image/route.ts',
@@ -91,7 +91,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: 'd1fef99ad144717b02fa08370e94da752b36010066f95bde6ceaaac50877d924',
+    sourceSha256: 'f63cfee912b1346eecf531368ca05898484d902df52fa8465e7bed7987664b22',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-fleet-view',
-    sourceSha256: 'f71b1cf2b8a9145ed35223bd146c83de16429cef118d25b9f66ef7325d51e2bf',
+    sourceSha256: '65baafc12ec4ca7fae242f5b3a8222a3037c3d91eff8f684bc1910e0f4993ffb',
   },
   {
     source: 'src/app/api/v1/views/gpu-metrics/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '1f0a0c83de5e252989c2b87d54f12cf9c0c955d00f6d28467d82ddfb781bd67a',
+    sourceSha256: 'e0a3718b8b0b69e3cfd1fdfb6310a988d242236e290ab5a7a3219b555070e07b',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '44b9aaada2dfb85afb8beb530733aab0f3a4adb337d502f4e537c024a9550e3e',
+    sourceSha256: '52e09c51d4e639b615ddf3d499e20a6eb8eafd5e6d314339f15a8299339e9266',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -1137,7 +1137,17 @@ export const stablePublicApiContracts = [
   },
   {
     operationId: 'list-benchmarks',
-    parameters: ['model', 'date', 'exact', 'runId', 'exactRun', 'view', 'sequence', 'powerValid'],
+    parameters: [
+      'model',
+      'date',
+      'exact',
+      'runId',
+      'exactRun',
+      'view',
+      'scenario',
+      'sequence',
+      'powerValid',
+    ],
     statuses: ['200', '400', '500'],
     auth: 'none',
     cachePolicy: 'public-db-day',
@@ -1873,7 +1883,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '867f8384ec6385328c00a43a057539aac7a106b7387e736e4d4c4f2b4a789860',
+    sourceSha256: '7665c97db5a134d1901334d97571985ce982adb60af94771542c7dab618c5e81',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1882,7 +1892,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: 'd1f267e95631a7c4471c1eb7c326068eb4c4c8fbcacae37c275c422de1d030f3',
+    sourceSha256: '8a2ecff9c7118e38fe988e9d3f179b0835a1da70e84bc93c2b3c9c242865d838',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1909,7 +1919,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '8aeb6c8f774c998f04c701f0e5d47c6db2be0cbddb07324683b9dae62f64a9e4',
+    sourceSha256: 'd26ee3fa0f22d85cfb56b36fa06229419c26225bc9a01ff4e29f3e4421d819da',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1918,7 +1928,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: 'e84d275265ea8bc0f8959cf3521d41a70b59490d000890271def6ed2dd83e001',
+    sourceSha256: 'dfd228fe3ce2e88bf4465bf5e6fa1d25d0d191bf58152265632db09b33e8ec9c',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1927,7 +1937,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/api/pareto-api.ts',
-    sourceSha256: 'c3ee15cc5fedfe9d2ea4199f879258850d39cb41c194b5296080f147fcc6d52b',
+    sourceSha256: 'a7214bb7d50123f3b58867cc377d38e25584d9d5f86cd07bf75c30cd02010b07',
     reviewArea: {
       en: 'Pareto selectors, validation, source scope, missing-axis counts and boundary observations.',
       zh: 'Pareto 选择条件、验证、来源范围、缺失坐标计数和边界观测值。',
@@ -1951,7 +1961,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-request-params.ts',
-    sourceSha256: '1599646d72e9a4e24f74aa229b4da58f97714f50ebe824f030f168f9fd5fb235',
+    sourceSha256: '4d9103b48e73fa8d927de46e920ba33b7221cb3cf0167c3de1403a2135bdb2b2',
     reviewArea: {
       en: '/api/v1/benchmarks query validation and 400 messages.',
       zh: '/api/v1/benchmarks 查询参数校验与 400 错误信息。',
@@ -1967,7 +1977,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmarks-endpoint.server.ts',
-    sourceSha256: 'd967b586fff50b080c079409a99eacb25d2b8e8f39b93d6b4102ce4224d9957b',
+    sourceSha256: 'e43e958dd9ae08549f0dace005346dad54caf86d6a727a11f7e053f8e0426a6d',
     reviewArea: {
       en: 'Benchmarks endpoint parameter validation, date/run/view selection, calculator trimming, power validity filtering and cache keys shared by the route, views and pareto.',
       zh: '基准端点的参数校验、日期/运行/视图选择、计算器裁剪、功耗有效性过滤，以及路由、视图和 pareto 共用的缓存键。',
@@ -2058,7 +2068,7 @@ export const apiContractSourceDigests = [
     // Reviewed for the document early fetch: `benchmarksUrl` and `DASHBOARD_AVAILABILITY_URL`
     // build the same URLs as before, and `fetchJson` can read an early response for one. No
     // parameter, response, or caching contract changed, so the docs stand.
-    sourceSha256: '70d2b4a3e83e253c674d70fe845ae8ed5261256d3ba14f0a9b42c697f01de1b2',
+    sourceSha256: '3bb5932adcfa8dc5f6f466ba64320a5aa6196ff45bb9e5bc77fcf42faee79626',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -2140,7 +2150,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/views-api/options-view.ts',
-    sourceSha256: '5109209260a00e1688108af96e8add60b87e321cb4e01572fb4f71f2fff3e4d6',
+    sourceSha256: '9d8378a856b3f0c76238a87fc7c621c30f28d92968f8f675e44ab18869ef81e8',
     reviewArea: {
       en: 'The /api/v1/views/options payload and the API reference example taken from it.',
       zh: '/api/v1/views/options 的响应内容，以及取自该响应的 API 参考文档示例。',

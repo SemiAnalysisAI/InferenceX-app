@@ -56,24 +56,35 @@ export function resolveModelParam(value: string | null, param = 'model'): Resolv
   return resolved;
 }
 
-const SEQUENCE_ALIASES: Readonly<Record<string, Scenario>> = {
+const SCENARIO_ALIASES: Readonly<Record<string, Scenario>> = {
   ...Object.fromEntries(SCENARIO_OPTIONS.map((scenario) => [scenario, scenario])),
   ...SCENARIO_BY_SEGMENT,
   // The benchmark_type that agentic rows are stored under.
   agentic_traces: Scenario.AgenticTraces,
 };
 
-export function parseSequenceParam(
+/** The key a request names its scenario with: `scenario`, or the older `sequence`. */
+export function scenarioParamName(search: URLSearchParams): 'scenario' | 'sequence' {
+  return search.has('sequence') && !search.has('scenario') ? 'sequence' : 'scenario';
+}
+
+export function parseScenarioValue(
   value: string | null,
   fallback: Scenario,
-  param = 'sequence',
+  param: string,
 ): Scenario {
   if (!value) return fallback;
   const alias = value.toLowerCase();
-  if (!Object.hasOwn(SEQUENCE_ALIASES, alias)) {
-    throw new ViewsApiParamError(param, `Unknown sequence: ${value}`, SCENARIO_OPTIONS);
+  if (!Object.hasOwn(SCENARIO_ALIASES, alias)) {
+    throw new ViewsApiParamError(param, `Unknown ${param}: ${value}`, SCENARIO_OPTIONS);
   }
-  return SEQUENCE_ALIASES[alias];
+  return SCENARIO_ALIASES[alias];
+}
+
+/** Reads `scenario`, or `sequence` when a client still sends the older name. */
+export function parseScenarioParam(search: URLSearchParams, fallback: Scenario): Scenario {
+  const param = scenarioParamName(search);
+  return parseScenarioValue(search.get(param), fallback, param);
 }
 
 export function parseEnumParam<T extends string>(

@@ -10,7 +10,7 @@ import {
   parseFreeListParam,
   parseNumberParam,
   parsePrecisionsParam,
-  parseSequenceParam,
+  parseScenarioParam,
   parseTcoBasisParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
@@ -86,7 +86,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const search = request.nextUrl.searchParams;
 
     const model = resolveModelParam(search.get('model'));
-    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
+    const scenario = parseScenarioParam(search, Scenario.EightK_OneK);
     const requestedPrecisions = parsePrecisionsParam(search.get('precisions'));
     const mwRaw = search.get('mw');
     if (mwRaw === null || mwRaw === '') {
@@ -317,6 +317,7 @@ export function GET(request: NextRequest): Promise<Response> {
 
     const resolvedParams = {
       model: model.displayName,
+      scenario,
       sequence: scenario,
       precisions,
       mw,

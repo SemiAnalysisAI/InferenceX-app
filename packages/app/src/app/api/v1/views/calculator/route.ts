@@ -15,7 +15,7 @@ import {
   parseNumberParam,
   parsePrecisionsParam,
   parseRunIdParam,
-  parseSequenceParam,
+  parseScenarioParam,
   parseTcoBasisParam,
   parseChipBasisParam,
   resolveModelParam,
@@ -172,7 +172,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const search = request.nextUrl.searchParams;
 
     const model = resolveModelParam(search.get('model'));
-    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
+    const scenario = parseScenarioParam(search, Scenario.EightK_OneK);
     const requestedPrecisions = parsePrecisionsParam(search.get('precisions'));
     const target = parseNumberParam(search.get('target'), 'target', CALCULATOR_DEFAULT_TARGET, {
       min: 0,
@@ -358,6 +358,7 @@ export function GET(request: NextRequest): Promise<Response> {
 
     const resolvedParams = {
       model: model.displayName,
+      scenario,
       sequence: scenario,
       precisions,
       target,

@@ -80,19 +80,21 @@ const lifecycleDefaults = {
 export function buildOptionsPayload() {
   const models = MODEL_OPTIONS.map((model) => {
     const { dbModelKeys } = resolveModelParam(model);
+    const deprecatedScenarios = SCENARIO_OPTIONS.filter(
+      (scenario) => getScenarioCategoryForModel(scenario, model) === 'deprecated',
+    );
     return {
       name: model as string,
       dbKeys: dbModelKeys,
       category: getModelCategory(model),
       releaseDate: getModelReleaseDate(model),
       compareSlug: COMPARE_SLUG_BY_DISPLAY.get(model) ?? null,
-      deprecatedSequences: SCENARIO_OPTIONS.filter(
-        (scenario) => getScenarioCategoryForModel(scenario, model) === 'deprecated',
-      ),
+      deprecatedScenarios,
+      deprecatedSequences: deprecatedScenarios,
     };
   });
 
-  const sequences = SCENARIO_OPTIONS.map((scenario) => {
+  const scenarios = SCENARIO_OPTIONS.map((scenario) => {
     const islOsl = scenarioToIslOsl(scenario);
     return {
       key: scenario as string,
@@ -138,7 +140,8 @@ export function buildOptionsPayload() {
 
   return {
     models,
-    sequences,
+    scenarios,
+    sequences: scenarios,
     precisions: PRECISION_OPTIONS,
     hardware,
     frameworks,
@@ -180,6 +183,7 @@ export function buildOptionsPayload() {
     },
     defaults: {
       model: Model.DeepSeek_V4_Pro as string,
+      scenario: Scenario.EightK_OneK as string,
       sequence: Scenario.EightK_OneK as string,
       metric: DEFAULT_METRIC_CONFIG_KEY,
       percentile: 'p90',

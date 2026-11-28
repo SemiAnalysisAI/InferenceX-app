@@ -115,6 +115,33 @@ describe('GET /api/v1/views/calculator', () => {
     expect(responseBody.param).toBe('model');
   });
 
+  it('answers scenario and the older sequence parameter identically, echoing both names', async () => {
+    const [fromScenario, fromSequence, fromBoth] = await Promise.all(
+      ['scenario=1k/1k', 'sequence=1k/1k', 'scenario=1k-1k&sequence=agentic'].map(async (query) => {
+        const response = await GET(
+          request(`/api/v1/views/calculator?model=DeepSeek-V4-Pro&${query}`),
+        );
+        return response.json();
+      }),
+    );
+    expect(fromScenario.params).toMatchObject({ scenario: '1k/1k', sequence: '1k/1k' });
+    expect(fromScenario.hardware.length).toBeGreaterThan(0);
+    expect(fromSequence).toEqual(fromScenario);
+    expect(fromBoth).toEqual(fromScenario);
+  });
+
+  it.each(['scenario', 'sequence'])(
+    'names %s in the error when that parameter carries an unknown workload',
+    async (param) => {
+      const response = await GET(
+        request(`/api/v1/views/calculator?model=DeepSeek-V4-Pro&${param}=16k/1k`),
+      );
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.param).toBe(param);
+    },
+  );
+
   it('interpolates each hardware group at the target (parity with interpolateForGPU)', async () => {
     const response = await GET(
       request('/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k'),

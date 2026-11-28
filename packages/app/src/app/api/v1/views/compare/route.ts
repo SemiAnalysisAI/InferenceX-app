@@ -2,7 +2,7 @@ import {
   validateParams as validateViewParams,
   parseEnumParam,
   parseFormatParam,
-  parseSequenceParam,
+  parseScenarioValue,
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -137,7 +137,7 @@ export function GET(request: NextRequest) {
     const { modelEntry, a, b } = resolvePair(searchParams);
     const scenarioParam = searchParams.get('scenario');
     const requestedScenario = scenarioParam
-      ? parseSequenceParam(scenarioParam, Scenario.EightK_OneK, 'scenario')
+      ? parseScenarioValue(scenarioParam, Scenario.EightK_OneK, 'scenario')
       : null;
     const variant = parseEnumParam(
       searchParams.get('variant'),

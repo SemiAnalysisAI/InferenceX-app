@@ -45,7 +45,7 @@ skill directory, or resolve `scripts/waterfall.mjs` relative to this file.
 ```bash
 node scripts/waterfall.mjs \
   --model DeepSeek-R1-0528 --hardware h200 --framework sglang \
-  --precision fp8 --sequence 8k/1k --metric outputTputPerGpu \
+  --precision fp8 --scenario 8k/1k --metric outputTputPerGpu \
   --target 35 --out /path/to/new-output
 
 node scripts/waterfall.mjs \

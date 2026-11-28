@@ -970,7 +970,7 @@ describe('new dashboard projections', () => {
 });
 
 describe('cache-reuse recipe selection', () => {
-  const query = 'model=DeepSeek-V4-Pro&sequence=agentic-traces&precisions=fp4';
+  const query = 'model=DeepSeek-V4-Pro&scenario=agentic-traces&precisions=fp4';
   const original = 'agg|sn|p1x8/1/-|d1x8/1/-|g8+8|spec-none|offload-off|';
   const selected = 'agg|sn|p1x8/1/-|d1x16/1/-|g8+16|spec-none|offload-on|';
   const rows = [
