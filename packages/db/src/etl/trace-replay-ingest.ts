@@ -97,6 +97,8 @@ export function cacheHitRatesFromPromptTokenTotals(
   totals: PromptTokenTotals | null,
 ): PreparedTraceReplay['cacheHitRates'] {
   if (!totals || !(totals.prompt > 0)) return null;
+  // Totals over unidentified disaggregated endpoints count prompts twice; keep the run's own rate.
+  if (totals.rolesUnidentified) return null;
   const sumPrompts = totals.prompt;
   const sumOf = (name: string): number => totals.bySource[name] ?? 0;
   const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
