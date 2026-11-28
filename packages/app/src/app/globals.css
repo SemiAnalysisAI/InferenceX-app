@@ -546,6 +546,41 @@ html[data-inferencex-embed] .autumn-leaves {
   --radius: 0.5rem;
 }
 
+/* simpsons theme tokens: begin */
+.simpsons {
+  color-scheme: light;
+  --background: #b6e6fc;
+  --foreground: #212339;
+  --card: #fffdf6;
+  --card-foreground: #212339;
+  --popover: #fffdf6;
+  --popover-foreground: #212339;
+  --primary: #204e8f;
+  --primary-foreground: #ffffff;
+  --secondary: #324488;
+  --secondary-foreground: #ffffff;
+  --brand: var(--primary);
+  --brand-fill: var(--brand);
+  --muted: #e1e9eb;
+  --muted-foreground: #43516a;
+  --accent: #fed41d;
+  --accent-foreground: #1a1a1a;
+  --border: #25283a;
+  --border-alt: #47546a;
+  --input: #465267;
+  --ring: #24569e;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: #204e8f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fed41d;
+  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-border: #1a1a1a;
+  --sidebar-ring: #24569e;
+  --radius: 0.75rem;
+}
+/* simpsons theme tokens: end */
+
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,

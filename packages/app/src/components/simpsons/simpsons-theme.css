@@ -1,0 +1,2595 @@
+@font-face {
+  font-family: 'SimpsonsKalam';
+  src: url('../../app/fonts/Simpsons-Kalam.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'SimpsonsNunito';
+  src: url('../../app/fonts/Simpsons-Nunito.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+}
+.simpsons body {
+  --sp-ink: #242433;
+  --sp-marker-hole: #fffcf1;
+  --sp-paper: #fffdf6;
+  --sp-sun: #fed41d;
+  --sp-pink: #fa9db4;
+  --sp-letter: 'SimpsonsKalam', 'Comic Sans MS', 'PingFang SC', sans-serif;
+  --font-dm-sans: 'SimpsonsNunito', 'PingFang SC', system-ui, sans-serif;
+  font-family: var(--font-dm-sans);
+  background: linear-gradient(#83cef3, #dff3ff 940px) fixed;
+}
+.simpsons ::selection {
+  background: #fed41d;
+  color: #242433;
+}
+.simpsons [data-testid='header'] {
+  background: #fff9df;
+  border-bottom: 2px solid var(--sp-ink);
+  box-shadow: 0 3px 0 #e6ad41;
+}
+.simpsons [data-testid='header'] nav a {
+  font-weight: 800;
+}
+.simpsons [data-testid='header'] nav a.bg-muted\/60 {
+  color: var(--sp-ink);
+  border-radius: 7px;
+  background: var(--sp-sun);
+  box-shadow: inset 0 0 0 1.5px var(--sp-ink);
+}
+.simpsons .simpsons-dial {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 33px;
+  height: 34px;
+  border: 1.5px solid var(--sp-ink);
+  border-radius: 7px;
+  color: var(--sp-ink);
+  background: #fffdf6;
+}
+.simpsons .simpsons-dial[aria-pressed='true'] {
+  background: #ffe987;
+}
+.simpsons .simpsons-dial[aria-pressed='false']::after {
+  content: '';
+  position: absolute;
+  width: 23px;
+  height: 1.5px;
+  transform: rotate(-48deg);
+  background: currentColor;
+}
+.simpsons .sp-master-mute[aria-pressed='false']::after {
+  display: none;
+}
+.simpsons
+  :is(
+    .simpsons-dial,
+    .simpsons-cue,
+    .simpsons-donut-button,
+    .simpsons-signoff button
+  ):focus-visible {
+  outline: 3px solid #145bb4;
+  outline-offset: 3px;
+}
+.simpsons .simpsons-shell {
+  padding-bottom: 16px;
+  padding-top: 18px;
+}
+.simpsons .simpsons-banner {
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1.42fr) minmax(200px, 0.55fr);
+  min-height: 149px;
+  border: 3px solid var(--sp-ink);
+  border-radius: 15px 13px 14px 12px;
+  overflow: hidden;
+  box-shadow: 4px 5px 0 var(--sp-ink);
+  color: var(--sp-ink);
+}
+.simpsons .simpsons-titles {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 15px 16px 18px clamp(14px, 1.8vw, 29px);
+  background:
+    radial-gradient(circle at 1.3px 1.3px, #e8a72e 1px, transparent 1.3px) right / 7px 7px,
+    #fed41d;
+}
+.simpsons .simpsons-titles::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(95deg, #fed41d 5%, #fed41d 43%, transparent 100%);
+}
+.simpsons .simpsons-station,
+.simpsons .simpsons-edition,
+.simpsons .simpsons-show {
+  position: relative;
+  z-index: 1;
+}
+.simpsons .simpsons-station,
+.simpsons .simpsons-score-label,
+.simpsons .simpsons-board-meta,
+.simpsons .simpsons-signoff span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 900 10px/1.2 var(--font-dm-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+.simpsons .simpsons-station {
+  margin-bottom: 9px;
+}
+.simpsons .simpsons-show {
+  font: 700 clamp(35px, 4.25vw, 65px)/1 var(--sp-letter);
+  transform: rotate(-4deg);
+  letter-spacing: -0.045em;
+}
+.simpsons .simpsons-edition {
+  font: 900 clamp(11px, 1vw, 15px)/1.2 var(--font-dm-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.simpsons .simpsons-cover-bart {
+  position: absolute;
+  height: 96%;
+  width: 34%;
+  right: -1.7%;
+  bottom: 0;
+  object-fit: contain;
+  object-position: bottom;
+  transform: rotate(5deg);
+}
+.simpsons .simpsons-board {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  border-inline: 3px solid var(--sp-ink);
+  color: #fffde7;
+  background-color: #234b41;
+  background-image:
+    repeating-linear-gradient(175deg, transparent 0 8px, #dbf6c903 8px 10px),
+    radial-gradient(ellipse at 24% 50%, #3b6556, transparent 84%);
+  box-shadow:
+    inset 0 -6px #ad744e,
+    inset 0 -8px #202f28;
+  padding: 16px clamp(70px, 8vw, 127px) 17px clamp(19px, 2.3vw, 38px);
+}
+.simpsons .simpsons-board-text {
+  position: relative;
+  z-index: 1;
+}
+.simpsons .simpsons-board-meta {
+  color: #f4e2a4;
+  font-size: 9px;
+  gap: 8px;
+  letter-spacing: 0.12em;
+}
+.simpsons .simpsons-board-meta i {
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: #d8cca2;
+}
+.simpsons .simpsons-board p {
+  font: 700 clamp(18px, 2vw, 32px)/1.13 var(--sp-letter);
+  margin: 9px 0 0;
+  text-wrap: balance;
+}
+.simpsons .simpsons-chalk-dash {
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 45px;
+  height: 2px;
+  border-radius: 53%;
+  transform: rotate(-2deg);
+  background: #fff3;
+}
+.simpsons .simpsons-board::after {
+  content: '';
+  position: absolute;
+  bottom: 8px;
+  left: 19%;
+  height: 4px;
+  width: 20px;
+  background: #f7eedb;
+  border-radius: 3px;
+  box-shadow: 23px 1px 0 -1px #ebaeb5;
+}
+.simpsons .simpsons-cover-lisa {
+  position: absolute;
+  right: 9px;
+  bottom: 8px;
+  height: 78%;
+  width: 23%;
+  object-fit: contain;
+  object-position: bottom;
+}
+.simpsons .simpsons-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--sp-pink);
+  padding: 12px 8px;
+}
+.simpsons .simpsons-score-label {
+  letter-spacing: 0.13em;
+}
+.simpsons .simpsons-scores {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  line-height: 1;
+}
+.simpsons .simpsons-scores span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 17px/1 var(--sp-letter);
+}
+.simpsons .simpsons-scores b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 33px;
+  background: #fff5da;
+  border: 1.5px solid var(--sp-ink);
+  border-radius: 4px;
+  font: 900 22px/1 var(--font-dm-sans);
+  font-variant-numeric: tabular-nums;
+}
+.simpsons .simpsons-scores i {
+  font-style: normal;
+  font-weight: 900;
+}
+.simpsons .simpsons-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.simpsons .simpsons-cue,
+.simpsons .simpsons-signoff button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1.5px solid var(--sp-ink);
+  border-radius: 6px;
+  background: #fff8e2;
+  box-shadow: 2px 2px 0 var(--sp-ink);
+  color: var(--sp-ink);
+  font: 900 12px/1 var(--font-dm-sans);
+  padding: 7px 10px;
+}
+.simpsons .simpsons-donut-button {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+}
+.simpsons .simpsons-donut-button img {
+  width: 27px;
+  transform: rotate(-14deg);
+}
+.simpsons .simpsons-donut-button:hover img {
+  transform: rotate(5deg);
+}
+.simpsons :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--sp-letter);
+  font-weight: 700;
+}
+.simpsons [data-slot='card'],
+.simpsons [data-testid='compare-agentx-hero'] {
+  background-color: var(--sp-paper);
+  border: 2px solid var(--sp-ink);
+  border-radius: 15px 13px 14px 11px;
+  box-shadow: 3px 4px 0 var(--sp-ink);
+}
+.simpsons figure[data-testid='chart-figure'] > [data-slot='card'] {
+  border-width: 3px;
+  box-shadow:
+    inset 0 5px #fed41d,
+    4px 5px 0 var(--sp-ink);
+  background: #fffcf1;
+}
+.simpsons
+  :is(
+    [data-slot='select-trigger'],
+    [data-slot='input'],
+    input:not([type='range'])[class*='border']
+  ) {
+  border-color: #515267;
+  border-radius: 6px;
+  background: #fffdf6;
+}
+.simpsons :is([data-slot='tabs-list'], [data-slot='control-panel']) {
+  border: 1.5px solid var(--sp-ink);
+  background: #ffefbf;
+}
+.simpsons [data-slot='dashboard-navigation'] nav :is(a, button) {
+  border-radius: 6px 6px 0 0;
+  background: color-mix(in srgb, #fffdf6 78%, transparent);
+}
+.simpsons
+  :is(
+    [data-slot='tabs-trigger'][data-state='active'],
+    [data-slot='dashboard-navigation'] [data-tab-active='true']
+  ) {
+  background: var(--sp-sun);
+  color: var(--sp-ink);
+}
+.simpsons
+  :is(
+    [data-slot='button'][class*='bg-primary'],
+    [data-testid='compare-agentx-revenue-calculator-link']
+  ) {
+  background: var(--primary);
+  color: #fff;
+}
+.simpsons
+  :is(
+    [data-slot='button'],
+    [data-testid='compare-agentx-revenue-calculator-link'],
+    [data-testid='compare-agentx-dashboard-link']
+  )[class*='rounded'] {
+  border: 1.5px solid var(--sp-ink);
+  box-shadow: 2px 2px 0 var(--sp-ink);
+  border-radius: 7px;
+}
+.simpsons :is([data-chart-tooltip], [data-slot='popover-content']) {
+  border: 2px solid var(--sp-ink);
+  border-radius: 8px;
+  background: #fff8dc;
+  box-shadow: 3px 3px 0 var(--sp-ink);
+  color: var(--sp-ink);
+}
+.simpsons [data-testid='d3-chart-svg'] :is(.grid-v, .grid-h) {
+  stroke: #bbcccd;
+}
+.simpsons .simpsons-scene {
+  position: relative;
+  height: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.simpsons .simpsons-scene:has(.simpsons-actor, .simpsons-cameo) {
+  height: 112px;
+}
+.simpsons .sp-replay-gutter {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+}
+.simpsons .sp-replay-gutter:not(:empty) {
+  height: 138px;
+  background: var(--sp-strip, #fff1bf);
+  border-bottom: 2px solid var(--sp-ink);
+}
+.simpsons .sp-replay-rail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--sp-ink);
+  stroke-width: 2;
+}
+.simpsons .sp-receiver-desk {
+  display: grid;
+  grid-template-columns: clamp(145px, 17vw, 230px) minmax(0, 1fr) minmax(145px, 205px);
+  gap: clamp(12px, 2.5vw, 38px);
+  align-items: center;
+  border: 2px solid #35233e;
+  border-radius: 14px;
+  padding: 12px clamp(12px, 2vw, 28px);
+  background: #fff3d0;
+  color: #31223a;
+  margin: 0 0 8px;
+  box-shadow: 2px 3px 0 #493156;
+}
+.simpsons .sp-receiver {
+  position: relative;
+  aspect-ratio: 620/431;
+  width: 100%;
+}
+.simpsons .sp-receiver-frame {
+  width: 100%;
+  height: 100%;
+}
+.simpsons .sp-receiver-shot {
+  position: absolute;
+  left: 9%;
+  top: 12%;
+  width: 82%;
+  height: 66%;
+  object-fit: cover;
+}
+.simpsons .sp-station-bug {
+  position: absolute;
+  right: 12%;
+  top: 14%;
+  width: 14%;
+}
+.simpsons .sp-episode-id {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+.simpsons .sp-episode-id img {
+  width: 108px;
+  padding: 4px 13px;
+  background: #67a5dd url('/decorative/simpsons/art/cloud-sky.webp') center/cover;
+  border: 1.5px solid #342839;
+  border-radius: 50% / 22%;
+}
+.simpsons .sp-episode .sp-episode-title {
+  font-family: var(--sp-letter);
+  font-size: clamp(19px, 2.1vw, 30px);
+  font-weight: 900;
+  line-height: 1.15;
+  margin: 5px 0 3px;
+}
+.simpsons .sp-episode p {
+  max-width: 56ch;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.simpsons .sp-transcript {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: #56345d;
+  font-weight: 800;
+  font-size: 13px;
+  margin-top: 4px;
+}
+.simpsons .sp-transcript img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+}
+.simpsons .sp-remote {
+  display: grid;
+  gap: 7px;
+}
+.simpsons .sp-remote label {
+  display: grid;
+  font-size: 11px;
+  gap: 3px;
+  font-weight: 800;
+}
+.simpsons .sp-remote :is(button, select) {
+  border: 1.5px solid currentColor;
+  border-radius: 5px;
+  min-height: 34px;
+  padding: 3px 8px;
+  max-width: 100%;
+  background: #fff9e5;
+  font-size: 13px;
+}
+.simpsons .sp-remote button {
+  color: white;
+  background: #56375e;
+  font-weight: bold;
+}
+@media (max-width: 640px) {
+  .simpsons .sp-receiver-desk {
+    grid-template-columns: minmax(88px, 32%) minmax(0, 1fr);
+    padding: 10px;
+    gap: 8px 12px;
+  }
+  .simpsons .sp-episode-id img {
+    width: 78px;
+    padding: 2px 9px;
+  }
+  .simpsons .sp-episode-id span {
+    display: none;
+  }
+  .simpsons .sp-episode p {
+    font-size: 12px;
+  }
+  .simpsons .sp-remote {
+    grid-column: 1/-1;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: end;
+  }
+  .simpsons .sp-news-flash {
+    grid-column: 1/-1;
+  }
+}
+@media (forced-colors: active) {
+  .simpsons .sp-receiver-desk,
+  .simpsons .sp-remote :is(select, button) {
+    border: 1px solid ButtonText;
+  }
+  .simpsons .sp-replay-gutter {
+    display: none;
+  }
+}
+.simpsons .simpsons-stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.simpsons :is(.simpsons-actor, .simpsons-punch, .simpsons-prop) {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transform-origin: 50% 85%;
+}
+.simpsons .simpsons-actor {
+  object-fit: contain;
+  filter: drop-shadow(0 1px 0 #fff) drop-shadow(1px 2px 1px #25373b4a);
+}
+.simpsons .simpsons-prop {
+  display: grid;
+  place-items: center;
+  color: var(--sp-ink);
+  background: #fff4cc;
+  border: 2px solid var(--sp-ink);
+  border-radius: 3px;
+  font: 900 14px/1 var(--font-dm-sans);
+}
+.simpsons .simpsons-rider {
+  transform-origin: 0 0;
+}
+.simpsons .sp-frontier-ride {
+  overflow: hidden;
+  pointer-events: none;
+}
+.simpsons .sp-frontier-ride image {
+  pointer-events: none;
+}
+.simpsons .sp-frontier-caption {
+  position: absolute;
+  inset: 4px auto auto 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  color: #242433;
+  background: #fed41d;
+  border: 2px solid #242433;
+  border-radius: 12px 12px 12px 2px;
+  font: 700 15px/1.2 var(--sp-letter);
+}
+@media (forced-colors: active) {
+  .simpsons .sp-frontier-ride,
+  .simpsons .sp-frontier-caption {
+    display: none;
+  }
+}
+.simpsons .simpsons-prop-ride {
+  font: 700 19px/1 var(--sp-letter);
+  border-radius: 4px;
+  box-shadow: 2px 2px var(--sp-ink);
+}
+.simpsons .simpsons-prop-1 {
+  font-size: 27px;
+  background: #fed41d;
+  border-radius: 50%;
+}
+.simpsons .simpsons-prop-3 {
+  color: #bf303b;
+  font: 700 25px/1 var(--sp-letter);
+}
+.simpsons .simpsons-prop-4 {
+  background: #244a40;
+  color: white;
+  font-family: var(--sp-letter);
+}
+.simpsons .simpsons-punch {
+  display: grid;
+  place-items: center;
+  background: var(--sp-sun);
+  border: 2px solid var(--sp-ink);
+  border-radius: 13px 11px 12px 3px;
+  box-shadow: 2px 2px var(--sp-ink);
+  font: 700 16px/1 var(--sp-letter);
+  text-align: center;
+  padding: 1px 4px;
+  color: var(--sp-ink);
+}
+.simpsons .simpsons-cameo {
+  position: absolute;
+  bottom: 22px;
+  right: 25px;
+}
+.simpsons .simpsons-tv {
+  display: grid;
+  grid-template-columns: 1fr 21px;
+  gap: 7px;
+  width: 216px;
+  border: 3px solid var(--sp-ink);
+  border-radius: 15px 15px 10px 10px;
+  background: #b78acb;
+  box-shadow: 3px 4px var(--sp-ink);
+  padding: 9px;
+}
+.simpsons .simpsons-tv-screen {
+  aspect-ratio: 1.57;
+  overflow: hidden;
+  background: #281e3c;
+  border: 2px solid var(--sp-ink);
+  border-radius: 24% / 16%;
+}
+.simpsons .simpsons-tv-screen img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.simpsons .simpsons-tv-caption {
+  grid-column: 1/-1;
+  color: var(--sp-ink);
+  font: 800 11px/1.2 var(--font-dm-sans);
+}
+.simpsons .simpsons-tv-caption span {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 9px;
+  margin-bottom: 2px;
+}
+.simpsons .simpsons-tv-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+}
+.simpsons .simpsons-tv-rail i {
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--sp-ink);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fed41d 44%, #352e3c 45% 55%, #fed41d 56%);
+}
+.simpsons .simpsons-tv-rail span {
+  height: 23px;
+  width: 12px;
+  background: repeating-linear-gradient(#42394e 0 1.5px, transparent 2px 5px);
+}
+.simpsons .simpsons-cutaway {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.simpsons .simpsons-cutaway img {
+  height: 112px;
+  width: 70px;
+  object-fit: contain;
+  filter: drop-shadow(2px 2px white);
+}
+.simpsons .simpsons-cutaway span {
+  background: #fffdf4;
+  border: 2px solid var(--sp-ink);
+  border-radius: 15px 16px 15px 1px;
+  box-shadow: 2px 3px var(--sp-ink);
+  padding: 8px 10px;
+  font: 700 21px/1 var(--sp-letter);
+}
+.simpsons [data-testid='footer'] {
+  background: #fffae7;
+  border-top: 2px solid var(--sp-ink);
+  padding-top: 10px;
+}
+.simpsons .simpsons-signoff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-height: 106px;
+  overflow: hidden;
+  border-top: 2px solid var(--sp-ink);
+  background: #9cd8f0;
+}
+.simpsons .simpsons-signoff img {
+  width: 99px;
+  align-self: flex-end;
+}
+.simpsons .simpsons-signoff {
+  background:
+    linear-gradient(90deg, #fff3ce 8%, #fff3cee8 54%, transparent 85%),
+    url('/decorative/simpsons/art/ad-break.webp') right 46% / min(55%, 480px) auto no-repeat,
+    #fff3ce;
+}
+.simpsons[data-simpsons-channel='tavern'] .simpsons-signoff {
+  background-image:
+    linear-gradient(90deg, #fff3ce 8%, #fff3cee8 54%, transparent 85%),
+    url('/decorative/simpsons/art/tavern.webp');
+}
+.simpsons[data-simpsons-channel='plant'] .simpsons-signoff {
+  background-image:
+    linear-gradient(90deg, #1b2d20 8%, #1b2d20e8 54%, transparent 85%),
+    url('/decorative/simpsons/art/plant-shift.webp');
+}
+.simpsons .simpsons-signoff strong {
+  display: block;
+  font: 700 30px/1.3 var(--sp-letter);
+}
+.simpsons .simpsons-signoff button[aria-pressed='true'] {
+  background: #f8afc1;
+}
+.simpsons main.relative > div.flex.flex-col.gap-12:has(> section h1) {
+  background: #fffdf5;
+  border: 2px solid var(--sp-ink);
+  border-radius: 13px;
+  padding: clamp(18px, 3vw, 44px);
+  margin-block: 18px;
+  width: calc(100% - 32px);
+  box-shadow: 3px 4px var(--sp-ink);
+}
+.simpsons .simpsons-chart-mount {
+  min-width: 0;
+  grid-column: 1/-1;
+}
+.simpsons .simpsons-chart-strip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 31px;
+  margin: 3px 0 8px;
+  padding: 3px 6px;
+  border: 1.5px solid var(--sp-ink);
+  border-radius: 6px;
+  background: #fff3c8;
+}
+.simpsons .simpsons-transmit,
+.simpsons .simpsons-channel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: 900 9px/1.15 var(--font-dm-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.simpsons .simpsons-transmit {
+  background: #25443b;
+  color: #fff9dd;
+  padding: 3px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.simpsons .simpsons-chart-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.simpsons .simpsons-chart-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font: 900 10px/1 var(--font-dm-sans);
+  border-radius: 3px;
+  min-height: 23px;
+}
+.simpsons .simpsons-marker-toggle {
+  width: 27px;
+}
+.simpsons .simpsons-marker-toggle img {
+  width: 18px;
+  height: 18px;
+}
+.simpsons .simpsons-marker-toggle[aria-pressed='false'] img {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+.simpsons .simpsons-chart-cue {
+  border: 1px solid var(--sp-ink);
+  padding: 3px 7px;
+  background: #fed41d;
+}
+.simpsons .simpsons-chart-actions button:focus-visible {
+  outline: 2px solid #145bb4;
+  outline-offset: 2px;
+}
+@media (max-width: 639px) {
+  .simpsons [data-testid='header'] span:has(> .simpsons-dial) {
+    display: flex;
+    gap: 0;
+  }
+  .simpsons .simpsons-channel {
+    font-size: 8px;
+    letter-spacing: 0.03em;
+  }
+  .simpsons .simpsons-chart-actions {
+    gap: 3px;
+  }
+  .simpsons .simpsons-chart-strip {
+    gap: 5px;
+  }
+}
+html[data-inferencex-embed] [data-testid='simpsons-theme-banner'],
+html[data-inferencex-embed] .simpsons-scene {
+  display: none;
+}
+@media (min-width: 1600px) {
+  .simpsons .simpsons-banner {
+    min-height: 161px;
+  }
+}
+@media (max-width: 950px) {
+  .simpsons .simpsons-banner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) 151px;
+    min-height: 131px;
+  }
+  .simpsons .simpsons-board {
+    padding-right: 55px;
+    padding-left: 12px;
+  }
+  .simpsons .simpsons-board-meta span:first-child,
+  .simpsons .simpsons-board-meta i {
+    display: none;
+  }
+  .simpsons .simpsons-scores,
+  .simpsons .simpsons-scores span {
+    gap: 4px;
+  }
+  .simpsons .simpsons-cover-lisa {
+    right: 1px;
+  }
+}
+@media (max-width: 680px) {
+  .simpsons .simpsons-shell {
+    padding-top: 12px;
+  }
+  .simpsons .simpsons-banner {
+    grid-template-columns: minmax(0, 1fr) 125px;
+    min-height: 0;
+    border-radius: 10px;
+    box-shadow: 3px 3px var(--sp-ink);
+  }
+  .simpsons .simpsons-titles {
+    min-height: 92px;
+    padding: 9px 5px 10px 12px;
+  }
+  .simpsons .simpsons-show {
+    font-size: clamp(27px, 7.5vw, 43px);
+  }
+  .simpsons .simpsons-station {
+    font-size: 8px;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .simpsons .simpsons-edition {
+    font-size: 8px;
+  }
+  .simpsons .simpsons-cover-bart {
+    width: 31%;
+    right: -1%;
+    height: 76%;
+    bottom: 3px;
+  }
+  .simpsons .simpsons-board {
+    grid-column: 1/-1;
+    grid-row: 2;
+    min-height: 71px;
+    border-inline: 0;
+    border-top: 2px solid var(--sp-ink);
+    padding: 7px 58px 10px 14px;
+  }
+  .simpsons .simpsons-board p {
+    font-size: 17px;
+    line-height: 1.13;
+    margin-top: 4px;
+  }
+  .simpsons .simpsons-board-meta {
+    font-size: 8px;
+  }
+  .simpsons .simpsons-board-meta span:first-child,
+  .simpsons .simpsons-board-meta i {
+    display: initial;
+  }
+  .simpsons .simpsons-cover-lisa {
+    height: 85%;
+    width: 47px;
+    right: 5px;
+  }
+  .simpsons .simpsons-score {
+    gap: 4px;
+    border-left: 2px solid var(--sp-ink);
+    padding: 6px 4px;
+  }
+  .simpsons .simpsons-score-label {
+    font-size: 8px;
+  }
+  .simpsons .simpsons-scores span {
+    font-size: 13px;
+  }
+  .simpsons .simpsons-scores b {
+    min-width: 17px;
+    height: 23px;
+    font-size: 15px;
+  }
+  .simpsons .simpsons-cue {
+    padding: 5px;
+    font-size: 10px;
+  }
+  .simpsons .simpsons-controls {
+    gap: 3px;
+  }
+  .simpsons .simpsons-donut-button {
+    width: 24px;
+    height: 27px;
+  }
+  .simpsons .simpsons-donut-button img {
+    width: 22px;
+  }
+  .simpsons .simpsons-dial {
+    width: 25px;
+    height: 30px;
+    border: 0;
+    background: transparent !important;
+  }
+  .simpsons .simpsons-tv {
+    width: 144px;
+    gap: 4px;
+    grid-template-columns: 1fr 14px;
+    padding: 5px;
+  }
+  .simpsons .simpsons-tv-caption {
+    font-size: 9px;
+  }
+  .simpsons .simpsons-tv-rail i {
+    width: 13px;
+    height: 13px;
+  }
+  .simpsons .simpsons-cameo {
+    bottom: 14px;
+    right: 12px;
+  }
+  .simpsons .simpsons-punch {
+    font-size: 13px;
+  }
+  .simpsons .simpsons-signoff {
+    gap: 10px;
+  }
+  .simpsons .simpsons-signoff img {
+    width: 57px;
+  }
+  .simpsons .simpsons-signoff strong {
+    font-size: 21px;
+  }
+  .simpsons .simpsons-signoff span {
+    font-size: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .simpsons .simpsons-stage {
+    display: none;
+  }
+  .simpsons .simpsons-donut-button:hover img {
+    transform: none;
+  }
+}
+@media (forced-colors: active) {
+  .simpsons .simpsons-point,
+  .simpsons .simpsons-scene {
+    display: none;
+  }
+  .simpsons .simpsons-board {
+    border: 2px solid CanvasText;
+  }
+}
+
+/* Broadcast design tokens. The dark set is an exterior/night sky; the plot is always lit. */
+.simpsons {
+  --overlay-run-0: #d54827;
+  --overlay-run-1: #966400;
+  --overlay-run-2: #4055ae;
+  --overlay-run-3: #33933e;
+  --overlay-run-4: #c43875;
+  --overlay-run-5: #8252a0;
+  --overlay-run-6: #b52f38;
+  --overlay-run-7: #397752;
+  scrollbar-color: #84748c #fff4cd;
+}
+.simpsons body {
+  --sp-letter:
+    'SimpsonsKalam', 'PingFang SC', 'Hiragino Maru Gothic ProN', 'Microsoft YaHei', sans-serif;
+  --font-dm-sans:
+    'SimpsonsNunito', 'PingFang SC', 'Hiragino Maru Gothic ProN', 'Microsoft YaHei', system-ui,
+    sans-serif;
+  --sp-sky: #85cef2;
+  --sp-haze: #e8f4f7;
+  --sp-trim: #fed41d;
+  --sp-air: #eef7e1;
+  --sp-strip: #fff3c8;
+  isolation: isolate;
+  background: linear-gradient(var(--sp-sky), var(--sp-haze) 930px) fixed;
+}
+.simpsons[data-simpsons-channel='plant'] body {
+  --sp-sky: #101914;
+  --sp-haze: #182a20;
+  --sp-trim: #5cff68;
+  --sp-strip: #183325;
+  --sp-paper: #19271e;
+  --sp-pink: #223e2c;
+  --sp-marker-hole: #19271e;
+  background:
+    radial-gradient(ellipse at 80% 0%, #243d2e, transparent 45%),
+    linear-gradient(var(--sp-sky), var(--sp-haze)) fixed;
+  background-color: #101914;
+}
+.simpsons[data-simpsons-channel='tavern'] body {
+  --sp-sky: #e0ac75;
+  --sp-haze: #f8dfb3;
+  --sp-trim: #f5ba54;
+  --sp-strip: #f8dfb0;
+  --sp-paper: #fff7e5;
+  --sp-pink: #e9b88e;
+  --sp-air: #ffeac8;
+}
+.simpsons[data-simpsons-channel='tavern'] .simpsons-titles {
+  background-color: #f6bb66;
+}
+.simpsons .simpsons-titles::before {
+  background: linear-gradient(95deg, var(--sp-trim) 5%, var(--sp-trim) 43%, transparent 100%);
+}
+.simpsons .simpsons-chart-strip {
+  background: var(--sp-strip);
+}
+.simpsons body::before {
+  content: '';
+  position: fixed;
+  inset: auto 0 0;
+  height: 95px;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    url('/decorative/simpsons/art/towers.webp') right 3% bottom -8px / 78px auto no-repeat,
+    radial-gradient(ellipse at 13% 66%, #655b6480 0 5px, transparent 7px),
+    radial-gradient(ellipse at 12.5% 61%, #71656d60 0 7px, transparent 10px),
+    radial-gradient(ellipse at 11.8% 55%, #80737b40 0 9px, transparent 13px);
+  opacity: 0.72;
+}
+.simpsons :is([data-testid='autumn-leaves'], .autumn-leaves) {
+  display: none !important;
+}
+.simpsons [data-testid='header-brand'] {
+  border: 1.5px solid #aa6472;
+  border-radius: 9px 12px 9px 7px;
+  padding: 1px 6px;
+  background: #fff3c9;
+  box-shadow: 2px 2px #ec9ead;
+}
+.simpsons [data-testid='inferencex-wordmark'],
+.simpsons .inferencex-wave-letter {
+  font-family: var(--sp-letter);
+  color: #ffda35;
+  -webkit-text-stroke: 1.9px #25283a;
+  paint-order: stroke fill;
+  text-shadow: 1px 1px #25283a;
+  background: none;
+}
+.simpsons .sp-chalk-next {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: pointer;
+}
+.simpsons .sp-chalk-next:focus-visible {
+  outline: 3px dashed #fff0ae;
+  outline-offset: -6px;
+}
+.simpsons .simpsons-scores:focus-visible,
+.simpsons .sp-program-strip button:focus-visible {
+  outline: 3px solid #1a62ad;
+  outline-offset: 2px;
+}
+.simpsons .sp-program-strip {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: space-between;
+  background: #343548;
+  color: #fff7dc;
+  border-top: 2px solid var(--sp-ink);
+  padding: 5px 12px;
+}
+.simpsons .sp-channel-dial,
+.simpsons .sp-channel-dial button,
+.simpsons .simpsons-arcade-open,
+.simpsons .sp-mobile-audio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.simpsons .sp-channel-dial > span {
+  font: 900 9px/1 var(--font-dm-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.simpsons .sp-channel-dial button,
+.simpsons .simpsons-arcade-open {
+  border-radius: 4px;
+  border: 1px solid #c0b9aa;
+  padding: 4px 7px;
+  color: #f8f0da;
+  font: 850 11px/1 var(--font-dm-sans);
+}
+.simpsons .sp-channel-dial i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #98918c;
+}
+.simpsons .sp-channel-dial button[aria-pressed='true'] {
+  background: #eff3d1;
+  color: #25392f;
+}
+.simpsons .sp-channel-dial button[aria-pressed='true'] i {
+  background: #35834c;
+}
+.simpsons .simpsons-arcade-open {
+  background: var(--sp-trim);
+  border-color: #f5d38a;
+  color: #272536;
+  padding: 5px 9px;
+}
+.simpsons .simpsons-arcade-open b {
+  display: inline-block;
+  border-left: 1px solid #776b4e;
+  padding-left: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.simpsons .sp-mobile-audio {
+  display: none;
+}
+.simpsons [data-slot='button'] {
+  border: 1.5px solid #363649;
+  box-shadow: 1px 2px #363649;
+}
+.simpsons [data-slot='button']:not(:disabled):hover {
+  translate: 0 -1px;
+}
+.simpsons [data-slot='button']:not(:disabled):active {
+  translate: 0 2px;
+  box-shadow: none;
+}
+.simpsons [data-slot='switch'] {
+  background: #686776;
+  border: 1px solid var(--sp-ink);
+}
+.simpsons [data-slot='switch'][data-state='checked'] {
+  background: #34533a;
+}
+.simpsons [data-slot='switch-thumb'] {
+  background: #e6e8c4;
+  border: 1.5px solid #404437;
+}
+.simpsons [data-slot='switch'][data-state='checked'] [data-slot='switch-thumb'] {
+  background: #bbf575;
+  box-shadow: 0 0 4px #ceff76;
+}
+.simpsons [data-slot='checkbox'] {
+  border: 1.5px solid #333647;
+  border-radius: 4px;
+}
+.simpsons [data-slot='checkbox'][data-state='checked'] {
+  background: #345d49;
+  color: white;
+}
+.simpsons :is([data-slot='badge'], [data-slot='select-chip']) {
+  border: 1px solid #665563;
+  border-radius: 7px 4px 6px 3px;
+  box-shadow: 1px 1px #665563;
+}
+.simpsons :is([data-slot='badge'], [data-slot='select-chip']):not([style*='background']) {
+  background: #ffd6a8;
+  color: #443044;
+}
+.simpsons main table.w-full {
+  border-collapse: collapse;
+  background: #fffaf0;
+  color: #292939;
+}
+.simpsons main table.w-full :is(th, td) {
+  border-bottom: 1px solid #777581;
+}
+.simpsons main table.w-full th {
+  background: var(--sp-trim);
+  color: #292939;
+}
+.simpsons main table.w-full tbody tr:nth-child(even) {
+  background: #f8edcf;
+}
+.simpsons [role='dialog'] {
+  border: 3px solid #393447;
+  box-shadow:
+    0 0 0 4px #b38bc5,
+    0 0 0 6px #393447,
+    5px 8px #393447;
+  background: #fffaf0;
+}
+.simpsons [data-slot='skeleton'] {
+  border: 1px solid #6c7669;
+  border-radius: 5px;
+  background: repeating-linear-gradient(172deg, #758b7b 0 4px, #809584 5px 7px);
+}
+.simpsons :is(code, kbd, samp) {
+  color: #daf2bc;
+  background: #2d443a;
+  border: 1px solid #617766;
+  border-radius: 3px;
+  padding: 0.04em 0.26em;
+}
+.simpsons pre code {
+  display: block;
+  overflow-x: auto;
+  padding: 0.4em 0.7em;
+}
+.simpsons :is(.x-axis-label, .y-axis-label) {
+  font-family: var(--sp-letter);
+  font-weight: 700;
+}
+.simpsons [data-testid='chart-legend'] span:has(> .simpsons-swatch),
+.simpsons [data-testid='chart-legend'] span:has(> span > .simpsons-swatch) {
+  width: fit-content;
+}
+.simpsons [data-testid='chart-legend'] span:has(> .simpsons-swatch) {
+  background-color: transparent !important;
+  display: inline-flex;
+  align-items: center;
+}
+.simpsons .simpsons-swatch {
+  max-width: none;
+  flex: none;
+  pointer-events: none;
+}
+.simpsons rect.bar {
+  stroke: #3f3947;
+  stroke-width: 1px;
+  paint-order: stroke fill;
+}
+.simpsons .roofline-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0.4px 0.3px #4033458f) drop-shadow(0 1px 0.5px #e6b956aa);
+}
+.simpsons[data-simpsons-channel='plant'] {
+  color-scheme: dark;
+  --background: #101914;
+  --foreground: #e4f5e8;
+  --card: #19271e;
+  --card-foreground: #e4f5e8;
+  --popover: #1c3023;
+  --popover-foreground: #e4f5e8;
+  --accent: #5cff68;
+  --accent-foreground: #102416;
+  --primary: #5cff68;
+  --primary-foreground: #102416;
+  --muted: #253c2d;
+  --muted-foreground: #b5d4bd;
+  --border: #688b71;
+  --input: #71967a;
+  --ring: #5cff68;
+}
+.simpsons[data-simpsons-channel='tavern'] {
+  --background: #f7dfb6;
+  --card: #fff4dd;
+  --popover: #fff2d5;
+  --accent: #ecaf4e;
+  --primary: #764922;
+  --muted: #e5d6c0;
+  --border: #5f473b;
+}
+.simpsons .simpsons-banner[data-compact='true'] :is(.simpsons-cover-bart, .simpsons-cover-lisa) {
+  display: none;
+}
+.simpsons .simpsons-banner[data-compact='true'] .simpsons-board {
+  padding-inline-end: 15px;
+}
+.simpsons[data-simpsons-channel='plant'] [data-testid='header'] {
+  background: #152219;
+  box-shadow: 0 2px #507c59;
+}
+.simpsons[data-simpsons-channel='plant'] .simpsons-titles {
+  background:
+    radial-gradient(circle at 1px 1px, #376345 1px, transparent 1.2px) right / 6px 6px,
+    #1b3123;
+  color: #5cff68;
+}
+.simpsons[data-simpsons-channel='plant'] .simpsons-titles::before {
+  background: linear-gradient(95deg, #14231a 10%, #14231af0 52%, transparent);
+}
+.simpsons[data-simpsons-channel='plant'] :is(.simpsons-score, .simpsons-chart-strip) {
+  color: #e4f5e8;
+}
+.simpsons[data-simpsons-channel='plant'] .simpsons-scores b,
+.simpsons[data-simpsons-channel='plant'] .simpsons-dial {
+  color: #242433;
+}
+.simpsons[data-simpsons-channel='plant'] .simpsons-chart-cue,
+.simpsons[data-simpsons-channel='plant'] [data-testid='header'] nav a.bg-muted\/60,
+.simpsons[data-simpsons-channel='plant']
+  [data-slot='dashboard-navigation']
+  nav
+  [data-tab-active='true'] {
+  color: #102416;
+  background: #5cff68;
+}
+.simpsons[data-simpsons-channel='plant'] figure[data-testid='chart-figure'] > [data-slot='card'] {
+  background: var(--card);
+  box-shadow:
+    inset 0 3px var(--accent),
+    4px 5px #0b110d;
+}
+.simpsons[data-simpsons-channel='plant']
+  :is(
+    [data-slot='select-trigger'],
+    [data-slot='input'],
+    input:not([type='range'])[class*='border'],
+    [data-slot='tabs-list'],
+    [data-slot='control-panel'],
+    [data-slot='dashboard-navigation'] nav :is(a, button)
+  ) {
+  background: #1c3023;
+  color: #e4f5e8;
+  border-color: #688b71;
+}
+.simpsons[data-simpsons-channel='plant']
+  :is(
+    [data-slot='button'][class*='bg-primary'],
+    [data-testid='compare-agentx-revenue-calculator-link'],
+    [data-slot='tabs-trigger'][data-state='active'],
+    [data-slot='dashboard-navigation'] [data-tab-active='true']
+  ) {
+  color: #102416;
+  background: #5cff68;
+}
+.simpsons[data-simpsons-channel='plant']
+  :is(.sp-file-list button, .sp-plot-sign, [data-testid='scatter-empty-state']) {
+  color: #242433;
+}
+.simpsons[data-simpsons-channel='plant'] [data-testid='d3-chart-svg'] :is(.grid-v, .grid-h) {
+  stroke: #526e5b;
+}
+.simpsons[data-simpsons-channel='plant'] .simpsons-board {
+  background-color: #263d39;
+  background-image: repeating-linear-gradient(0deg, transparent 0 4px, #9abe7420 4px 5px);
+}
+.simpsons[data-simpsons-channel='plant'] .sp-program-strip {
+  background: #203838;
+  color: #d6f9b9;
+}
+.simpsons[data-simpsons-channel='tavern'] .sp-program-strip {
+  background: #5b3c35;
+}
+.simpsons[data-simpsons-channel='tavern'] .simpsons-board {
+  background-color: #474f3e;
+}
+.simpsons [data-testid='scatter-empty-state'] {
+  border: 2px solid var(--sp-ink);
+  background: linear-gradient(180deg, #e0efca, #fff9dd 45%);
+}
+.simpsons .sp-plot-sign,
+.simpsons .sp-404-sign {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 18px/1.1 var(--sp-letter);
+  color: #353647;
+}
+.simpsons .sp-plot-sign::before,
+.simpsons .sp-404-sign::before {
+  content: '';
+  width: 34px;
+  height: 32px;
+  background: url('/decorative/simpsons/art/homer.webp') center 17% / 26px auto no-repeat;
+  border-bottom: 6px solid #60865a;
+}
+.simpsons .sp-404-sign {
+  padding: 3px 9px;
+  background: #ffd144;
+  border: 2px solid #373342;
+  transform: rotate(-3deg);
+}
+.simpsons .simpsons-dossier {
+  max-width: 450px;
+  max-height: 85dvh;
+  overflow: auto;
+  gap: 12px;
+}
+.simpsons .sp-file-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.simpsons .sp-file-head img {
+  height: 72px;
+  width: 51px;
+  object-fit: contain;
+}
+.simpsons .sp-file-head small {
+  font: 850 9px/1 var(--font-dm-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.simpsons .sp-file-head h2 {
+  font: 700 29px/1.12 var(--sp-letter);
+  margin: 6px 0 3px;
+}
+.simpsons .sp-file-list {
+  display: grid;
+  gap: 6px;
+}
+.simpsons .sp-file-list button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  padding: 6px 9px;
+  border: 1.5px solid #51465a;
+  background: #fff3d0;
+  border-radius: 5px;
+}
+.simpsons .sp-file-list button > b {
+  font: 900 13px monospace;
+  background: #e4c4cb;
+  color: #55344a;
+  border-radius: 3px;
+  padding: 4px;
+}
+.simpsons .sp-file-list button[data-done='true'] > b {
+  background: #d2e6bf;
+  color: #23533e;
+}
+.simpsons .sp-file-list :is(strong, small) {
+  display: block;
+}
+.simpsons .sp-file-list small,
+.simpsons .sp-file-list i {
+  font: 750 11px/1.2 var(--font-dm-sans);
+}
+.simpsons .sp-file-list i {
+  margin-left: auto;
+}
+@media (hover: hover) and (pointer: fine) {
+  .simpsons :is(button, a, [role='tab']):not([disabled]) {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='27' viewBox='0 0 24 27'%3E%3Cpath fill='%23ffda3a' stroke='%232a2736' stroke-width='1.7' stroke-linejoin='round' d='M8 14V3q1-3 3 0v7-1q2-3 4 0 3-2 4 1 4-1 4 4l-2 9-9 2-9-10q-1-4 3-3z'/%3E%3C/svg%3E")
+        9 2,
+      pointer;
+  }
+}
+@media (min-width: 681px) {
+  .simpsons .simpsons-banner[data-compact='true'] {
+    min-height: 0;
+  }
+  .simpsons .simpsons-banner[data-compact='true'] .simpsons-titles {
+    padding-block: 10px;
+  }
+  .simpsons .simpsons-banner[data-compact='true'] .simpsons-show {
+    font-size: clamp(30px, 3vw, 46px);
+  }
+  .simpsons .simpsons-banner[data-compact='true'] .simpsons-score {
+    gap: 4px;
+    padding-block: 6px;
+  }
+  .simpsons .simpsons-banner[data-compact='true'] .simpsons-board p {
+    font-size: clamp(18px, 1.6vw, 24px);
+  }
+}
+@media (max-width: 639px) {
+  .simpsons .sp-program-strip {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 5px 6px;
+  }
+  .simpsons .sp-channel-dial {
+    gap: 3px;
+    flex: 1;
+  }
+  .simpsons .sp-channel-dial > span {
+    display: none;
+  }
+  .simpsons .sp-channel-dial button {
+    font-size: 9px;
+    padding: 5px 4px;
+  }
+  .simpsons .sp-mobile-audio {
+    display: flex;
+    gap: 3px;
+  }
+  .simpsons .sp-mobile-audio .simpsons-dial {
+    color: #fff8dd;
+    min-width: 29px;
+    height: 28px;
+    border: 1px solid #ada5a0;
+  }
+  .simpsons .simpsons-arcade-open {
+    font-size: 10px;
+  }
+  .simpsons [data-testid='header'] :has(> .simpsons-dial) {
+    display: none !important;
+  }
+  .simpsons .simpsons-banner[data-compact='true'] .simpsons-titles {
+    min-height: 68px;
+  }
+  .simpsons .simpsons-banner[data-compact='true'] .simpsons-board {
+    min-height: 62px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .simpsons [data-slot='button']:is(:hover, :active) {
+    translate: none;
+  }
+  .simpsons [data-slot='skeleton'] {
+    animation: none;
+  }
+}
+html[data-inferencex-embed] :is(.simpsons-chart-strip, .simpsons-chart-mount, .simpsons-signoff) {
+  display: none !important;
+}
+
+/* One Channel 6 console: the CRT owns the left bay, detention and the
+   score share the right bay, and a single control rail closes the cabinet. */
+.simpsons .sp-export-imprint {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 10px;
+  color: #32263a;
+  background: #ffedba;
+  font: 700 14px var(--sp-letter);
+}
+.simpsons .sp-export-imprint img {
+  width: 22px;
+  height: 18px;
+  object-fit: contain;
+}
+.simpsons[data-simpsons-channel='plant'] [data-testid='footer'] {
+  background: #152219;
+  color: #e4f5e8;
+}
+.simpsons[data-simpsons-channel='plant'] .simpsons-signoff {
+  color: #e4f5e8;
+}
+.simpsons .simpsons-banner {
+  grid-template-columns: minmax(0, 2.85fr) minmax(215px, 1fr);
+  grid-template-areas: 'desk board' 'desk score' 'program program';
+  background: #fff3d0;
+}
+.simpsons .sp-receiver-desk {
+  grid-area: desk;
+  grid-template-columns: minmax(118px, 0.85fr) minmax(140px, 1.35fr) minmax(115px, 0.85fr);
+  gap: clamp(8px, 1.25vw, 21px);
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  margin: 0;
+  padding: 10px 16px;
+  background: linear-gradient(100deg, #eed9b0, #fff5d7 34%, #fff3d0);
+}
+.simpsons .sp-receiver {
+  max-width: 205px;
+  justify-self: center;
+}
+.simpsons .sp-episode .sp-episode-title {
+  font-family: var(--sp-letter);
+  line-height: 1.05;
+}
+.simpsons .sp-episode .sp-field-reading {
+  font-weight: 900;
+  font-size: 12px;
+  color: #264a44;
+}
+.simpsons .simpsons-banner .simpsons-board {
+  grid-area: board;
+  padding: 8px 68px 12px 12px;
+  border-inline: 2px solid #31223a;
+  border-right: 0;
+}
+.simpsons .simpsons-banner .simpsons-board p {
+  font-size: clamp(15px, 1.45vw, 22px);
+  margin: 4px 0 0;
+}
+.simpsons .simpsons-board-marge {
+  position: absolute;
+  right: 4px;
+  bottom: 5px;
+  height: calc(100% - 10px);
+  max-width: 58px;
+  object-fit: contain;
+  object-position: bottom;
+}
+.simpsons .simpsons-banner .simpsons-score {
+  grid-area: score;
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
+  align-content: center;
+  border-left: 2px solid #31223a;
+  gap: 3px 9px;
+  padding: 5px 8px;
+}
+.simpsons .simpsons-score-label {
+  display: none;
+}
+.simpsons .simpsons-score .simpsons-scores {
+  font-size: 13px;
+  gap: 4px;
+}
+.simpsons .simpsons-score .simpsons-scores b {
+  font-size: 17px;
+  min-width: 20px;
+  height: 22px;
+}
+.simpsons .simpsons-controls {
+  gap: 4px;
+}
+.simpsons .sp-program-strip {
+  grid-area: program;
+}
+.simpsons .simpsons-scene:has(.simpsons-cameo) {
+  height: auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 18px;
+}
+.simpsons .simpsons-scene .simpsons-cameo {
+  position: relative;
+  inset: auto;
+  max-width: 100%;
+  align-items: center;
+}
+.simpsons .simpsons-cutaway img {
+  height: 86px;
+}
+.simpsons .simpsons-cutaway span {
+  color: #242433;
+}
+.simpsons .sp-replay-gutter:not(:empty) {
+  height: 82px;
+  background:
+    url('/decorative/simpsons/art/hillside.webp') left 3% bottom -6px / auto 90% no-repeat,
+    linear-gradient(90deg, transparent 0%, #fff1c8 33%, #fff1c8 65%, transparent 89%),
+    url('/decorative/simpsons/art/school.webp') right 47% / 47% auto no-repeat,
+    linear-gradient(#95cef1 30%, #c8de86 80%);
+}
+.simpsons .sp-replay-gutter:has(.simpsons-actor) {
+  height: 140px;
+}
+.simpsons .sp-set-idle {
+  display: flex;
+  height: 100%;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(35px, 8vw, 120px);
+}
+.simpsons .sp-set-idle img {
+  height: 94%;
+  width: auto;
+  object-fit: contain;
+}
+.simpsons .sp-set-idle img + img {
+  height: 84%;
+}
+.simpsons .sp-replay-gutter:has(.simpsons-actor) .sp-set-idle {
+  visibility: hidden;
+}
+.simpsons .sp-replay-rail {
+  stroke: #452846;
+  stroke-width: 3;
+}
+.simpsons[data-simpsons-channel='plant'] [data-chart-tooltip] {
+  background: #1c3023;
+  color: #e4f5e8;
+}
+.simpsons :is([data-testid='chart-legend'], .tick, .simpsons-score) {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 850px) {
+  .simpsons .simpsons-banner {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'desk desk' 'board score' 'program program';
+  }
+  .simpsons .simpsons-banner .simpsons-board {
+    min-height: 56px;
+    padding-right: 44px;
+    border-left: 0;
+  }
+  .simpsons .simpsons-board-marge {
+    max-width: 35px;
+  }
+}
+@media (max-width: 640px) {
+  .simpsons .sp-receiver-desk {
+    grid-template-columns: minmax(76px, 31%) minmax(0, 1fr);
+    padding: 7px 9px;
+    gap: 5px 8px;
+  }
+  .simpsons .sp-remote {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 5px;
+  }
+  .simpsons .sp-remote .sp-news-flash {
+    display: none;
+  }
+  .simpsons .sp-remote :is(select, button) {
+    min-height: 28px;
+    font-size: 11px;
+  }
+  .simpsons .simpsons-banner .simpsons-board {
+    padding: 5px 32px 9px 7px;
+  }
+  .simpsons .simpsons-banner .simpsons-board p {
+    font-size: 13px;
+  }
+  .simpsons .simpsons-board-marge {
+    max-width: 25px;
+  }
+  .simpsons .sp-replay-gutter:not(:empty) {
+    background-size:
+      auto 60%,
+      auto,
+      59% auto,
+      auto;
+  }
+}
+@media (forced-colors: active) {
+  .simpsons .sp-replay-gutter:not(:empty) {
+    display: none;
+  }
+  .simpsons .sp-receiver-desk {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+/* The original cast portrait is the home establishing shot. Inside routes keep
+   their tuner, not a second full-size masthead. */
+.simpsons .sp-receiver-desk[data-home='true'] {
+  position: relative;
+  grid-template-columns: minmax(240px, 1.75fr) minmax(140px, 1fr) minmax(130px, 0.8fr);
+  padding: 0 14px 0 0;
+}
+.simpsons .sp-family-set {
+  align-self: stretch;
+  min-height: 216px;
+  position: relative;
+  overflow: hidden;
+  background: #8bd0ee url('/decorative/simpsons/art/terrace.webp') center 54% / cover;
+  border-right: 3px solid #322738;
+}
+.simpsons .sp-family-portrait {
+  position: absolute;
+  height: 96%;
+  width: 66%;
+  object-fit: contain;
+  object-position: right bottom;
+  right: 3%;
+  bottom: 0;
+  filter: drop-shadow(2px 3px 0 #33223863);
+}
+.simpsons .sp-family-title {
+  position: absolute;
+  width: 32%;
+  max-width: 137px;
+  top: 8%;
+  left: 3%;
+  border-radius: 48%;
+  border: 2px solid #382b42;
+  transform: rotate(-5deg);
+}
+.simpsons .sp-family-set:has(.sp-episode-frame) {
+  background: #2b2738;
+}
+.simpsons .sp-family-set .sp-episode-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.simpsons .sp-receiver-desk[data-home='true']:has(.sp-episode-frame) .sp-receiver {
+  visibility: hidden;
+}
+.simpsons .sp-receiver-desk[data-home='true'] .sp-receiver {
+  position: absolute;
+  width: clamp(64px, 7vw, 98px);
+  bottom: 6px;
+  left: 9px;
+  transform: rotate(-3deg);
+}
+.simpsons .sp-receiver-desk[data-home='true'] .sp-episode-id img {
+  display: none;
+}
+.simpsons .sp-tour-ticket {
+  border: 1px dashed currentColor;
+  border-radius: 4px;
+  padding: 3px 9px;
+  color: #392537;
+  background: #ffe5a4;
+  font: 800 12px var(--font-dm-sans);
+}
+.simpsons .sp-contact-print {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 4px;
+  color: #fff7df;
+  background: #302737;
+}
+.simpsons .sp-contact-print img {
+  width: 100%;
+  height: 62px;
+  object-fit: cover;
+}
+.simpsons .sp-contact-print small {
+  display: block;
+  font: 750 10px/1.4 var(--font-dm-sans);
+}
+.simpsons .sp-tour-special img {
+  width: 130px;
+  max-height: 84px;
+  object-fit: cover;
+}
+.simpsons .sp-tour-special strong {
+  display: block;
+  font-size: 11px;
+}
+.simpsons .sp-tour-intro {
+  padding: 8px 12px;
+  background: #fff1cd;
+  color: #34283d;
+  border-left: 4px solid #9d4878;
+}
+.simpsons .sp-tour-intro p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.simpsons .sp-postmark {
+  width: 35px;
+  height: 35px;
+  object-fit: contain;
+  filter: grayscale(1);
+}
+.simpsons .sp-file-list button[data-done='true'] .sp-postmark {
+  filter: none;
+}
+.simpsons .simpsons-dossier {
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+.simpsons[data-simpsons-channel='plant']
+  main
+  :is(button[role='combobox'], button:has(svg.lucide-calendar)) {
+  background: #263d2b;
+  color: #f5ffea;
+  border-color: #92b699;
+}
+.simpsons[data-simpsons-channel='plant']
+  main
+  :is(button[role='combobox'], button:has(svg.lucide-calendar))
+  :is(span, svg) {
+  color: inherit;
+}
+@media (max-width: 850px) {
+  .simpsons .sp-receiver-desk[data-home='true'] {
+    grid-template-columns: minmax(195px, 1.3fr) minmax(115px, 1fr) minmax(110px, 0.8fr);
+  }
+  .simpsons .sp-family-set {
+    min-height: 172px;
+  }
+}
+@media (max-width: 640px) {
+  .simpsons .sp-receiver-desk[data-home='true'] {
+    grid-template-columns: minmax(130px, 1fr) minmax(0, 0.95fr);
+    gap: 6px 8px;
+    padding: 0 0 6px;
+  }
+  .simpsons .sp-family-set {
+    min-height: 154px;
+  }
+  .simpsons .sp-family-portrait {
+    width: 86%;
+  }
+  .simpsons .sp-family-title {
+    width: 40%;
+  }
+  .simpsons .sp-receiver-desk[data-home='true'] .sp-receiver {
+    width: 48px;
+    bottom: auto;
+    top: 111px;
+    left: 3px;
+  }
+  .simpsons .sp-receiver-desk[data-home='true'] .sp-episode {
+    padding-right: 5px;
+  }
+  .simpsons .sp-receiver-desk[data-home='true'] .sp-remote {
+    padding-inline: 7px;
+  }
+  .simpsons .simpsons-chart-mount {
+    display: flex;
+    flex-direction: column;
+    scroll-margin-top: 72px;
+  }
+  .simpsons .simpsons-chart-strip {
+    order: 2;
+    margin: 0 0 6px;
+    scroll-margin-top: 72px;
+  }
+  .simpsons .sp-replay-gutter:not(:empty) {
+    height: 76px;
+    min-height: 76px;
+  }
+  .simpsons .sp-program-strip {
+    flex-wrap: wrap;
+  }
+}
+@media (forced-colors: active) {
+  .simpsons .sp-tour-ticket,
+  .simpsons .sp-tour-intro {
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+.simpsons .simpsons-banner[hidden] {
+  display: none;
+}
+.simpsons .simpsons-shell:has(> .simpsons-banner[hidden]:only-child) {
+  display: none;
+}
+.simpsons .sp-broadcast-ticket {
+  display: grid;
+  grid-template-columns: minmax(210px, 40%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  overflow: hidden;
+  border: 3px solid #242433;
+  border-radius: 13px;
+  box-shadow: 3px 4px #242433;
+  background: #fff3ca;
+  color: #292939;
+  font-family: SimpsonsNunito, sans-serif;
+}
+.simpsons .sp-ticket-illustration {
+  align-self: stretch;
+  position: relative;
+  min-height: 146px;
+  overflow: hidden;
+  border-right: 3px solid #242433;
+}
+.simpsons .sp-ticket-illustration img {
+  position: absolute;
+  pointer-events: none;
+}
+.simpsons .sp-ticket-scene {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 48%;
+}
+.simpsons .sp-ticket-family {
+  right: 2%;
+  bottom: 0;
+  height: 97%;
+  width: 55%;
+  object-fit: contain;
+  object-position: bottom right;
+}
+.simpsons .sp-ticket-logo {
+  top: 10%;
+  left: 3%;
+  width: 35%;
+  height: 58%;
+  object-fit: contain;
+  object-position: top left;
+  filter: drop-shadow(1px 2px #252333);
+}
+.simpsons .sp-ticket-listing {
+  min-width: 0;
+  padding-block: 6px;
+}
+.simpsons .sp-ticket-listing :is(small, strong, span) {
+  display: block;
+}
+.simpsons .sp-ticket-listing small {
+  color: #4f3945;
+  font:
+    900 10px/1.3 SimpsonsNunito,
+    sans-serif;
+  letter-spacing: 0.09em;
+}
+.simpsons .sp-ticket-listing strong {
+  margin: 5px 0;
+  font: 700 clamp(21px, 2.4vw, 38px)/1.13 var(--sp-letter);
+}
+.simpsons .sp-ticket-listing span {
+  font-size: 13px;
+  font-weight: 900;
+}
+.simpsons .sp-ticket-remote {
+  padding: 8px 13px 8px 0;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+.simpsons .sp-broadcast-ticket .sp-channel-dial {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 3px;
+  padding: 0;
+}
+.simpsons .sp-ticket-remote :is(button, .sp-studio-open),
+.simpsons .sp-desk-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid #373046;
+  border-radius: 4px;
+  min-height: 30px;
+  min-width: 26px;
+  color: #31273c;
+  background: #fffdf0;
+  font:
+    900 11px/1.1 SimpsonsNunito,
+    sans-serif;
+}
+.simpsons .sp-ticket-remote .sp-channel-dial button[aria-pressed='true'] {
+  background: #ffd323;
+  color: #222432;
+}
+.simpsons .sp-ticket-remote .sp-studio-open {
+  background: #54345a;
+  color: #fff9ed;
+}
+.simpsons .sp-broadcast-ticket[data-home='false'] {
+  grid-template-columns: 110px 1fr auto;
+  gap: 10px;
+}
+.simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-illustration {
+  min-height: 48px;
+}
+.simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-listing :is(small, span) {
+  display: none;
+}
+.simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-listing strong {
+  margin: 0;
+  font-size: 17px;
+}
+.simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-remote {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-block: 4px;
+}
+.simpsons .sp-chart-ticket-slot:empty {
+  display: none;
+}
+.simpsons .simpsons-chart-strip:has(.sp-chart-ticket-slot:not(:empty)) {
+  display: flex;
+  gap: 4px;
+  padding: 2px 5px 2px 2px;
+}
+.simpsons
+  .simpsons-chart-strip:has(.sp-chart-ticket-slot:not(:empty))
+  > :is(.simpsons-transmit, .simpsons-channel) {
+  display: none;
+}
+.simpsons .sp-chart-ticket-slot:not(:empty) {
+  flex: 1;
+  min-width: 0;
+}
+.simpsons .sp-chart-ticket-slot .sp-broadcast-ticket {
+  border: 0;
+  box-shadow: none;
+  border-radius: 3px;
+}
+.simpsons .sp-chart-ticket-slot .sp-ticket-remote {
+  padding-right: 0;
+}
+.simpsons
+  .sp-replay-gutter:not(:empty):not(:has(.simpsons-actor, .simpsons-punch, .sp-frontier-caption)) {
+  height: 0;
+  min-height: 0;
+  border: 0;
+  margin: 0;
+}
+.simpsons .sp-replay-gutter:has(.sp-frontier-caption) {
+  height: 38px;
+  min-height: 38px;
+}
+.simpsons .sp-replay-gutter:has(.sp-frontier-caption) .sp-set-idle {
+  display: none;
+}
+.simpsons .simpsons-chart-strip {
+  order: 0;
+}
+.simpsons .simpsons-shell :is(button, select, a),
+.simpsons .simpsons-chart-strip button {
+  min-width: 24px;
+  min-height: 28px;
+}
+.simpsons .sp-studio-open:focus-visible,
+.simpsons .sp-desk-close:focus-visible,
+html.simpsons header :is(a, button):focus-visible {
+  outline: 3px solid #1476bd;
+  outline-offset: 2px;
+}
+.simpsons .simpsons-shell .sp-ticket-remote :is(button, .sp-studio-open):active {
+  transform: translateY(1px);
+}
+html.simpsons main table {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .simpsons .sp-broadcast-ticket[data-home='true'] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 0 10px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='true'] .sp-ticket-illustration {
+    grid-row: span 2;
+    min-height: 154px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='true'] .sp-ticket-family {
+    width: 86%;
+    height: 83%;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='true'] .sp-ticket-logo {
+    width: 61%;
+    height: 40%;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='true'] .sp-ticket-listing {
+    align-self: end;
+    padding: 8px 8px 0 0;
+  }
+  .simpsons .sp-ticket-listing small {
+    font-size: 8px;
+  }
+  .simpsons .sp-ticket-listing strong {
+    font-size: 19px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='true'] .sp-ticket-remote {
+    justify-items: start;
+    align-self: start;
+    padding: 6px 4px 7px 0;
+    gap: 5px;
+  }
+  .simpsons .sp-ticket-remote .sp-channel-dial button {
+    padding: 2px 4px;
+    font-size: 9px;
+  }
+  .simpsons .sp-ticket-remote .sp-channel-dial button i {
+    display: none;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] {
+    display: flex;
+    gap: 4px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-illustration {
+    flex: 1;
+    min-width: 36px;
+    max-width: 120px;
+    min-height: 42px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-listing {
+    display: none;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-logo {
+    width: 53%;
+    height: 65%;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-ticket-remote {
+    flex: 0 0 auto;
+    padding-inline: 0;
+    gap: 3px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-channel-dial {
+    counter-reset: preset;
+    gap: 2px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-channel-dial button {
+    min-width: 24px;
+    padding: 0;
+    font-size: 0;
+    counter-increment: preset;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-channel-dial button::after {
+    content: counter(preset);
+    font-size: 11px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-studio-open {
+    font-size: 10px;
+    padding: 3px;
+  }
+  .simpsons .sp-broadcast-ticket[data-home='false'] .sp-studio-open svg {
+    display: none;
+  }
+  .simpsons .sp-chart-ticket-slot .sp-ticket-illustration {
+    border: 0;
+  }
+  .simpsons .simpsons-chart-actions {
+    gap: 3px;
+  }
+  .simpsons .simpsons-chart-actions > button {
+    min-height: 32px;
+  }
+}
+@media (forced-colors: active) {
+  .simpsons :is(.sp-broadcast-ticket, .sp-ticket-remote button, .sp-desk-close) {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+}
+
+.simpsons .sp-cable-clue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  max-width: 100%;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 12px;
+  font-weight: 750;
+}
+.simpsons figure[data-testid='chart-figure'] {
+  border-top: 4px solid #694777;
+  outline: 1px solid var(--sp-ink);
+  outline-offset: -1px;
+  border-radius: 10px;
+}
+.simpsons figure[data-testid='chart-figure'] figcaption {
+  border-inline-start: 5px solid #e779aa;
+  padding-inline-start: 10px;
+  background-image: url('/decorative/simpsons/art/donut.webp');
+  background-repeat: no-repeat;
+  background-size: 25px 25px;
+  background-position: 8px center;
+  padding-left: 41px;
+}
+.simpsons .sp-print-stamp {
+  display: none;
+}
+.simpsons :is(.dot-group, .unofficial-overlay-pt) > .visible-shape:has(+ .simpsons-point) {
+  opacity: 0;
+}
+.simpsons [id$='-export'] .sp-print-stamp {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  border: 3px double #ffdc43;
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: #263d33;
+  color: #fff3c0 !important;
+  letter-spacing: 1px;
+  font: bold 12px/1.6 monospace;
+}
+.simpsons [id$='-export'] > div:first-child {
+  background: var(--sp-marker-hole);
+  border: 5px solid #654279;
+  border-bottom: 8px solid #493055;
+  padding: 7px;
+  border-radius: 12px;
+}
+.simpsons .grid line,
+.simpsons .gridlines line {
+  stroke-dasharray: 3 3;
+}
+.simpsons [data-chart-tooltip]:not([data-sheet='true']) {
+  border: 3px solid #54365e !important;
+  border-radius: 12px 10px 12px 3px !important;
+  box-shadow: 3px 3px 0 #f5af37 !important;
+}
+.simpsons [data-chart-tooltip]:not([data-sheet='true'])::before {
+  content: 'CHANNEL 6  /  FIELD READING';
+  display: block;
+  text-align: left;
+  background: #4c305a;
+  color: #fff5c0;
+  padding: 3px 8px;
+  font: 700 10px/1.3 monospace;
+  letter-spacing: 0.5px;
+}
+html[lang^='zh'].simpsons [data-chart-tooltip]:not([data-sheet='true'])::before {
+  content: '第六频道 / 现场读数';
+}
+.simpsons :is([data-testid='scatter-empty-state'], [data-testid='chart-empty-state']) {
+  border: 4px double #ffe766;
+  border-radius: 13px;
+  background: #203e34;
+  color: #fff6cf;
+  box-shadow: 0 0 0 3px #775540;
+}
+.simpsons :is([data-testid='scatter-empty-state'], [data-testid='chart-empty-state']) :is(h3, p) {
+  color: inherit;
+}
+.simpsons .sp-plot-sign {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #fff6cf;
+  background: transparent;
+}
+.simpsons .sp-plot-sign::before {
+  content: '';
+  display: inline-block;
+  width: 46px;
+  height: 46px;
+  background: transparent url('/decorative/simpsons/art/donut.webp') center/contain no-repeat;
+}
+.simpsons :is([data-slot='skeleton'].h-\[600px\], .sp-held-skeleton) {
+  display: grid;
+  place-items: center;
+  min-height: 145px;
+  border: 5px solid #665074;
+  border-radius: 17px;
+  background:
+    linear-gradient(0deg, #321f4080, #321f4055),
+    url('/decorative/simpsons/art/couch-family.webp') center/cover;
+  animation: sp-station-acquire 0.44s steps(4) both;
+}
+.simpsons :is([data-slot='skeleton'].h-\[600px\], .sp-held-skeleton)::after {
+  content: 'CHANNEL 6 • PLEASE STAND BY';
+  border: 2px solid #292135;
+  background: #ffe26b;
+  color: #35293d;
+  padding: 5px 12px;
+  font: bold 13px/1.4 monospace;
+}
+html[lang^='zh'].simpsons :is([data-slot='skeleton'].h-\[600px\], .sp-held-skeleton)::after {
+  content: '第六频道 · 正在调谐';
+}
+.simpsons figure[data-sp-tune='on'] {
+  animation: sp-station-acquire 0.48s steps(4) both;
+}
+.simpsons figure[data-sp-midframe] {
+  animation-delay: -0.22s;
+  animation-play-state: paused;
+}
+@keyframes sp-station-acquire {
+  0%,
+  52% {
+    border-top-color: #ffb938;
+    box-shadow: inset 0 3px #ed81bb;
+  }
+  28%,
+  79% {
+    border-top-color: #9b5db2;
+    box-shadow: inset 0 3px #78d5e0;
+  }
+  100% {
+    border-top-color: #694777;
+    box-shadow: none;
+  }
+}
+.simpsons .sp-assignment-desk {
+  color: var(--sp-ink);
+  background: var(--sp-paper, #fff6d6);
+  border: 2px solid var(--sp-ink);
+  border-radius: 4px 4px 12px 6px;
+  overflow: hidden;
+  margin: 6px 0;
+  font:
+    600 13px/1.4 system-ui,
+    sans-serif;
+}
+.simpsons .sp-assignment-desk summary {
+  cursor: pointer;
+  min-height: 32px;
+  padding: 7px 12px;
+  background: #3e2d50;
+  color: #fff1c1;
+  font-weight: 750;
+}
+.simpsons .sp-assignment-desk p,
+.simpsons .sp-assignment-desk ul {
+  margin: 6px 12px;
+}
+.simpsons .sp-desk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px 12px 8px;
+}
+.simpsons .sp-desk-actions button {
+  min-height: 35px;
+  min-width: 28px;
+  border: 1px solid #4c3154;
+  border-bottom: 3px solid #4c3154;
+  background: #ffe39a;
+  color: #322237;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.simpsons .sp-wire-story {
+  display: grid;
+  grid-template-columns: minmax(74px, 148px) minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  background: #fff3c9;
+  color: #322237;
+  border-bottom: 3px double #523552;
+  padding: 8px;
+  pointer-events: none;
+}
+.simpsons .sp-wire-story :is(small, strong, b) {
+  display: block;
+}
+.simpsons .sp-wire-story small {
+  font: 700 10px/1.4 monospace;
+  letter-spacing: 1px;
+}
+.simpsons .sp-wire-story strong {
+  font:
+    bold 19px/1.2 Georgia,
+    serif;
+}
+.simpsons .sp-wire-story p {
+  margin: 3px 0;
+}
+.simpsons .sp-wire-still {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  height: 82px;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+}
+.simpsons .sp-wire-still img {
+  min-width: 0;
+  width: 0;
+  flex: 1;
+  height: 100%;
+  object-fit: cover;
+}
+.simpsons .sp-prop-key {
+  display: flex;
+  align-items: center;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  font: 700 10px/1.2 var(--font-dm-sans);
+  margin: 5px 0 2px;
+  color: var(--sp-ink);
+}
+.simpsons .sp-prop-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.simpsons figure[data-testid='chart-figure'] figcaption {
+  position: relative;
+  padding-left: 83px;
+  background-image: none;
+}
+.simpsons figure[data-testid='chart-figure'] figcaption::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  width: 65px;
+  height: 42px;
+  border: 4px solid #724e83;
+  border-right-width: 8px;
+  border-radius: 8px;
+  background: #473354 url('/decorative/simpsons/art/couch-family.webp') center/cover;
+  pointer-events: none;
+}
+.simpsons [data-testid='scatter-empty-state'] button {
+  color: #30243b !important;
+  background: #ffeaa4 !important;
+  border: 2px solid #694777;
+}
+@media (max-width: 640px) {
+  .simpsons figure[data-testid='chart-figure'] figcaption {
+    padding-left: 43px;
+  }
+  .simpsons figure[data-testid='chart-figure'] figcaption::before {
+    width: 33px;
+    height: 28px;
+    left: 1px;
+    border-width: 2px;
+    border-right-width: 4px;
+  }
+  .simpsons .sp-prop-key {
+    gap: 3px 7px;
+  }
+}
+.simpsons figure[data-testid='chart-figure'] [id$='-export'] figcaption,
+.simpsons [id$='-export'] figure[data-testid='chart-figure'] figcaption {
+  padding-left: 10px;
+}
+.simpsons figure[data-testid='chart-figure'] [id$='-export'] figcaption::before,
+.simpsons [id$='-export'] figure[data-testid='chart-figure'] figcaption::before {
+  content: none;
+  display: none;
+}
+.simpsons .sp-wire-story[data-story='cloud'] {
+  background: #f2e8d2;
+  border-block: 4px double #493d32;
+  font-family: Georgia, serif;
+}
+.simpsons .sp-wire-story[data-story='overlords'] {
+  background: #1d3256;
+  color: #fff7cd;
+  border-bottom: 6px solid #e29c2f;
+}
+.simpsons .sp-wire-story[data-story='milhouse'] {
+  background: #f7e6f6;
+  border-inline-start: 9px solid #a83862;
+}
+.simpsons .sp-wire-story[data-story='ralph'] {
+  background: #ffe99a;
+  border-inline: 6px dashed #875e30;
+}
+.simpsons .sp-wire-story[data-story='hedge'] {
+  background: #254e39;
+  color: #fffbd5;
+}
+.simpsons .sp-standby-hold {
+  padding: 8px;
+}
+@media (max-width: 640px) {
+  .simpsons .sp-wire-story {
+    grid-template-columns: 75px minmax(0, 1fr);
+    font-size: 12px;
+  }
+  .simpsons .sp-wire-story strong {
+    font-size: 16px;
+  }
+  .simpsons .sp-ticket-listing .sp-cable-clue {
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .simpsons :is(figure[data-sp-tune], [data-slot='skeleton'], .sp-held-skeleton) {
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .simpsons
+    :is(
+      .sp-wire-story,
+      .sp-wire-story p,
+      .sp-assignment-desk,
+      .sp-plot-sign,
+      .sp-desk-actions button,
+      .sp-assignment-desk summary
+    ) {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+  .simpsons .sp-wire-still {
+    display: none;
+  }
+  .simpsons .sp-wire-story {
+    display: block;
+  }
+}
