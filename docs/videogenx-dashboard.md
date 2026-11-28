@@ -100,6 +100,31 @@ Named-run overlays use the same series and axes.
 
 中文：图表配置中的 X 轴指标（`r_x`）可选单条视频中位延迟（`p50`，默认）或每个部署的 GPU 数（`gpus`）。每个部署只在并发 1 下记录 20 条视频，样本太少，无法估计尾部分位数，因此仪表板显示中位延迟和单条视频的延迟范围，不显示 P90 或 P95。旧的 `r_x=p90` 链接会打开中位延迟视图。GPU 坐标轴按对数刻度绘制参与计算的 GPU 数，刻度只标在实测的数量上。GPU 数是部署的属性而不是测量值，因此注册表为它设置 `rankOn: 'p50'`：每组曲线沿用中位延迟下的 Pareto 前沿，「仅最优」和「最优」引擎与中位延迟视图一致。未记录 GPU 数的部署无法放到该坐标轴上，因此也不参与该坐标轴上的排名。数据点标签本来就写着 GPU 数，所以该坐标轴不显示标签；悬停卡片改为显示中位延迟，详情面板列出中位延迟。芯片配置历史中每个部署的 GPU 数固定不变，因此只提供延迟坐标轴并绘制中位延迟，URL 中仍保留 `r_x=gpus`。相对无损输出的质量损失（LPIPS）和 GPU 峰值显存列在“尚未测量”下，有数据之前不能选择。叠加运行使用同一套曲线和坐标轴。
 
+## Precision
+
+Precision follows AgentX's precision control. Each cell's weight precision comes from the
+`precision` field of its InferenceX `aggregate.json`, sealed in the bundle; runs recorded before
+the field served BF16 and read as BF16 (`precision.ts`). Benchmark config's Precision control is
+the shared `PrecisionSelector`, and `r_prec` holds an explicit pick as AgentX's `i_prec` does. With
+no pick, `resolveEffectivePrecisions` shows BF16, the Diffusers reference's precision, plus the
+precisions of a `?unofficialrun=` run's cells, so an FP8 named run still overlays. Precision
+narrows the selected workload's cells, runs, chip configs and workload mix, never which workload
+is selected. A precision other than BF16 joins the runtime key (`vllm-omni@fp8`), so FP8 and BF16
+cells of one deployment never replace each other and a lossy FP8 cell pairs only with a lossless
+FP8 twin; BF16 keys stay as they were, so shared Chip config links resolve. Best ranks each
+engine on its points in every shown precision and the winner draws one line per precision, as
+AgentX's Best per SKU does. Once two precisions are shown, each takes the next point shape
+(`getShapeKeyForPrecision`) unless engines are compared, a Precisions key appears under the legend,
+and pills and hover cards name the precision ("B200 FP8 (vLLM-Omni)"); a non-BF16 precision is
+also named alone. The clip stage, readout, Chip config options and deployment detail name a
+non-BF16 precision ("FP8") beside its layout. Precision is not a lossy optimization: FP8 lines
+are solid and rank. The quality method's reference PSNR range and Show me use only lossless BF16
+leads, because an FP8 clip's gap to the BF16 reference also holds its quantization. The overview
+API returns the resolved list in `params.precisions`, the workload's precisions in
+`options.precisions`, and each cell's `metadata.precision`; the CSV has a `precision` column.
+
+中文：精度沿用 AgentX 的精度控件。每个数据点的权重精度取自 InferenceX `aggregate.json`（已封存在结果包中）的 `precision` 字段；该字段出现之前记录的运行都使用 BF16，按 BF16 处理（`precision.ts`）。基准测试配置中的“精度”控件是共享的 `PrecisionSelector`，`r_prec` 与 AgentX 的 `i_prec` 一样只记录明确的选择。未选择时，`resolveEffectivePrecisions` 显示 BF16（Diffusers 参考视频的精度），再加上 `?unofficialrun=` 运行数据点的精度，因此 FP8 的指定运行仍会叠加显示。精度只筛选所选工作负载的数据点、运行、芯片配置和工作负载构成，不改变所选的工作负载。BF16 以外的精度会写入 runtime 键（`vllm-omni@fp8`），因此同一部署的 FP8 与 BF16 数据点互不覆盖，有损的 FP8 数据点也只与 FP8 的无损对照配对；BF16 的键保持不变，已分享的芯片配置链接仍可解析。「最优」按每个引擎在所有已显示精度下的数据点评选，胜出的引擎每种精度各画一条线，与 AgentX 的 Best per SKU 一致。显示两种及以上精度时，除非正在对比引擎，每种精度依次使用下一个点形（`getShapeKeyForPrecision`），图例下方出现精度说明，系列标签和悬停卡片写明精度（如 “B200 FP8 (vLLM-Omni)”）；只显示一种非 BF16 精度时同样写明。对比区、读数区、芯片配置选项和部署详情会在布局旁写明非 BF16 精度（“FP8”）。精度不是有损优化：FP8 曲线为实线并参与评选。质量评分方法中的参考 PSNR 范围和“播放示例”只使用无损的 BF16 代表部署，因为 FP8 视频与 BF16 参考视频的差距还包含量化误差。overview API 在 `params.precisions` 返回解析后的精度列表，在 `options.precisions` 返回该工作负载已有的精度，每个数据点带有 `metadata.precision`；CSV 增加 `precision` 列。
+
 ## Layout
 
 The page follows the inference and AgentX two-level layout. The overview has five parts:
@@ -563,6 +588,7 @@ official/unofficial source membership remain unchanged.
 | Deadline, cost tier                                                          | Same pure calculations in `resultProjection`                                                                   |
 | X and Y metrics, Optimal only, open deployment                               | `r_x`, `r_y`, `r_optimal`, `r_point`; every axis value is in each cell                                         |
 | Engine comparison, Lossy optimizations                                       | `r_lossy` (`r_compare` is retired and ignored); presentation only, every cell carries `metadata.optimizations` |
+| Precision                                                                    | `r_prec`; `params.precisions` resolved, `options.precisions`, `metadata.precision`                             |
 | Fixed GPU basis, all GPU counts                                              | `r_basis`, `r_gpus` accepted but ignored; resolved params are participating and null                           |
 | Profit estimator (removed)                                                   | `r_api`, `r_price_t2v`, `r_price_i2v`, `r_price_r2v`, `r_utilization` accepted but ignored                     |
 | Deployment labels, detail tab, pinned point                                  | Presentation only                                                                                              |
