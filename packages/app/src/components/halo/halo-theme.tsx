@@ -2,6 +2,8 @@
 
 import { HaloDecorations, HaloThemeBanner } from './halo-decorations';
 import { HaloMusic } from './halo-music';
+import { HaloInterfaceSound } from './halo-sound';
+import { HaloCharts } from './halo-charts';
 import './halo-theme.css';
 
 export default function HaloTheme() {
@@ -10,6 +12,8 @@ export default function HaloTheme() {
       <HaloDecorations />
       <HaloThemeBanner />
       <HaloMusic />
+      <HaloInterfaceSound />
+      <HaloCharts />
     </>
   );
 }
