@@ -689,14 +689,14 @@ export default function VideoResultsClips({
     });
     onSubjectChange(stagePointKey(p));
   };
-  const optionLabel = (item: StageOption) =>
-    item.kind === 'reference'
-      ? s.referenceShort
-      : item.kind === 'twin'
-        ? s.twin(hardwareLabel(nextHardware))
-        : item.value === nextHardware
-          ? `${hardwareLabel(item.value)} ${s.official}`
-          : hardwareLabel(item.value);
+  const optionLabel = (item: StageOption) => {
+    if (item.kind === 'reference') return s.referenceShort;
+    if (item.kind === 'twin') return s.twin(hardwareLabel(nextHardware));
+    const name = [hardwareLabel(item.value), item.point && precisionTag(item.point)]
+      .filter(Boolean)
+      .join(' · ');
+    return item.value === nextHardware ? `${name} ${s.official}` : name;
+  };
   return (
     <section
       id="comparison-clips"

@@ -2,6 +2,7 @@ import { replaceClientSearch } from '@/lib/routing/client-navigation';
 import { deploymentKey, isQueueing, losslessTwin, runtimeKey } from './deployment';
 import type { VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
+import { precisionOf, REFERENCE_PRECISION } from './precision';
 import { RESULTS_HARDWARE } from './results';
 import { resultsPointKey } from './results-chart';
 import { resultsClipGroups, type ResultsClipGroup, type ResultsClipSide } from './results-clips';
@@ -253,13 +254,23 @@ export function phonePairing(
   return slowest?.hardwareKey ?? null;
 }
 
-/** A config's Compare-row id: its hardware, its runtime when lossy, and whether it is `namedRun`'s. */
-export const configId = (p: VideoPoint, namedRun?: string) =>
-  `${p.hardwareKey ?? ''}${isLossy(p) ? `+${runtimeKey(p)}` : ''}${p.runId === namedRun ? '-overlay' : ''}`;
+/** A config's run channel: its hardware, and whether it is `namedRun`'s. */
+const channelId = (p: VideoPoint, namedRun?: string) =>
+  `${p.hardwareKey ?? ''}${p.runId === namedRun ? '-overlay' : ''}`;
 
 /**
- * The configs the Compare row plays: each hardware's opening deployment, then each drawn lossy
- * config that may have clips, at its lower-median latency deployment as a lead's opening is.
+ * A config's Compare-row id: its hardware, its runtime when lossy or not BF16, and whether it is
+ * `namedRun`'s.
+ */
+export const configId = (p: VideoPoint, namedRun?: string) =>
+  isLossy(p) || precisionOf(p) !== REFERENCE_PRECISION
+    ? `${p.hardwareKey ?? ''}+${runtimeKey(p)}${p.runId === namedRun ? '-overlay' : ''}`
+    : channelId(p, namedRun);
+
+/**
+ * The configs the Compare row plays: each hardware's opening deployment, then each drawn config
+ * that may have clips and is lossy or in another precision than its channel's opening, at its
+ * lower-median latency deployment as a lead's opening is.
  */
 export function compareConfigs(
   openings: readonly VideoPoint[],
@@ -267,10 +278,15 @@ export function compareConfigs(
   namedRun?: string,
 ): VideoPoint[] {
   const offered = new Set(openings.map((p) => configId(p, namedRun)));
-  const lossy = Map.groupBy(
+  const opened = new Map(openings.map((p) => [channelId(p, namedRun), precisionOf(p)]));
+  const otherPrecision = (p: VideoPoint) => {
+    const opening = opened.get(channelId(p, namedRun));
+    return opening !== undefined && precisionOf(p) !== opening;
+  };
+  const extra = Map.groupBy(
     drawn.filter(
       (p) =>
-        isLossy(p) &&
+        (isLossy(p) || otherPrecision(p)) &&
         mayHaveClips(p) &&
         p.p50 !== null &&
         !isQueueing(p) &&
@@ -280,7 +296,7 @@ export function compareConfigs(
   );
   return [
     ...openings,
-    ...[...lossy.values()].map((config) => {
+    ...[...extra.values()].map((config) => {
       const byLatency = config.toSorted((a, b) => a.p50! - b.p50!);
       return byLatency[Math.floor((byLatency.length - 1) / 2)];
     }),
