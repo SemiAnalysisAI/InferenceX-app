@@ -400,6 +400,9 @@ interface EntityView {
   kind: Entity['kind'];
 }
 
+/** Physical pixel budget of the drawing buffer in low detail (800x500). */
+const LOW_DETAIL_PIXELS = 800 * 500;
+
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
   private readonly game: Game;
@@ -632,10 +635,26 @@ export class Renderer {
     this.handScene.add(this.handRoot);
   }
 
+  /** Low detail: half-resolution drawing, no sky dome, no hand pass, no particles. */
+  lowDetail = false;
+  private dpr = 1;
+
+  setLowDetail(on: boolean) {
+    if (this.lowDetail === on) return;
+    this.lowDetail = on;
+    this.setSize(this.width, this.height, this.dpr);
+  }
+
   setSize(width: number, height: number, dpr: number) {
     this.width = width;
     this.height = height;
-    this.renderer.setPixelRatio(Math.min(dpr, 2));
+    this.dpr = dpr;
+    // Low detail: half scale, and the drawing buffer kept to about 800x500 physical pixels.
+    this.renderer.setPixelRatio(
+      this.lowDetail
+        ? Math.min(0.5, Math.sqrt(LOW_DETAIL_PIXELS / Math.max(1, width * height)))
+        : Math.min(dpr, 2),
+    );
     this.renderer.setSize(width, height, false);
     for (const cam of [this.camera, this.skyCamera, this.handCamera]) {
       cam.aspect = width / Math.max(1, height);
@@ -1410,17 +1429,21 @@ export class Renderer {
     }
 
     this.updateEntities(alpha);
-    this.updateParticles(dt);
+    if (this.lowDetail) this.particleMaterial.visible = false;
+    else {
+      this.particleMaterial.visible = true;
+      this.updateParticles(dt);
+    }
     this.particleMaterial.uniforms.uScale.value =
       (this.height / (2 * Math.tan((cam.fov * Math.PI) / 360))) * this.renderer.getPixelRatio();
 
     const r = this.renderer;
     r.setClearColor(fogColor, 1);
     r.clear(true, true, true);
-    if (!p.eyesInWater && ey >= 30) r.render(this.skyScene, this.skyCamera);
+    if (!this.lowDetail && !p.eyesInWater && ey >= 30) r.render(this.skyScene, this.skyCamera);
     r.clearDepth();
     r.render(this.scene, cam);
-    if (options.thirdPerson === 0 && !options.hideHand && !p.dead) {
+    if (!this.lowDetail && options.thirdPerson === 0 && !options.hideHand && !p.dead) {
       this.updateHand(alpha, dt);
       r.clearDepth();
       this.handCamera.fov = 70;

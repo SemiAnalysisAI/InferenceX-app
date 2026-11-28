@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const DECORATIONS = [
   {
@@ -58,6 +59,26 @@ const DECORATIONS = [
 export function MinecraftDecorations() {
   const [active, setActive] = useState(false);
   const [dragonNonce, setDragonNonce] = useState(0);
+  const [banner, setBanner] = useState<Element | null>(null);
+  const [footer, setFooter] = useState<Element | null>(null);
+
+  // The art credit sits in the stock footer, in the page flow, so no card can cover it.
+  useEffect(() => {
+    if (!active) return;
+    const find = () => setFooter(document.querySelector('footer[data-testid="footer"]'));
+    find();
+    const timer = window.setInterval(find, 1500);
+    return () => window.clearInterval(timer);
+  }, [active]);
+
+  // The dragon flies through the banner's sky, behind its content, not across the page.
+  useEffect(() => {
+    if (!active) return;
+    const find = () => setBanner(document.querySelector('.mc-play-banner'));
+    find();
+    const timer = window.setTimeout(find, 900);
+    return () => window.clearTimeout(timer);
+  }, [active, dragonNonce]);
 
   useEffect(() => {
     let wasMinecraft = document.documentElement.classList.contains('minecraft');
@@ -79,6 +100,8 @@ export function MinecraftDecorations() {
   useEffect(() => {
     if (dragonNonce === 0) return;
     if (localStorage.getItem('minecraft-sound') === 'false') return;
+    // No sound before a user gesture.
+    if (!(navigator.userActivation?.hasBeenActive ?? false)) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const audio = new Audio('/decorative/minecraft/ender-dragon.mp3');
@@ -99,6 +122,7 @@ export function MinecraftDecorations() {
     <>
       <div
         aria-hidden="true"
+        data-mc-props=""
         className="hidden lg:block fixed inset-0 pointer-events-none z-0 overflow-hidden"
       >
         {DECORATIONS.map((d) => (
@@ -112,42 +136,46 @@ export function MinecraftDecorations() {
         ))}
       </div>
 
-      <div
-        aria-hidden="true"
-        className="hidden md:block fixed inset-0 pointer-events-none z-0 overflow-hidden"
-      >
-        <img
-          key={dragonNonce}
-          src="/decorative/minecraft/ender-dragon.gif"
-          alt=""
-          className="absolute top-[15%] [image-rendering:pixelated] drop-shadow-[0_0_24px_rgba(160,80,200,0.55)] mc-dragon-flyacross"
-          style={{ width: 'min(280px, 22vw)' }}
-        />
-      </div>
+      {banner?.isConnected &&
+        createPortal(
+          <div aria-hidden="true" className="mc-dragon-sky">
+            <img
+              key={dragonNonce}
+              src="/decorative/minecraft/ender-dragon.gif"
+              alt=""
+              className="mc-dragon-flyacross"
+            />
+          </div>,
+          banner,
+        )}
 
-      <div className="hidden lg:block fixed bottom-1 right-2 z-0 text-3xs text-foreground/50 text-right leading-tight">
-        <div>
-          art:{' '}
-          <a
-            href="https://minecraft.wiki/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-foreground"
+      {footer?.isConnected &&
+        createPortal(
+          <p
+            data-mc-credit=""
+            className="container mx-auto px-4 pb-4 text-xs text-muted-foreground lg:px-8"
           >
-            minecraft.wiki
-          </a>
-        </div>
-        <div>
-          <a
-            href="https://creativecommons.org/licenses/by-nc-sa/3.0/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-foreground"
-          >
-            CC BY-NC-SA 3.0
-          </a>
-        </div>
-      </div>
+            art:{' '}
+            <a
+              href="https://minecraft.wiki/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground"
+            >
+              minecraft.wiki
+            </a>
+            {' · '}
+            <a
+              href="https://creativecommons.org/licenses/by-nc-sa/3.0/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground"
+            >
+              CC BY-NC-SA 3.0
+            </a>
+          </p>,
+          footer,
+        )}
     </>
   );
 }

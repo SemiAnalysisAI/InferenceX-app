@@ -1,16 +1,13 @@
 'use client';
 
-import { MinecraftBackground } from './minecraft-background';
-import { MinecraftDecorations } from './minecraft-decorations';
-import { MinecraftPlayBanner } from './minecraft-play-banner';
-import './minecraft-theme.css';
+import { lazy } from 'react';
+
+// Entry for the lazy theme map. It only points at the real theme, so the eager chunk-loader stub
+// lists one small chunk for Minecraft rather than every chunk the theme is split into (the stub is
+// part of each route's first-load JS and is counted by check:route-budgets). The surrounding
+// OptionalThemeBoundary supplies the Suspense boundary and the failure fallback.
+const MinecraftThemeRoot = lazy(() => import('./minecraft-theme-root'));
 
 export default function MinecraftTheme() {
-  return (
-    <>
-      <MinecraftBackground />
-      <MinecraftDecorations />
-      <MinecraftPlayBanner />
-    </>
-  );
+  return <MinecraftThemeRoot />;
 }

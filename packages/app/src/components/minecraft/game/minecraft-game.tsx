@@ -58,7 +58,17 @@ interface Settings {
   gamma: number;
   clouds: boolean;
   volume: number;
+  /** Graphics detail: auto switches to low after two slow seconds. */
+  detail: 'auto' | 'low' | 'full';
 }
+/** Average frame time that switches the game to low detail. */
+const LOW_DETAIL_FRAME_MS = 100;
+/** Seconds in a row over LOW_DETAIL_FRAME_MS before auto low detail. */
+const LOW_DETAIL_SECONDS = 2;
+/** Render distance in low detail. */
+const LOW_DETAIL_CHUNKS = 3;
+/** Longest frame the game clock catches up on (10 ticks); anything longer is dropped. */
+const MAX_FRAME_S = 0.5;
 const DEFAULT_SETTINGS: Settings = {
   fov: 70,
   sensitivity: 0.5,
@@ -67,6 +77,7 @@ const DEFAULT_SETTINGS: Settings = {
   gamma: 0.5,
   clouds: true,
   volume: 0.8,
+  detail: 'auto',
 };
 const SETTINGS_KEY = 'inferencex-minecraft-options';
 
@@ -142,6 +153,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
   const chatHistoryIndex = useRef(-1);
   const [heldName, setHeldName] = useState<{ text: string; time: number } | null>(null);
   const [fps, setFps] = useState(0);
+  const [lowNotice, setLowNotice] = useState(false);
   const [splash] = useState(() => SPLASHES[Math.floor(Math.random() * SPLASHES.length)]);
   const [locked, setLocked] = useState(false);
   const [saveNote, setSaveNote] = useState('');
@@ -188,7 +200,15 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
       } catch {}
       const session = sessionRef.current;
-      if (session) session.game.renderDistance = next.renderDistance;
+      if (session) {
+        const low = next.detail === 'low' || (next.detail === 'auto' && session.renderer.lowDetail);
+        session.renderer.setLowDetail(low);
+        session.game.renderDistance = low
+          ? Math.min(next.renderDistance, LOW_DETAIL_CHUNKS)
+          : next.renderDistance;
+        if (rootRef.current) rootRef.current.dataset.lowDetail = String(low);
+        if (next.detail !== 'auto') setLowNotice(false);
+      }
       audioRef.current?.setVolume(next.volume);
       return next;
     });
@@ -357,6 +377,11 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
         Math.max(1, rect.height),
         window.devicePixelRatio || 1,
       );
+      if (settingsRef.current.detail === 'low') {
+        renderer.setLowDetail(true);
+        game.renderDistance = Math.min(game.renderDistance, LOW_DETAIL_CHUNKS);
+        rootRef.current!.dataset.lowDetail = 'true';
+      }
       const audio = audioRef.current;
       audio?.setVolume(settingsRef.current.volume);
       audio?.preload([
@@ -410,14 +435,30 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
         };
       };
 
+      let slowSeconds = 0;
       const frame = () => {
         if (!running) return;
         raf = requestAnimationFrame(frame);
         const now = performance.now();
-        const dt = Math.min(0.1, (now - last) / 1000);
+        // The game clock runs fixed 20 Hz ticks (Game.update); a slow frame catches up with
+        // several ticks so slow drawing drops frames, not game time.
+        const dt = Math.min(MAX_FRAME_S, (now - last) / 1000);
         last = now;
         frames++;
         if (now - fpsTime >= 1000) {
+          const frameMs = (now - fpsTime) / Math.max(1, frames);
+          // Software WebGL and slow devices: two seconds over 100 ms a frame switch to low detail.
+          slowSeconds = loadingDone && frameMs > LOW_DETAIL_FRAME_MS ? slowSeconds + 1 : 0;
+          if (
+            slowSeconds >= LOW_DETAIL_SECONDS &&
+            settingsRef.current.detail === 'auto' &&
+            !renderer.lowDetail
+          ) {
+            renderer.setLowDetail(true);
+            game.renderDistance = Math.min(game.renderDistance, LOW_DETAIL_CHUNKS);
+            if (rootRef.current) rootRef.current.dataset.lowDetail = 'true';
+            setLowNotice(true);
+          }
           setFps(Math.round((frames * 1000) / (now - fpsTime)));
           frames = 0;
           fpsTime = now;
@@ -1243,6 +1284,21 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
               ]}
             />
           ) : null}
+          {lowNotice ? (
+            <div className="mc-low-detail" role="status" data-testid="minecraft-low-detail">
+              <span>{tr(locale, 'Low detail: frames were slow', '低画面细节：帧率过低')}</span>
+              <button type="button" onClick={() => updateSettings({ detail: 'full' })}>
+                {tr(locale, 'Turn off', '关闭')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLowNotice(false)}
+                aria-label={tr(locale, 'Dismiss', '知道了')}
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
           {game.screen ? (
             <ContainerScreen
               game={game}
@@ -1692,6 +1748,22 @@ function OptionsPanel({
           onClick={() => update({ viewBobbing: !settings.viewBobbing })}
         >
           {t('View Bobbing', '视角摇晃')}: {settings.viewBobbing ? t('ON', '开') : t('OFF', '关')}
+        </McButton>
+        <McButton
+          scale={s}
+          width={150}
+          testId="minecraft-detail"
+          onClick={() => {
+            const order: Settings['detail'][] = ['auto', 'low', 'full'];
+            update({ detail: order[(order.indexOf(settings.detail) + 1) % 3] });
+          }}
+        >
+          {t('Detail', '画面细节')}:{' '}
+          {settings.detail === 'auto'
+            ? t('Auto', '自动')
+            : settings.detail === 'low'
+              ? t('Low', '低')
+              : t('Full', '完整')}
         </McButton>
         <McButton scale={s} width={150} onClick={() => update({ clouds: !settings.clouds })}>
           {t('Clouds', '云')}: {settings.clouds ? t('ON', '开') : t('OFF', '关')}

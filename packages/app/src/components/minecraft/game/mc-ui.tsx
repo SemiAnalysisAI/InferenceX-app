@@ -10,8 +10,8 @@ import {
 } from 'react';
 
 import { ICON, ICON_COLUMNS, ICON_ROWS, type IconName } from './mc-atlas';
-import { xpForLevel, type Game, type SlotRef } from './mc-game';
-import { ITEMS, itemName, type Stack } from './mc-items';
+import { TPS, xpForLevel, type Game, type SlotRef } from './mc-game';
+import { breakTime, ITEMS, itemName, type Stack } from './mc-items';
 import { DIMENSION_NAMES } from './mc-dimensions';
 
 export const GAME_ASSETS = '/decorative/minecraft/game/';
@@ -173,6 +173,7 @@ export function Hud({
           ? ` · ${tr(locale, 'Entering portal', '正在进入传送门')}`
           : ''}
       </div>
+      <InferenceReadout game={game} locale={locale} boss={Boolean(dragon)} />
       {dragon ? (
         <div
           className="mc-boss"
@@ -1101,6 +1102,71 @@ export function Panorama() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The game as a benchmark run, in the site's own terms. Mining a block is one token: time to the
+ * first mined block is TTFT, mined blocks per minute is throughput, and how fast the held tool
+ * breaks the block under the crosshair is interactivity, so a better pickaxe tier moves you along
+ * the same throughput/interactivity frontier the charts plot. Inventory is the KV cache (a full
+ * cache evicts: new drops stay on the ground) and nearby hostile mobs are the batch.
+ */
+function InferenceReadout({ game, locale, boss }: { game: Game; locale: Locale; boss: boolean }) {
+  const { bench, player: p } = game;
+  const ttft = bench.first >= 0 ? (bench.first - bench.start) / TPS : null;
+  const recent = bench.breaks.filter((t) => t >= game.ticks - 60 * TPS).length;
+  // Blocks mined in the last minute; for the first 10 s there is no honest rate yet.
+  const elapsed = (game.ticks - bench.start) / TPS;
+  const perMinute =
+    bench.start < 0 || elapsed < 10 ? null : Math.round((recent * 60) / Math.min(60, elapsed));
+  const target = game.target;
+  const seconds = target
+    ? game.mode === 'creative'
+      ? 0.25
+      : breakTime(target.id, game.held?.id, p.onGround || p.flying, p.eyesInWater)
+    : null;
+  // The real ceiling: break ticks plus the 5-tick cooldown after every block.
+  const interactivity =
+    seconds === null || !Number.isFinite(seconds)
+      ? null
+      : TPS / (5 + (game.mode === 'creative' || seconds === 0 ? 0 : Math.ceil(seconds * TPS)));
+  const used = game.inventory.filter(Boolean).length;
+  const near = game.nearBatch;
+  const batch = near + game.bossBatch;
+  const rows: [string, string, boolean?][] = [
+    [tr(locale, 'TTFT', '首个方块'), ttft === null ? '—' : `${ttft.toFixed(1)} s`],
+    [
+      tr(locale, 'Throughput', '吞吐量'),
+      perMinute === null ? '—' : `${perMinute} ${tr(locale, 'blk/min', '方块/分')}`,
+    ],
+    [
+      tr(locale, 'Interactivity', '交互性'),
+      interactivity === null
+        ? '—'
+        : `${interactivity.toFixed(1)} ${tr(locale, 'blk/s', '方块/秒')}`,
+    ],
+    [tr(locale, 'KV cache', 'KV 缓存'), `${used}/36`, used >= 36],
+    [tr(locale, 'Batch', '批大小'), String(batch), near >= 4],
+  ];
+  return (
+    <div
+      className="mc-infer"
+      data-testid="minecraft-inference-hud"
+      data-boss={boss ? 'true' : undefined}
+    >
+      <strong>{tr(locale, 'InferenceX run', 'InferenceX 运行')}</strong>
+      {rows.map(([label, value, warn]) => (
+        <span key={label} data-warn={warn ? 'true' : undefined}>
+          {label} <b>{value}</b>
+        </span>
+      ))}
+      {used >= 36 ? (
+        <em>{tr(locale, 'KV cache full: new drops are evicted', 'KV 缓存已满：新掉落物被逐出')}</em>
+      ) : near >= 4 ? (
+        <em>{tr(locale, 'Large batch: more mobs, slower you', '批太大：怪物更多，你更慢')}</em>
+      ) : null}
     </div>
   );
 }

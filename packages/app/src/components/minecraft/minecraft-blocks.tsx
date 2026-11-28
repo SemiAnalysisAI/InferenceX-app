@@ -83,7 +83,6 @@ function BlockGroup({
 
   useFrame(({ clock }) => {
     frameCounter.current = (frameCounter.current ?? 0) + 1;
-    if (frameCounter.current % 3 !== 0) return;
     if (!meshRef.current) return;
 
     const t = clock.elapsedTime;
