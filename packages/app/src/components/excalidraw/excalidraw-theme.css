@@ -4,6 +4,14 @@
    behavior are untouched. */
 
 @font-face {
+  font-family: 'Virgil';
+  src: url('../../app/fonts/Virgil-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Excalifont';
   src: url('../../app/fonts/Excalifont-Regular.woff2') format('woff2');
   font-weight: 100 900;
@@ -26,25 +34,25 @@
     U+A720-A7FF;
 }
 
-/* The body's next/font class defines --font-dm-sans; this selector outranks it so every
-   sans-serif surface (including D3 chart labels) picks up the hand-drawn face. Code stays
-   monospace for legibility. */
+/* Keep next/font's stock variable intact for native chart badges and use a separate
+   handwriting stack for site chrome. Code stays monospace for legibility. */
 .excalidraw body {
-  --font-dm-sans:
-    'Excalifont', 'Segoe Print', 'Comic Sans MS', var(--font-dm-sans-base, sans-serif);
-  --excalidraw-ink: #1e1e1e;
-  --excalidraw-violet: #6965db;
-  --excalidraw-violet-dark: #5b57d1;
-  --excalidraw-violet-light: #e0dfff;
+  --excalidraw-font: 'Excalifont', 'Segoe Print', 'Comic Sans MS', var(--font-dm-sans, sans-serif);
+  --excalidraw-ink: var(--foreground);
+  --excalidraw-violet: var(--primary);
+  --excalidraw-violet-dark: color-mix(in srgb, var(--primary) 85%, var(--foreground));
+  --excalidraw-violet-light: var(--accent);
   --excalidraw-sketch-radius: 28px 10px 32px 8px / 8px 32px 10px 28px;
   --excalidraw-island-shadow:
     0 0 0.9310142993927002px 0 rgba(0, 0, 0, 0.17), 0 0 3.1270833015441895px 0 rgba(0, 0, 0, 0.08),
     0 7px 14px 0 rgba(0, 0, 0, 0.05);
-  background-color: #ffffff;
-  background-image:
-    linear-gradient(to right, #f1f1f1 1px, transparent 1px),
-    linear-gradient(to bottom, #f1f1f1 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-color: var(--background);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--foreground) 8%, transparent) 0.8px,
+    transparent 0.9px
+  );
+  background-size: 18px 18px;
+  font-family: var(--excalidraw-font);
   letter-spacing: 0.01em;
 }
 
@@ -52,24 +60,13 @@
   background: rgba(105, 101, 219, 0.25);
 }
 
-/* Full-page whiteboard sketch of GPU hardware, washed out behind the grid so content
-   stays readable. */
+/* Sparse canvas marks behind the workspace. */
 .excalidraw-scene {
   position: fixed;
   inset: 0;
   z-index: -10;
   pointer-events: none;
   overflow: hidden;
-}
-
-.excalidraw-scene-image {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  opacity: 0.22;
 }
 
 /* Banner: a sketched frame around the wordmark, like a sticky title on the canvas. */
@@ -99,6 +96,9 @@
 
 .excalidraw-wordmark {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   margin: 0;
   color: var(--excalidraw-ink);
   font-family: 'Excalifont', 'Segoe Print', 'Comic Sans MS', sans-serif;
@@ -106,15 +106,22 @@
   line-height: 1;
 }
 
+.excalidraw-wordmark img {
+  width: clamp(1.2rem, 2.5vw, 1.8rem);
+  aspect-ratio: 1;
+  height: auto;
+  border-radius: 0.3rem;
+}
+
 .excalidraw-tagline {
   margin: 0;
-  color: #5c5c5c;
+  color: var(--muted-foreground);
   font-size: 1.05rem;
 }
 
 /* Header: an Excalidraw "island" — white panel, soft shadow, no hard rule. */
 .excalidraw header {
-  background-color: rgba(255, 255, 255, 0.92);
+  background-color: color-mix(in srgb, var(--background) 95%, transparent);
   box-shadow: var(--excalidraw-island-shadow);
 }
 
@@ -123,7 +130,7 @@
   border-color: var(--excalidraw-ink);
   border-width: 1.5px;
   border-radius: var(--excalidraw-sketch-radius);
-  background-color: rgba(255, 255, 255, 0.94);
+  background-color: color-mix(in srgb, var(--card) 96%, transparent);
   backdrop-filter: none;
 }
 
@@ -176,6 +183,1950 @@
   font-family: var(--font-mono);
 }
 
+.excalidraw {
+  --overlay-run-0: #7a46d2;
+  --overlay-run-1: #137991;
+  --overlay-run-2: #ba3e61;
+  --overlay-run-3: #93620e;
+  --overlay-run-4: #3e7433;
+  --overlay-run-5: #ae4f26;
+  --overlay-run-6: #4167b5;
+  --overlay-run-7: #805075;
+  --excalidraw-corner: 9px 4px 8px 5px / 5px 9px 4px 8px;
+  scrollbar-color: var(--primary) var(--muted);
+}
+
+.excalidraw[data-excalidraw-paper='vellum'] {
+  --background: #fff8e9;
+  --card: #fffcf2;
+  --popover: #fffcf2;
+  --foreground: #352821;
+  --primary: #844825;
+  --muted: #f4e5d2;
+  --muted-foreground: #6d5140;
+  --accent: #f3dfcb;
+  --border: #765642;
+  --border-alt: #cbb19d;
+  --ring: #844825;
+}
+
+.excalidraw[data-excalidraw-paper='blueprint'] {
+  color-scheme: dark;
+  --background: #172646;
+  --foreground: #f1f4ff;
+  --card: #1d3155;
+  --card-foreground: var(--foreground);
+  --popover: #213759;
+  --popover-foreground: var(--foreground);
+  --primary: #c8c7ff;
+  --primary-foreground: #21244c;
+  --secondary: #9acdf2;
+  --secondary-foreground: #172646;
+  --muted: #263c63;
+  --muted-foreground: #c3cee8;
+  --accent: #324d79;
+  --accent-foreground: #f2f3ff;
+  --border: #a3b7dc;
+  --border-alt: #6580a9;
+  --input: #b6c9ec;
+  --ring: #c8c7ff;
+  --excalidraw-plot-paper: #ecf3ff;
+  --overlay-run-0: #c8aaff;
+  --overlay-run-1: #83daf0;
+  --overlay-run-2: #ff9bb8;
+  --overlay-run-3: #f0cf76;
+  --overlay-run-4: #a4e295;
+  --overlay-run-5: #ffae8b;
+  --overlay-run-6: #a3bdff;
+  --overlay-run-7: #f0a9df;
+}
+
+.excalidraw:lang(zh) body {
+  --excalidraw-font:
+    'Excalifont', 'Kaiti SC', KaiTi, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+}
+
+.excalidraw :is(pre, code, kbd) {
+  font-family: var(--font-mono), monospace;
+}
+
+.excalidraw :is(:not(pre) > code, kbd) {
+  color: var(--foreground);
+  background: var(--muted);
+  border-radius: 3px;
+}
+
+.excalidraw-scene-ink {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  color: var(--primary);
+  opacity: 0.24;
+}
+
+.excalidraw [data-testid='autumn-leaves'] {
+  display: none;
+}
+
+.excalidraw-theme-banner {
+  padding: 0.35rem 0 0.65rem;
+  border-bottom: 1px dashed var(--border-alt);
+}
+
+.excalidraw-banner-mark {
+  isolation: isolate;
+}
+
+.excalidraw-banner-mark::before {
+  position: absolute;
+  z-index: -1;
+  inset: 8px 11px 5px 8px;
+  border-radius: 7% 3% 8% 5%;
+  background: var(--muted);
+  transform: rotate(-1deg);
+  content: '';
+}
+
+.excalidraw-banner-frame path {
+  stroke: var(--primary);
+}
+
+.excalidraw-banner-copy {
+  flex: 1 1 210px;
+}
+
+.excalidraw-banner-copy strong {
+  display: block;
+  font-size: 1.08rem;
+}
+
+.excalidraw-tagline {
+  font-size: 0.85rem;
+}
+
+.excalidraw-banner-tools,
+.excalidraw-board-toggles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.excalidraw-board-toggles {
+  flex-wrap: nowrap;
+}
+.excalidraw-mobile-audio {
+  display: none;
+}
+
+.excalidraw-board-toggles button,
+.excalidraw-banner-tools :is(select, button),
+.excalidraw-desk-card button {
+  padding: 0.35rem 0.55rem;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.excalidraw-banner-tools .excalidraw-desk-launch,
+.excalidraw-desk-card button,
+.excalidraw-board-toggles [aria-pressed='true'] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+.excalidraw-board-stamp {
+  padding: 0.2rem 0.4rem;
+  border: 1px dashed var(--primary);
+  color: var(--primary);
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw [data-testid='header-brand'] {
+  border-block-end: 1px dashed var(--primary);
+}
+
+.excalidraw [data-testid='inferencex-wordmark'] {
+  font-family: var(--excalidraw-font);
+  letter-spacing: -0.035em;
+}
+
+.excalidraw :is(button, [role='button'], [role='tab'], [role='option'], select) {
+  transition:
+    background-color 130ms,
+    color 130ms,
+    box-shadow 130ms;
+}
+
+.excalidraw :is(button:hover, [role='button']:hover, select:hover):not(:disabled) {
+  box-shadow: inset 0 -2px color-mix(in srgb, var(--primary) 60%, transparent);
+}
+
+.excalidraw :is(button:active, [role='button']:active):not(:disabled) {
+  box-shadow: inset 0 2px color-mix(in srgb, var(--primary) 65%, transparent);
+}
+
+.excalidraw
+  :is(
+    [data-slot='tabs-list'],
+    [role='tablist'],
+    [data-slot='badge'],
+    [data-testid*='select-chip']
+  ) {
+  border: 1px dashed var(--border-alt);
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw [role='tab'][aria-selected='true'] {
+  color: var(--primary);
+  background-color: var(--accent);
+  box-shadow: inset 0 -2px var(--primary);
+}
+
+.excalidraw :is([role='switch'], [data-slot='switch']) {
+  border: 1px solid var(--border);
+  border-radius: 10px 8px 10px 6px;
+}
+
+.excalidraw [role='switch'][aria-checked='true'] {
+  background: var(--primary);
+}
+
+.excalidraw
+  :is(
+    [role='listbox'],
+    [role='dialog'],
+    [role='menu'],
+    [role='tooltip'],
+    [data-slot='popover-content'],
+    [data-slot='tooltip-content']
+  ) {
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw table :is(td, th) {
+  border-bottom: 1px dashed var(--border-alt);
+}
+
+.excalidraw table thead {
+  background: var(--muted);
+}
+
+.excalidraw :is([data-slot='skeleton'], .animate-pulse.bg-muted) {
+  border-radius: var(--excalidraw-corner);
+  background-image: repeating-linear-gradient(
+    120deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--primary) 13%, transparent) 5px 6px
+  );
+}
+
+.excalidraw :is([data-testid*='empty-state'], [data-slot='empty-state']) {
+  background: var(--muted);
+  border: 1px dashed var(--border-alt);
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw .tabular-nums:has(+ h1):not(header *) {
+  padding: 0.35rem 0.8rem;
+  border: 2px dashed var(--primary);
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw :is([data-testid='chart-legend'], [data-testid='legend-overflow-strip']) {
+  border-color: var(--border-alt);
+  border-style: dashed;
+  border-radius: var(--excalidraw-corner);
+  background-color: var(--card);
+}
+
+.excalidraw [data-testid='legend-section-heading'] {
+  text-decoration: underline dashed color-mix(in srgb, var(--primary) 48%, transparent);
+  text-underline-offset: 3px;
+}
+
+.excalidraw [data-testid='legend-line-swatch'] {
+  box-shadow: 0 1px color-mix(in srgb, var(--foreground) 32%, transparent);
+}
+
+.excalidraw [data-testid='chart-legend'] label:has(:is(svg, [data-testid='legend-line-swatch'])) {
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw [data-testid='chart-legend'] label > span.opacity-50 {
+  opacity: 1;
+  color: var(--muted-foreground);
+}
+
+.excalidraw [data-testid='chart-legend'] button[data-testid^='legend-points-'] {
+  opacity: 1;
+}
+
+.excalidraw [data-testid='chart-instructions'] {
+  color: var(--muted-foreground);
+}
+
+.excalidraw .chart-root .grid line {
+  stroke-dasharray: 3 3;
+  stroke-linecap: round;
+}
+
+.excalidraw[data-excalidraw-paper='vellum'] body {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0 23px,
+    color-mix(in srgb, var(--primary) 11%, transparent) 23px 24px
+  );
+  background-size: auto;
+}
+
+.excalidraw[data-excalidraw-paper='blueprint'] body {
+  background-image:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary) 17%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(color-mix(in srgb, var(--primary) 17%, transparent) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+.excalidraw[data-excalidraw-paper='vellum'] .chart-root .grid line {
+  stroke-dasharray: 1 4;
+}
+
+.excalidraw[data-excalidraw-paper='blueprint'] .chart-root .grid line {
+  stroke-dasharray: 6 3;
+}
+
+/* The canvas points are siblings behind the SVG. Tint their shared host, not the SVG,
+   so the drafting sheet improves contrast without masking any part of the plot. */
+.excalidraw[data-excalidraw-paper='blueprint']
+  :is([data-testid='chart-figure'], [data-testid='historical-trend-figure'])
+  div:has(> svg:is([data-testid='d3-chart-svg'], [data-testid='trend-chart-svg'])) {
+  background-color: var(--excalidraw-plot-paper);
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw[data-excalidraw-paper='blueprint']
+  :is([data-testid='chart-figure'], [data-testid='historical-trend-figure'])
+  svg:is([data-testid='d3-chart-svg'], [data-testid='trend-chart-svg']),
+.excalidraw[data-excalidraw-paper='blueprint']
+  :is([data-testid='chart-figure'], [data-testid='historical-trend-figure'])
+  div:has(> svg:is([data-testid='d3-chart-svg'], [data-testid='trend-chart-svg']))
+  > [data-testid='chart-instructions'] {
+  --foreground: #172646;
+  --muted-foreground: #43547d;
+  color: var(--foreground);
+}
+
+.excalidraw[data-excalidraw-paper='blueprint']
+  :is([data-testid='chart-figure'], [data-testid='historical-trend-figure'])
+  svg:is([data-testid='d3-chart-svg'], [data-testid='trend-chart-svg'])
+  .grid
+  line {
+  stroke: #a8bddb;
+}
+
+/* Use the same next/font stack and spacing as light mode for native series badges. */
+.excalidraw .line-label {
+  font-family: var(--font-dm-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: normal;
+}
+
+.excalidraw [id$='-export'] [data-export-table],
+.excalidraw [id$='-export'] [data-export-table] table {
+  max-width: none !important;
+}
+
+.excalidraw [id$='-export'] [data-export-table] :is(th, td) {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+}
+
+.excalidraw [id$='-export'] [data-testid='result-context'] > dl {
+  min-height: 1.65rem;
+  align-items: baseline;
+}
+
+.excalidraw [id$='-export'] [data-testid='result-context-scenario'] {
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+.excalidraw [id$='-export'] div:has(> [data-testid='result-context-scenario']) {
+  flex-wrap: nowrap;
+  line-height: 1.15;
+}
+
+.excalidraw [data-testid='precision-multiselect'] [data-slot='select-chip'] {
+  border: 1px solid var(--primary);
+  border-radius: 5px 8px 6px 7px;
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+@media (forced-colors: none) {
+  .excalidraw circle.point:has(+ .excalidraw-micro-marker) {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .excalidraw [data-testid='mobile-chart-select'] {
+    flex-wrap: wrap;
+    gap: 0 0.85rem;
+    overflow: visible;
+    mask-image: none !important;
+  }
+}
+
+.excalidraw .chart-root :is(.x-axis, .y-axis, .x-axis-top) text {
+  font-family: var(--excalidraw-font);
+}
+
+.excalidraw .chart-root :is(.x-axis, .y-axis) .domain {
+  stroke-linecap: round;
+  stroke-width: 1.3;
+}
+
+.excalidraw :is(.roofline-path, .line-layer path) {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
+}
+
+.excalidraw .dot-group .visible-shape {
+  stroke: color-mix(in srgb, var(--foreground) 45%, transparent);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+}
+
+.excalidraw .dot-group:has(> .excalidraw-svg-marker) > .visible-shape,
+.excalidraw
+  .legend-container
+  label
+  > span.relative:has(> .excalidraw-legend-marker)
+  > span.rounded-full {
+  opacity: 0;
+}
+
+.excalidraw-legend-marker {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.excalidraw
+  .legend-container
+  label:hover
+  > span.relative:has(> [title])
+  > .excalidraw-legend-marker {
+  visibility: hidden;
+}
+
+.excalidraw-scene-ink {
+  transform: translateY(calc(var(--excalidraw-scroll, 0px) * 0.49));
+}
+
+.excalidraw-theme-banner {
+  position: relative;
+}
+
+.excalidraw-welcome-sketch {
+  position: relative;
+  order: 1;
+  flex: 1 0 100%;
+  min-width: 0;
+  min-height: 255px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.8fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(0.45rem, 2vw, 1.6rem);
+  padding: 3.6rem clamp(0.75rem, 3vw, 2.6rem) 1.6rem;
+  border: 2px solid var(--primary);
+  outline: 1px dashed var(--border-alt);
+  outline-offset: -6px;
+  border-radius: 15px 9px 22px 11px / 9px 17px 12px 19px;
+  color: var(--foreground);
+  background: radial-gradient(
+      color-mix(in srgb, var(--primary) 32%, transparent) 1px,
+      transparent 1.5px
+    )
+    1px 2px / 15px 15px var(--card);
+  box-shadow: 5px 6px var(--accent);
+}
+
+.excalidraw-welcome-tools {
+  display: flex;
+  justify-self: center;
+  align-self: start;
+  grid-column: 1 / -1;
+  position: absolute;
+  top: 0.55rem;
+  padding: 0.18rem;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  box-shadow: 3px 4px var(--accent);
+}
+
+.excalidraw-welcome-tools button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+}
+
+.excalidraw-welcome-tools svg {
+  width: 22px;
+}
+
+.excalidraw-welcome-idea {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.excalidraw-welcome-idea span {
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+
+.excalidraw-welcome-idea strong {
+  font-size: clamp(1.6rem, 2.6vw, 2.8rem);
+  line-height: 1.06;
+  text-decoration: underline dashed var(--primary);
+  text-underline-offset: 0.3rem;
+}
+
+.excalidraw-welcome-nodes,
+.excalidraw-welcome-figures {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.excalidraw-welcome-nodes {
+  position: relative;
+}
+
+.excalidraw-welcome-ink {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  color: var(--primary);
+}
+
+.excalidraw-welcome-sketch[data-tool='2'] .excalidraw-welcome-ink {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.excalidraw-welcome-ink path {
+  stroke-width: 3;
+}
+
+.excalidraw-welcome-ink-controls {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.excalidraw-welcome-ink-controls button {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  padding: 0.25rem 0.5rem;
+  background: var(--card);
+}
+
+.excalidraw-welcome-node,
+.excalidraw-welcome-figures button {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 0;
+  justify-items: center;
+  align-content: center;
+  gap: 0.15rem;
+  padding: 0.35rem;
+  text-align: center;
+  font-size: clamp(0.72rem, 1vw, 0.94rem);
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+}
+
+.excalidraw-welcome-node img,
+.excalidraw-welcome-figures img {
+  display: block;
+  width: clamp(48px, 7vw, 100px);
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 15px 9px 13px 7px;
+}
+
+.excalidraw-welcome-sketch svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.excalidraw-welcome-link {
+  flex: 0 1 14%;
+  width: 55px;
+  color: var(--primary);
+}
+
+.excalidraw-welcome-sketch[data-tool='1'] .excalidraw-welcome-link {
+  stroke-width: 3;
+  stroke-dasharray: 10 2;
+}
+
+.excalidraw-welcome-sketch[data-tool='2'] [data-node='tokens'] {
+  background: repeating-linear-gradient(135deg, var(--accent) 0 3px, var(--card) 3px 7px);
+}
+
+.excalidraw-welcome-figures button {
+  min-height: 108px;
+  font-weight: 650;
+}
+
+.excalidraw-welcome-figures span {
+  min-height: 2.75em;
+  display: grid;
+  align-items: center;
+}
+
+.excalidraw-welcome-figures img {
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.4, 1.3);
+}
+
+.excalidraw-welcome-figures [data-pose='1'] img {
+  transform: translateY(-3px) rotate(-11deg) scale(0.9);
+}
+
+.excalidraw-welcome-figures [data-pose='2'] img {
+  transform: translateY(-9px) rotate(8deg) scale(0.91);
+}
+
+.excalidraw-welcome-figures [data-pose='2'] {
+  background: var(--accent);
+  border: 2px dashed var(--primary);
+}
+
+.excalidraw-review-stencil {
+  grid-column: 1 / -1;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 2px dashed var(--primary);
+  border-radius: var(--excalidraw-corner);
+  padding: 0.3rem 0.55rem;
+  background: var(--card);
+}
+
+.excalidraw-review-stencil img {
+  background: #fff;
+  border-radius: 0.35rem;
+}
+
+.excalidraw-palette-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.23rem;
+}
+
+.excalidraw :is(.excalidraw-palette-chips, .excalidraw-welcome-tools) button {
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+}
+
+.excalidraw .excalidraw-palette-chips button {
+  padding: 0.35rem 0.5rem;
+  min-height: 34px;
+  font-size: 0.8rem;
+}
+
+.excalidraw :is(.excalidraw-palette-chips, .excalidraw-welcome-tools) button[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.excalidraw-stamp-book {
+  background: var(--card);
+  padding: 0.25rem 0.5rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--excalidraw-corner);
+  font-size: 0.8rem;
+  max-width: 100%;
+}
+
+.excalidraw-stamp-book[open] {
+  flex-basis: 100%;
+}
+
+.excalidraw-stamp-book summary {
+  padding: 0.2rem;
+  cursor: pointer;
+}
+
+.excalidraw-stamp-book ul {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  gap: 0.3rem;
+  padding-block: 0.45rem;
+}
+
+.excalidraw-stamp-book li {
+  padding: 0.18rem 0.45rem;
+  border: 1px dashed var(--border-alt);
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw-stamp-book [data-earned='true'] {
+  border: 1px solid var(--primary);
+  background: var(--accent);
+}
+
+@media (max-width: 799px) {
+  .excalidraw-welcome-sketch {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .excalidraw-welcome-nodes {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .excalidraw-welcome-figures img {
+    transition: none;
+  }
+}
+
+.excalidraw-chart-frame-ink {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  max-width: 100%;
+  margin-block-start: 4px;
+  padding: 0.18rem 0.4rem;
+  border: 1px dashed var(--primary);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+}
+
+.excalidraw-chart-frame-ink img {
+  object-fit: contain;
+  height: 29px;
+  max-width: 55%;
+  background: #fff;
+  border-radius: 3px;
+}
+
+.excalidraw-chart-frame-ink[data-sketch-marked='true'] {
+  background-color: var(--accent);
+  border-style: solid;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .excalidraw-chart-frame-ink[data-sketch-marked='true'] img:last-child {
+    animation: excalidraw-ink-nod 320ms ease-out;
+  }
+}
+
+@keyframes excalidraw-ink-nod {
+  45% {
+    transform: translateY(-3px) rotate(-8deg);
+  }
+}
+
+@media (forced-colors: active) {
+  .excalidraw-chart-frame-ink {
+    display: none;
+  }
+}
+
+/* Keep the real benchmark in the first viewport. Board controls expand in document flow. */
+.excalidraw[data-excalidraw-paper='blueprint'] [data-testid='inferencex-wordmark'] {
+  --wordmark-blue: #bedbff;
+}
+
+.excalidraw-theme-banner,
+.excalidraw-theme-banner[data-compact='true'] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 10px;
+  margin-top: 0;
+  padding: 3px 0 7px;
+}
+
+.excalidraw-theme-banner .excalidraw-banner-mark {
+  grid-column: 1;
+  grid-row: 1;
+  width: 145px;
+  height: 37px;
+}
+
+.excalidraw-theme-banner .excalidraw-banner-copy,
+.excalidraw-theme-banner .excalidraw-tagline {
+  display: none;
+}
+
+.excalidraw-theme-banner .excalidraw-wordmark {
+  font-size: 1.22rem;
+}
+
+.excalidraw-desk-options {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.excalidraw-desk-options > summary {
+  display: flex;
+  min-height: 38px;
+  min-width: 60px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.excalidraw-desk-options > summary::-webkit-details-marker {
+  display: none;
+}
+
+.excalidraw-desk-options > summary svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.excalidraw-options-panel {
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px dashed var(--border-alt);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+}
+
+.excalidraw-desk-options:not([open]) + .excalidraw-options-panel {
+  display: none;
+}
+
+.excalidraw-options-panel .excalidraw-banner-tools {
+  flex: 1 1 auto;
+}
+
+.excalidraw-options-panel .excalidraw-stamp-book {
+  min-height: 32px;
+}
+
+.excalidraw-theme-banner .excalidraw-ip-workbench {
+  order: 0;
+  display: contents;
+}
+
+.excalidraw-theme-banner .excalidraw-ip-workbench > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.excalidraw-theme-banner .excalidraw-ip-workbench > .excalidraw-ip-island {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  width: auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  padding: 1px 3px;
+}
+
+.excalidraw-theme-banner .excalidraw-ip-island button {
+  min-height: 34px;
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.excalidraw-theme-banner[data-compact='false'] [data-desk-tool='chart'],
+.excalidraw-theme-banner[data-compact='true'] [data-desk-tool='flow'] {
+  display: none;
+}
+
+.excalidraw-welcome-sketch {
+  isolation: isolate;
+  order: 0;
+  grid-column: 1 / -1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.9fr) minmax(0, 0.95fr);
+  column-gap: clamp(8px, 2vw, 28px);
+  row-gap: 5px;
+  padding: 2px clamp(10px, 2vw, 30px) 3px;
+}
+
+.excalidraw-welcome-sketch .excalidraw-scene {
+  position: absolute;
+  z-index: -1;
+  border-radius: inherit;
+}
+
+.excalidraw-welcome-tools {
+  position: static;
+  padding: 1px;
+}
+
+.excalidraw-welcome-tools button {
+  width: 32px;
+  height: 30px;
+}
+
+.excalidraw-welcome-tools .excalidraw-welcome-show-figures {
+  display: none;
+}
+
+.excalidraw-welcome-nodes {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.excalidraw-welcome-node,
+.excalidraw-welcome-figures button {
+  padding: 3px;
+}
+
+.excalidraw-welcome-node img,
+.excalidraw-welcome-figures img {
+  width: clamp(48px, 6vw, 84px);
+}
+
+.excalidraw-welcome-figures button {
+  min-height: 0;
+}
+
+.excalidraw-welcome-figures span {
+  min-height: 1.6em;
+}
+
+@media (max-width: 799px) {
+  .excalidraw-theme-banner .excalidraw-banner-mark,
+  .excalidraw-theme-banner[data-compact='true'] .excalidraw-banner-mark {
+    display: grid;
+    width: 40px;
+    height: 44px;
+  }
+
+  .excalidraw-theme-banner .excalidraw-wordmark,
+  .excalidraw-theme-banner[data-compact='true'] .excalidraw-wordmark {
+    font-size: 0;
+  }
+
+  .excalidraw-theme-banner .excalidraw-wordmark img {
+    width: 24px;
+  }
+
+  .excalidraw-banner-frame,
+  .excalidraw-banner-mark::before {
+    display: none;
+  }
+
+  .excalidraw-theme-banner .excalidraw-ip-island button,
+  .excalidraw-desk-options > summary,
+  .excalidraw-welcome-tools button {
+    width: 44px;
+    min-height: 44px;
+  }
+
+  .excalidraw-theme-banner .excalidraw-ip-island button > span:not([aria-hidden]) {
+    display: none;
+  }
+
+  .excalidraw-theme-banner[data-compact='true'] .excalidraw-ip-island .excalidraw-ip-open-relay {
+    display: inline-flex;
+  }
+
+  .excalidraw-welcome-sketch {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .excalidraw-welcome-idea {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+  }
+
+  .excalidraw-welcome-idea span {
+    font-size: 0.7rem;
+  }
+
+  .excalidraw-welcome-idea strong {
+    font-size: clamp(1.08rem, 5vw, 1.6rem);
+    text-underline-offset: 0.15rem;
+  }
+
+  .excalidraw-welcome-node img,
+  .excalidraw-welcome-figures img {
+    width: clamp(48px, 15vw, 78px);
+  }
+
+  .excalidraw-welcome-figures:not([data-open='true']) {
+    display: none;
+  }
+
+  .excalidraw-welcome-tools .excalidraw-welcome-show-figures {
+    display: grid;
+  }
+
+  .excalidraw-welcome-show-figures[aria-expanded='true'] {
+    color: var(--primary-foreground);
+    background: var(--primary);
+  }
+}
+
+@media (max-width: 639px) {
+  .excalidraw-theme-banner[data-compact='true'] .excalidraw-options-panel .excalidraw-mobile-audio {
+    display: block;
+  }
+
+  .excalidraw-options-panel .excalidraw-stamp-book summary,
+  .excalidraw-options-panel .excalidraw-architecture-note button,
+  .excalidraw-welcome-ink-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 359px) {
+  .excalidraw-theme-banner,
+  .excalidraw-theme-banner[data-compact='true'] {
+    column-gap: 2px;
+  }
+
+  .excalidraw-theme-banner .excalidraw-banner-mark,
+  .excalidraw-theme-banner[data-compact='true'] .excalidraw-banner-mark {
+    width: 26px;
+  }
+}
+
+.excalidraw-note-doodle {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 36px;
+  color: var(--primary);
+}
+
+.excalidraw-note-doodle svg {
+  width: 23px;
+  height: 23px;
+}
+
+.excalidraw-architecture-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-basis: 100%;
+  max-width: min(100%, 22rem);
+  padding: 0.55rem 0.7rem;
+  border: 1px dashed var(--primary);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+  box-shadow: 3px 4px var(--accent);
+  font-size: 0.86rem;
+}
+
+.excalidraw-architecture-note button {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+@media (max-width: 639px) {
+  .excalidraw-note-doodle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (forced-colors: none) {
+  .excalidraw :is(.excalidraw-note-doodle, .excalidraw-desk-launch, .excalidraw-relay-node) {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='m3 21 4-13 6 1 2 5Z' fill='%23e4dfff' stroke='%23272735' stroke-width='1.5'/%3E%3Cpath d='m4 20 6-8m3-3 5-6 4 4-7 7' fill='none' stroke='%23272735' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E")
+        3 21,
+      pointer;
+  }
+}
+
+.excalidraw svg rect.bar {
+  rx: 2px;
+  stroke: color-mix(in srgb, var(--foreground) 45%, transparent);
+  stroke-width: 0.8;
+  stroke-dasharray: 4 1;
+}
+
+@media (forced-colors: none) {
+  .excalidraw svg rect.bar[style*='--excalidraw-bar-ink'] {
+    fill: var(--excalidraw-bar-ink);
+  }
+}
+
+.excalidraw :is([data-chart-tooltip], [data-testid='point-details-panel']) {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  box-shadow: 3px 3px var(--accent);
+}
+
+.excalidraw [data-chart-tooltip]:not([data-sheet='true']) {
+  background: color-mix(in srgb, #ffd96c 24%, var(--popover)) !important;
+  border: 1px solid var(--foreground) !important;
+  border-radius: 4px 6px 12px 5px !important;
+  box-shadow:
+    inset -2px -2px color-mix(in srgb, var(--foreground) 22%, transparent),
+    3px 4px 0 color-mix(in srgb, var(--foreground) 25%, transparent) !important;
+}
+
+.excalidraw[data-excalidraw-paper='blueprint'] [data-chart-tooltip]:not([data-sheet='true']) {
+  background: color-mix(in srgb, var(--primary) 16%, var(--popover)) !important;
+}
+
+.excalidraw [data-chart-tooltip]:not([data-sheet='true']) [data-hover-tooltip] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.excalidraw .excalidraw-editor-handle {
+  stroke: var(--primary);
+  stroke-width: 0.85;
+  pointer-events: none;
+}
+
+.excalidraw .excalidraw-chart-pen-trace {
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation: excalidraw-draw-series 1050ms cubic-bezier(0.28, 0.78, 0.2, 1) both;
+  pointer-events: none;
+}
+
+@keyframes excalidraw-draw-series {
+  59% {
+    opacity: 0.84;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.excalidraw :is([data-testid='scatter-empty-state'], [data-testid='chart-empty-state']) {
+  border: 1px dashed var(--primary);
+  border-radius: 9px 3px 10px 4px / 3px 9px 5px 10px;
+  box-shadow: 3px 4px 0 var(--accent);
+  background-color: var(--card);
+}
+
+.excalidraw :is([data-testid='scatter-empty-state'], [data-testid='chart-empty-state'])::before {
+  content: '';
+  display: block;
+  width: 68px;
+  height: 52px;
+  background: center / contain no-repeat url('/decorative/excalidraw/despair.webp');
+  border: 1px dashed var(--primary);
+  border-radius: 6px 3px 7px 4px;
+  pointer-events: none;
+}
+
+.excalidraw [data-testid='scatter-empty-state'] > svg:first-of-type {
+  display: none;
+}
+
+.excalidraw [data-testid='scatter-empty-state'] h3 {
+  font-family: var(--excalidraw-font);
+  font-size: 1rem;
+}
+
+.excalidraw
+  :is(
+    .chart-root [data-slot='skeleton'],
+    figure[data-testid='chart-figure'] [data-slot='skeleton'],
+    figure[data-testid='calculator-figure'] [data-slot='skeleton'],
+    [data-slot='card'] > [data-slot='skeleton'][class*='600px'],
+    .excalidraw-chart-loading-preview
+  ) {
+  border: 1px dashed var(--primary);
+  border-radius: 11px 5px 8px 4px / 5px 9px 5px 9px;
+  animation: none;
+  background:
+    center / 126px auto no-repeat url('/decorative/excalidraw/architecture-strip.webp'),
+    radial-gradient(
+        circle,
+        color-mix(in srgb, var(--primary) 33%, transparent) 1px,
+        transparent 1px
+      )
+      0 0 / 15px 15px var(--card);
+}
+
+.excalidraw .excalidraw-chart-loading-preview {
+  display: grid;
+  place-items: center;
+  min-height: 285px;
+  margin-block: 0.5rem;
+  padding-block-start: 112px;
+  color: var(--foreground);
+  font-family: var(--excalidraw-font);
+}
+
+.excalidraw :is(.excalidraw-chart-despair, .excalidraw-chart-box-joke) {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.15rem 0.5rem;
+  border: 1px dashed var(--primary);
+  border-radius: var(--excalidraw-corner);
+  background-color: var(--card);
+  color: var(--foreground);
+  font-size: 0.78rem;
+}
+
+.excalidraw .excalidraw-chart-box-joke img {
+  object-fit: contain;
+  flex: 0 0 58px;
+}
+
+.excalidraw
+  :is(
+    [data-slot='skeleton'][class*='600px'],
+    figure[data-testid='calculator-figure'] [data-slot='skeleton']
+  )::after {
+  content: 'Sketching the chart…';
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding-top: 6.5rem;
+  color: var(--foreground);
+  font-family: var(--excalidraw-font);
+}
+
+.excalidraw[lang='zh']
+  :is(
+    [data-slot='skeleton'][class*='600px'],
+    figure[data-testid='calculator-figure'] [data-slot='skeleton']
+  )::after {
+  content: '正在绘制图表…';
+}
+
+.excalidraw [id$='-export']:has(.excalidraw-export-imprint) {
+  border: 2px solid var(--primary);
+  border-radius: 12px 7px 13px 6px / 6px 11px 6px 10px;
+  box-shadow:
+    inset 0 0 0 4px var(--card),
+    inset 0 0 0 5px var(--primary);
+}
+
+.excalidraw .excalidraw-export-imprint {
+  width: fit-content;
+  padding: 0.18rem 0.55rem;
+  margin-block: 0.3rem;
+  border: 1px dashed var(--primary);
+  border-radius: var(--excalidraw-corner);
+  color: var(--foreground);
+  font-family: var(--excalidraw-font);
+  font-size: 0.78rem;
+}
+
+.excalidraw :is(.excalidraw-desk-caption, .excalidraw-tracing-trail) {
+  max-width: 100%;
+  width: fit-content;
+  margin: 0.3rem 0;
+  padding: 0.22rem 0.55rem;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px dashed var(--primary);
+  border-radius: 7px 3px 6px 3px;
+  font-size: 0.8rem;
+}
+
+.excalidraw .excalidraw-desk-caption {
+  border-style: solid;
+  background-color: var(--accent);
+}
+
+.excalidraw .excalidraw-desk-notes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: clamp(4px, 2vw, 14px);
+}
+
+.excalidraw .excalidraw-desk-notes [data-tracing='clue'] {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-size: 0.75rem;
+}
+
+.excalidraw .excalidraw-desk-notes .excalidraw-desk-caption {
+  flex-basis: 100%;
+}
+
+.excalidraw .excalidraw-tracing-trail a,
+.excalidraw .excalidraw-desk-journal summary,
+.excalidraw .excalidraw-ip-panel details > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.excalidraw .excalidraw-desk-journal {
+  font-size: 0.75rem;
+}
+
+.excalidraw .excalidraw-desk-journal ul {
+  list-style: decimal inside;
+  padding: 0.2rem 0.4rem;
+}
+
+.excalidraw .excalidraw-tracing-payoff {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.excalidraw
+  :is(
+    [data-testid='chart-figure'],
+    [data-testid='historical-trend-figure'],
+    [data-testid='calculator-figure']
+  )
+  table
+  :is(thead, th) {
+  background-color: var(--accent);
+  border-bottom: 1px dashed var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.excalidraw .excalidraw-plot-shrug {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-block-start: 0.25rem;
+  font-size: 0.76rem;
+}
+
+.excalidraw .excalidraw-plot-shrug img {
+  flex: none;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce), (forced-colors: active) {
+  .excalidraw .excalidraw-chart-pen-trace {
+    display: none;
+  }
+}
+
+.excalidraw :is(.excalidraw-desk-dialog, .excalidraw-relay-dialog) {
+  max-width: min(92vw, 850px);
+  max-height: 92dvh;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.excalidraw .excalidraw-desk-dialog {
+  max-width: min(92vw, 490px);
+}
+.excalidraw :is(.excalidraw-desk-dialog, .excalidraw-relay-dialog) h2 {
+  padding-right: 2rem;
+}
+.excalidraw-desk-card {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+.excalidraw-desk-card img {
+  width: min(100%, 440px);
+  height: auto;
+  border-radius: 0.5rem;
+}
+.excalidraw-desk-card p {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 639px) {
+  .excalidraw-mobile-audio {
+    display: block;
+  }
+  .excalidraw-banner-mark {
+    width: 190px;
+    height: 48px;
+  }
+  .excalidraw-wordmark {
+    font-size: 1.5rem;
+  }
+  .excalidraw-banner-tools {
+    flex-basis: 100%;
+  }
+  .excalidraw-board-toggles button,
+  .excalidraw-banner-tools :is(select, button) {
+    min-height: 44px;
+  }
+  .excalidraw-scene-ink {
+    opacity: 0.13;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .excalidraw
+    :is(button, [role='button'], [role='tab'], select, [role='dialog'], [data-slot='skeleton']) {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .excalidraw :is(.excalidraw-scene, .excalidraw-banner-mark::before) {
+    display: none;
+  }
+  .excalidraw :is(button, select, [role='tab'], [role='switch']) {
+    border: 1px solid ButtonText;
+  }
+  .excalidraw :is(button, select, a):focus-visible {
+    outline: 2px solid Highlight;
+  }
+  .excalidraw :is([aria-pressed='true'], [aria-selected='true']) {
+    border: 2px solid Highlight;
+  }
+}
+
 html[data-inferencex-embed] [data-testid='excalidraw-theme-banner'] {
   display: none;
+}
+
+.excalidraw-ip-workbench {
+  display: grid;
+  gap: 0.55rem;
+  align-items: start;
+  justify-items: start;
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+.excalidraw-ip-island {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 0.15rem;
+  padding: 0.25rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--excalidraw-island-shadow);
+  justify-self: center;
+  justify-content: center;
+}
+
+.excalidraw-ip-workbench {
+  order: 2;
+}
+
+.excalidraw-ip-workbench button,
+.excalidraw-ip-plot-note button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.excalidraw-ip-workbench
+  :is(button:hover, button[aria-expanded='true'], button[aria-pressed='true']) {
+  border-color: var(--primary);
+  background: var(--accent);
+}
+
+.excalidraw-ip-workbench button:disabled {
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+.excalidraw-ip-workbench button :is(svg, .excalidraw-ip-icon) {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.excalidraw-ip-icon {
+  display: inline-block;
+  background: currentColor;
+  mask: var(--excalidraw-ip-icon) center / contain no-repeat;
+  forced-color-adjust: none;
+}
+
+.excalidraw-ip-icon[data-icon='library'] {
+  --excalidraw-ip-icon: url('/decorative/excalidraw/tool-library.webp');
+}
+
+.excalidraw-ip-icon[data-icon='open'] {
+  --excalidraw-ip-icon: url('/decorative/excalidraw/tool-open.webp');
+}
+
+.excalidraw-ip-icon[data-icon='select'] {
+  --excalidraw-ip-icon: url('/decorative/excalidraw/tool-select.webp');
+}
+
+.excalidraw-ip-panel {
+  display: grid;
+  max-width: 100%;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--card);
+}
+
+.excalidraw-ip-panel label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.excalidraw-ip-panel input {
+  min-width: 0;
+  padding: 0.3rem 0.55rem;
+  background: var(--background);
+}
+
+.excalidraw-ip-actions,
+.excalidraw-ip-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.excalidraw-ip-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.excalidraw-ip-tiles button {
+  display: grid;
+  justify-items: center;
+  grid-template-rows: 64px 1fr;
+  overflow: hidden;
+  white-space: normal;
+  background: var(--card);
+  border-color: var(--border);
+  text-align: center;
+}
+
+.excalidraw-ip-workbench img {
+  object-fit: contain;
+  background: white;
+  border-radius: 0.25rem;
+}
+
+.excalidraw-ip-tiles img {
+  align-self: start;
+  width: 64px;
+  height: 64px;
+  max-width: 100%;
+}
+
+.excalidraw-ip-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  border: 1px dashed var(--primary);
+  padding: 0.4rem;
+  border-radius: var(--excalidraw-corner);
+}
+
+.excalidraw-ip-workspace {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  min-height: 178px;
+  align-items: end;
+  padding: 0.65rem;
+  background:
+    radial-gradient(color-mix(in srgb, var(--primary) 32%, transparent) 1px, transparent 1.5px) 1px
+      2px / 14px 14px,
+    var(--card);
+}
+
+.excalidraw-workspace-art,
+.excalidraw-workspace-sticky {
+  grid-column: 1 / -1;
+  align-self: center;
+  justify-self: center;
+}
+
+.excalidraw-workspace-art {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+}
+
+.excalidraw-workspace-art img {
+  width: min(560px, 100%);
+  height: auto;
+  border: 1px solid var(--border);
+  padding: 0.35rem;
+}
+
+.excalidraw-workspace-system img {
+  width: min(440px, 100%);
+}
+
+.excalidraw-workspace-sticky {
+  display: grid;
+  justify-content: center;
+  grid-template-columns: repeat(3, minmax(0, 120px));
+  gap: clamp(4px, 2vw, 22px);
+  width: 100%;
+  margin: 6px 0;
+}
+
+.excalidraw-workspace-sticky > div {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  min-width: 0;
+}
+
+.excalidraw-ip-workbench .excalidraw-workspace-sticky img {
+  grid-area: 1 / 1;
+  width: 100%;
+  background: transparent;
+}
+
+.excalidraw-workspace-sticky span {
+  grid-area: 1 / 1;
+  padding: 0.38rem;
+  color: #151515;
+  font-size: clamp(0.72rem, 2.3vw, 0.95rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.excalidraw-workspace-placement {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.excalidraw-cursor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  color: var(--primary);
+  font-size: 0.75rem;
+}
+
+.excalidraw-cursor svg {
+  width: 14px;
+  height: 14px;
+}
+
+.excalidraw-editor {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.excalidraw-properties {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.45rem;
+  font-size: 0.75rem;
+}
+
+.excalidraw-properties select {
+  display: block;
+  appearance: none;
+  width: 100%;
+  padding: 0.24rem 1.25rem 0.24rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.excalidraw-properties label:has(select) {
+  position: relative;
+}
+
+.excalidraw-properties label:has(select)::after {
+  position: absolute;
+  inset-inline-end: 0.45rem;
+  bottom: 0.68rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-inline-end: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
+  transform: rotate(42deg);
+  content: '';
+  pointer-events: none;
+}
+
+.excalidraw-properties label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  gap: 0.32rem;
+  cursor: pointer;
+}
+
+.excalidraw-properties input[type='checkbox'] {
+  appearance: none;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  border: 1.5px solid var(--primary);
+  border-radius: 4px 2px 5px 3px;
+  color: var(--primary-foreground);
+  background: var(--card);
+}
+
+.excalidraw-properties input[type='checkbox']:checked {
+  background: var(--primary);
+}
+
+.excalidraw-properties input[type='checkbox']:checked::after {
+  width: 0.61rem;
+  height: 0.38rem;
+  border-inline-start: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.1rem) rotate(-49deg);
+  content: '';
+}
+
+.excalidraw-properties :is(input, select):focus-visible,
+.excalidraw-stamp-book summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .excalidraw-properties :is(input[type='checkbox'], select) {
+    appearance: auto;
+    display: revert;
+    accent-color: auto;
+  }
+  .excalidraw-properties :is(label:has(select), input[type='checkbox']:checked)::after {
+    content: none;
+  }
+}
+
+@media (max-width: 530px) {
+  .excalidraw-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.excalidraw-ip-note,
+.excalidraw-ip-plot-note {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 36rem;
+  padding: 0.5rem;
+  border: 1px dashed var(--primary);
+  border-radius: var(--excalidraw-corner);
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.excalidraw-ip-note img {
+  flex: none;
+}
+
+.excalidraw-ip-note strong {
+  font-family: Virgil, 'Excalifont', sans-serif;
+  font-weight: 400;
+}
+
+.excalidraw-ip-note p,
+.excalidraw-ip-status,
+.excalidraw-ip-plot-note {
+  font-size: 0.88rem;
+}
+
+.excalidraw-ip-plot-note {
+  margin-top: 0.5rem;
+}
+
+.excalidraw-ip-plot-note button {
+  margin-inline-start: auto;
+}
+
+.excalidraw-ip-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.4rem;
+}
+
+.excalidraw-ip-flow button {
+  max-width: 100%;
+  min-width: 5rem;
+  border-color: var(--primary);
+  border-radius: 0.45rem 0.2rem 0.6rem 0.3rem;
+  overflow-wrap: anywhere;
+}
+
+.excalidraw-ip-flow[data-ink='ink'] {
+  --primary: var(--foreground);
+}
+
+.excalidraw-ip-flow[data-fill='true'] button:not([data-shape='diamond']),
+.excalidraw-ip-flow[data-fill='true'] button[data-shape='diamond']::before {
+  background: repeating-linear-gradient(-40deg, var(--accent) 0 2px, var(--card) 2px 6px);
+}
+
+.excalidraw-ip-flow[data-rough='false'] button[data-shape='rectangle'] {
+  border-radius: 4px;
+}
+
+.excalidraw-ip-flow > svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.excalidraw-ip-flow button[data-shape='ellipse'] {
+  border-radius: 60% 45% 55% 48%;
+}
+
+.excalidraw-ip-flow button[data-shape='diamond'] {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  border-color: transparent;
+  min-height: 3.65rem;
+}
+
+.excalidraw-ip-flow button[data-shape='diamond']::before {
+  position: absolute;
+  z-index: -1;
+  width: 2.45rem;
+  height: 2.45rem;
+  border: 1px solid var(--primary);
+  border-radius: 0.2rem;
+  background: var(--card);
+  transform: rotate(45deg);
+  content: '';
+}
+
+.excalidraw-ip-flow button[data-shape='diamond'][aria-pressed='true']::before {
+  background: var(--accent);
+}
+
+.excalidraw-ip-flow > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+}
+
+.excalidraw-ip-selection {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+@media (max-width: 639px) {
+  .excalidraw-ip-island {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .excalidraw-ip-workbench button,
+  .excalidraw-ip-plot-note button {
+    min-height: 44px;
+  }
+}
+
+@media (forced-colors: active) {
+  .excalidraw-ip-workbench :is(button, input),
+  .excalidraw-ip-plot-note button {
+    border-color: ButtonText;
+  }
+  .excalidraw-ip-selection {
+    stroke: Highlight;
+  }
+  .excalidraw-ip-icon {
+    background: ButtonText;
+  }
+  .excalidraw-ip-workbench button[aria-expanded='true'] {
+    border-color: Highlight;
+  }
 }

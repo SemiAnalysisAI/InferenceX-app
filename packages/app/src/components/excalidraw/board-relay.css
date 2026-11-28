@@ -1,0 +1,315 @@
+.excalidraw-relay {
+  display: grid;
+  gap: 0.52rem;
+  font-size: 0.79rem;
+}
+.excalidraw-relay :is(button, select) {
+  padding: 0.3rem 0.5rem;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.excalidraw-relay button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.excalidraw-relay :is([aria-pressed='true'], [aria-current='location']) {
+  background: var(--accent);
+  border: 2px solid var(--primary);
+}
+.excalidraw-relay-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.36rem;
+}
+.excalidraw-relay-map {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.26rem;
+}
+.excalidraw-relay-map button {
+  text-align: start;
+}
+.excalidraw-relay-map button span {
+  color: var(--primary);
+  font-family: var(--font-mono);
+}
+.excalidraw-relay-map small {
+  color: var(--primary);
+}
+.excalidraw-relay-note {
+  padding: 0.42rem 0.58rem;
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px dashed var(--border-alt);
+  border-radius: var(--excalidraw-corner);
+}
+.excalidraw-relay-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 0.52rem;
+}
+.excalidraw-relay-viewport {
+  min-width: 0;
+  height: 280px;
+  overflow: hidden;
+  border-radius: var(--excalidraw-corner);
+}
+.excalidraw-relay-viewport[data-zoomed='true'] {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.excalidraw-relay-viewport[data-zoomed='true'] .excalidraw-relay-board {
+  width: 2400px;
+  height: 1400px;
+}
+.excalidraw-relay-board {
+  height: 100%;
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+  background-color: var(--card);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--room-ink) 42%, transparent) 0.8px,
+    transparent 0.9px
+  );
+  background-size: 13px 13px;
+}
+.excalidraw-relay-board[data-tool='pan'] {
+  cursor: grab;
+  touch-action: none;
+}
+.excalidraw-relay-board[data-tool='pan']:active {
+  cursor: grabbing;
+}
+.excalidraw-relay-board:not([data-tool='pen'], [data-tool='pan']) {
+  cursor: crosshair;
+}
+.excalidraw-relay-board[data-tool='pen'] [data-relay-port] {
+  touch-action: none;
+}
+.excalidraw-relay-board[data-tool='pan'] [data-relay-port] {
+  pointer-events: none;
+}
+.excalidraw-relay .excalidraw-relay-node[data-sticky='true'] {
+  background: color-mix(in srgb, #edbd52 28%, var(--card));
+  border-style: dashed;
+  rotate: -2deg;
+}
+.excalidraw-relay-board > svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.excalidraw-relay-board path {
+  fill: none;
+  stroke: var(--room-ink);
+  stroke-linecap: round;
+  stroke-width: 1.75;
+}
+.excalidraw-relay-board [data-wire='guide'] path {
+  stroke: var(--muted-foreground);
+  stroke-dasharray: 2 4;
+  stroke-opacity: 0.62;
+}
+.excalidraw-relay-board [data-wire='live'] path {
+  stroke: var(--foreground);
+  stroke-width: 2.5;
+}
+.excalidraw-relay-board [data-wire='jam'] path {
+  stroke: var(--destructive);
+  stroke-width: 3;
+  stroke-dasharray: 2 4;
+}
+.excalidraw-relay-board [data-wire='live'] .excalidraw-relay-echo {
+  stroke: var(--room-ink);
+  stroke-width: 1.55;
+}
+.excalidraw-relay-echo {
+  opacity: 0.64;
+}
+.excalidraw-relay[data-calm='false'] [data-wire='live'] .excalidraw-relay-echo {
+  stroke-dasharray: 1.5 6;
+  animation: excalidraw-relay-flow 1.2s infinite linear;
+}
+@keyframes excalidraw-relay-flow {
+  to {
+    stroke-dashoffset: -15;
+  }
+}
+.excalidraw-relay .excalidraw-relay-node {
+  position: absolute;
+  translate: -50% -50%;
+  padding: 0.3rem;
+  width: clamp(56px, 13vw, 106px);
+  min-height: 52px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  border-color: transparent;
+  background: var(--card);
+  font-size: clamp(0.6rem, 1.7vw, 0.78rem);
+  line-height: 1.15;
+}
+.excalidraw-relay .excalidraw-relay-node[aria-pressed='true'] {
+  border-color: var(--primary);
+  border-style: dashed;
+}
+.excalidraw-relay-node[data-routed='true'] .excalidraw-relay-actor path {
+  stroke-width: 3.2;
+}
+.excalidraw-relay-actor {
+  display: block;
+  width: 42px;
+  height: 27px;
+  pointer-events: none;
+}
+.excalidraw-relay-actor path {
+  stroke: var(--primary);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+.excalidraw-relay-actor path:first-child {
+  fill: var(--accent);
+}
+.excalidraw-relay-node kbd {
+  position: absolute;
+  top: 1px;
+  inset-inline-end: 2px;
+  font-size: 0.63rem;
+}
+.excalidraw-relay-board-label {
+  position: absolute;
+  bottom: 5px;
+  left: 7px;
+  padding: 0.15rem 0.35rem;
+  color: var(--foreground);
+  background: var(--card);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+}
+.excalidraw-relay-meter {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+  padding: 0.48rem;
+  border: 1px solid var(--border-alt);
+  border-radius: var(--excalidraw-corner);
+  background: var(--card);
+}
+.excalidraw-relay-score {
+  display: grid;
+  gap: 0.12rem;
+}
+.excalidraw-relay-score b {
+  color: var(--primary);
+  font-size: 0.95rem;
+}
+.excalidraw-relay-validation:empty {
+  block-size: 0;
+  margin-block-end: -0.25rem;
+}
+.excalidraw-relay-validation [data-sla-state] {
+  display: block;
+  padding: 0.18rem 0.32rem;
+  border: 1px dashed currentColor;
+  border-radius: var(--excalidraw-corner);
+  color: var(--destructive);
+  font-weight: 700;
+}
+.excalidraw-relay-review {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+.excalidraw-relay-review li {
+  padding: 0.12rem 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--excalidraw-corner);
+}
+.excalidraw-relay-review li[aria-current='step'] {
+  border-color: var(--primary);
+  background: var(--accent);
+}
+.excalidraw-relay-plot svg {
+  width: 100%;
+  max-height: 66px;
+}
+.excalidraw-relay-plot small {
+  color: var(--muted-foreground);
+}
+.excalidraw-relay-meter label {
+  display: grid;
+  grid-template-columns: 2.3rem 1fr 2rem;
+  align-items: center;
+  gap: 0.2rem;
+}
+.excalidraw-relay-meter meter {
+  width: 100%;
+}
+.excalidraw-relay-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.excalidraw-relay-summary [role='status'] {
+  color: var(--primary);
+}
+@media (max-width: 639px) {
+  .excalidraw .excalidraw-relay-dialog {
+    padding: 0.75rem;
+  }
+  .excalidraw-relay :is(button, select) {
+    min-height: 44px;
+  }
+  .excalidraw-relay-map {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .excalidraw-relay-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .excalidraw-relay-board {
+    min-height: 0;
+  }
+  .excalidraw-relay-viewport {
+    height: 245px;
+  }
+  .excalidraw-relay .excalidraw-relay-node {
+    width: clamp(43px, 13vw, 57px);
+    padding-inline: 0.12rem;
+    overflow-wrap: anywhere;
+  }
+  .excalidraw-relay-node kbd {
+    display: none;
+  }
+  .excalidraw-relay-board-label {
+    top: 0;
+    bottom: auto;
+    padding-block: 0;
+  }
+  .excalidraw-relay-meter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .excalidraw-relay-plot svg {
+    max-height: 45px;
+  }
+}
+@media (forced-colors: active) {
+  .excalidraw-relay-board path {
+    stroke: CanvasText !important;
+  }
+  .excalidraw-relay-board [data-wire='jam'] path {
+    stroke: Mark !important;
+  }
+  .excalidraw-relay-node[data-routed='true'] {
+    border: 2px solid Highlight;
+  }
+}
