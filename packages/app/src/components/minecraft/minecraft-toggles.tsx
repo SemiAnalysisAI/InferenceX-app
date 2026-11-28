@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Music, Volume2, VolumeOff } from 'lucide-react';
 import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
 const toggleClasses = cn(
@@ -12,7 +13,28 @@ const toggleClasses = cn(
   'focus-visible:outline-none',
 );
 
+const STRINGS = {
+  en: {
+    // The game's own options wording: "<Category>: ON/OFF".
+    musicOff: 'Music: ON',
+    musicOn: 'Music: OFF',
+    soundOff: 'Sounds: ON',
+    soundOn: 'Sounds: OFF',
+    music: 'Music',
+    sound: 'Sounds',
+  },
+  zh: {
+    musicOff: '音乐：开',
+    musicOn: '音乐：关',
+    soundOff: '声音：开',
+    soundOn: '声音：关',
+    music: '音乐',
+    sound: '声音',
+  },
+};
+
 export function MinecraftToggles() {
+  const t = STRINGS[useLocale()];
   const [isMinecraft, setIsMinecraft] = useState(false);
   const [musicOn, setMusicOn] = useState(true);
   const [soundOn, setSoundOn] = useState(true);
@@ -66,8 +88,9 @@ export function MinecraftToggles() {
         type="button"
         className={toggleClasses}
         onClick={toggleMusic}
-        title={musicOn ? 'Mute music' : 'Unmute music'}
-        aria-label={musicOn ? 'Mute music' : 'Unmute music'}
+        title={musicOn ? t.musicOff : t.musicOn}
+        aria-label={t.music}
+        aria-pressed={musicOn}
       >
         <span className="relative">
           <Music className="w-[20px] h-[20px]" />
@@ -82,8 +105,9 @@ export function MinecraftToggles() {
         type="button"
         className={toggleClasses}
         onClick={toggleSound}
-        title={soundOn ? 'Mute click sounds' : 'Unmute click sounds'}
-        aria-label={soundOn ? 'Mute click sounds' : 'Unmute click sounds'}
+        title={soundOn ? t.soundOff : t.soundOn}
+        aria-label={t.sound}
+        aria-pressed={soundOn}
       >
         {soundOn ? (
           <Volume2 className="w-[20px] h-[20px]" />

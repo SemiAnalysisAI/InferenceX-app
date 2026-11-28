@@ -13,34 +13,23 @@ const INTERACTIVE =
 
 let userHasInteracted = false;
 
-const MINECRAFT_OST_VIDEO_ID = 'bIOiV4d1SVI';
-
-const SONGS = [
-  { name: 'Subwoofer Lullaby', start: 0 },
-  { name: 'Living Mice', start: 207 },
-  { name: 'Haggstorm', start: 370 },
-  { name: 'Minecraft', start: 572 },
-  { name: 'Mice on Venus', start: 817 },
-  { name: 'Dry Hands', start: 1099 },
-  { name: 'Wet Hands', start: 1146 },
-  { name: 'Clark', start: 1233 },
-  { name: 'Sweden', start: 1418 },
-  { name: 'Danny', start: 1631 },
-];
+/** C418 "Sweden" from the game's own asset index, trimmed to a 140 s mono loop (see README). */
+const MUSIC_SRC = '/decorative/minecraft/ip/audio/sweden-loop.mp3';
+const MUSIC_TITLE = 'C418 - Sweden';
+const MUSIC_VOLUME = 0.3;
+const MUSIC_POS_KEY = 'minecraft-music-pos';
 
 function getInitialMusicStart(): number {
   try {
-    const raw = sessionStorage.getItem('minecraft-music-pos');
+    const raw = sessionStorage.getItem(MUSIC_POS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Date.now() - parsed.ts < 30_000 && typeof parsed.time === 'number' && parsed.time > 0) {
-        return Math.floor(parsed.time);
+        return parsed.time;
       }
     }
   } catch {}
-
-  const song = SONGS[Math.floor(Math.random() * SONGS.length)];
-  return song.start;
+  return 0;
 }
 
 export function MinecraftBackground() {
@@ -129,9 +118,6 @@ export function MinecraftBackground() {
   }, [isMinecraft, soundEnabled]);
 
   const [musicEnabled, setMusicEnabled] = useState(false);
-  const playerRef = useRef<YT.Player | null>(null);
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const nudgeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     function check() {
@@ -144,153 +130,69 @@ export function MinecraftBackground() {
 
   const showMusic = isMinecraft && musicEnabled;
 
+  // The music loop: a local file, created only once music is on, started only by a gesture.
   useEffect(() => {
     if (!showMusic) return;
-    if (document.querySelector('#yt-iframe-api')) return;
-    const tag = document.createElement('script');
-    tag.id = 'yt-iframe-api';
-    tag.src = 'https://www.youtube.com/iframe_api';
-    document.head.append(tag);
-  }, [showMusic]);
-
-  useEffect(() => {
-    if (!showMusic) return;
-    const interval = setInterval(() => {
-      const player = playerRef.current;
-      if (!player) return;
-      try {
-        const time = player.getCurrentTime();
-        if (time > 0) {
-          sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
-        }
-      } catch {}
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [showMusic]);
-
-  useEffect(() => {
-    if (!showMusic) return;
-    function save() {
-      const player = playerRef.current;
-      if (!player) return;
-      try {
-        const time = player.getCurrentTime();
-        if (time > 0) {
-          sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
-        }
-      } catch {}
-    }
-    window.addEventListener('beforeunload', save);
-    return () => window.removeEventListener('beforeunload', save);
-  }, [showMusic]);
-
-  useEffect(() => {
-    if (!showMusic) {
-      playerRef.current?.destroy();
-      playerRef.current = null;
-      if (wrapperRef.current) wrapperRef.current.innerHTML = '';
-      return;
-    }
-
+    const audio = new Audio();
+    audio.preload = 'none';
+    audio.loop = true;
+    audio.volume = MUSIC_VOLUME;
+    let started = false;
     let disposed = false;
-    let retry: ReturnType<typeof setInterval> | undefined;
-    function createPlayer() {
-      if (disposed || playerRef.current || !wrapperRef.current) return;
-      const el = document.createElement('div');
-      wrapperRef.current.append(el);
-
-      let started = false;
-      const startSeconds = getInitialMusicStart();
-
-      function nudge() {
-        if (disposed || started) return;
-        playerRef.current?.playVideo();
-      }
-      nudgeRef.current = nudge;
-      function onStarted() {
-        started = true;
-        document.removeEventListener('pointerdown', nudge, true);
-        document.removeEventListener('keydown', nudge, true);
-        nudgeRef.current = null;
-      }
-
-      try {
-        playerRef.current = new YT.Player(el, {
-          height: '1',
-          width: '1',
-          videoId: MINECRAFT_OST_VIDEO_ID,
-          playerVars: {
-            autoplay: 1,
-            loop: 1,
-            playlist: MINECRAFT_OST_VIDEO_ID,
-            start: startSeconds,
-            controls: 0,
-            disablekb: 1,
-            modestbranding: 1,
-          },
-          events: {
-            onReady: (e: YT.PlayerEvent) => {
-              if (disposed) return;
-              e.target.setVolume(30);
-              e.target.playVideo();
-              document.addEventListener('pointerdown', nudge, true);
-              document.addEventListener('keydown', nudge, true);
-              if (userHasInteracted) {
-                let retries = 0;
-                retry = setInterval(() => {
-                  if (disposed || started || retries++ > 10) {
-                    clearInterval(retry);
-                    return;
-                  }
-                  playerRef.current?.playVideo();
-                }, 300);
-              }
-            },
-            onStateChange: (e: YT.PlayerEvent & { data: number }) => {
-              if (disposed) return;
-              if (e.data === 1 && !started) onStarted();
-              if (e.data === 0) e.target.playVideo();
-            },
-          },
-        });
-      } catch {}
-    }
-
-    let installedCallback = false;
-    if (typeof YT !== 'undefined' && typeof YT.Player === 'function') {
-      createPlayer();
-    } else {
-      installedCallback = true;
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        prev?.();
-        createPlayer();
-      };
-    }
-
-    return () => {
-      disposed = true;
-      clearInterval(retry);
-      if (installedCallback) {
-        window.onYouTubeIframeAPIReady = undefined;
-      }
-      if (nudgeRef.current) {
-        document.removeEventListener('pointerdown', nudgeRef.current, true);
-        document.removeEventListener('keydown', nudgeRef.current, true);
-        nudgeRef.current = null;
-      }
-      const player = playerRef.current;
-      if (player) {
+    const save = () => {
+      if (audio.currentTime > 0) {
         try {
-          const time = player.getCurrentTime();
-          if (time > 0) {
-            sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
-          }
+          sessionStorage.setItem(
+            MUSIC_POS_KEY,
+            JSON.stringify({ time: audio.currentTime, ts: Date.now() }),
+          );
         } catch {}
       }
-      playerRef.current?.destroy();
-      playerRef.current = null;
-      if (wrapperRef.current) wrapperRef.current.innerHTML = '';
+    };
+    const start = () => {
+      if (disposed || started) return;
+      started = true;
+      audio.src = MUSIC_SRC;
+      const resume = getInitialMusicStart();
+      if (resume > 0) {
+        audio.addEventListener('loadedmetadata', () => (audio.currentTime = resume), {
+          once: true,
+        });
+      }
+      void audio
+        .play()
+        .then(() => {
+          if (disposed) return;
+          window.dispatchEvent(
+            new CustomEvent('minecraft-line', { detail: { id: 'nowPlaying', arg: MUSIC_TITLE } }),
+          );
+        })
+        .catch(() => {
+          started = false;
+        });
+    };
+    const onGesture = () => {
+      start();
+      if (started) {
+        document.removeEventListener('pointerdown', onGesture, true);
+        document.removeEventListener('keydown', onGesture, true);
+      }
+    };
+    if (userHasInteracted) start();
+    document.addEventListener('pointerdown', onGesture, true);
+    document.addEventListener('keydown', onGesture, true);
+    const interval = setInterval(save, 2000);
+    window.addEventListener('beforeunload', save);
+    return () => {
+      disposed = true;
+      save();
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', save);
+      document.removeEventListener('pointerdown', onGesture, true);
+      document.removeEventListener('keydown', onGesture, true);
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
     };
   }, [showMusic]);
 
@@ -301,11 +203,6 @@ export function MinecraftBackground() {
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0, opacity: 0.18 }}>
         <MinecraftScene />
       </div>
-      <div
-        ref={wrapperRef}
-        className="fixed"
-        style={{ width: 1, height: 1, opacity: 0, pointerEvents: 'none', zIndex: -1 }}
-      />
     </>
   );
 }

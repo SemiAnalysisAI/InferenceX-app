@@ -1,0 +1,8 @@
+# Minecraft theme fonts
+
+Used only by the Minecraft theme (`.minecraft` selectors). The font is not loaded by the default light or dark page.
+
+| File                | What it is                                                                                                   | Source URL                                                         | Fetch date                                           | Change made                                                       | Bytes | SHA-256                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------- | ----- | ------------------------------------------------------------------ |
+| `Monocraft.woff2`   | Monocraft, a monospace face after the Minecraft UI font (name table: Version 4.2, FontForge build 5-12-2025) | https://github.com/IdreesInc/Monocraft                             | in the repository since 2026-04-13 (commit 17e740ea) | WOFF2 file; the conversion step is not recorded in the repository | 31460 | `6aabcf1497ea4892de6cfbddf9bca260438047e53450f5680ad54e5186c28973` |
+| `Monocraft-OFL.txt` | the font's licence text (SIL Open Font License 1.1)                                                          | https://raw.githubusercontent.com/IdreesInc/Monocraft/main/LICENSE | 2026-11-27                                           | none                                                              | 4377  | `f69c147003e052dbc9d96c40a9f73647e72766cfda95a597b94ed827fe25acb1` |

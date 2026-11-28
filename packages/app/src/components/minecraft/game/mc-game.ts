@@ -312,6 +312,28 @@ export class Game {
   difficulty: Difficulty;
   time = 1000;
   ticks = 0;
+  /**
+   * Inference read-out for the HUD: this session's first tick, the tick of its first mined
+   * block (time to first token) and the ticks of recent mined blocks (throughput).
+   */
+  bench = { start: -1, first: -1, breaks: [] as number[] };
+  /** Hostile mobs within 24 blocks (slows the player at 4 or more). */
+  nearBatch = 0;
+  /** The Ender Dragon and its living crystals in this dimension. */
+  bossBatch = 0;
+
+  countBatch() {
+    const p = this.player;
+    let near = 0;
+    let boss = 0;
+    for (const e of this.entities) {
+      if (e.removed) continue;
+      if (e.kind === 'dragon' || e.kind === 'crystal') boss++;
+      else if (HOSTILE.has(e.kind) && Math.hypot(e.x - p.x, e.z - p.z) < 24) near++;
+    }
+    this.nearBatch = near;
+    this.bossBatch = boss;
+  }
   readonly player: Player;
   inventory: (Stack | null)[] = emptySlots(36);
   selected = 0;
@@ -511,7 +533,8 @@ export class Game {
 
   update(dt: number, input: Input) {
     this.input = input;
-    this.accumulator = Math.min(this.accumulator + dt, 0.25);
+    // Up to ten catch-up ticks per frame; longer stalls are dropped.
+    this.accumulator = Math.min(this.accumulator + dt, 0.5);
     while (this.accumulator >= 1 / TPS) {
       this.accumulator -= 1 / TPS;
       this.tick();
@@ -521,6 +544,7 @@ export class Game {
 
   tick() {
     this.ticks++;
+    if (this.bench.start < 0) this.bench.start = this.ticks;
     this.time = (this.time + 1) % (DAY * 1000);
     this.world.stepFluids();
     this.world.changed.length = 0;
@@ -532,6 +556,7 @@ export class Game {
     this.tickPlayer();
     this.tickEntities();
     if (this.ticks % 20 === 0) this.spawnHostiles();
+    if (this.ticks % 10 === 0) this.countBatch();
     this.endgame.tick();
   }
 
@@ -642,6 +667,8 @@ export class Game {
       mz /= len;
     }
     let speedScale = 0.98;
+    // Large batch: four or more hostile mobs within 24 blocks slow you, 5% per extra mob.
+    if (this.nearBatch >= 4) speedScale *= Math.max(0.7, 1 - 0.05 * (this.nearBatch - 3));
     if (p.sneaking) speedScale *= 0.3;
     if (p.eating) speedScale *= 0.2;
     const sin = Math.sin(p.yaw);
@@ -975,6 +1002,13 @@ export class Game {
     if (id === B.air || (BLOCKS[id].hardness < 0 && this.mode !== 'creative')) return;
     const def = BLOCKS[id];
     this.events.push({ type: 'break', x, y, z, id });
+    const bench = this.bench;
+    if (bench.start >= 0) {
+      if (bench.first < 0) bench.first = this.ticks;
+      bench.breaks.push(this.ticks);
+      while (bench.breaks.length > 0 && bench.breaks[0] < this.ticks - 60 * TPS)
+        bench.breaks.shift();
+    }
     this.sound(DIG_SOUND[def.sound], x + 0.5, y + 0.5, z + 0.5, 1, 0.8 + this.random() * 0.2);
     const held = this.held?.id;
     if (id === B.door) {
@@ -2768,7 +2802,14 @@ export class Game {
         const id = (args[0] ?? '').replace('minecraft:', '');
         const count = Number(args[1] ?? 1);
         if (!ITEMS[id]) return this.t(`Unknown item '${id}'`, `未知的物品“${id}”`);
-        this.giveItem({ id, count: Math.max(1, Math.min(64 * 36, count || 1)) });
+        const asked = Math.max(1, Math.min(64 * 36, count || 1));
+        const left = this.giveItem({ id, count: asked });
+        if (left >= asked) return this.t('Inventory full', '物品栏已满');
+        if (left > 0)
+          return this.t(
+            `Gave ${asked - left} [${itemName(id, 'en')}], inventory full`,
+            `已将 ${asked - left} 个[${itemName(id, 'zh')}]给予玩家，物品栏已满`,
+          );
         return this.t(
           `Gave ${count || 1} [${itemName(id, 'en')}]`,
           `已将 ${count || 1} 个[${itemName(id, 'zh')}]给予玩家`,

@@ -1,0 +1,1946 @@
+/*
+ * Minecraft depth layer. Loaded only with the lazy Minecraft theme chunk, so every rule here is
+ * already gated on the theme being selected. Block tiles are 16px crops of the game's own
+ * terrain atlas (see public/decorative/minecraft/README.md), drawn with pixelated scaling.
+ */
+
+.minecraft {
+  --mc-tile: url('/decorative/minecraft/site/stone.png');
+  --mc-floor: url('/decorative/minecraft/site/dirt.png');
+  --mc-wall: url('/decorative/minecraft/site/cobblestone.png');
+  --mc-accent-tile: url('/decorative/minecraft/site/gold-block.png');
+  --mc-gem-tile: url('/decorative/minecraft/site/diamond-block.png');
+  --mc-ore-tile: url('/decorative/minecraft/site/diamond-ore.png');
+  --mc-side: url('/decorative/minecraft/site/grass-side.png');
+  --mc-deep: url('/decorative/minecraft/site/bedrock.png');
+  --mc-gui: #c6c6c6;
+  --mc-slot: #8b8b8b;
+  --mc-ink: #000;
+  --mc-yellow: #ffff55;
+  --mc-green: #55ff55;
+  --mc-aqua: #55ffff;
+  --mc-red: #ff5555;
+  --mc-tooltip: #100010f0;
+  --mc-tooltip-edge: #5000ff;
+  --mc-tooltip-edge-2: #28007f;
+  --mc-redstone: #ff2a1a;
+  --mc-xp: #80ff20;
+  scrollbar-color: #8b8b8b #1b1b1b;
+}
+
+/* Dimensions. The Overworld is the base palette in globals.css; the Nether and the End swap the
+   tokens, the block tiles and the overlay run colours. Picked from the banner, kept per device. */
+html.minecraft[data-minecraft-dimension='nether'] {
+  --background: #1d0b0b;
+  --card: #241010;
+  --popover: #2e1414;
+  --muted: #3b1a1a;
+  --accent: #3b1a1a;
+  --border: #6b2a2a;
+  --border-alt: #3e1616;
+  --primary: #ff8a2a;
+  --secondary: #e8c35c;
+  --brand: #ff8a2a;
+  --chart-grid: color-mix(in oklab, #ff8a2a 18%, var(--card));
+  --mc-tile: url('/decorative/minecraft/site/netherrack.png');
+  --mc-floor: url('/decorative/minecraft/site/nether-bricks.png');
+  --mc-wall: url('/decorative/minecraft/site/nether-bricks.png');
+  --mc-accent-tile: url('/decorative/minecraft/site/glowstone.png');
+  --mc-side: url('/decorative/minecraft/site/netherrack.png');
+  --overlay-run-0: oklch(0.74 0.2 45);
+  --overlay-run-1: oklch(0.82 0.15 90);
+  --overlay-run-2: oklch(0.7 0.2 15);
+  --overlay-run-3: oklch(0.78 0.12 190);
+  --overlay-run-4: oklch(0.72 0.18 330);
+  --overlay-run-5: oklch(0.85 0.1 60);
+  --overlay-run-6: oklch(0.7 0.16 140);
+  --overlay-run-7: oklch(0.78 0.16 280);
+}
+
+html.minecraft[data-minecraft-dimension='end'] {
+  --background: #0d0a14;
+  --card: #15101f;
+  --popover: #1d1629;
+  --muted: #2a2140;
+  --accent: #2a2140;
+  --border: #5a4a7a;
+  --border-alt: #2a2140;
+  --primary: #e5f0a8;
+  --primary-foreground: #1b1426;
+  --secondary: #c77dff;
+  --brand: #c77dff;
+  --chart-grid: color-mix(in oklab, #c77dff 16%, var(--card));
+  --mc-tile: url('/decorative/minecraft/site/end-stone.png');
+  --mc-floor: url('/decorative/minecraft/site/obsidian.png');
+  --mc-wall: url('/decorative/minecraft/site/obsidian.png');
+  --mc-accent-tile: url('/decorative/minecraft/site/end-stone.png');
+  --mc-side: url('/decorative/minecraft/site/end-stone.png');
+  --overlay-run-0: oklch(0.76 0.17 310);
+  --overlay-run-1: oklch(0.9 0.1 110);
+  --overlay-run-2: oklch(0.72 0.16 270);
+  --overlay-run-3: oklch(0.8 0.13 180);
+  --overlay-run-4: oklch(0.74 0.2 340);
+  --overlay-run-5: oklch(0.85 0.1 80);
+  --overlay-run-6: oklch(0.7 0.14 220);
+  --overlay-run-7: oklch(0.8 0.14 30);
+}
+
+.minecraft ::selection {
+  color: #000;
+  background: var(--mc-yellow);
+  text-shadow: none;
+}
+
+/* Focus ring is the white outline a focused Minecraft button gets, with a black keyline so it
+   reads on any block. */
+.minecraft :focus-visible {
+  outline: 2px solid #fff !important;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px #000;
+}
+
+/* ------------------------------------------------------------------ cards */
+
+.minecraft main [data-slot='card']:not([data-slot='card'] [data-slot='card']) {
+  border: 2px solid #000;
+  box-shadow:
+    inset 2px 2px 0 rgb(255 255 255 / 0.12),
+    inset -2px -2px 0 rgb(0 0 0 / 0.45),
+    4px 4px 0 rgb(0 0 0 / 0.35);
+}
+
+.minecraft [data-slot='card-title'],
+.minecraft [data-slot='control-panel'] > legend {
+  color: var(--mc-yellow);
+  text-shadow: 2px 2px 0 #3f3f15 !important;
+}
+
+.minecraft [data-slot='control-panel'] {
+  border: 2px solid #000;
+  background-color: rgb(0 0 0 / 0.25);
+  box-shadow:
+    inset 2px 2px 0 rgb(0 0 0 / 0.55),
+    inset -2px -2px 0 rgb(255 255 255 / 0.1);
+}
+
+.minecraft [data-slot='control-panel'] > legend {
+  padding: 2px 8px;
+  border: 2px solid #000;
+  background: #373737;
+}
+
+.minecraft [data-slot='stat'] {
+  border-left: 4px solid var(--mc-xp);
+  padding-left: 8px;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+/* Filled buttons become the stone GUI button from the title screen, with its highlighted and
+   pressed sprites. The text keeps the colour token so contrast stays above 4.5:1 on grey. */
+.minecraft [data-slot='button']:is([class~='bg-primary'], [class~='bg-brand-fill']) {
+  color: #fff !important;
+  border: 3px solid transparent !important;
+  border-image: url('/decorative/minecraft/game/button.png') 3 fill / 3px stretch !important;
+  background: none !important;
+  image-rendering: pixelated;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+}
+.minecraft
+  [data-slot='button']:is([class~='bg-primary'], [class~='bg-brand-fill']):is(
+    :hover,
+    :focus-visible
+  ):not(:disabled) {
+  color: #ffffa0 !important;
+  border-image-source: url('/decorative/minecraft/game/button-highlighted.png') !important;
+}
+.minecraft [data-slot='button']:is([class~='bg-primary'], [class~='bg-brand-fill']):active {
+  transform: translateY(1px);
+  filter: brightness(0.85);
+}
+.minecraft [data-slot='button']:disabled,
+.minecraft button:disabled {
+  color: #a0a0a0 !important;
+  border-image: url('/decorative/minecraft/game/button-disabled.png') 3 fill / 3px stretch !important;
+  background: none !important;
+  cursor: not-allowed;
+}
+
+.minecraft [data-slot='button'][aria-pressed='true'],
+.minecraft button[aria-pressed='true'] {
+  color: var(--mc-yellow) !important;
+  background-color: rgb(0 0 0 / 0.45) !important;
+  border-color: #373737 #ffffff80 #ffffff80 #373737 !important;
+}
+
+/* ------------------------------------------------------------------- tabs */
+
+/* Tab strips are the creative inventory's tab row: stone tabs, the open one lifted and joined to
+   the panel below it. */
+.minecraft [data-slot='tabs-list'] {
+  gap: 4px;
+  padding: 4px 4px 0;
+  background: rgb(0 0 0 / 0.35);
+  border-bottom: 2px solid #000;
+}
+
+.minecraft [data-slot='tabs-trigger'],
+.minecraft [data-slot='dashboard-navigation'] nav a {
+  color: #e0e0e0;
+  background:
+    linear-gradient(rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.55)),
+    var(--mc-tile) 0 0 / 32px 32px;
+  image-rendering: pixelated;
+  border: 2px solid #000 !important;
+  border-bottom-width: 0 !important;
+  box-shadow:
+    inset 2px 2px 0 rgb(255 255 255 / 0.18),
+    inset -2px 0 0 rgb(0 0 0 / 0.4);
+  transition: transform 80ms steps(2, end);
+}
+
+.minecraft [data-slot='tabs-trigger']:hover,
+.minecraft [data-slot='dashboard-navigation'] nav a:hover {
+  color: #ffffa0;
+  transform: translateY(-1px);
+}
+
+.minecraft [data-slot='tabs-trigger'][data-state='active'],
+.minecraft
+  [data-slot='dashboard-navigation']
+  nav
+  a:is([aria-current='page'], [data-tab-active='true']) {
+  color: var(--mc-yellow);
+  background:
+    linear-gradient(rgb(0 0 0 / 0.2), rgb(0 0 0 / 0.2)),
+    var(--mc-tile) 0 0 / 32px 32px;
+  transform: translateY(-3px);
+  margin-bottom: -3px;
+  padding-bottom: calc(0.5rem + 3px);
+}
+
+.minecraft [data-slot='dashboard-navigation'] .tab-indicator {
+  height: 3px;
+  background: var(--mc-yellow) !important;
+}
+
+.minecraft header[data-testid='header'] nav a[aria-current='page'] {
+  color: var(--mc-yellow) !important;
+  background-color: rgb(0 0 0 / 0.45) !important;
+  border-color: #373737 #ffffff60 #ffffff60 #373737 !important;
+}
+
+/* ----------------------------------------------------- inputs and popups */
+
+/* Inputs are the black text field with the grey frame; focus swaps to the white frame. */
+.minecraft [data-slot='input'],
+.minecraft [data-slot='select-trigger'],
+.minecraft [data-slot='input-group'],
+.minecraft [data-slot='textarea'] {
+  background-color: #000 !important;
+  border: 2px solid #a0a0a0 !important;
+  box-shadow: none;
+}
+.minecraft [data-slot='select-trigger']:hover,
+.minecraft [data-slot='input']:hover {
+  border-color: #d0d0d0 !important;
+}
+.minecraft
+  :is([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger']):focus-visible,
+.minecraft [data-slot='input-group']:focus-within {
+  border-color: #fff !important;
+}
+.minecraft :is(input, textarea)::placeholder {
+  color: #808080;
+}
+.minecraft input[type='checkbox'],
+.minecraft input[type='radio'] {
+  accent-color: var(--mc-green);
+}
+
+/* Popups, menus and hover help all use the item tooltip: near-black violet with the purple
+   gradient frame. */
+.minecraft [data-slot='select-content'],
+.minecraft [data-slot='popover-content'],
+.minecraft [data-slot='dropdown-menu-content'],
+.minecraft [role='menu'],
+.minecraft [role='listbox'],
+.minecraft [data-radix-popper-content-wrapper] > [data-side]:not([data-slot]) {
+  color: #fff;
+  background: var(--mc-tooltip) !important;
+  border: 2px solid transparent !important;
+  border-image: linear-gradient(var(--mc-tooltip-edge), var(--mc-tooltip-edge-2)) 1 !important;
+  box-shadow:
+    0 0 0 2px var(--mc-tooltip),
+    4px 4px 0 2px rgb(0 0 0 / 0.5) !important;
+}
+
+.minecraft [data-slot='select-item'],
+.minecraft [role='option'],
+.minecraft [role='menuitem'] {
+  border-radius: 0 !important;
+}
+.minecraft [data-slot='select-item']:is(:hover, [data-highlighted]),
+.minecraft [role='option']:is(:hover, [data-highlighted], [aria-selected='true']),
+.minecraft [role='menuitem']:is(:hover, [data-highlighted]) {
+  color: var(--mc-yellow) !important;
+  background: rgb(255 255 255 / 0.12) !important;
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+
+/* Badges and chips are inventory slots holding a label. */
+.minecraft [data-slot='select-chip'],
+.minecraft [data-slot='badge'] {
+  color: #fff;
+  background-color: #373737 !important;
+  border: 2px solid !important;
+  border-color: #1b1b1b #8b8b8b #8b8b8b #1b1b1b !important;
+  text-shadow: 1px 1px 0 #000 !important;
+}
+.minecraft [data-slot='badge'][class~='bg-primary'],
+.minecraft [data-slot='badge'][class*='bg-brand'] {
+  color: #3f2a00 !important;
+  background: var(--mc-accent-tile) 0 0 / 16px 16px !important;
+  text-shadow: none !important;
+}
+
+/* Switches are levers on a cobblestone base: off is down, on is up with a redstone glow. */
+.minecraft [data-slot='switch'] {
+  border: 2px solid #000 !important;
+  background: var(--mc-wall) 0 0 / 16px 16px !important;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 0 20px rgb(0 0 0 / 0.35);
+}
+.minecraft [data-slot='switch'][data-state='checked'] {
+  box-shadow:
+    inset 0 0 0 20px rgb(0 0 0 / 0.1),
+    0 0 6px 1px var(--mc-redstone);
+}
+.minecraft [data-slot='switch-thumb'] {
+  background: url('/decorative/minecraft/site/oak-planks.png') 0 0 / 16px 16px !important;
+  border: 2px solid #000;
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.35),
+    inset -1px -1px 0 rgb(0 0 0 / 0.4);
+}
+.minecraft [data-slot='switch'][data-state='checked'] [data-slot='switch-thumb'] {
+  background: url('/decorative/minecraft/site/redstone-ore.png') 0 0 / 16px 16px !important;
+}
+
+/* Loading skeletons are stone being mined: the crack overlay steps through ten stages. */
+.minecraft [data-slot='skeleton'] {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      rgb(0 0 0 / 0.5) 6px 8px,
+      transparent 8px 14px
+    ),
+    var(--mc-tile) 0 0 / 32px 32px !important;
+  image-rendering: pixelated;
+  border: 2px solid #000;
+  animation: mc-mine 1.4s steps(10, end) infinite !important;
+}
+@keyframes mc-mine {
+  0% {
+    background-size:
+      0 0,
+      32px 32px;
+    filter: brightness(1);
+  }
+  100% {
+    background-size:
+      32px 32px,
+      32px 32px;
+    filter: brightness(0.7);
+  }
+}
+
+/* Tables are a chest grid: stone header row, dark slots, the hovered row highlighted. */
+.minecraft main table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 2px solid #000;
+}
+.minecraft main table thead {
+  background:
+    linear-gradient(rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.55)),
+    var(--mc-tile) 0 0 / 32px 32px !important;
+}
+.minecraft main table th {
+  color: var(--mc-yellow);
+  border-bottom: 2px solid #000;
+}
+.minecraft main table tbody tr:nth-child(even) {
+  background-color: rgb(255 255 255 / 0.03);
+}
+.minecraft main table tbody tr:hover {
+  background-color: rgb(255 255 255 / 0.1) !important;
+}
+
+/* Dialogs sit on the options-screen dirt, darkened. The game's own dialog is excluded. */
+.minecraft [role='dialog']:not(.mc-dialog, [data-sheet]) {
+  background:
+    linear-gradient(rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.72)),
+    var(--mc-floor) 0 0 / 48px 48px !important;
+  image-rendering: pixelated;
+  border: 3px solid #000 !important;
+  box-shadow:
+    inset 3px 3px 0 rgb(255 255 255 / 0.18),
+    inset -3px -3px 0 rgb(0 0 0 / 0.6),
+    8px 8px 0 rgb(0 0 0 / 0.5) !important;
+}
+.minecraft [role='dialog']:not(.mc-dialog) h2 {
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+}
+
+.minecraft code,
+.minecraft kbd {
+  padding: 0 4px;
+  color: var(--mc-aqua);
+  background: #000;
+  border: 1px solid #555;
+}
+
+.minecraft hr {
+  border-color: #000;
+  border-top-width: 2px;
+}
+
+/* -------------------------------------------------- empty, 404, loading */
+
+.minecraft [data-slot='empty-state'],
+.minecraft [data-testid='scatter-empty-state'] {
+  position: relative;
+}
+.minecraft [data-slot='empty-state']::before,
+.minecraft [data-testid='scatter-empty-state']::before {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 8px;
+  background: url('/decorative/minecraft/site/bedrock.png') 0 0 / 32px 32px;
+  image-rendering: pixelated;
+  border: 2px solid #000;
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 0.5);
+}
+
+/* The 404 page: the number is set in the gold block, with a creeper watching from above. */
+.minecraft main div.grow.text-center > [data-slot='eyebrow'].tabular-nums,
+.minecraft main div.text-center > [data-slot='eyebrow'].tabular-nums {
+  position: relative;
+  display: inline-block;
+  padding: 4px 14px;
+  font-size: 2rem !important;
+  line-height: 1.2;
+  color: #fff !important;
+  background: var(--mc-ore-tile) 0 0 / 32px 32px;
+  image-rendering: pixelated;
+  border: 3px solid #000;
+  text-shadow: 3px 3px 0 #000 !important;
+}
+.minecraft main div.text-center > [data-slot='eyebrow'].tabular-nums::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  width: 48px;
+  height: 48px;
+  translate: -50% 0;
+  background: url('/decorative/minecraft/site/creeper-face.png') 0 0 / 48px 48px;
+  image-rendering: pixelated;
+  border: 3px solid #000;
+}
+.minecraft main div.text-center > [data-slot='eyebrow'].tabular-nums::after {
+  content: 'You died! · 你死了！';
+  display: block;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--mc-red);
+}
+
+/* ------------------------------------------------------------ wordmark */
+
+/* The InferenceX wordmark is chiselled out of the current dimension's stone, like the title logo. */
+.minecraft [data-testid='inferencex-wordmark'] {
+  filter: drop-shadow(2px 2px 0 #000) drop-shadow(1px 1px 0 #3f3f3f);
+}
+.minecraft [data-testid='inferencex-wordmark'] .inferencex-wave-letter {
+  color: transparent !important;
+  background:
+    linear-gradient(rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.2)),
+    var(--mc-tile) 0 0 / 16px 16px;
+  -webkit-background-clip: text;
+  background-clip: text;
+  image-rendering: pixelated;
+  text-shadow: none !important;
+}
+.minecraft [data-testid='inferencex-wordmark'] .inferencex-wave-letter:last-child {
+  background:
+    linear-gradient(rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.05)),
+    var(--mc-gem-tile) 0 0 / 16px 16px;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* -------------------------------------------------------------- footer */
+
+/* The footer is a cross-section of the ground: a grass course, dirt, then stone down to bedrock. */
+.minecraft footer[data-testid='footer'] {
+  margin-top: 48px;
+  padding-top: 0;
+  background:
+    linear-gradient(rgb(0 0 0 / 0.62), rgb(0 0 0 / 0.8)),
+    var(--mc-tile) 0 0 / 48px 48px;
+  image-rendering: pixelated;
+}
+.minecraft footer[data-testid='footer']::before {
+  content: '';
+  display: block;
+  height: 48px;
+  background:
+    linear-gradient(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.45)),
+    var(--mc-side) 0 0 / 48px 48px repeat-x;
+  image-rendering: pixelated;
+  border-top: 2px solid #000;
+}
+.minecraft footer[data-testid='footer']::after {
+  content: '';
+  display: block;
+  height: 24px;
+  background: var(--mc-deep) 0 0 / 24px 24px;
+  image-rendering: pixelated;
+  opacity: 0.8;
+}
+.minecraft footer[data-testid='footer'] > .container {
+  border-top: 0;
+}
+
+/* -------------------------------------------------------------- charts */
+
+.minecraft svg[data-testid='d3-chart-svg'] {
+  shape-rendering: crispEdges;
+}
+.minecraft svg[data-testid='d3-chart-svg'] .tick text {
+  fill: #e0e0e0;
+}
+
+/* Gridlines are a block grid: dashed in 4px pixels, square caps, no anti-aliasing. The canvas
+   layer repaints them from these computed styles. */
+.minecraft svg[data-testid='d3-chart-svg'] :is(.grid, .grid-h, .grid-v) line {
+  stroke: rgb(255 255 255 / 0.13);
+  stroke-width: 2px;
+  stroke-dasharray: 4 4;
+  stroke-linecap: butt;
+}
+
+.minecraft svg[data-testid='d3-chart-svg'] .domain {
+  stroke: #fff;
+  stroke-width: 2px;
+  stroke-linecap: square;
+}
+.minecraft svg[data-testid='d3-chart-svg'] .tick line {
+  stroke: #a0a0a0;
+  stroke-width: 2px;
+}
+
+/* Frontier lines are mitred stair steps; the global frontier is a redstone line. */
+.minecraft svg[data-testid='d3-chart-svg'] :is(.roofline-path, .overlay-roofline-path) {
+  stroke-width: 3px;
+  stroke-linejoin: miter;
+  stroke-linecap: square;
+  shape-rendering: crispEdges;
+}
+.minecraft svg[data-testid='d3-chart-svg'] .global-pareto-frontier {
+  stroke: var(--mc-redstone);
+  stroke-width: 3px;
+  stroke-dasharray: 6 3;
+  stroke-linecap: butt;
+  filter: drop-shadow(0 0 2px rgb(255 42 26 / 0.7));
+}
+
+.minecraft svg[data-testid='d3-chart-svg'] rect.bar {
+  stroke: #000;
+  stroke-width: 2px;
+}
+.minecraft svg[data-testid='d3-chart-svg'] :is(.mc-bar-texture, .mc-bar-bevel, .mc-point-marker) {
+  pointer-events: none;
+}
+
+.minecraft .canvas-point-surface {
+  cursor:
+    url('/decorative/minecraft/game/crosshair.png') 7 7,
+    crosshair;
+}
+
+/* A new chart is mined in: the plot steps up from black over a few frames. */
+.minecraft .mc-mining {
+  animation: mc-chart-mine 480ms steps(6, end);
+}
+@keyframes mc-chart-mine {
+  0% {
+    clip-path: inset(100% 0 0 0);
+    filter: brightness(0.3);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1);
+  }
+}
+
+/* Legend swatches are blocks in the series colour, bevelled like an inventory item. */
+.minecraft .legend-container label > span:first-child > span.rounded-full {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border: 1px solid rgb(0 0 0 / 0.85);
+  border-radius: 0 !important;
+  /* The same ore block as the chart points: specks in a lighter tint over the series colour. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff' fill-opacity='.6' d='M2 2h2v1H2zM2 3h1v1H2zM6 2h1v1H6zM5 5h2v1H5zM6 6h1v1H6zM1 6h2v1H1z'/%3E%3Cpath fill='%23000' fill-opacity='.34' d='M3 3h1v1H3zM6 7h1v1H6zM2 7h1v1H2z'/%3E%3C/svg%3E");
+  background-size: 10px 10px;
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.5),
+    inset -1px -1px 0 rgb(0 0 0 / 0.38);
+}
+.minecraft .legend-container label:hover {
+  color: var(--mc-yellow);
+}
+
+/* Chart tooltips are item tooltips. The panel keeps its padding and border width. */
+.minecraft [data-chart-tooltip] > div {
+  color: #fff !important;
+  background: var(--mc-tooltip) !important;
+  border-color: var(--mc-tooltip-edge) !important;
+  border-radius: 0 !important;
+  box-shadow:
+    0 0 0 2px var(--mc-tooltip),
+    inset 0 0 0 1px var(--mc-tooltip-edge-2),
+    4px 4px 0 2px rgb(0 0 0 / 0.5) !important;
+}
+.minecraft [data-chart-tooltip] > div :is(strong, b, h3, h4):first-child {
+  color: var(--mc-aqua);
+}
+
+/* The creeper that lives on the first chart card. */
+.minecraft [data-mc-creeper-host] {
+  position: relative;
+}
+.minecraft .mc-creeper {
+  position: absolute;
+  z-index: 5;
+  right: 10px;
+  bottom: -2px;
+  width: 30px !important;
+  min-width: 0 !important;
+  height: 30px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  background: #000 !important;
+  border: 2px solid #000 !important;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+}
+.minecraft .mc-creeper-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: url('/decorative/minecraft/site/creeper-face.png') 0 0 / 100% 100%;
+  image-rendering: pixelated;
+}
+.minecraft .mc-creeper:hover {
+  transform: translateY(-2px);
+}
+.minecraft .mc-creeper[data-state='hiss'] {
+  animation: mc-creeper-swell 1.5s steps(6, end) forwards;
+}
+.minecraft .mc-creeper[data-state='hiss'] .mc-creeper-face {
+  animation: mc-creeper-flash 0.25s steps(1, end) infinite;
+}
+.minecraft .mc-creeper[data-state='pop'] {
+  visibility: hidden;
+}
+@keyframes mc-creeper-swell {
+  to {
+    transform: scale(1.4, 1.25);
+  }
+}
+@keyframes mc-creeper-flash {
+  50% {
+    filter: brightness(3) saturate(0);
+  }
+}
+.minecraft .mc-boom {
+  position: fixed;
+  z-index: 140;
+  width: 96px;
+  height: 96px;
+  pointer-events: none;
+  translate: -50% -50%;
+  background:
+    radial-gradient(circle, #fff 0 18%, transparent 19%),
+    conic-gradient(
+      from 0deg,
+      #fff 0 10%,
+      #bbb 10% 25%,
+      #fff 25% 40%,
+      #888 40% 55%,
+      #fff 55% 70%,
+      #ccc 70% 85%,
+      #fff 85%
+    );
+  clip-path: polygon(
+    50% 0,
+    62% 30%,
+    100% 25%,
+    72% 52%,
+    92% 90%,
+    55% 70%,
+    30% 100%,
+    32% 64%,
+    0 62%,
+    28% 42%,
+    8% 10%,
+    42% 28%
+  );
+  animation: mc-boom 520ms steps(5, end) forwards;
+}
+@keyframes mc-boom {
+  0% {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------- advancements */
+
+.minecraft .mc-toasts {
+  position: fixed;
+  z-index: 135;
+  top: 64px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.minecraft .mc-toast {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 2px 10px;
+  align-items: center;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 10px;
+  color: #fff;
+  background: #212121;
+  border: 2px solid #000;
+  box-shadow:
+    inset 2px 2px 0 #555,
+    inset -2px -2px 0 #0b0b0b;
+  animation: mc-toast 5s steps(8, end) forwards;
+}
+.minecraft .mc-toast img,
+.minecraft .mc-toast .mc-toast-icon {
+  grid-row: span 2;
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  background-size: 100% 100%;
+  border: 2px solid #000;
+}
+.minecraft .mc-toast-head {
+  font-size: 0.75rem;
+  color: var(--mc-yellow);
+}
+.minecraft .mc-toast-title {
+  font-size: 0.8125rem;
+  color: #fff;
+}
+.minecraft .mc-toast[data-kind='challenge'] .mc-toast-head {
+  color: #ff55ff;
+}
+@keyframes mc-toast {
+  0% {
+    transform: translateX(110%);
+  }
+  8%,
+  88% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(110%);
+  }
+}
+
+/* --------------------------------------------------------- the banner */
+
+.minecraft .mc-play-banner {
+  flex-wrap: wrap;
+}
+.minecraft .mc-play-banner-title {
+  position: relative;
+  min-width: 0;
+}
+.minecraft .mc-play-banner-title .mc-splash {
+  position: absolute;
+  left: 232px;
+  top: 46px;
+  max-width: 260px;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  color: var(--mc-yellow);
+  text-shadow: 2px 2px 0 #3f3f15 !important;
+  transform: rotate(-14deg);
+  transform-origin: 0 50%;
+  animation: mc-splash-pulse 0.9s ease-in-out infinite alternate;
+  white-space: nowrap;
+}
+@keyframes mc-splash-pulse {
+  to {
+    scale: 1.08;
+  }
+}
+.minecraft .mc-play-banner-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.minecraft .mc-dimensions {
+  display: flex;
+  gap: 4px;
+}
+.minecraft .mc-play-banner .mc-dimensions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  color: #e0e0e0;
+  border: 2px solid #000 !important;
+  border-image: none !important;
+  background: rgb(0 0 0 / 0.55) !important;
+}
+.minecraft .mc-play-banner .mc-dimensions button::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  background: var(--mc-dim-tile) 0 0 / 14px 14px;
+  image-rendering: pixelated;
+  border: 1px solid #000;
+}
+.minecraft .mc-play-banner .mc-dimensions button[aria-pressed='true'] {
+  color: var(--mc-yellow);
+  background: rgb(0 0 0 / 0.8) !important;
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+.minecraft .mc-play-banner .mc-dimensions button[data-dim='overworld'] {
+  --mc-dim-tile: url('/decorative/minecraft/site/grass-side.png');
+}
+.minecraft .mc-play-banner .mc-dimensions button[data-dim='nether'] {
+  --mc-dim-tile: url('/decorative/minecraft/site/netherrack.png');
+}
+.minecraft .mc-play-banner .mc-dimensions button[data-dim='end'] {
+  --mc-dim-tile: url('/decorative/minecraft/site/end-stone.png');
+}
+.minecraft .mc-xp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--mc-xp);
+  text-shadow: 1px 1px 0 #000 !important;
+}
+.minecraft .mc-xp-bar {
+  position: relative;
+  width: 182px;
+  height: 5px;
+  background: url('/decorative/minecraft/game/xp-bg.png') 0 0 / 100% 100%;
+  image-rendering: pixelated;
+}
+.minecraft .mc-xp-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: url('/decorative/minecraft/game/xp-fill.png') 0 0 / 182px 100%;
+  image-rendering: pixelated;
+}
+.minecraft .mc-play-banner[data-compact='true'] {
+  padding-block: 10px;
+  margin-block: 8px;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-title img {
+  width: 160px;
+}
+.minecraft .mc-play-banner[data-compact='true'] :is(.mc-splash, .mc-play-banner-title strong) {
+  display: none;
+}
+.minecraft .mc-play-banner[data-compact='true'] button[data-testid='minecraft-launch'] {
+  height: 36px;
+  min-width: 160px;
+}
+.minecraft .mc-play-banner-world {
+  font-size: 0.75rem;
+  color: #e0e0e0;
+}
+.minecraft .mc-play-banner-world b {
+  color: #ff55ff;
+  font-weight: 400;
+}
+
+html.minecraft[data-minecraft-dimension='nether'] .mc-play-banner {
+  background:
+    linear-gradient(90deg, #200000d0, #40000040 70%, #200000a0),
+    url('/decorative/minecraft/site/netherrack.png') 0 0 / 64px 64px;
+}
+html.minecraft[data-minecraft-dimension='end'] .mc-play-banner {
+  background:
+    linear-gradient(90deg, #0a0414d0, #14082840 70%, #0a0414a0),
+    url('/decorative/minecraft/site/end-stone.png') 0 0 / 64px 64px;
+}
+html.minecraft[data-minecraft-dimension='nether'] header {
+  border-image: linear-gradient(to right, #6b1a1a, #a33, #ff8a2a, #a33, #6b1a1a) 1 !important;
+}
+html.minecraft[data-minecraft-dimension='end'] header {
+  border-image: linear-gradient(to right, #2a2140, #c77dff, #e5f0a8, #c77dff, #2a2140) 1 !important;
+}
+
+/* ------------------------------------------------------- mobile, a11y */
+
+@media (max-width: 640px) {
+  .minecraft .mc-play-banner-side {
+    align-items: stretch;
+    width: 100%;
+  }
+  .minecraft .mc-dimensions {
+    justify-content: space-between;
+  }
+  .minecraft .mc-play-banner .mc-dimensions button {
+    flex: 1;
+    justify-content: center;
+  }
+  .minecraft .mc-play-banner-title .mc-splash {
+    position: static;
+    transform: none;
+    white-space: normal;
+    animation: none;
+  }
+  .minecraft .mc-xp-bar {
+    flex: 1;
+  }
+  .minecraft .mc-toasts {
+    top: auto;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    align-items: center;
+  }
+  .minecraft .mc-creeper {
+    width: 24px !important;
+    height: 24px !important;
+  }
+  .minecraft footer[data-testid='footer']::before {
+    height: 32px;
+    background-size:
+      100% 100%,
+      32px 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minecraft :is(.mc-mining, .mc-toast, .mc-boom, .mc-creeper, .mc-creeper-face, .mc-splash),
+  .minecraft [data-slot='skeleton'],
+  .minecraft [data-slot='tabs-trigger'] {
+    animation: none !important;
+    transition: none !important;
+  }
+  .minecraft .mc-toast {
+    transform: none;
+  }
+  .minecraft .mc-boom {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .minecraft [data-testid='inferencex-wordmark'] .inferencex-wave-letter {
+    color: CanvasText !important;
+    background: none;
+  }
+  .minecraft :is(.mc-toast, [data-chart-tooltip] > div, [role='dialog'], .mc-creeper) {
+    forced-color-adjust: auto;
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: CanvasText !important;
+  }
+  .minecraft [data-slot='button']:is([class~='bg-primary'], [class~='bg-brand-fill']) {
+    border-image: none !important;
+    border-color: ButtonText !important;
+  }
+  .minecraft .mc-creeper-face,
+  .minecraft footer[data-testid='footer']::before,
+  .minecraft footer[data-testid='footer']::after {
+    display: none;
+  }
+  .minecraft svg[data-testid='d3-chart-svg'] .global-pareto-frontier {
+    filter: none;
+  }
+}
+
+html[data-inferencex-embed] :is(.mc-toasts, .mc-creeper) {
+  display: none;
+}
+
+/* ------------------------------------------------- round ip-r1 additions */
+
+/* The banner carries the splash now; the hero's own splash overlapped the heading. */
+.minecraft .splash-wrapper {
+  display: none !important;
+}
+
+/* A pixel arrow cursor site-wide; links and buttons get the same arrow in splash yellow. */
+html.minecraft body {
+  cursor:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='34' viewBox='0 0 11 17' shape-rendering='crispEdges'><path fill='%23000' d='M0 0h1v1h-1zM0 1h1v1h-1zM1 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM0 3h1v1h-1zM3 3h1v1h-1zM0 4h1v1h-1zM4 4h1v1h-1zM0 5h1v1h-1zM5 5h1v1h-1zM0 6h1v1h-1zM6 6h1v1h-1zM0 7h1v1h-1zM7 7h1v1h-1zM0 8h1v1h-1zM8 8h1v1h-1zM0 9h1v1h-1zM9 9h1v1h-1zM0 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM8 10h1v1h-1zM9 10h1v1h-1zM10 10h1v1h-1zM0 11h1v1h-1zM3 11h1v1h-1zM6 11h1v1h-1zM0 12h1v1h-1zM2 12h1v1h-1zM4 12h1v1h-1zM7 12h1v1h-1zM0 13h1v1h-1zM1 13h1v1h-1zM4 13h1v1h-1zM7 13h1v1h-1zM0 14h1v1h-1zM5 14h1v1h-1zM8 14h1v1h-1zM5 15h1v1h-1zM8 15h1v1h-1zM6 16h1v1h-1zM7 16h1v1h-1z'/><path fill='%23fff' d='M1 2h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM1 9h1v1h-1zM2 9h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM6 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM1 10h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM1 11h1v1h-1zM2 11h1v1h-1zM4 11h1v1h-1zM5 11h1v1h-1zM1 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM5 13h1v1h-1zM6 13h1v1h-1zM6 14h1v1h-1zM7 14h1v1h-1zM6 15h1v1h-1zM7 15h1v1h-1z'/></svg>")
+      0 0,
+    auto;
+}
+html.minecraft
+  :is(
+    a[href],
+    button:not(:disabled),
+    [role='button'],
+    [role='tab'],
+    [role='switch'],
+    summary,
+    label[for]
+  ) {
+  cursor:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='34' viewBox='0 0 11 17' shape-rendering='crispEdges'><path fill='%23000' d='M0 0h1v1h-1zM0 1h1v1h-1zM1 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM0 3h1v1h-1zM3 3h1v1h-1zM0 4h1v1h-1zM4 4h1v1h-1zM0 5h1v1h-1zM5 5h1v1h-1zM0 6h1v1h-1zM6 6h1v1h-1zM0 7h1v1h-1zM7 7h1v1h-1zM0 8h1v1h-1zM8 8h1v1h-1zM0 9h1v1h-1zM9 9h1v1h-1zM0 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM8 10h1v1h-1zM9 10h1v1h-1zM10 10h1v1h-1zM0 11h1v1h-1zM3 11h1v1h-1zM6 11h1v1h-1zM0 12h1v1h-1zM2 12h1v1h-1zM4 12h1v1h-1zM7 12h1v1h-1zM0 13h1v1h-1zM1 13h1v1h-1zM4 13h1v1h-1zM7 13h1v1h-1zM0 14h1v1h-1zM5 14h1v1h-1zM8 14h1v1h-1zM5 15h1v1h-1zM8 15h1v1h-1zM6 16h1v1h-1zM7 16h1v1h-1z'/><path fill='%23ffff55' d='M1 2h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM1 9h1v1h-1zM2 9h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM6 9h1v1h-1zM7 9h1v1h-1zM8 9h1v1h-1zM1 10h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM1 11h1v1h-1zM2 11h1v1h-1zM4 11h1v1h-1zM5 11h1v1h-1zM1 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM5 13h1v1h-1zM6 13h1v1h-1zM6 14h1v1h-1zM7 14h1v1h-1zM6 15h1v1h-1zM7 15h1v1h-1z'/></svg>")
+      0 0,
+    pointer;
+}
+html.minecraft
+  :is(input:not([type='checkbox'], [type='radio']), textarea, [contenteditable='true']) {
+  cursor: text;
+}
+
+/* The action bar: one line of game text above the bottom edge, gone after three seconds. */
+.minecraft .mc-actionbar {
+  position: fixed;
+  z-index: 134;
+  left: 50%;
+  bottom: 18px;
+  max-width: min(640px, calc(100vw - 24px));
+  padding: 2px 8px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: #fff;
+  text-align: center;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+  background: rgb(0 0 0 / 0.45);
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s steps(4, end);
+}
+.minecraft .mc-actionbar[data-show='true'] {
+  opacity: 1;
+}
+
+/* Nether portal: a purple swirl washes over the page for a moment, then the palette is there. */
+.minecraft .mc-portal {
+  position: fixed;
+  z-index: 133;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-conic-gradient(from 0deg, #5a1a9a88 0 12deg, #b04dff66 12deg 24deg),
+    radial-gradient(circle, #c77dff55, #3a0a6acc 70%);
+  animation: mc-portal 1.4s steps(14, end) forwards;
+}
+@keyframes mc-portal {
+  0% {
+    opacity: 0;
+    transform: scale(1.2) rotate(0deg);
+  }
+  35% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1) rotate(40deg);
+  }
+}
+
+/* Finding diamonds: the gem beside the top of the frontier twinkles in two steps. */
+.minecraft svg[data-testid='d3-chart-svg'] .mc-diamond-find {
+  pointer-events: none;
+  animation: mc-diamond 1.2s steps(2, end) infinite;
+}
+@keyframes mc-diamond {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Herobrine, for a moment, at the edge of the page. */
+.minecraft .mc-herobrine {
+  position: fixed;
+  z-index: 132;
+  left: 0;
+  bottom: 0;
+  width: 56px;
+  height: auto;
+  opacity: 0.85;
+  pointer-events: none;
+  filter: brightness(0.6);
+  animation: mc-herobrine 1.4s steps(4, end) forwards;
+}
+@keyframes mc-herobrine {
+  0%,
+  100% {
+    transform: translateX(-100%);
+  }
+  30%,
+  70% {
+    transform: translateX(0);
+  }
+}
+
+/* Banner mobs: Steve, a villager and the chicken jockey, in the game's own renders. */
+.minecraft .mc-mobs {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin-inline: auto 12px;
+  align-self: flex-end;
+}
+.minecraft .mc-mobs :is(button, img) {
+  display: block;
+  height: 96px;
+  width: auto;
+  padding: 0;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  image-rendering: auto;
+}
+.minecraft .mc-mobs button {
+  height: auto;
+  min-width: 0;
+  transition: transform 0.12s steps(2, end);
+}
+.minecraft .mc-mobs button img {
+  height: 96px;
+  width: auto;
+}
+.minecraft .mc-mobs button:is(:hover, :focus-visible) {
+  transform: translateY(-4px);
+}
+.minecraft .mc-mobs button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+/* Eye contact: the enderman teleports to another spot in the row. */
+.minecraft .mc-mobs .mc-mobs-enderman {
+  order: 0;
+}
+.minecraft .mc-mobs .mc-mobs-enderman[data-spot='1'] {
+  order: 2;
+}
+.minecraft .mc-mobs .mc-mobs-enderman[data-spot='2'] {
+  order: -1;
+}
+.minecraft .mc-actionbar img {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -2px;
+  image-rendering: pixelated;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-mobs {
+  display: none;
+}
+
+/* The death screen on the 404 page. */
+.minecraft [data-mc-died] {
+  background: linear-gradient(to bottom, #50000080, #a0000040);
+}
+.minecraft [data-mc-died] > :not(.mc-died, h1) {
+  display: none !important;
+}
+.minecraft [data-mc-died] > h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.minecraft .mc-died {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.minecraft .mc-died-title {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 4px 4px 0 #3f3f3f !important;
+}
+.minecraft .mc-died-message {
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+}
+.minecraft .mc-died-score {
+  margin-bottom: 16px;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+}
+.minecraft .mc-died-score b {
+  color: var(--mc-yellow);
+  font-weight: 400;
+}
+.minecraft .mc-died-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(400px, calc(100vw - 48px));
+  height: 40px;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+  background: url('/decorative/minecraft/game/button.png') 0 0 / 100% 100%;
+  image-rendering: pixelated;
+  border: 2px solid #000;
+}
+.minecraft .mc-died-button:is(:hover, :focus-visible) {
+  color: var(--mc-yellow);
+  background-image: url('/decorative/minecraft/game/button-highlighted.png');
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .minecraft .mc-mobs {
+    margin-inline: 0;
+  }
+  .minecraft .mc-mobs :is(button img, img) {
+    height: 64px;
+  }
+  .minecraft .mc-actionbar {
+    bottom: 72px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minecraft :is(.mc-portal, .mc-herobrine, .mc-diamond-find, .mc-mobs button) {
+    animation: none !important;
+    transition: none !important;
+  }
+  .minecraft .mc-portal {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  html.minecraft body,
+  html.minecraft :is(a[href], button, [role='button']) {
+    cursor: auto;
+  }
+  .minecraft :is(.mc-actionbar, .mc-died-button) {
+    forced-color-adjust: auto;
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: CanvasText !important;
+  }
+  .minecraft :is(.mc-portal, .mc-herobrine) {
+    display: none;
+  }
+  .minecraft [data-mc-died] {
+    background: Canvas;
+  }
+}
+
+html[data-inferencex-embed] :is(.mc-actionbar, .mc-portal, .mc-herobrine) {
+  display: none;
+}
+
+/* ------------------------------------------------- round ip-r2: safe lanes */
+
+/* The hotbar strip: part of the sticky header, so messages never cover page content. */
+.minecraft .mc-site-hud {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  overflow: hidden;
+  background:
+    linear-gradient(rgb(0 0 0 / 0.62), rgb(0 0 0 / 0.62)),
+    url('/decorative/minecraft/site/stone.png') 0 0 / 16px 16px;
+  image-rendering: pixelated;
+  border-top: 2px solid #000;
+  pointer-events: none;
+}
+.minecraft .mc-hud-bar {
+  display: flex;
+  border: 2px solid #000;
+  background: #8b8b8b;
+}
+.minecraft .mc-hud-bar span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  background: #3f3f3f;
+  box-shadow:
+    inset 2px 2px 0 #1c1c1c,
+    inset -2px -2px 0 #9b9b9b;
+}
+.minecraft .mc-hud-bar span:first-child {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+.minecraft .mc-hud-bar img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+.minecraft .mc-site-hud .mc-actionbar {
+  position: absolute;
+  inset: 0 auto 0 12px;
+  bottom: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(50% - 120px);
+  height: 26px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: none;
+  transform: none;
+}
+.minecraft .mc-site-hud .mc-actionbar img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+.minecraft .mc-site-hud .mc-toasts {
+  position: absolute;
+  inset: 0 12px auto auto;
+  bottom: auto;
+  left: auto;
+  flex-direction: row;
+  align-items: center;
+  max-width: calc(50% - 120px);
+  height: 26px;
+}
+.minecraft .mc-site-hud .mc-toast {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: auto;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  box-shadow: none;
+  border-width: 1px;
+  animation: mc-hud-toast 5s steps(8, end) forwards;
+}
+.minecraft .mc-site-hud .mc-toast:not(:last-child) {
+  display: none;
+}
+.minecraft .mc-site-hud .mc-toast :is(img, .mc-toast-icon) {
+  width: 16px;
+  height: 16px;
+  border: 0;
+}
+.minecraft .mc-site-hud .mc-toast-head {
+  font-size: 0.6875rem;
+}
+.minecraft .mc-site-hud .mc-toast-title {
+  overflow: hidden;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+}
+@keyframes mc-hud-toast {
+  0% {
+    opacity: 0;
+  }
+  6%,
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* Sticky table heads that sit under the header move down by the strip's height. */
+.minecraft thead.sticky.top-14 {
+  top: calc(3.5rem + 30px);
+}
+@media (max-width: 767px) {
+  .minecraft .mc-site-hud:has(.mc-actionbar[data-show='true'], .mc-toast) .mc-hud-bar {
+    visibility: hidden;
+  }
+  .minecraft .mc-site-hud .mc-actionbar {
+    max-width: calc(100% - 24px);
+  }
+  .minecraft .mc-site-hud .mc-toasts {
+    max-width: 48%;
+  }
+  .minecraft .mc-site-hud .mc-toast-head {
+    display: none;
+  }
+  .minecraft .mc-site-hud:has(.mc-toast) .mc-actionbar {
+    max-width: 48%;
+  }
+}
+
+/* The Nether swirl plays inside the banner only. */
+.minecraft .mc-play-banner {
+  position: relative;
+  overflow: hidden;
+}
+.minecraft .mc-play-banner .mc-portal {
+  position: absolute;
+  z-index: 3;
+}
+
+/* Corner props only where the page has real gutters; under that they would sit on content. */
+@media (max-width: 1799px) {
+  .minecraft [data-mc-props] {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minecraft :is(.mc-site-hud .mc-toast, .mc-actionbar, .mc-dragon-flyacross, .splash-text) {
+    animation: none !important;
+    transition: none !important;
+  }
+  .minecraft .mc-dragon-flyacross {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .minecraft .mc-site-hud {
+    forced-color-adjust: auto;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+}
+html[data-inferencex-embed] .mc-site-hud {
+  display: none;
+}
+
+.minecraft .mc-dragon-sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.minecraft .mc-dragon-sky img {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  height: calc(100% - 8px);
+  max-height: 150px;
+  width: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 16px rgb(160 80 200 / 0.55));
+}
+.minecraft .mc-play-banner > :not(.mc-dragon-sky, .mc-portal) {
+  position: relative;
+  z-index: 1;
+}
+
+/* round ip-r3: the stock inline series badges keep their stock footprint. Monocraft is a
+   monospace face about 15% wider than the stock face at the same size, which made the badges
+   wider and moved them onto other series; at 11px the badges measure close to stock, so the
+   chart's own placement lands them where it does in the default theme. */
+.minecraft .line-label text {
+  font-size: 11px;
+}
+
+/* round ip-r3: the Overworld banner is a daylight scene, not a dark strip. Sky gradient over the
+   game's own panorama, a row of grass blocks for the mobs to stand on, and mobs at 128px. The
+   left keeps a dark scrim so the logo, splash and copy stay at 4.5:1 or more. */
+.minecraft .mc-play-banner:not([data-compact='true']) {
+  min-height: 200px;
+  padding-bottom: 40px;
+}
+html.minecraft:not([data-minecraft-dimension='nether'], [data-minecraft-dimension='end'])
+  .mc-play-banner:not([data-compact='true']) {
+  background:
+    linear-gradient(90deg, #000000b0 0, #00000060 34%, #00000000 58%),
+    linear-gradient(to bottom, #7fb2ff80, #b9d6ff30 70%),
+    url('/decorative/minecraft/game/panorama-0.jpg') center 35% / cover;
+}
+.minecraft .mc-play-banner:not([data-compact='true'])::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 0;
+  height: 32px;
+  background: url('/decorative/minecraft/site/grass-side.png') 0 0 / 32px 32px repeat-x;
+  image-rendering: pixelated;
+  border-top: 2px solid #000;
+  pointer-events: none;
+}
+html.minecraft[data-minecraft-dimension='nether']
+  .mc-play-banner:not([data-compact='true'])::after {
+  background-image: url('/decorative/minecraft/site/netherrack.png');
+}
+html.minecraft[data-minecraft-dimension='end'] .mc-play-banner:not([data-compact='true'])::after {
+  background-image: url('/decorative/minecraft/site/end-stone.png');
+}
+@media (min-width: 1024px) {
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-mobs {
+    margin-bottom: -8px;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-mobs :is(button, img),
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-mobs button img {
+    height: 128px;
+  }
+}
+@media (forced-colors: active) {
+  .minecraft .mc-play-banner::after {
+    display: none;
+  }
+}
+
+/* round 4: the first screen. The home heading and the chart stay within reach of their stock
+   positions: a shorter home banner on desktop, a restacked one on the phone, and a single-row
+   strip on every other route. The mobs and the logo keep their size on the home page. */
+.minecraft .mc-play-banner:not([data-compact='true']) {
+  min-height: 172px;
+  margin-block: 10px;
+  padding-top: 14px;
+  padding-bottom: 36px;
+}
+.minecraft .mc-play-banner[data-compact='true'] {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  margin-block: 6px;
+  padding: 6px 12px;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-title {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-title img {
+  width: 128px;
+  flex: none;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-world {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-side {
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  margin-left: auto;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-xp {
+  display: none;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-dimensions button {
+  height: 32px;
+}
+.minecraft .mc-play-banner[data-compact='true'] button[data-testid='minecraft-launch'] {
+  width: auto;
+  height: 32px;
+  min-width: 0;
+  padding: 0 14px;
+  font-size: 0.875rem;
+}
+.minecraft .mc-dim-label {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  /* Home banner, phone: logo and splash, then the dimension tiles beside Play, then the mobs
+     standing on the ground row. */
+  .minecraft .mc-play-banner:not([data-compact='true']) {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    min-height: 0;
+    margin-block: 6px;
+    padding: 8px 12px 0;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-play-banner-title {
+    gap: 4px;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-play-banner-title img {
+    width: 184px;
+  }
+  .minecraft
+    .mc-play-banner:not([data-compact='true'])
+    :is(.mc-play-banner-title strong, .mc-play-banner-world) {
+    display: none;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-play-banner-title .mc-splash {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-play-banner-side {
+    order: 1;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) :is(.mc-xp, .mc-lines) {
+    display: none;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) button[data-testid='minecraft-launch'] {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    height: 40px;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-mobs {
+    order: 2;
+    justify-content: space-between;
+    width: 100%;
+    margin: 0;
+    padding-inline: 4px;
+    position: relative;
+    z-index: 2;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-mobs :is(button img, img) {
+    height: 56px;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true'])::after {
+    height: 14px;
+    background-size: 14px 14px;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-mobs {
+    margin-bottom: 8px;
+  }
+  /* Dimension tiles on the phone: the block face only, 40px square; the name stays the
+     button's accessible name and its title. */
+  .minecraft .mc-play-banner .mc-dimensions {
+    flex: none;
+    gap: 4px;
+  }
+  .minecraft .mc-play-banner .mc-dimensions button {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+  .minecraft .mc-play-banner[data-compact='true'] .mc-dimensions button {
+    width: 32px;
+    height: 32px;
+  }
+  .minecraft .mc-play-banner .mc-dimensions button::before {
+    width: 20px;
+    height: 20px;
+    background-size: 20px 20px;
+  }
+  .minecraft .mc-play-banner .mc-dim-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  /* Chart pages, phone: one row, logo, dimension tiles and Play. */
+  .minecraft .mc-play-banner[data-compact='true'] {
+    flex-direction: row;
+    padding: 6px 8px;
+    gap: 8px;
+  }
+  .minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-title img {
+    width: 92px;
+  }
+  .minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-world {
+    display: none;
+  }
+  .minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-side {
+    gap: 6px;
+  }
+}
+@media (max-width: 640px) {
+  .minecraft .mc-play-banner button[data-testid='minecraft-launch'] {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+  }
+  .minecraft .mc-play-banner[data-compact='true'] button[data-testid='minecraft-launch'] {
+    padding: 0 8px;
+    font-size: 0.8125rem;
+  }
+  .minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-side {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .minecraft .mc-play-banner[data-compact='true'] .mc-play-banner-title {
+    flex: none;
+  }
+}
+
+/* round 4: the diamond find pops in beside the frontier peak at three times its resting size,
+   with a white flash, then settles to 12px within four seconds. Never over the point itself. */
+.minecraft svg[data-testid='d3-chart-svg'] .mc-gem {
+  transform-box: fill-box;
+  transform-origin: 0 100%;
+}
+.minecraft svg[data-testid='d3-chart-svg'] .mc-gem-pop {
+  animation: mc-gem-pop 4s steps(16, end) both;
+}
+@keyframes mc-gem-pop {
+  0% {
+    transform: scale(0.4);
+    filter: brightness(3);
+  }
+  10% {
+    transform: scale(3);
+    filter: brightness(1.6) drop-shadow(0 0 3px #7ff);
+  }
+  70% {
+    transform: scale(3);
+    filter: drop-shadow(0 0 3px #7ff);
+  }
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .minecraft svg[data-testid='d3-chart-svg'] .mc-gem-pop {
+    animation: none;
+  }
+}
+
+/* -------------------------------------------------- round 5: export frame and stamp */
+
+/* The PNG export container gets a stone frame in its padding and room for the stamp. The
+   exporter sets 16px padding inline; the frame stays inside it, clear of the chart. */
+.minecraft [id$='-export'] {
+  position: relative;
+  padding-bottom: 34px !important;
+  box-shadow:
+    inset 0 0 0 2px #000,
+    inset 0 0 0 5px #7f7f7f,
+    inset 0 0 0 7px #3f3f3f;
+}
+.minecraft .mc-export-stamp {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  font-family: var(--font-minecraft, 'Monocraft', monospace);
+  font-size: 11px;
+  line-height: 14px;
+  color: #fff;
+  background: #100010;
+  border: 2px solid #2a0a5e;
+}
+.minecraft .mc-export-stamp img {
+  width: 14px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+/* The lines index: a summary in the XP row, the list opens as a tooltip-framed popover. */
+.minecraft .mc-lines {
+  position: relative;
+  margin-top: -6px;
+  font-size: 0.75rem;
+  text-shadow: 1px 1px 0 #000 !important;
+}
+.minecraft .mc-play-banner[data-compact='true'] .mc-lines {
+  display: none;
+}
+.minecraft .mc-lines summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--mc-aqua, #55ffff);
+  text-decoration: underline dotted;
+}
+.minecraft .mc-lines summary::-webkit-details-marker {
+  display: none;
+}
+.minecraft .mc-lines ol {
+  position: absolute;
+  z-index: 40;
+  right: 0;
+  top: calc(100% + 6px);
+  width: max-content;
+  max-width: min(360px, 80vw);
+  margin: 0;
+  padding: 6px 10px;
+  list-style: decimal inside;
+  color: #aaa;
+  background: #100010f0;
+  border: 2px solid #2a0a5e;
+  outline: 1px solid #000;
+}
+.minecraft .mc-lines li[data-heard] {
+  color: #fff;
+}
+
+/* Herobrine's eyes: two white pixels in the dark gap between the mobs, the chain's first clue. */
+.minecraft .mc-mobs .mc-herobrine-eyes {
+  align-self: center;
+  width: 24px;
+  height: 24px !important;
+  margin-bottom: 30px;
+  background: #0b0b0b !important;
+}
+.minecraft .mc-herobrine-eyes span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(#fff, #fff) 5px 10px / 4px 3px no-repeat,
+    linear-gradient(#fff, #fff) 15px 10px / 4px 3px no-repeat;
+  animation: mc-eyes 4s steps(1, end) infinite;
+}
+@keyframes mc-eyes {
+  0%,
+  92% {
+    opacity: 1;
+  }
+  93%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Empty charts keep the stock message; the added line is in the game's yellow. */
+.minecraft .mc-empty-line {
+  margin-top: 6px;
+  font-size: 0.875rem;
+  color: var(--mc-yellow, #ffff55);
+  text-shadow: 2px 2px 0 #3f3f00;
+}
+.minecraft [data-slot='empty-state'],
+.minecraft [data-testid='scatter-empty-state'] {
+  background:
+    linear-gradient(rgb(0 0 0 / 0.62), rgb(0 0 0 / 0.62)),
+    url('/decorative/minecraft/site/stone.png') 0 0 / 32px 32px !important;
+  image-rendering: pixelated;
+  border: 2px solid #000 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minecraft .mc-herobrine-eyes span {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  .minecraft .mc-herobrine-eyes span {
+    forced-color-adjust: none;
+  }
+  .minecraft .mc-lines ol {
+    border-color: CanvasText;
+  }
+  .minecraft [id$='-export'] {
+    box-shadow: none;
+  }
+}
+
+/* Herobrine's trail sign sits over the hotbar slots in the header strip, never on the page. */
+.minecraft .mc-herobrine-trail {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 2px;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  color: #fff !important;
+  background: #100010;
+  border: 2px solid #2a0a5e;
+  transform: translateX(-50%);
+  text-decoration: none;
+}
+.minecraft .mc-herobrine-trail:focus-visible {
+  outline: 2px solid #fff;
+}
+@media (forced-colors: active) {
+  .minecraft .mc-herobrine-trail {
+    border-color: LinkText;
+  }
+}
+
+/* Loading: the big skeleton is a chunk being generated, with the game's own loading words. */
+.minecraft [data-slot='skeleton'][class*='h-[600px]'] {
+  position: relative;
+}
+.minecraft [data-slot='skeleton'][class*='h-[600px]']::after {
+  content: 'Loading terrain…';
+  position: absolute;
+  inset: 50% 0 auto;
+  font-size: 1rem;
+  color: #fff;
+  text-align: center;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  filter: none;
+}
+.minecraft:lang(zh) [data-slot='skeleton'][class*='h-[600px]']::after,
+.minecraft [lang^='zh'] [data-slot='skeleton'][class*='h-[600px]']::after,
+.minecraft [lang='zh'] [data-slot='skeleton'][class*='h-[600px]']::after {
+  content: '正在加载地形…';
+}
+.minecraft .mc-loading-hold {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+/* Home banner at desktop widths: one row, so the banner keeps its height and the page heading
+   its place; the mob row gives up space first. */
+@media (min-width: 1200px) {
+  .minecraft .mc-play-banner:not([data-compact='true']) {
+    flex-wrap: nowrap;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-mobs {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .minecraft .mc-play-banner:not([data-compact='true']) .mc-play-banner-side {
+    flex-shrink: 0;
+  }
+}

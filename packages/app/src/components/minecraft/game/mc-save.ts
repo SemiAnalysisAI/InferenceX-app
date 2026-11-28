@@ -74,6 +74,8 @@ export interface SaveData extends SavedDimension {
   dimension?: Dimension;
   dimensions?: Partial<Record<Dimension, SavedDimension>>;
   progress?: Progress;
+  /** The read-out's run stats (tick numbers, so they continue with the saved clock). */
+  bench?: { start: number; first: number; breaks: number[] };
 }
 
 const PLAYER_FIELDS = [
@@ -228,6 +230,7 @@ export function serialize(game: Game, meta: WorldMeta): SaveData {
     dimension: game.dimension,
     dimensions,
     progress: structuredClone(game.endgame.progress),
+    bench: { ...game.bench, breaks: [...game.bench.breaks] },
   };
 }
 
@@ -258,6 +261,14 @@ export function restore(data: SaveData): Game {
   game.resetDimension();
   if (data.progress) game.endgame.progress = { ...game.endgame.progress, ...data.progress };
   game.endgame.portalCooldown = 100;
+  const bench = data.bench;
+  if (bench && Number.isFinite(bench.start) && Array.isArray(bench.breaks))
+    game.bench = {
+      start: Number(bench.start),
+      first: Number(bench.first),
+      breaks: bench.breaks.filter(Number.isFinite).slice(-1200),
+    };
+  game.countBatch();
   const p = game.player as unknown as Record<string, number | boolean | string>;
   for (const f of PLAYER_FIELDS) {
     const v = data.player?.[f];
