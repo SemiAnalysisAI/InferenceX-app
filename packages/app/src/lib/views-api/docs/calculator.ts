@@ -137,6 +137,7 @@ const successExample = {
   generatedAt: '2026-08-20',
   params: {
     model: 'DeepSeek-V4-Pro',
+    scenario: '1k/1k',
     sequence: '1k/1k',
     precisions: ['fp4'],
     target: 35,
@@ -218,12 +219,21 @@ export const operations: ApiOperation[] = [
         'DeepSeek-V4-Pro',
       ),
       parameter(
+        'scenario',
+        false,
+        'enum',
+        'Workload scenario. Accepts 1k/1k, 1k/8k, 8k/1k (or hyphenated forms) and agentic-traces (alias agentic).',
+        '工作负载场景。支持 1k/1k、1k/8k、8k/1k（或连字符形式）以及 agentic-traces（别名 agentic）。',
+        { type: 'string', default: '8k/1k' },
+        '1k/1k',
+      ),
+      parameter(
         'sequence',
         false,
         'enum',
-        'Workload sequence. Accepts 1k/1k, 1k/8k, 8k/1k (or hyphenated forms) and agentic-traces (alias agentic).',
-        '负载序列。支持 1k/1k、1k/8k、8k/1k（或连字符形式）以及 agentic-traces（别名 agentic）。',
-        { type: 'string', default: '8k/1k' },
+        'Older name of scenario, still accepted. scenario takes precedence when both are sent, and params returns the resolved value under both names.',
+        'scenario 的旧参数名，仍可使用。同时传入时以 scenario 为准，params 中以两个名称返回解析后的值。',
+        { type: 'string' },
         '1k/1k',
       ),
       parameter(
@@ -364,6 +374,6 @@ export const operations: ApiOperation[] = [
       },
     ],
     responseShapeName: 'CalculatorView',
-    curlUrl: `${API_BASE_URL}/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k`,
+    curlUrl: `${API_BASE_URL}/api/v1/views/calculator?model=DeepSeek-V4-Pro&scenario=1k/1k`,
   },
 ];

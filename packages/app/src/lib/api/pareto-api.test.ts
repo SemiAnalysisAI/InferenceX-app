@@ -158,6 +158,20 @@ describe('Pareto API', () => {
     expect(compute([row(1, 1, 1, { benchmark_type: 'future_type' })]).counts.selected).toBe(0);
   });
 
+  it('reads the workload from scenario or the older sequence name and returns both', () => {
+    const scenarioQuery = query.replace('sequence=', 'scenario=');
+    expect(parseParetoRequest(new URLSearchParams(scenarioQuery)).selection).toMatchObject({
+      scenario: '1k/1k',
+      sequence: '1k/1k',
+    });
+    expect(parse().selection).toMatchObject({ scenario: '1k/1k', sequence: '1k/1k' });
+    expect(parse('&scenario=agentic-traces').selection.scenario).toBe('agentic-traces');
+    expect(() => parse('&scenario=16k%2F1k')).toThrow('Unknown scenario');
+    expect(() =>
+      parseParetoRequest(new URLSearchParams(query.replace('1k%2F1k', '16k%2F1k'))),
+    ).toThrow('Unknown sequence');
+  });
+
   it.each([
     '&unknown=1',
     '&i_frontier=1',

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "package_version": "1.2.0",
   "files": {
-    "SKILL.md": "d0851c1c728ee65244e7526a0debf8551ce9068ac9e94406984632cda51fb7b3",
+    "SKILL.md": "d1ede8516997e0ae9fc2ad4e9b0fb2646fcfd1129aee16ffbcf3198dca0c2ddf",
     "agents/openai.yaml": "02288ecf7628bd11cdea9aa1339b7310650d069b29959924600c03639928c03e",
-    "scripts/waterfall.mjs": "44632960b2fe45a7b96f7b1e11b7e7c801006b3edd0dc470648b1d9d58e7aa17"
+    "scripts/waterfall.mjs": "87374eca42ae56d5e1d3ddd92c15095e785846a58dee94dc555b32330778fb5c"
   }
 }

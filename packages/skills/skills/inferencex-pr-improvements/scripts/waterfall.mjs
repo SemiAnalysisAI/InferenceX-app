@@ -11,7 +11,8 @@ const HELP = `Usage:
   node waterfall.mjs --model MODEL --hardware GPU [options] --out NEW_DIRECTORY
 
 Options (live mode only):
-  --sequence 8k/1k          Workload; agentic-traces uses P90, single-turn median
+  --scenario 8k/1k          Workload; agentic-traces uses P90, single-turn median
+  --sequence 8k/1k          Older name of --scenario
   --metric outputTputPerGpu Metric key; costhOutput gives owning $/M output tokens
   --target 35              Interactivity target in tok/s/user
   --framework sglang       Optional framework selector
@@ -32,6 +33,7 @@ const keys = [
   'out',
   'model',
   'hardware',
+  'scenario',
   'sequence',
   'metric',
   'target',
@@ -80,6 +82,9 @@ const validDate = (value) =>
 let output;
 const save = (name, value) => writeFile(join(output, name), value, { flag: 'wx' });
 
+// Responses saved before the API returned scenario carry only sequence.
+const scenarioOf = (params) => params.scenario ?? params.sequence;
+
 function validate(data) {
   if (data?.error) throw new Error(`API error: ${data.error}`);
   if (
@@ -93,12 +98,12 @@ function validate(data) {
   if (
     !data.metric?.label ||
     !data.params.model ||
-    !data.params.sequence ||
+    !scenarioOf(data.params) ||
     !Number.isFinite(data.target)
   )
     throw new Error('Missing metric, model, workload or target metadata.');
   const axis = data.interactivity;
-  const agentic = data.params.sequence === 'agentic-traces';
+  const agentic = scenarioOf(data.params) === 'agentic-traces';
   if (
     axis?.statistic !== (agentic ? 'p90' : 'median') ||
     axis?.field !== (agentic ? 'p90_intvty' : 'median_intvty') ||
@@ -144,7 +149,7 @@ function validate(data) {
 
 function render(data) {
   const p = data.params;
-  const scope = `${p.model} · ${p.sequence} · ${data.interactivity.statistic.toUpperCase()} interactivity ${data.target} tok/s/user`;
+  const scope = `${p.model} · ${scenarioOf(p)} · ${data.interactivity.statistic.toUpperCase()} interactivity ${data.target} tok/s/user`;
   const notes =
     'Values are interpolated at the target. Record gains exclude regressions, recoveries and synthetic extensions. Source links identify curves, not isolated causal PR effects.';
   const title = `InferenceX improvement waterfall — ${p.model}`;
@@ -357,7 +362,7 @@ async function main() {
     url.search = new URLSearchParams({
       model: a.model,
       gpus: a.hardware.toLowerCase(),
-      sequence: a.sequence ?? '8k/1k',
+      scenario: a.scenario ?? a.sequence ?? '8k/1k',
       metric: a.metric ?? 'outputTputPerGpu',
       target: String(target),
       chart: 'waterfall',

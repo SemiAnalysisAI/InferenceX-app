@@ -22,6 +22,7 @@ export const BENCHMARK_REQUEST_ERRORS = {
   invalidExactRun: 'exactRun must be true or false',
   exactRunWithoutRunId: 'exactRun=true requires runId',
   unknownView: 'Unknown view',
+  unknownScenario: 'Unknown calculator scenario',
   unknownSequence: 'Unknown calculator sequence',
   unknownPowerValid: 'Unknown powerValid filter',
   powerValidWithCalculator: 'powerValid cannot be combined with view=calculator',
@@ -36,7 +37,7 @@ export interface BenchmarkRequestParams {
   exactRun: boolean;
   view: 'calculator' | undefined;
   /** Set only for view=calculator. */
-  sequence: string;
+  scenario: string;
   powerValid: PowerValidityFilter | null;
 }
 
@@ -112,9 +113,13 @@ export function parseBenchmarkRequest(search: URLSearchParams): BenchmarkRequest
   }
   const view = viewParam ?? undefined;
 
-  const sequence = search.get('sequence') ?? '';
-  if (view === 'calculator' && !isScenarioKey(sequence)) {
-    return fail(BENCHMARK_REQUEST_ERRORS.unknownSequence);
+  const scenario = search.get('scenario') ?? search.get('sequence') ?? '';
+  if (view === 'calculator' && !isScenarioKey(scenario)) {
+    return fail(
+      search.has('sequence') && !search.has('scenario')
+        ? BENCHMARK_REQUEST_ERRORS.unknownSequence
+        : BENCHMARK_REQUEST_ERRORS.unknownScenario,
+    );
   }
 
   const powerValid = parsePowerValidityFilter(search.get('powerValid'));
@@ -134,7 +139,7 @@ export function parseBenchmarkRequest(search: URLSearchParams): BenchmarkRequest
       runId,
       exactRun,
       view,
-      sequence: view === 'calculator' ? sequence : '',
+      scenario: view === 'calculator' ? scenario : '',
       powerValid,
     },
   };

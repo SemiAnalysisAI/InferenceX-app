@@ -111,7 +111,7 @@ export function benchmarksUrl(
   if (exactRun) params.set('exactRun', 'true');
   if (view) {
     params.set('view', view.type);
-    params.set('sequence', view.sequence);
+    params.set('scenario', view.sequence);
   }
   return `/api/v1/benchmarks?${params}`;
 }

@@ -14,9 +14,9 @@ configuration and date.
 ## Use the view API first
 
 Read the deployed OpenAPI contract. For an AgentX inference view, specify
-`sequence=agentic-traces&percentile=p90&xmode=interactivity` and retain its resolved
+`scenario=agentic-traces&percentile=p90&xmode=interactivity` and retain its resolved
 parameters and `xAxis`. Historical views fix the statistic by workload:
-`sequence=agentic-traces` uses P90, while single-turn sequences retain the median.
+`scenario=agentic-traces` uses P90, while single-turn scenarios retain the median.
 The corrected historical response declares
 `interactivity.statistic=p90`, `interactivity.field=p90_intvty`, and
 `interactivity.unit=tok/s/user`. Require that metadata before claiming a deployed

@@ -97,7 +97,7 @@ row.metrics.power_valid === 1 && row.metrics.power_metric_schema_version === 2;
 The exporter then requires `benchmark_type === 'single_turn'`, exact numeric
 `isl` and `osl`, and the optional raw-model match. Strings such as `"1"`, booleans,
 missing verdicts, and other schema versions do not qualify. The ordinary benchmark
-route does not implement workload filtering through `sequence`; the calculator
+route does not implement workload filtering through `scenario`; the calculator
 projection cannot be combined with `powerValid`. The first exporter covers
 single-turn snapshots. For other public reads, return to the general skill;
 history has no `powerValid` parameter.

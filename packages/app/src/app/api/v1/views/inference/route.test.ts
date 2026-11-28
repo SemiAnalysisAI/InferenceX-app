@@ -516,12 +516,13 @@ describe('GET /api/v1/views/inference', () => {
   ])('accepts %s without fabricating published results', async (model, dbKey) => {
     mockGetLatestBenchmarks.mockResolvedValue([]);
     const res = await GET(
-      request(`/api/v1/views/inference?model=${model}&sequence=agentic-traces`),
+      request(`/api/v1/views/inference?model=${model}&scenario=agentic-traces`),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.params.model).toBe(model);
     expect(body.params.sequence).toBe('agentic-traces');
+    expect(body.params.scenario).toBe('agentic-traces');
     expect(body.series).toEqual([]);
     expect(body.count).toBe(0);
     expect(mockGetLatestBenchmarks.mock.calls[0][1]).toEqual([dbKey]);

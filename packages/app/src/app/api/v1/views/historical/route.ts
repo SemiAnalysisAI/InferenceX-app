@@ -13,7 +13,7 @@ import {
   parseMetricParam,
   parseNumberParam,
   parsePrecisionsParam,
-  parseSequenceParam,
+  parseScenarioParam,
   parseTcoBasisParam,
   parseChipBasisParam,
   parseVendorsParam,
@@ -114,7 +114,7 @@ export function GET(request: NextRequest) {
     const search = request.nextUrl.searchParams;
 
     const { displayName, dbModelKeys } = resolveModelParam(search.get('model'));
-    const scenario = parseSequenceParam(search.get('sequence'), Scenario.EightK_OneK);
+    const scenario = parseScenarioParam(search, Scenario.EightK_OneK);
     const metricConfigKey = parseMetricParam(search.get('metric'));
     const target = parseNumberParam(search.get('target'), 'target', DEFAULT_TARGET_INTERACTIVITY, {
       min: 1,
@@ -250,6 +250,7 @@ export function GET(request: NextRequest) {
       };
       const params = {
         model: displayName,
+        scenario: scenario as string,
         sequence: scenario as string,
         metric: metricConfigKey,
         precisions: resolvedPrecisions,
@@ -452,6 +453,7 @@ export function GET(request: NextRequest) {
 
     const resolvedParams = {
       model: displayName,
+      scenario: scenario as string,
       sequence: scenario as string,
       metric: metricConfigKey,
       target,

@@ -31,6 +31,7 @@ import {
   parseEnumParam,
   parseNumberMap,
   parseNumberParam,
+  scenarioParamName,
   validateParams,
 } from './params';
 import { VIEW_QUERY_PARAMS } from './registry';
@@ -50,8 +51,8 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       view === 'first-token'
         ? { ...selection(search), chipBasis: parseChipBasisParam(search.get('chipBasis')) }
         : selection(search);
-    if (view !== 'first-token' && params.sequence !== Scenario.AgenticTraces)
-      throw new ViewsApiParamError('sequence', 'This view requires agentic-traces', [
+    if (view !== 'first-token' && params.scenario !== Scenario.AgenticTraces)
+      throw new ViewsApiParamError(scenarioParamName(search), 'This view requires agentic-traces', [
         'agentic-traces',
       ]);
     const groups = await calculatorGroups(request, params);

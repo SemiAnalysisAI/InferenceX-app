@@ -89,14 +89,24 @@ describe('GET /api/v1/views/options', () => {
     });
   });
 
-  it('describes sequences with isl/osl and deprecation flags', async () => {
+  it('describes scenarios with isl/osl and deprecation flags', async () => {
     const bodyRes = await GET(request('/api/v1/views/options'));
     const body = await bodyRes.json();
-    const eightOne = body.sequences.find((s: { key: string }) => s.key === '8k/1k');
+    const eightOne = body.scenarios.find((s: { key: string }) => s.key === '8k/1k');
     expect(eightOne).toMatchObject({ isl: 8192, osl: 1024, deprecated: false });
-    const agentic = body.sequences.find((s: { key: string }) => s.key === 'agentic-traces');
+    const agentic = body.scenarios.find((s: { key: string }) => s.key === 'agentic-traces');
     expect(agentic).toBeDefined();
     expect(agentic.isl).toBeNull();
+  });
+
+  it('keeps the older sequence names beside the scenario ones', async () => {
+    const response = await GET(request('/api/v1/views/options'));
+    const body = await response.json();
+    expect(body.sequences).toEqual(body.scenarios);
+    expect(body.defaults.sequence).toBe(body.defaults.scenario);
+    for (const model of body.models) {
+      expect(model.deprecatedSequences, model.name).toEqual(model.deprecatedScenarios);
+    }
   });
 
   it('keeps 8K/1K active for both GLM-5.3-Flash and GLM-5.2', async () => {
@@ -172,7 +182,7 @@ describe('GET /api/v1/views/options', () => {
     const body = await bodyRes.json();
     expect(body.defaults).toMatchObject({
       model: 'DeepSeek-V4-Pro',
-      sequence: '8k/1k',
+      scenario: '8k/1k',
       metric: 'y_tokensPerDollarH',
       percentile: 'p90',
       xmode: 'interactivity',

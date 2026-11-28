@@ -31,6 +31,7 @@ function response({ agentic = false, cost = false } = {}) {
     params: {
       chart: 'waterfall',
       model: agentic ? 'DeepSeek-V4-Pro' : 'DeepSeek-R1-0528',
+      scenario: agentic ? 'agentic-traces' : '8k/1k',
       sequence: agentic ? 'agentic-traces' : '8k/1k',
       precisions: ['fp8'],
       tcoBasis: 'internal',
@@ -131,6 +132,15 @@ for (const example of [
   });
 }
 
+test('installed PR improvements skill renders a response saved before scenario was returned', () => {
+  const data = response({ agentic: true });
+  delete data.params.scenario;
+  const result = offline(data);
+  assert.equal(result.status, 0, result.stderr);
+  const summary = readFileSync(join(result.output, 'summary.md'), 'utf8');
+  assert.ok(summary.includes('agentic-traces · P90 interactivity 35 tok/s/user'));
+});
+
 function run(args) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [script, ...args], {
@@ -188,84 +198,86 @@ async function serve(t, { waterfall = true, handleData } = {}) {
   return { origin: `http://127.0.0.1:${server.address().port}`, requests };
 }
 
-test('installed live helper forwards selectors and captures the returned AgentX steps', async (t) => {
-  const expected = {
-    model: 'DeepSeek-V4-Pro',
-    gpus: 'b200',
-    frameworks: 'sglang',
-    precisions: 'fp4',
-    sequence: 'agentic-traces',
-    metric: 'outputTputPerGpu',
-    target: '35',
-    chart: 'waterfall',
-    format: 'json',
-    tcoBasis: 'internal',
-    extendToDate: '2026-10-19',
-    start: '2026-10-01',
-    end: '2026-10-19',
-  };
-  const data = response({ agentic: true });
-  data.params.precisions = ['fp4'];
-  data.series[0].key = 'b200_sglang';
-  data.series[0].hwKey = 'b200_sglang';
-  data.series[0].label = 'B200 (SGLang)';
-  const { origin, requests } = await serve(t, {
-    handleData(url, res) {
-      if (
-        url.pathname !== '/api/v1/views/historical' ||
-        Object.keys(expected).some((key) => url.searchParams.get(key) !== expected[key])
-      ) {
-        res.statusCode = 422;
-        res.end('{"error":"Wrong selection"}');
-        return;
-      }
-      res.end(JSON.stringify(data));
-    },
+for (const flag of ['--scenario', '--sequence']) {
+  test(`installed live helper forwards selectors and captures the returned AgentX steps (${flag})`, async (t) => {
+    const expected = {
+      model: 'DeepSeek-V4-Pro',
+      gpus: 'b200',
+      frameworks: 'sglang',
+      precisions: 'fp4',
+      scenario: 'agentic-traces',
+      metric: 'outputTputPerGpu',
+      target: '35',
+      chart: 'waterfall',
+      format: 'json',
+      tcoBasis: 'internal',
+      extendToDate: '2026-10-19',
+      start: '2026-10-01',
+      end: '2026-10-19',
+    };
+    const data = response({ agentic: true });
+    data.params.precisions = ['fp4'];
+    data.series[0].key = 'b200_sglang';
+    data.series[0].hwKey = 'b200_sglang';
+    data.series[0].label = 'B200 (SGLang)';
+    const { origin, requests } = await serve(t, {
+      handleData(url, res) {
+        if (
+          url.pathname !== '/api/v1/views/historical' ||
+          Object.keys(expected).some((key) => url.searchParams.get(key) !== expected[key])
+        ) {
+          res.statusCode = 422;
+          res.end('{"error":"Wrong selection"}');
+          return;
+        }
+        res.end(JSON.stringify(data));
+      },
+    });
+    const output = join(suite.project(), 'live');
+    const result = await run([
+      '--model',
+      'DeepSeek-V4-Pro',
+      '--hardware',
+      'B200',
+      '--framework',
+      'SGLang',
+      '--precision',
+      'FP4',
+      flag,
+      'agentic-traces',
+      '--metric',
+      'outputTputPerGpu',
+      '--target',
+      '35',
+      '--start',
+      '2026-10-01',
+      '--end',
+      '2026-10-19',
+      '--base-url',
+      origin,
+      '--out',
+      output,
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(
+      requests.map((entry) => [entry.method, entry.url.pathname]),
+      [
+        ['GET', '/api/openapi.json'],
+        ['GET', '/api/v1/views/historical'],
+      ],
+    );
+    assert.ok(requests.every((entry) => entry.headers['x-inferencex-traffic'] === undefined));
+    assert.deepEqual(Object.fromEntries(requests[1].url.searchParams), expected);
+    const receipt = JSON.parse(readFileSync(join(output, 'request.json'), 'utf8'));
+    assert.equal(receipt.mode, 'live');
+    assert.equal(receipt.status, 200);
+    assert.equal(receipt.url, requests[1].url.href.replace('http://localhost', origin));
+    const summary = readFileSync(join(output, 'summary.md'), 'utf8');
+    assert.ok(summary.includes('+50% change'));
+    assert.ok(summary.includes('B200 (SGLang)'));
+    assert.ok(summary.includes('P90 interactivity'));
   });
-  const output = join(suite.project(), 'live');
-  const result = await run([
-    '--model',
-    'DeepSeek-V4-Pro',
-    '--hardware',
-    'B200',
-    '--framework',
-    'SGLang',
-    '--precision',
-    'FP4',
-    '--sequence',
-    'agentic-traces',
-    '--metric',
-    'outputTputPerGpu',
-    '--target',
-    '35',
-    '--start',
-    '2026-10-01',
-    '--end',
-    '2026-10-19',
-    '--base-url',
-    origin,
-    '--out',
-    output,
-  ]);
-  assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(
-    requests.map((entry) => [entry.method, entry.url.pathname]),
-    [
-      ['GET', '/api/openapi.json'],
-      ['GET', '/api/v1/views/historical'],
-    ],
-  );
-  assert.ok(requests.every((entry) => entry.headers['x-inferencex-traffic'] === undefined));
-  assert.deepEqual(Object.fromEntries(requests[1].url.searchParams), expected);
-  const receipt = JSON.parse(readFileSync(join(output, 'request.json'), 'utf8'));
-  assert.equal(receipt.mode, 'live');
-  assert.equal(receipt.status, 200);
-  assert.equal(receipt.url, requests[1].url.href.replace('http://localhost', origin));
-  const summary = readFileSync(join(output, 'summary.md'), 'utf8');
-  assert.ok(summary.includes('+50% change'));
-  assert.ok(summary.includes('B200 (SGLang)'));
-  assert.ok(summary.includes('P90 interactivity'));
-});
+}
 
 test('unsupported deployments preserve capability receipt and receive no data query', async (t) => {
   const { origin, requests } = await serve(t, { waterfall: false });

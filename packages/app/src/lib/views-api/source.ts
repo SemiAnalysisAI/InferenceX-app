@@ -23,7 +23,7 @@ import {
   parsePrecisionsParam,
   parseRunIdListParam,
   parseRunIdParam,
-  parseSequenceParam,
+  parseScenarioParam,
   parseTcoBasisParam,
   resolveModelParam,
 } from './params';
@@ -53,7 +53,7 @@ export function readResponse<T>(response: Response): Promise<T> {
 
 export function selection(search: URLSearchParams, fallback = Scenario.AgenticTraces) {
   const { displayName: model } = resolveModelParam(search.get('model'));
-  const scenario = parseSequenceParam(search.get('sequence'), fallback);
+  const scenario = parseScenarioParam(search, fallback);
   const date = parseDateParam(search.get('date'), 'date');
   const runId = parseRunIdParam(search.get('runId'));
   const percentile = parseEnumParam(
@@ -65,7 +65,17 @@ export function selection(search: URLSearchParams, fallback = Scenario.AgenticTr
   const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
   const precisions = parsePrecisionsParam(search.get('precisions'));
   const gpus = parseFreeListParam(search.get('gpus'));
-  return { model, sequence: scenario, date, runId, percentile, tcoBasis, precisions, gpus };
+  return {
+    model,
+    scenario,
+    sequence: scenario,
+    date,
+    runId,
+    percentile,
+    tcoBasis,
+    precisions,
+    gpus,
+  };
 }
 export type ViewSelection = Omit<ReturnType<typeof selection>, 'precisions'> & {
   precisions: string[];

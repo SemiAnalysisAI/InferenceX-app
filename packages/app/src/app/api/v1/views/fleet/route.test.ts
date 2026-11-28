@@ -145,7 +145,7 @@ describe('GET /api/v1/views/fleet', () => {
 
   it('builds one lifecycle series per chip from the best-so-far staircase', async () => {
     const response = await GET(
-      request('/api/v1/views/fleet?model=DeepSeek-V4-Pro&sequence=1k/1k&mw=100'),
+      request('/api/v1/views/fleet?model=DeepSeek-V4-Pro&scenario=1k/1k&mw=100'),
     );
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -153,6 +153,7 @@ describe('GET /api/v1/views/fleet', () => {
     expect(body.view).toBe('fleet');
     expect(body.apiVersion).toBe('v1');
     expect(body.generatedAt).toBe('2026-07-01');
+    expect(body.params).toMatchObject({ scenario: '1k/1k', sequence: '1k/1k' });
     expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
       expect.anything(),
       expect.arrayContaining(['dsv4']),

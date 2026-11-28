@@ -43,21 +43,21 @@ describe('parseBenchmarkRequest', () => {
         runId: undefined,
         exactRun: false,
         view: undefined,
-        sequence: '',
+        scenario: '',
         powerValid: null,
       },
     });
   });
 
-  it('drops sequence outside the calculator view', () => {
-    const result = parse('model=DeepSeek-R1-0528&sequence=1k%2F1k');
-    expect(result.ok && result.params.sequence).toBe('');
+  it('drops the scenario outside the calculator view', () => {
+    const result = parse('model=DeepSeek-R1-0528&scenario=1k%2F1k');
+    expect(result.ok && result.params.scenario).toBe('');
   });
 
-  it('keeps the calculator sequence and an exact run selection', () => {
-    expect(parse('model=DeepSeek-R1-0528&view=calculator&sequence=8k%2F1k')).toMatchObject({
+  it('keeps the calculator scenario and an exact run selection', () => {
+    expect(parse('model=DeepSeek-R1-0528&view=calculator&scenario=8k%2F1k')).toMatchObject({
       ok: true,
-      params: { view: 'calculator', sequence: '8k/1k' },
+      params: { view: 'calculator', scenario: '8k/1k' },
     });
     expect(parse('model=DeepSeek-R1-0528&runId=27489075807&exactRun=true')).toMatchObject({
       ok: true,
@@ -65,8 +65,26 @@ describe('parseBenchmarkRequest', () => {
     });
   });
 
-  it('rejects a calculator view without a sequence', () => {
+  it('still reads the calculator scenario from the older sequence parameter', () => {
+    expect(parse('model=DeepSeek-R1-0528&view=calculator&sequence=8k%2F1k')).toMatchObject({
+      ok: true,
+      params: { view: 'calculator', scenario: '8k/1k' },
+    });
+    expect(
+      parse('model=DeepSeek-R1-0528&view=calculator&scenario=agentic-traces&sequence=8k%2F1k'),
+    ).toMatchObject({ ok: true, params: { scenario: 'agentic-traces' } });
+  });
+
+  it('rejects a calculator view without a known scenario, naming the parameter sent', () => {
     expect(parse('model=DeepSeek-R1-0528&view=calculator')).toEqual({
+      ok: false,
+      error: 'Unknown calculator scenario',
+    });
+    expect(parse('model=DeepSeek-R1-0528&view=calculator&scenario=16k%2F1k')).toEqual({
+      ok: false,
+      error: 'Unknown calculator scenario',
+    });
+    expect(parse('model=DeepSeek-R1-0528&view=calculator&sequence=16k%2F1k')).toEqual({
       ok: false,
       error: 'Unknown calculator sequence',
     });

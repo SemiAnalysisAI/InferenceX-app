@@ -22,16 +22,16 @@ export function parseBenchmarksQuery(params: URLSearchParams): BenchmarkRequestP
 }
 
 export async function loadBenchmarks(query: BenchmarkRequestParams): Promise<BenchmarkRow[]> {
-  const { dbModelKeys, date, runId, sequence, powerValid } = query;
+  const { dbModelKeys, date, runId, scenario, powerValid } = query;
   if (FIXTURES_MODE) {
     const fixture = loadFixture<BenchmarkRow[]>('benchmarks');
     return query.view === 'calculator'
-      ? toCalculatorBenchmarkRows(fixture, sequence)
+      ? toCalculatorBenchmarkRows(fixture, scenario)
       : filterByPowerValidity(fixture, powerValid);
   }
   if (query.view === 'calculator') {
     return agenticWorkflowMetadataOnly(
-      await getCachedCalculatorBenchmarks(dbModelKeys, sequence, date),
+      await getCachedCalculatorBenchmarks(dbModelKeys, scenario, date),
     );
   }
   const rows =

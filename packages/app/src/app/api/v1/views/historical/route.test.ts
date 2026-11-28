@@ -392,6 +392,7 @@ describe('GET /api/v1/views/historical', () => {
     );
     const resBody = await res.json();
     expect(resBody.params.sequence).toBe('agentic-traces');
+    expect(resBody.params.scenario).toBe('agentic-traces');
   });
 
   it('interpolates AgentX trends and waterfall steps at P90 interactivity', async () => {

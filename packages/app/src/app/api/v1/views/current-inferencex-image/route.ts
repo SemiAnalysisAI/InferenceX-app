@@ -73,9 +73,12 @@ export function GET(request: NextRequest) {
         ? 'all'
         : (active.map(imageRowDisplayModel).find((name) => name.toLowerCase() === requestedModel) ??
           resolveModelParam(requestedModel).displayName);
-    const sequences = scenarioOptionsForModel(active, model);
-    const sequence = resolveSelectedScenario(sequences, s.get('sequence') ?? 'agentic-traces');
-    const filters = { model, precision, spec, hardware, nodeType, frameworks, sequence };
+    const scenarios = scenarioOptionsForModel(active, model);
+    const scenario = resolveSelectedScenario(
+      scenarios,
+      s.get('scenario') ?? s.get('sequence') ?? 'agentic-traces',
+    );
+    const filters = { model, precision, spec, hardware, nodeType, frameworks, sequence: scenario };
     const firstSubmitted = firstSubmissionDates(raw);
     const rows = active
       .filter((row) => matchesImageFilters(row, filters))
@@ -86,6 +89,7 @@ export function GET(request: NextRequest) {
         return {
           ...row,
           displayModel: imageRowDisplayModel(row),
+          scenario: imageRowScenario(row),
           sequence: imageRowScenario(row),
           ageDays,
           actualLatest: release?.tag ?? null,
@@ -98,8 +102,8 @@ export function GET(request: NextRequest) {
     return cachedJson(request, {
       apiVersion: 'v1',
       view: 'current-inferencex-image',
-      params: { ...filters, asOf, includeHistory },
-      options: { sequences },
+      params: { ...filters, scenario, asOf, includeHistory },
+      options: { scenarios, sequences: scenarios },
       rows,
       releases: releaseData,
       ageSummary: imageAgeSummary(rows, asOf),

@@ -106,6 +106,20 @@ describe('public evidence projections', () => {
       outdated: true,
       staleAgentx: true,
     });
+    const byScenario = await images(
+      request(
+        'current-inferencex-image',
+        `model=${Model.DeepSeek_V4_1_Flash}&hardware=b200&precision=fp8&frameworks=sglang&spec=none&scenario=agentic-traces&asOf=2026-09-19`,
+      ),
+    );
+    const scenarioBody = await byScenario.json();
+    expect(scenarioBody.rows).toEqual(body.rows);
+    expect(scenarioBody.rows[0].scenario).toBe('agentic-traces');
+    expect(scenarioBody.params).toMatchObject({
+      scenario: 'agentic-traces',
+      sequence: 'agentic-traces',
+    });
+    expect(scenarioBody.options.sequences).toEqual(scenarioBody.options.scenarios);
     const other = await images(
       request('current-inferencex-image', 'nodeType=disagg&hardware=h200&asOf=2026-09-19'),
     );

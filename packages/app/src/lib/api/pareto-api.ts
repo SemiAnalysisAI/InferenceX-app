@@ -12,6 +12,7 @@ export const PARETO_DIRECTIONS = ['min', 'max'] as const;
 export const PARETO_PARAMETERS = [
   'model',
   'rawModel',
+  'scenario',
   'sequence',
   'xMetric',
   'yMetric',
@@ -32,6 +33,8 @@ const metricPattern = /^[a-z][a-z0-9_.]{0,99}$/u;
 export interface ParetoSelection {
   model: string;
   rawModel: string;
+  scenario: string;
+  /** The older name of `scenario`, kept in the response for existing clients. */
   sequence: string;
   xMetric: string;
   yMetric: string;
@@ -60,8 +63,12 @@ export function parseParetoRequest(params: URLSearchParams): {
   const rawModel = params.get('rawModel') ?? '';
   if (!Object.hasOwn(DISPLAY_MODEL_TO_DB, model)) throw new Error('Unknown model');
   if (!DISPLAY_MODEL_TO_DB[model].includes(rawModel)) throw new Error('Unknown rawModel for model');
-  const sequence = params.get('sequence') ?? '';
-  if (!isScenarioKey(sequence)) throw new Error('Unknown sequence');
+  const scenario = params.get('scenario') ?? params.get('sequence') ?? '';
+  if (!isScenarioKey(scenario)) {
+    throw new Error(
+      params.has('sequence') && !params.has('scenario') ? 'Unknown sequence' : 'Unknown scenario',
+    );
+  }
   const xMetric = params.get('xMetric') ?? '';
   const yMetric = params.get('yMetric') ?? '';
   if (!metricPattern.test(xMetric) || !metricPattern.test(yMetric))
@@ -105,7 +112,8 @@ export function parseParetoRequest(params: URLSearchParams): {
     selection: {
       model,
       rawModel,
-      sequence,
+      scenario,
+      sequence: scenario,
       xMetric,
       yMetric,
       xDirection,
@@ -126,9 +134,9 @@ export function computeParetoResponse(
   const selected = rows.filter(
     (row) =>
       row.model === selection.rawModel &&
-      rowToScenario(row) === selection.sequence &&
+      rowToScenario(row) === selection.scenario &&
       row.benchmark_type ===
-        (selection.sequence === 'agentic-traces' ? 'agentic_traces' : 'single_turn') &&
+        (selection.scenario === 'agentic-traces' ? 'agentic_traces' : 'single_turn') &&
       (!selection.hardware || row.hardware === selection.hardware) &&
       (!selection.framework || row.framework === selection.framework) &&
       (!selection.precision || row.precision === selection.precision),

@@ -62,19 +62,31 @@ const parameters: readonly ApiParameter[] = [
     example: 'DeepSeek-V4-Pro',
   },
   {
-    name: 'sequence',
+    name: 'scenario',
     location: 'query',
     required: false,
     type: 'enum',
     description: text(
-      'Benchmark sequence. Aliases like 8k-1k and agentic are accepted.',
-      '基准序列。也接受 8k-1k、agentic 等别名。',
+      'Workload scenario. Aliases like 8k-1k and agentic are accepted.',
+      '工作负载场景。也接受 8k-1k、agentic 等别名。',
     ),
     schema: {
       type: 'string',
       enum: SCENARIO_KEYS,
       default: '8k/1k',
     },
+    example: 'agentic-traces',
+  },
+  {
+    name: 'sequence',
+    location: 'query',
+    required: false,
+    type: 'enum',
+    description: text(
+      'Older name of scenario, still accepted. scenario takes precedence when both are sent, and params returns the resolved value under both names.',
+      'scenario 的旧参数名，仍可使用。同时传入时以 scenario 为准，params 中以两个名称返回解析后的值。',
+    ),
+    schema: { type: 'string', enum: SCENARIO_KEYS },
     example: 'agentic-traces',
   },
   {
@@ -509,6 +521,7 @@ const responseExample = {
   apiVersion: 'v1',
   params: {
     model: 'DeepSeek-V4-Pro',
+    scenario: '8k/1k',
     sequence: '8k/1k',
     metric: 'y_tpPerGpu',
     target: 35,

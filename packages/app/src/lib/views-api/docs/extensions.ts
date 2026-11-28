@@ -154,9 +154,13 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     `${MODEL_PARAM_FORMS.en} Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.`,
     `${MODEL_PARAM_FORMS.zh}基于基准测试的视图需要此参数。镜像视图还接受当前镜像列表中的模型名，去除首尾空白后匹配，默认 all；未知模型返回 400。`,
   ],
+  scenario: [
+    'Workload scenario: 1k/1k, 1k/8k, 8k/1k or agentic-traces. AgentX extension views default to agentic-traces.',
+    '工作负载场景：1k/1k、1k/8k、8k/1k 或 agentic-traces。AgentX 扩展视图默认使用 agentic-traces。',
+  ],
   sequence: [
-    'Workload: 1k/1k, 1k/8k, 8k/1k or agentic-traces. AgentX extension views default to agentic-traces.',
-    '工作负载：1k/1k、1k/8k、8k/1k 或 agentic-traces。AgentX 扩展视图默认使用 agentic-traces。',
+    'Older name of scenario, still accepted. scenario takes precedence when both are sent, and params returns the resolved value under both names.',
+    'scenario 的旧参数名，仍可使用。同时传入时以 scenario 为准，params 中以两个名称返回解析后的值。',
   ],
   date: [
     'Snapshot cutoff date, YYYY-MM-DD. runId selects an exact logical run snapshot instead.',
@@ -638,7 +642,7 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
             'Single run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells and overlayDeploymentCells. A stored run keeps its actual approval. A run absent from the five History pages is read live from the JSON documents of its public native h3-results artifacts and is always unapproved, with publishedAt null and no media. The selected run is excluded from official cells. Unknown, unreadable or ineligible runs return no overlay. No storage or publication is triggered.',
             '单个运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行只放入 overview 中独立的 overlayCells 和 overlayDeploymentCells，并从正式结果中排除。已存储的运行保留实际批准状态；不在前五页 History 中的运行，会从其公开的原生 h3-results 产物实时读取 JSON 文档，始终视为未批准，publishedAt 为 null，且不附带媒体。未知、无法读取或未达准入要求的运行不返回叠加结果。该参数不会触发存储或发布。',
           ]
-        : view === 'current-inferencex-image' && name === 'sequence'
+        : view === 'current-inferencex-image' && name === 'scenario'
           ? ([
               'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
               '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',

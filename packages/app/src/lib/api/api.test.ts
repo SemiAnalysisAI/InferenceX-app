@@ -77,7 +77,7 @@ describe('fetchBenchmarks', () => {
     );
   });
 
-  it('requests the compact calculator view for one sequence', async () => {
+  it('requests the compact calculator view for one scenario', async () => {
     mockOk([]);
     await fetchBenchmarks(
       'DeepSeek-R1-0528',
@@ -92,7 +92,7 @@ describe('fetchBenchmarks', () => {
       },
     );
     expect(mockFetch).toHaveBeenCalledWith(
-      '/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&sequence=agentic-traces',
+      '/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&scenario=agentic-traces',
       expect.objectContaining({}),
     );
   });
