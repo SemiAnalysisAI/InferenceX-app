@@ -153,7 +153,7 @@ export function ReferencePsnrWidget({
       <figure className="m-0">
         <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-medium">{t.title}</span>
-          <span className="rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
+          <span className="pill pill-px-2 pill-py-0.5 border border-border/60 text-xs text-muted-foreground">
             {t.measured}
           </span>
         </div>

@@ -257,6 +257,33 @@ html[data-inferencex-embed] .autumn-leaves {
   max-width: 96rem;
 }
 
+/* Round caps hide r·(1 − π/4) of inline space, so text ends get that back. */
+@utility pill {
+  --pill-edge: calc((var(--pill-py) + 0.5lh) * (1 - pi / 4));
+  border-radius: calc(infinity * 1px);
+  padding-block: var(--pill-py);
+  padding-inline: calc(var(--pill-px) + var(--pill-edge));
+  gap: max(var(--pill-py), var(--pill-px) - (1lh - 1cap) / 2);
+}
+
+@utility pill-px-* {
+  --pill-px: --spacing(--value(number));
+}
+
+@utility pill-py-* {
+  --pill-py: --spacing(--value(number));
+}
+
+/* Cancels the start padding so a 1lh icon box sits concentric with the cap. */
+@utility pill-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1lh;
+  height: 1lh;
+  margin-inline-start: calc(var(--pill-py) - var(--pill-px) - var(--pill-edge));
+}
+
 :root {
   --radius: 0.625rem;
 
