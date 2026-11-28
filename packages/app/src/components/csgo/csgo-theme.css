@@ -1,72 +1,2220 @@
+@font-face {
+  font-family: 'CsgoDisplay';
+  src: url('../../app/fonts/Csgo-Rajdhani-700.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CsgoDisplay';
+  src: url('../../app/fonts/Csgo-Rajdhani-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CsgoBody';
+  src: url('../../app/fonts/Csgo-Barlow-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CsgoBody';
+  src: url('../../app/fonts/Csgo-Barlow-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
+html.csgo {
+  --overlay-run-0: #5aa7ff;
+  --overlay-run-1: #e07a2f;
+  --overlay-run-2: #de4b4b;
+  --overlay-run-3: #7dffb3;
+  --overlay-run-4: #e6bd68;
+  --overlay-run-5: #c9b7ff;
+  --overlay-run-6: #8fd0e8;
+  --overlay-run-7: #f2f0e6;
+  --csgo-brass: #e6bd68;
+  --csgo-ink: #101820;
+  --csgo-panel: #18232df2;
+  --csgo-ct: #8eb7d4;
+  --csgo-t: #e07a2f;
+  --csgo-radar: #7dffb3;
+  --csgo-bomb: #de4b4b;
+  cursor:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M12 2v6M12 16v6M2 12h6M16 12h6' stroke='%23e6bd68' stroke-width='1.4'/><circle cx='12' cy='12' r='2' fill='none' stroke='%23e6bd68'/></svg>")
+      12 12,
+    crosshair;
+}
+
+html.csgo[data-csgo-side='t'] {
+  --background: #1a120c;
+  --foreground: #f6efe6;
+  --card: #2a1c12;
+  --popover: #24180f;
+  --primary: #e07a2f;
+  --primary-foreground: #1a120c;
+  --secondary: #e6bd68;
+  --muted: #3a281c;
+  --accent: #4a3020;
+  --border: #8a6244;
+  --ring: #e07a2f;
+  --overlay-run-0: #e07a2f;
+  --overlay-run-1: #e6bd68;
+  --overlay-run-3: #f0c8a0;
+}
+
+html.csgo[data-csgo-side='night'] .csgo-scene-shade {
+  background: linear-gradient(180deg, #04140c66, #04140ce8);
+}
+
+html.csgo[data-csgo-side='t'] .csgo-scene-shade {
+  background: linear-gradient(180deg, #1a120c55, #1a120ce0);
+}
+
+html.csgo[data-csgo-side='day'] {
+  color-scheme: light;
+  background-color: #f4efe4;
+  color: #1c140c;
+  --background: #f4efe4;
+  --foreground: #1c140c;
+  --card: #fffaf2;
+  --card-foreground: #1c140c;
+  --popover: #fffaf2;
+  --popover-foreground: #1c140c;
+  --primary: #8a5a12;
+  --primary-foreground: #fffaf2;
+  --secondary: #1d4e7a;
+  --secondary-foreground: #fffaf2;
+  --muted: #e7dcc8;
+  --muted-foreground: #3a3126;
+  --accent: #efe4d0;
+  --accent-foreground: #1c140c;
+  --border: #8a7356;
+  --border-alt: #cbbba0;
+  --input: #8a7356;
+  --ring: #8a5a12;
+  --brand: #8a5a12;
+  --brand-fill: #8a5a12;
+  --sidebar: #fffaf2;
+  --sidebar-foreground: #1c140c;
+  --sidebar-primary: #8a5a12;
+  --sidebar-primary-foreground: #fffaf2;
+  --sidebar-accent: #efe4d0;
+  --sidebar-accent-foreground: #1c140c;
+  --sidebar-border: #8a7356;
+  --sidebar-ring: #8a5a12;
+  --chart-grid: #cbbba0;
+  --overlay-run-0: #1d4e7a;
+  --overlay-run-1: #b45309;
+  --overlay-run-2: #9f1239;
+  --overlay-run-3: #3f6212;
+  --overlay-run-4: #8a5a12;
+  --overlay-run-5: #5b21b6;
+  --overlay-run-6: #0f766e;
+  --overlay-run-7: #44403c;
+}
+
+/* Day tokens are light, but the scene, header and chart floor are painted
+   with their own dark fills. Pair those fills with the light ink, or the
+   last mode the capture script lands in is dark text on a dark page. */
+html.csgo[data-csgo-side='day'] body,
+html.csgo[data-csgo-side='day'] .vt-site-header,
+html.csgo[data-csgo-side='day'] [data-slot='card'],
+html.csgo[data-csgo-side='day'] [data-testid='chart-figure'] {
+  background-color: #fffaf2;
+  color: #1c140c;
+}
+
+/* Points and series lines are painted on a canvas under the SVG, then the SVG
+   copies are hidden. An opaque SVG background covers that canvas. */
+html.csgo[data-csgo-side='day'] [data-testid='d3-chart-svg'] {
+  background-color: transparent;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .vt-site-header {
+  background-color: #f4efe4;
+}
+
+html.csgo[data-csgo-side='day'] .vt-site-header :is(a, button),
+html.csgo[data-csgo-side='day'] [data-testid='unofficial-domain-notice'] {
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] :is(h1, h2, h3, [data-slot='card-title']) {
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .text-muted-foreground,
+html.csgo[data-csgo-side='day'] [data-testid='d3-chart-svg'] text {
+  color: #3a3126;
+  fill: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-scene {
+  background: #efe6d4;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-scene-image {
+  opacity: 0.2;
+  filter: sepia(0.3) brightness(1.6) saturate(0.65);
+}
+
+html.csgo[data-csgo-side='day'] .csgo-scene-shade {
+  background: linear-gradient(180deg, #f4efe4d4, #f4efe4f2 34%, #f4efe4);
+}
+
+html.csgo[data-csgo-side='day'] .csgo-radar-grid {
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-rank,
+html.csgo[data-csgo-side='day'] .csgo-score strong,
+html.csgo[data-csgo-side='day'] .csgo-medals span {
+  background: #fffaf2;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-ops-dialog {
+  background: #fffaf2;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-mode-pick button,
+html.csgo[data-csgo-side='day'] .csgo-ops-bar button,
+html.csgo[data-csgo-side='day'] .csgo-ops-hud,
+html.csgo[data-csgo-side='day'] .csgo-ops-hud span {
+  color: #1c140c;
+  background-color: #efe4d0;
+}
+
+html.csgo[data-csgo-side='day'] [data-testid='chart-figure'] {
+  scroll-margin-top: 4.75rem;
+}
+
+html.csgo[data-csgo-side='night'] {
+  --background: #070b0a;
+  --foreground: #e7f6ee;
+  --card: #0d1612;
+  --popover: #101c16;
+  --primary: #7dffb3;
+  --primary-foreground: #06210f;
+  --secondary: #8eb7d4;
+  --muted: #15241c;
+  --accent: #1a2e24;
+  --border: #2f6b4a;
+  --ring: #7dffb3;
+  --overlay-run-0: #7dffb3;
+  --overlay-run-3: #5aa7ff;
+  --overlay-run-4: #d6ffe8;
+}
+
+html.csgo {
+  background-color: #101820;
+}
+
+.csgo body {
+  --font-dm-sans:
+    'CsgoBody', 'Barlow', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background-color: transparent;
+}
+
+.csgo :is(h1, h2, h3, [data-slot='card-title'], [data-testid='inferencex-wordmark']) {
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.csgo :is(code, kbd, samp) {
+  font-family: 'CsgoDisplay', 'Rajdhani', ui-monospace, monospace;
+  border: 1px solid var(--csgo-brass);
+  background: #101820;
+  color: var(--csgo-brass);
+  padding: 0 0.3em;
+  border-radius: 2px;
+}
+
+.csgo ::selection {
+  background: #e6bd68;
+  color: #101820;
+}
+
+.csgo {
+  scrollbar-color: var(--csgo-brass) #101820;
+}
+
+.csgo::-webkit-scrollbar,
+.csgo *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.csgo::-webkit-scrollbar-thumb,
+.csgo *::-webkit-scrollbar-thumb {
+  background: linear-gradient(#e6bd68, #8a6a2e);
+  border: 2px solid #101820;
+}
+
+.csgo .circuit-bg,
+.csgo .autumn-leaves,
+html[data-inferencex-embed] .csgo-scene,
+html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
+  display: none;
+}
+
 .csgo-scene {
   position: fixed;
   inset: 0;
-  z-index: -10;
+  z-index: -1;
   pointer-events: none;
   overflow: hidden;
+  background: #101820;
 }
 
 .csgo-scene-image,
-.csgo-scene-shade {
+.csgo-scene-shade,
+.csgo-radar-grid,
+.csgo-sweep {
   position: absolute;
-  width: 100%;
-  height: 100%;
   inset: 0;
 }
 
 .csgo-scene-image {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  object-position: center top;
+  object-position: center 30%;
+  transform: translateY(calc(var(--csgo-scroll, 0) * -0.08px));
+}
+
+.csgo-radar-grid {
+  background:
+    linear-gradient(#7dffb314 1px, transparent 1px),
+    linear-gradient(90deg, #7dffb314 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: 0 calc(var(--csgo-scroll, 0) * -0.22px);
+  mix-blend-mode: screen;
+  opacity: 0.55;
 }
 
 .csgo-scene-shade {
-  background: linear-gradient(180deg, #10182088, #101820d9 65%, #101820f5);
+  background: linear-gradient(180deg, #10182066, #101820d0 38%, #101820f6);
 }
 
-.csgo-theme-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-block: 1rem;
-  padding: 0.5rem 1rem;
-  border-left: 3px solid var(--primary);
-  background: linear-gradient(90deg, #18232deb, #18232d66);
+.csgo-sweep {
+  background:
+    linear-gradient(105deg, transparent 38%, #e6bd68dd 49%, #7dffb3cc 54%, transparent 66%),
+    repeating-radial-gradient(
+      circle at 72% 34%,
+      transparent 0 70px,
+      #7dffb355 70px 72px,
+      transparent 72px 140px
+    );
+  mix-blend-mode: screen;
+  transform-origin: 72% 34%;
+  opacity: 0.32;
 }
 
-.csgo-theme-banner img {
-  width: clamp(10rem, 22vw, 15rem);
-  height: auto;
+@media (prefers-reduced-motion: no-preference) {
+  .csgo-sweep {
+    animation: csgo-radar 14s linear infinite;
+  }
 }
 
-.csgo-theme-banner span {
-  flex-shrink: 0;
+@keyframes csgo-sweep {
+  from {
+    transform: translateX(-60%);
+  }
+  to {
+    transform: translateX(60%);
+  }
+}
+
+@keyframes csgo-radar {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .csgo header {
-  background: #101820ed;
+  background: #101820f2;
   border-bottom: 2px solid var(--primary);
+  box-shadow: inset 0 -1px 0 #ffffff14;
 }
 
-.csgo :is(button, [role='button'], [role='combobox'], input, textarea):focus-visible {
+.csgo header a[aria-current='page'],
+.csgo [data-slot='dashboard-navigation'] [data-tab-active='true'] {
+  background: #e6bd6822;
+  color: var(--csgo-brass);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+.csgo [data-testid='header-brand'] {
+  border: 1px solid #e6bd6888;
+  padding: 0.15rem 0.4rem;
+  background: #101820cc;
+}
+
+.csgo [data-testid='inferencex-wordmark'] {
+  color: var(--csgo-brass);
+  text-shadow: 0 1px 0 #000;
+}
+
+.csgo :is(button, [data-slot='button'], [role='button']) {
+  border: 1px solid #e6bd6888;
+  background: linear-gradient(#243240, #18232d);
+  color: var(--foreground);
+  box-shadow:
+    inset 0 1px 0 #ffffff22,
+    0 2px 0 #00000055;
+  transition:
+    transform 80ms linear,
+    background 80ms linear,
+    box-shadow 80ms linear;
+}
+
+.csgo :is(button, [data-slot='button'], [role='button']):hover {
+  background: linear-gradient(#314556, #1e2c38);
+  border-color: var(--csgo-brass);
+}
+
+.csgo :is(button, [data-slot='button'], [role='button']):active {
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 0 #00000066;
+}
+
+.csgo
+  :is(
+    button,
+    [role='button'],
+    [role='combobox'],
+    input,
+    textarea,
+    [data-slot='switch']
+  ):focus-visible {
   outline: 2px solid var(--ring);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
-.csgo :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
-  border-radius: var(--radius);
+.csgo
+  :is(
+    [data-slot='card'],
+    [data-slot='select-trigger'],
+    [data-slot='tabs-list'],
+    [data-slot='dialog-content']
+  ) {
+  border-radius: 2px;
 }
 
 .csgo [data-slot='card'] {
-  background-color: #18232df5;
-  border-top-color: var(--primary);
+  background: var(--csgo-panel);
+  border-top: 2px solid var(--primary);
+  box-shadow: 0 0 0 1px #ffffff10;
 }
 
-.csgo .autumn-leaves,
-html[data-inferencex-embed] .csgo-scene {
+.csgo [data-slot='card-header'] {
+  background: linear-gradient(90deg, #e6bd6824, transparent 70%);
+}
+
+.csgo [data-slot='tabs-list'],
+.csgo [data-slot='dashboard-navigation'] {
+  background: #101820e6;
+  border: 1px solid #60707c;
+  padding: 2px;
+}
+
+.csgo [data-slot='tabs-trigger'][data-state='active'] {
+  background: var(--csgo-brass);
+  color: #101820;
+}
+
+.csgo :is(input, textarea, [data-slot='select-trigger'], [data-slot='input']) {
+  background: #0c141c;
+  border: 1px solid #60707c;
+  box-shadow: inset 0 2px 0 #00000055;
+  color: var(--foreground);
+}
+
+.csgo
+  :is(
+    [data-slot='select-content'],
+    [data-slot='popover-content'],
+    [role='menu'],
+    [role='tooltip'],
+    [data-chart-tooltip]
+  ) {
+  background: #101820f5;
+  border: 1px solid var(--csgo-brass);
+  color: #f0eee7;
+  border-radius: 2px;
+}
+
+.csgo [data-slot='select-item'][data-highlighted],
+.csgo [role='option']:hover {
+  background: #e6bd6833;
+  color: var(--csgo-brass);
+}
+
+.csgo [data-slot='switch'] {
+  border: 1px solid var(--csgo-brass);
+  background: #101820;
+}
+
+.csgo [data-slot='switch'][data-state='checked'] {
+  background: #1d4d32;
+}
+
+.csgo [data-slot='switch-thumb'] {
+  background: var(--csgo-brass);
+}
+
+.csgo [data-slot='badge'] {
+  border: 1px solid var(--csgo-ct);
+  background: #101820cc;
+  color: var(--csgo-ct);
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.csgo table.w-full {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.csgo table.w-full th {
+  background: #101820;
+  color: var(--csgo-brass);
+  border-bottom: 1px solid var(--csgo-brass);
+  text-transform: uppercase;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+}
+
+.csgo table.w-full td {
+  border-bottom: 1px solid #60707c66;
+}
+
+.csgo table.w-full tr:nth-child(even) td {
+  background: #ffffff08;
+}
+
+.csgo [data-slot='skeleton'] {
+  background: repeating-linear-gradient(-45deg, #1c2833, #1c2833 8px, #243240 8px, #243240 16px);
+  position: relative;
+  overflow: hidden;
+}
+
+.csgo [data-slot='skeleton']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #7dffb355, transparent);
+  animation: csgo-sweep 1.6s linear infinite;
+}
+
+.csgo [data-slot='empty-state'],
+.csgo [data-testid='scatter-empty-state'] {
+  border: 1px dashed var(--csgo-radar);
+  background: radial-gradient(circle at 50% 50%, #7dffb322, transparent 42%), #101820cc;
+  color: var(--csgo-radar);
+}
+
+.csgo [data-testid='scatter-empty-state'] h3,
+.csgo [data-testid='scatter-empty-state'] p {
+  color: #f0eee7;
+}
+
+.csgo [data-testid='scatter-empty-state'] button {
+  min-height: 2.5rem;
+  color: #101820;
+  background: #e6bd68;
+  pointer-events: auto;
+}
+
+.csgo [data-testid='scatter-empty-state']::before {
+  content: 'NO CONTACT';
+  display: block;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.14em;
+  margin-bottom: 0.4rem;
+  color: #7dffb3;
+}
+
+html[data-csgo-locale='zh'] [data-testid='scatter-empty-state']::before {
+  content: '无接触';
+}
+
+.csgo div.flex.grow.flex-col.items-center.justify-center {
+  border: 1px solid var(--csgo-bomb);
+  box-shadow:
+    inset 0 0 0 4px #101820,
+    0 0 24px #de4b4b33;
+  margin: 1rem;
+}
+
+.csgo div.flex.grow.flex-col.items-center.justify-center [data-slot='eyebrow'] {
+  color: var(--csgo-bomb);
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 2rem;
+}
+
+.csgo .grid line {
+  stroke: #7dffb333;
+}
+
+.csgo .roofline-path,
+.csgo .overlay-roofline-path,
+.csgo .global-pareto-frontier {
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 8 4;
+}
+
+.csgo .legend text,
+.csgo .tick text,
+.csgo .axis text {
+  font-family: 'CsgoBody', 'Barlow', 'Noto Sans SC', sans-serif;
+}
+
+.csgo-round-tag {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0 0.3rem;
+  background: var(--csgo-bomb);
+  color: #fff;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 0.7rem;
+}
+
+.csgo-marker {
+  pointer-events: none;
+}
+
+.csgo label.group\/item > span.relative:has(.rounded-full) {
+  width: 16px;
+  height: 16px;
+}
+
+.csgo label.group\/item > span.relative > span.rounded-full,
+.csgo .csgo-legend-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  clip-path: circle(46%);
+  filter: drop-shadow(0 0 0.6px #101820);
+}
+
+.csgo label.group\/item:nth-child(4n + 2) :is(.csgo-legend-swatch, span.rounded-full) {
+  clip-path: none;
+  border-radius: 1px;
+}
+
+.csgo label.group\/item:nth-child(4n + 3) :is(.csgo-legend-swatch, span.rounded-full) {
+  clip-path: polygon(50% 4%, 96% 96%, 4% 96%);
+}
+
+.csgo label.group\/item:nth-child(4n + 4) :is(.csgo-legend-swatch, span.rounded-full) {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.csgo-shape-key {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.csgo-shape-key svg {
+  overflow: visible;
+  flex: none;
+}
+
+.csgo-theme-banner {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-left: 4px solid var(--primary);
+  background:
+    linear-gradient(90deg, #101820f2, #18232d99),
+    repeating-linear-gradient(-45deg, transparent, transparent 8px, #ffffff08 8px, #ffffff08 9px);
+}
+
+.csgo-figures {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.csgo-fig {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  border: 2px solid #5aa7ff;
+}
+
+.csgo-fig[data-side='t'] {
+  border-color: #e07a2f;
+}
+
+.csgo-fig img {
+  display: block;
+  height: 9.5rem;
+  width: auto;
+  max-width: 7.2rem;
+  object-fit: contain;
+  object-position: center bottom;
+  background: #000;
+}
+
+.csgo-fig[data-pose='aim'] img {
+  transform: translateX(8px) rotate(-3deg);
+}
+
+.csgo-fig[data-pose='fire'] {
+  box-shadow: 0 0 0 3px #e6bd68;
+}
+
+.csgo-fig[data-pose='fire']::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  right: 0.15rem;
+  top: 34%;
+  width: 1.6rem;
+  height: 0.4rem;
+  background: #ffe08a;
+  box-shadow: 0 0 0 2px #8a5a12;
+}
+
+.csgo-fig[data-pose='fire'] img {
+  transform: translateX(6px) rotate(-6deg);
+  filter: brightness(1.55);
+}
+
+.csgo-fig[data-react='duck'] img {
+  transform: translateY(3.4rem) scaleY(0.62);
+  transform-origin: center bottom;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .csgo-fig[data-pose='idle'] img {
+    animation: csgo-bob 1.6s ease-in-out infinite;
+  }
+}
+
+.csgo-fig figcaption {
+  margin: 0;
+  padding: 0.05rem 0.35rem 0.15rem;
+  text-align: center;
+  background: #101820;
+  color: #f0eee7;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+}
+
+@media (min-width: 960px) {
+  .csgo-theme-banner:not([data-compact='true']) {
+    position: relative;
+    padding-right: 17.5rem;
+  }
+
+  .csgo-figures {
+    position: absolute;
+    right: 1rem;
+    bottom: 0.85rem;
+  }
+
+  .csgo-fig img {
+    height: 16rem;
+    max-width: 8.5rem;
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-cast {
+    width: 100%;
+    max-height: 9rem;
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-cast img {
+    flex: 1 1 0;
+    width: 0;
+    max-width: none;
+    height: 8.5rem;
+  }
+}
+
+.csgo-banner-top,
+.csgo-banner-actions,
+.csgo-side-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.csgo-banner-top img {
+  width: clamp(7.5rem, 28vw, 13rem);
+  height: auto;
+}
+
+.csgo-word {
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: clamp(1.4rem, 4vw, 2.4rem);
+  line-height: 0.9;
+  color: var(--csgo-brass);
+  text-shadow: 2px 2px 0 #000;
+}
+
+.csgo-rank {
+  margin-left: auto;
+  border: 1px solid var(--csgo-brass);
+  padding: 0.35rem 0.6rem;
+  min-width: 7rem;
+  background: #101820cc;
+}
+
+.csgo-rank strong,
+.csgo-splash {
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.csgo-splash {
+  color: var(--csgo-t);
+  min-height: 1.25rem;
+}
+
+.csgo-banner-actions > button,
+.csgo-side-row button {
+  min-height: 2.5rem;
+  padding: 0.35rem 0.8rem;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-width: 2px;
+}
+
+.csgo-side-row button[data-side='ct'] {
+  border-left: 5px solid #5aa7ff;
+}
+
+.csgo-side-row button[data-side='t'] {
+  border-left: 5px solid #e07a2f;
+}
+
+.csgo-side-row button[data-side='night'] {
+  border-left: 5px solid #7dffb3;
+}
+
+.csgo-side-row button[data-side='day'] {
+  border-left: 5px solid #8a5a12;
+  color: #1c140c;
+  background: #f4efe4;
+}
+
+.csgo-side-row button[data-side='ct'][aria-pressed='true'] {
+  background: #1d4e7a;
+  color: #e7f3ff;
+  border-color: #5aa7ff;
+}
+
+.csgo-side-row button[data-side='t'][aria-pressed='true'] {
+  background: #8a3e12;
+  color: #ffe7d2;
+  border-color: #e07a2f;
+}
+
+.csgo-side-row button[data-side='night'][aria-pressed='true'] {
+  background: #143528;
+  color: #d6ffe8;
+  border-color: #7dffb3;
+}
+
+.csgo-side-row button[data-side='day'][aria-pressed='true'] {
+  background: #fffaf2;
+  color: #1c140c;
+  border-color: #8a5a12;
+}
+
+.csgo-banner-actions > button[data-testid='csgo-play'] {
+  background: linear-gradient(#3a4a28, #243018);
+  border-color: #8ea84a;
+  color: #e7f0c8;
+}
+
+.csgo-banner-actions > button[data-csgo-silent] {
+  min-width: 2.8rem;
+  background: linear-gradient(#5a2424, #3a1616);
+  border-color: #de4b4b;
+  color: #ffd0d0;
+}
+
+.csgo-score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.7rem;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.08em;
+  color: #d7e2ea;
+}
+
+.csgo-score strong {
+  min-width: 3.2rem;
+  text-align: center;
+  color: #f4f7f2;
+  background: #101820;
+  border: 1px solid #7dffb3;
+  padding: 0.1rem 0.45rem;
+}
+
+.csgo-score [data-side='ct'] {
+  color: #8ec4ff;
+}
+
+.csgo-score [data-side='t'] {
+  color: #ffb07a;
+}
+
+.csgo-cast {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-end;
+  overflow: hidden;
+  max-height: 7.5rem;
+}
+
+.csgo-cast img {
+  height: 6.5rem;
+  width: auto;
+  max-width: 28%;
+  object-fit: cover;
+  object-position: center 30%;
+  border: 1px solid #101820;
+  flex: none;
+}
+
+.csgo-line {
+  margin: 0;
+  color: #7dffb3;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.csgo-maps,
+.csgo-radio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.csgo-maps button,
+.csgo-radio button {
+  min-height: 2.5rem;
+  padding: 0.2rem 0.55rem;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.csgo-redraw {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 18%;
+  height: 42%;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  align-items: center;
+  justify-items: center;
+  pointer-events: none;
+  color: #ffb07a;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.18em;
+  border: 2px dashed #e07a2f;
+  background:
+    linear-gradient(#10182088, #10182088),
+    repeating-linear-gradient(90deg, transparent, transparent 28px, #e07a2f55 28px, #e07a2f55 30px);
+}
+
+.csgo-redraw i {
+  width: 70%;
+  height: 8px;
+  background: #e07a2f;
+}
+
+.csgo-jump {
+  pointer-events: none;
+}
+
+.csgo-gutter {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 2.8rem;
+  max-height: 3.4rem;
+  margin: 0 0 0.35rem;
+  padding: 0.2rem 0.4rem;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  background: #101820f2;
+  color: #f0eee7;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+
+.csgo-gutter-scope {
+  width: 1.7rem;
+  height: 1.7rem;
+  flex: none;
+  border: 2px solid #7dffb3;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 5px #101820,
+    inset 0 0 0 6px #7dffb3;
+}
+
+.csgo-gutter img {
+  height: 2.4rem;
+  width: auto;
+  max-width: 5.5rem;
+  object-fit: cover;
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .csgo-gutter {
+    max-height: none;
+    flex-wrap: wrap;
+    row-gap: 0.2rem;
+  }
+
+  .csgo-gutter span {
+    flex: 1 1 8rem;
+  }
+
+  .csgo-gutter img {
+    height: 1.7rem;
+  }
+
+  .csgo-fig img {
+    height: 7.5rem;
+    max-width: 38vw;
+  }
+
+  .csgo-figures {
+    justify-content: flex-start;
+  }
+}
+
+.csgo-gutter img.csgo-gutter-fig {
+  height: 2.5rem;
+  width: auto;
+  max-width: 1.7rem;
+  object-fit: contain;
+  object-position: center bottom;
+  background: #000;
+  border: 1px solid #5aa7ff;
+}
+
+.csgo-gutter img.csgo-gutter-fig[data-side='t'] {
+  border-color: #e07a2f;
+}
+
+.csgo-op {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 4.5rem;
+  padding: 0.15rem;
+  border: 2px solid #8eb7d4;
+  background: #101820cc;
+  color: #f0eee7;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.csgo-op img {
+  height: 4.2rem;
+  width: auto;
+  object-fit: cover;
+}
+
+.csgo-op[data-pose='aim'] img {
+  transform: translateX(6px) scale(1.04);
+}
+
+.csgo-op[data-pose='fire'] {
+  border-color: #e07a2f;
+}
+
+.csgo-op[data-pose='fire'] img {
+  transform: translateX(10px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .csgo-op[data-pose='idle'] img {
+    animation: csgo-bob 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes csgo-bob {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.csgo-payoff {
+  margin: 0.35rem 0 0;
+  padding: 0.35rem 0.6rem;
+  border-left: 4px solid #e6bd68;
+  background: #101820ee;
+  color: #f0eee7;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+}
+
+.csgo-jump-note {
+  color: #e6bd68;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.csgo-jump {
+  position: absolute;
+  z-index: 4;
+  width: 18px;
+  height: 36px;
+  pointer-events: none;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 1px 0 #101820);
+}
+
+.csgo-medals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.csgo-medals span {
+  border: 1px solid #8a7356;
+  padding: 0.1rem 0.35rem;
+  color: #d7e2ea;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
+.csgo-medals span[data-earned='true'] {
+  border-color: #e6bd68;
+  color: #e6bd68;
+  background: #101820;
+}
+
+.csgo-theme-banner[data-compact='true'] .csgo-splash,
+.csgo-theme-banner[data-compact='true'] .csgo-tag,
+.csgo-theme-banner[data-compact='true'] .csgo-cast,
+.csgo-theme-banner[data-compact='true'] .csgo-maps,
+.csgo-theme-banner[data-compact='true'] .csgo-figures,
+.csgo-theme-banner[data-compact='true'] .csgo-medals {
   display: none;
 }
 
-html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
+.csgo-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.csgo-ops-dialog {
+  width: min(960px, calc(100vw - 1rem));
+  max-width: none;
+  height: min(720px, calc(100dvh - 1rem));
+  padding: 2rem 0.6rem 0.6rem;
+  background: #101820;
+  border: 1px solid var(--csgo-brass);
+  color: #f0eee7;
+  overflow: hidden;
+}
+
+.csgo-ops-dialog > button {
+  color: var(--csgo-brass);
+  border-color: var(--csgo-brass);
+}
+
+.csgo-mode-pick {
+  display: grid;
+  gap: 0.55rem;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  padding-right: 0.2rem;
+}
+
+.csgo-mode-pick button,
+.csgo-ops-bar button,
+.csgo-ops-overlay button {
+  min-height: 2.5rem;
+  padding: 0.35rem 0.7rem;
+  text-align: left;
+}
+
+.csgo-ops {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  flex: 1;
+  height: 100%;
+  gap: 0.4rem;
+  min-height: 0;
+  position: relative;
+}
+
+.csgo-ops canvas {
+  width: 100%;
+  height: 100%;
+  background: #0c1410;
+  touch-action: none;
+}
+
+.csgo-ops-hud,
+.csgo-ops-bar,
+.csgo-sandbox {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 0.85rem;
+}
+
+.csgo-sandbox button[aria-pressed='true'] {
+  border-color: var(--csgo-radar);
+  color: var(--csgo-radar);
+}
+
+.csgo-ops-hud .csgo-sandbox {
+  flex-basis: 100%;
+}
+
+.csgo-ops-hud span,
+.csgo-meter {
+  border: 1px solid #60707c;
+  padding: 0.1rem 0.35rem;
+  background: #101820cc;
+}
+
+.csgo-meter {
+  position: relative;
+  min-width: 5.5rem;
+}
+
+.csgo-meter i {
+  display: block;
+  height: 4px;
+  background: var(--csgo-radar);
+}
+
+.csgo-ops-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.45rem;
+  background: #101820d0;
+  z-index: 2;
+  padding: 1rem;
+  text-align: center;
+  overflow: auto;
+}
+
+.csgo-buy-menu {
+  align-content: start;
+  justify-items: stretch;
+  background:
+    linear-gradient(#1a2418ee, #101810f2),
+    repeating-linear-gradient(90deg, transparent, transparent 18px, #ffffff08 18px, #ffffff08 19px);
+  border: 2px solid #8ea84a;
+}
+
+.csgo-buy-menu strong {
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #d6e7a8;
+}
+
+.csgo-buy-row {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(28rem, 100%);
+  text-align: left;
+}
+
+.csgo-buy-row i {
+  font-style: normal;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  color: #d6e7a8;
+}
+
+.csgo-buy-row b {
+  color: #e6bd68;
+}
+
+.csgo-ops-overlay p,
+.csgo-ops-overlay li {
+  max-width: 38rem;
+}
+
+.csgo-touch {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.csgo-stick {
+  width: 84px;
+  height: 84px;
+  border: 1px solid var(--csgo-brass);
+  border-radius: 50%;
+  position: relative;
+}
+
+@media (pointer: coarse), (max-width: 700px) {
+  .csgo-touch {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .csgo-stick {
+    width: 84px;
+    height: 84px;
+    border: 1px solid var(--csgo-brass);
+    border-radius: 50%;
+    position: relative;
+  }
+}
+
+.csgo-banner-audio {
   display: none;
+}
+
+/* Inside the game dialog the header switches are out of reach, so these always show. */
+.csgo-ops-audio .csgo-banner-audio {
+  display: flex;
+  gap: 0.25rem;
+}
+
+@media (max-width: 639px) {
+  .csgo-banner-audio {
+    display: flex;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .csgo-rank {
+    margin-left: 0;
+  }
+
+  .csgo-cast {
+    max-height: 4.6rem;
+  }
+
+  .csgo-cast img {
+    height: 4.2rem;
+  }
+
+  .csgo-score {
+    font-size: 0.78rem;
+  }
+
+  .csgo header nav a {
+    letter-spacing: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .csgo-sweep,
+  .csgo-sweep::before,
+  .csgo-op img,
+  .csgo [data-slot='skeleton']::after {
+    animation: none;
+  }
+}
+
+/* Day overrides sit after the dark fills. `background` (not background-color)
+   clears the button gradient; a color-only rule left dark ink on that gradient. */
+html.csgo[data-csgo-side='day'] .csgo-theme-banner {
+  background: #fffaf2;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] [data-testid='header-brand'] {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
+html.csgo[data-csgo-side='day'] [data-testid='inferencex-wordmark'] {
+  background: #101820;
+  border: 1px solid #e6bd6888;
+  padding: 0.15rem 0.4rem;
+  color: #e6bd68;
+  text-shadow: none;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-word,
+html.csgo[data-csgo-side='day'] .csgo-tag,
+html.csgo[data-csgo-side='day'] .csgo-score,
+html.csgo[data-csgo-side='day'] .csgo-line {
+  color: #1c140c;
+  text-shadow: none;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-score [data-side='ct'] {
+  color: #1d4e7a;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-score [data-side='t'] {
+  color: #8a3e12;
+}
+
+html.csgo[data-csgo-side='day'] :is(button, [data-slot='button'], [role='button']) {
+  background: #fffaf2;
+  color: #1c140c;
+  border-color: #8a7356;
+}
+
+html.csgo[data-csgo-side='day'] :is(button, [data-slot='button'], [role='button']):hover {
+  background: #efe4d0;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-side-row button[data-side='ct'][aria-pressed='true'] {
+  background: #1d4e7a;
+  color: #e7f3ff;
+  border-color: #5aa7ff;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-side-row button[data-side='t'][aria-pressed='true'] {
+  background: #8a3e12;
+  color: #ffe7d2;
+  border-color: #e07a2f;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-side-row button[data-side='night'][aria-pressed='true'] {
+  background: #143528;
+  color: #d6ffe8;
+  border-color: #7dffb3;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-side-row button[data-side='day'][aria-pressed='true'] {
+  background: #fffaf2;
+  color: #1c140c;
+  border-color: #8a5a12;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-banner-actions > button[data-testid='csgo-play'] {
+  background: #3a4a28;
+  color: #f4ffe0;
+  border-color: #8ea84a;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-banner-actions > button[data-csgo-silent] {
+  background: #5a2424;
+  color: #ffd0d0;
+  border-color: #de4b4b;
+}
+
+html.csgo[data-csgo-side='day'] :is([data-slot='dashboard-navigation'], [data-slot='tabs-list']) {
+  background: #fffaf2;
+  color: #1c140c;
+  border-color: #8a7356;
+}
+
+html.csgo[data-csgo-side='day'] [data-slot='dashboard-navigation'] :is(a, button) {
+  background: transparent;
+  color: #1c140c;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html.csgo[data-csgo-side='day'] [data-slot='dashboard-navigation'] [data-tab-active='true'] {
+  background: #e6bd6844;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day']
+  :is(input, textarea, [data-slot='select-trigger'], [data-slot='input']) {
+  background: #fffaf2;
+  color: #1c140c;
+  border-color: #8a7356;
+}
+
+html.csgo[data-csgo-side='day']
+  :is(
+    [data-slot='select-content'],
+    [data-slot='popover-content'],
+    [role='menu'],
+    [role='tooltip'],
+    [data-chart-tooltip]
+  ) {
+  background: #fffaf2;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-ops-dialog,
+html.csgo[data-csgo-side='day'] .csgo-ops-hud,
+html.csgo[data-csgo-side='day'] .csgo-ops-hud span,
+html.csgo[data-csgo-side='day'] .csgo-mode-pick button,
+html.csgo[data-csgo-side='day'] .csgo-ops-bar button {
+  background: #efe4d0;
+  color: #1c140c;
+}
+
+@media (forced-colors: active) {
+  .csgo-scene,
+  .csgo-marker,
+  .csgo-bar-seam,
+  .csgo-jump,
+  .csgo-gutter-scope {
+    display: none;
+  }
+
+  .csgo .visible-shape {
+    opacity: 1 !important;
+  }
+
+  .csgo :is(button, [data-slot='card'], [data-slot='dialog-content']) {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+/* Round 4: one short band. Home keeps the logo and one still. Other routes keep a strip. */
+.csgo-theme-banner:not([data-compact='true']) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(11rem, 17rem);
+  grid-template-areas:
+    'brand glance'
+    'score glance'
+    'actions glance';
+  gap: 0.25rem 0.7rem;
+  margin-block: 0.15rem;
+  padding: 0.25rem 0.5rem;
+  align-items: stretch;
+}
+
+.csgo-theme-banner:not([data-compact='true']) > * {
+  min-width: 0;
+}
+
+.csgo-brand {
+  grid-area: brand;
+}
+
+.csgo-glance {
+  grid-area: glance;
+}
+
+.csgo-score {
+  grid-area: score;
+}
+
+.csgo-line {
+  grid-area: line;
+}
+
+.csgo-banner-actions {
+  grid-area: actions;
+}
+
+.csgo-theme-banner:not([data-open='true'])
+  :is(.csgo-medals, .csgo-cast, .csgo-splash, .csgo-tag, .csgo-rank) {
+  display: none;
+}
+
+.csgo-glance {
+  position: relative;
+  min-height: 7.25rem;
+  max-height: 9.25rem;
+  overflow: hidden;
+  background: #101820;
+  border: 2px solid #e6bd68;
+}
+
+.csgo-glance-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+}
+
+.csgo-sticker {
+  position: absolute;
+  z-index: 2;
+  top: 0.35rem;
+  left: 0.35rem;
+  padding: 0.1rem 0.35rem;
+  background: #101820e6;
+  color: #e6bd68;
+  border: 1px solid #e6bd68;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-figures {
+  position: absolute;
+  right: 0.15rem;
+  bottom: 0;
+  height: 100%;
+  align-items: flex-end;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-fig img {
+  height: 7.4rem;
+  max-width: 3.6rem;
+}
+
+.csgo-banner-top img {
+  width: min(11rem, 38vw);
+  background: #101820;
+  border: 1px solid #e6bd68;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-score {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-line {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.csgo-banner-actions,
+.csgo-side-row,
+.csgo-maps {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.csgo-banner-actions > button,
+.csgo-side-row button,
+.csgo-maps button {
+  min-width: 2.5rem;
+  flex: none;
+}
+
+@media (max-width: 700px) {
+  .csgo-banner-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .csgo-side-row,
+  .csgo-maps {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: max-content;
+    max-width: none;
+    overflow: visible;
+  }
+}
+
+.csgo-ops-audio {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.csgo-theme-banner[data-compact='true'] {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-block: 0.2rem;
+  padding: 0.25rem 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.csgo-theme-banner[data-compact='true']
+  :is(.csgo-glance, .csgo-word, .csgo-brand-copy, .csgo-rank, .csgo-splash, .csgo-score-extra) {
+  display: none;
+}
+
+.csgo-theme-banner[data-compact='true'] .csgo-line-stack:not(:empty) {
+  position: fixed;
+  z-index: 40;
+  top: 11.5rem;
+  right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-width: 18rem;
+  padding: 0.2rem 0.45rem;
+  background: #101820;
+  border: 1px solid #e6bd68;
+  pointer-events: none;
+}
+
+.csgo-theme-banner[data-compact='true'] .csgo-line-stack .csgo-line {
+  display: block;
+  margin: 0;
+  color: #7dffb3;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+@media (max-width: 700px) {
+  .csgo-theme-banner[data-compact='true'] .csgo-score {
+    position: relative;
+  }
+
+  .csgo-theme-banner[data-compact='true'] .csgo-line-stack:not(:empty) {
+    position: absolute;
+    top: 0;
+    right: auto;
+    left: 0;
+    z-index: 3;
+    max-width: 100%;
+    background: #101820;
+  }
+}
+
+.csgo-theme-banner[data-compact='true'] .csgo-brand {
+  flex: none;
+}
+
+.csgo-theme-banner[data-compact='true'] .csgo-banner-top img {
+  width: 5.6rem;
+}
+
+.csgo-theme-banner[data-compact='true'] .csgo-banner-actions {
+  flex: 1;
+}
+
+html.csgo [data-testid='chart-figure'] {
+  scroll-margin-top: 7.5rem;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-ops-overlay,
+html.csgo[data-csgo-side='day'] .csgo-ops-overlay :is(p, li, strong, span) {
+  background: #fffaf2f2;
+  color: #1c140c;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-ops-overlay button {
+  background: #fffaf2;
+  color: #1c140c;
+  border-color: #8a7356;
+}
+
+@media (max-width: 959px) {
+  .csgo-theme-banner:not([data-compact='true']) {
+    grid-template-columns: minmax(0, 1fr) 8.75rem;
+    grid-template-areas:
+      'brand glance'
+      'score glance'
+      'actions actions';
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-line,
+  .csgo-theme-banner:not([data-compact='true']) .csgo-word,
+  .csgo-theme-banner:not([data-compact='true']) .csgo-score-extra {
+    display: none;
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-glance {
+    min-height: 6.25rem;
+    max-height: 6.75rem;
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-fig img {
+    height: 5.6rem;
+    max-width: 2.7rem;
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-banner-top img {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 960px) {
+  .csgo-theme-banner:not([data-compact='true']) {
+    padding-right: 0.55rem;
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-figures {
+    position: absolute;
+    right: 0.15rem;
+    bottom: 0;
+  }
+
+  .csgo-theme-banner:not([data-compact='true']) .csgo-fig img {
+    height: 8.6rem;
+    max-width: 4.2rem;
+  }
+}
+
+/* Day surfaces lose to later utilities unless marked important. Dark ink on a
+   navy card is the failure the last mode lands on. */
+html.csgo[data-csgo-side='day'] {
+  --background: #f4efe4 !important;
+  --foreground: #1c140c !important;
+  --card: #fffaf2 !important;
+  --card-foreground: #1c140c !important;
+  --popover: #fffaf2 !important;
+  --popover-foreground: #1c140c !important;
+  --muted: #e7dcc8 !important;
+  --muted-foreground: #3a3126 !important;
+  --accent: #efe4d0 !important;
+  --accent-foreground: #1c140c !important;
+  --border: #8a7356 !important;
+  --input: #fffaf2 !important;
+  --sidebar: #fffaf2 !important;
+  --sidebar-foreground: #1c140c !important;
+  --csgo-panel: #fffaf2 !important;
+  background-color: #f4efe4 !important;
+  color: #1c140c !important;
+}
+
+html.csgo[data-csgo-side='day']
+  :is(
+    body,
+    [data-slot='card'],
+    [data-slot='card-header'],
+    [data-slot='card-content'],
+    thead,
+    th,
+    [data-testid='chart-figure']
+  ) {
+  background-color: #fffaf2 !important;
+  background-image: none !important;
+  color: #1c140c !important;
+}
+
+html.csgo[data-csgo-side='day'] [data-testid='d3-chart-svg'] {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+html.csgo[data-csgo-side='day']
+  :is(
+    .text-foreground,
+    .text-card-foreground,
+    .text-muted-foreground,
+    [data-slot='heading'],
+    [data-slot='card-title']
+  ) {
+  color: #1c140c !important;
+}
+
+html.csgo[data-csgo-side='day'] header {
+  background: #fffaf2 !important;
+  background-image: none !important;
+  color: #1c140c !important;
+  box-shadow: none;
+}
+
+html.csgo[data-csgo-side='day'] header :is(a, button, span, p) {
+  color: #1c140c !important;
+}
+
+html.csgo[data-csgo-side='day'] [data-testid='inferencex-wordmark'],
+html.csgo[data-csgo-side='day'] [data-testid='inferencex-wordmark'] span {
+  background-color: transparent !important;
+  color: #8a5a12 !important;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-banner-top img {
+  background-color: #101820 !important;
+}
+
+.csgo-banner-actions > button,
+.csgo-maps button,
+.csgo-side-row button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-ops-overlay,
+html.csgo[data-csgo-side='day'] .csgo-ops-overlay :is(p, li, strong, span) {
+  background: #fffaf2f2 !important;
+  color: #1c140c !important;
+}
+
+html.csgo[data-csgo-side='day'] .csgo-ops-overlay button {
+  background: #fffaf2 !important;
+  color: #1c140c !important;
+}
+
+.csgo-fig[data-pose='duck'] img,
+.csgo-fig[data-pose='plant'] img {
+  transform-origin: center bottom;
+}
+
+.csgo-fig[data-pose='duck'] img {
+  transform: translateY(3.4rem) scaleY(0.62);
+}
+
+.csgo-fig[data-pose='plant'] img {
+  transform: translateY(1.1rem) rotate(7deg);
+}
+
+.csgo-fig[data-pose='plant']::after {
+  content: 'C4';
+  position: absolute;
+  left: 0.2rem;
+  bottom: 1.5rem;
+  color: #de4b4b;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+.csgo-line-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.csgo-line span + span {
+  margin-left: 0.45rem;
+}
+
+.csgo-theme-banner:not([data-compact='true']) {
+  position: relative;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-egg-clue,
+.csgo-theme-banner:not([data-compact='true']) .csgo-line-index {
+  position: absolute;
+  z-index: 4;
+  margin: 0;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-egg-clue {
+  top: 3.15rem;
+  left: 0.45rem;
+  max-width: min(34rem, 68%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #101820;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-line-index {
+  top: auto;
+  bottom: -1.35rem;
+  left: 0.45rem;
+  right: 0.45rem;
+  max-height: 1.2rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+  background: #101820;
+}
+
+.csgo-theme-banner:not([data-compact='true']) .csgo-line-index li {
+  padding: 0.02rem 0.28rem;
+  font-size: 0.62rem;
+  line-height: 1.15;
+}
+
+@media (max-width: 700px) {
+  .csgo-theme-banner:not([data-compact='true']) .csgo-line-index li {
+    padding-right: 0.08rem;
+    padding-left: 0.08rem;
+    letter-spacing: 0;
+  }
+}
+
+.csgo-line-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.csgo-line-index li {
+  border: 1px solid #8a7356;
+  padding: 0.1rem 0.35rem;
+  color: #d7e2ea;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.csgo-line-index li[data-found='true'] {
+  border-color: #e6bd68;
+  color: #e6bd68;
+}
+
+.csgo-egg-clue,
+.csgo-egg-next {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin-top: 0.35rem;
+  color: #e6bd68;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.csgo-defuse {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+  padding: 0.35rem;
+  border: 1px solid #de4b4b;
+  background: #101820;
+  color: #f0eee7;
+  pointer-events: none;
+}
+
+.csgo-defuse img {
+  width: 7rem;
+  height: 4rem;
+  object-fit: cover;
+  filter: sepia(0.4) saturate(1.4);
+}
+
+.csgo-defuse p {
+  margin: 0;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  font-size: 0.78rem;
+}
+
+.csgo-egg-payoff {
+  margin: 0.35rem 0 0;
+  color: #7dffb3;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+}
+
+.csgo-hold {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.csgo-hold[data-hold='pin'] {
+  left: 46%;
+  top: 46%;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #7dffb3;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #101820;
+}
+
+.csgo-hold[data-hold='pin']::before,
+.csgo-hold[data-hold='pin']::after {
+  content: '';
+  position: absolute;
+  background: #e6bd68;
+}
+
+.csgo-hold[data-hold='pin']::before {
+  left: 50%;
+  top: -3px;
+  width: 1px;
+  height: 20px;
+  transform: translateX(-50%);
+}
+
+.csgo-hold[data-hold='pin']::after {
+  top: 50%;
+  left: -3px;
+  width: 20px;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.csgo-skeleton-hold {
+  position: fixed;
+  z-index: 35;
+  top: 4.2rem;
+  left: 12%;
+  right: 12%;
+  max-height: 42vh;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border: 1px solid #e6bd68;
+  background: #101820;
+  color: #e6bd68;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  letter-spacing: 0.06em;
+}
+
+.csgo-skeleton-hold [data-slot='skeleton'] {
+  height: 14rem;
+  width: 100%;
+}
+
+.csgo-hold[data-hold='load'] {
+  left: 22%;
+  right: 28%;
+  top: 42%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 7rem;
+  padding: 0.8rem;
+  border: 1px dashed #7dffb3;
+  background: radial-gradient(circle at 50% 50%, #7dffb322, transparent 42%), #101820e6;
+  color: #7dffb3;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.csgo-hold[data-hold='load'] {
+  border-style: solid;
+  border-color: #e6bd68;
+  color: #e6bd68;
+}
+
+.csgo-hold[data-hold='round'] {
+  left: 12px;
+  right: 28%;
+  top: 34%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 22px;
+  padding: 0 0.45rem;
+  background: #101820e6;
+  color: #7dffb3;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.12em;
+  overflow: hidden;
+}
+
+.csgo-hold[data-hold='round'] strong {
+  position: relative;
+  z-index: 1;
+  background: #101820;
+}
+
+.csgo-hold[data-hold='round'] i {
+  display: block;
+  height: 8px;
+  width: 46%;
+  background: #7dffb3;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .csgo-hold[data-hold='round'] i {
+    animation: csgo-round-sweep 1.4s linear infinite;
+  }
+
+  html[data-csgo-round='hold'] .csgo-hold[data-hold='round'] i {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes csgo-round-sweep {
+  from {
+    transform: translateX(-30%);
+  }
+  to {
+    transform: translateX(80%);
+  }
+}
+
+.csgo-defuse-fx {
+  position: absolute;
+  z-index: 4;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe08a 0 30%, #de4b4b 55%, transparent 72%);
+  box-shadow: 0 0 0 2px #101820;
+}
+
+html.csgo [data-chart-tooltip] {
+  background: #101820;
+  color: #f0eee7;
+  border: 1px solid #e6bd68;
+  border-left: 4px solid #de4b4b;
+  border-radius: 0;
+  font-family: 'CsgoDisplay', 'Rajdhani', 'Noto Sans SC', sans-serif;
+  letter-spacing: 0.03em;
+}
+
+html.csgo [data-chart-tooltip] .csgo-round-tag {
+  display: inline-block;
+  margin-right: 0.35rem;
+  color: #de4b4b;
+  font-family: 'CsgoDisplay', 'Rajdhani', sans-serif;
+  letter-spacing: 0.08em;
+}
+
+@media (forced-colors: active) {
+  .csgo-hold,
+  .csgo-egg-clue,
+  .csgo-defuse,
+  .csgo-line-index li {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .csgo-hold[data-hold='round'] i,
+  .csgo-fig[data-pose='idle'] img {
+    animation: none;
+  }
+}
+
+@media print {
+  .csgo-scene,
+  .csgo-theme-banner,
+  .csgo-ops-dialog {
+    display: none;
+  }
 }
