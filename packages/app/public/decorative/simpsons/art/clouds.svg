@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="340" viewBox="0 0 1000 340">
+  <defs>
+    <g id="cloud" stroke-linecap="round" stroke-linejoin="round">
+      <path fill="#fffdf2" stroke="#507f9c" stroke-width="2.4" d="M14 54C2 54 0 43 6 37q5-6 16-5c-3-11 6-18 16-17q7-13 21-10 9 1 13 10c15-6 27 1 30 13q15-2 20 9 9-3 15 4 7 10-5 14z"/>
+      <path fill="none" stroke="#badcec" stroke-width="2.7" d="M17 47q10 1 12-5 6 6 12 0m40-13q8-3 13 4m12 17q10 1 13-4"/>
+    </g>
+  </defs>
+  <use href="#cloud" transform="translate(11 43) scale(.95)"/>
+  <use href="#cloud" transform="translate(207 9) scale(.57)"/>
+  <use href="#cloud" transform="translate(642 27) scale(1.03)"/>
+  <use href="#cloud" transform="translate(850 174) scale(.93)"/>
+  <use href="#cloud" transform="translate(440 211) scale(.65)"/>
+  <use href="#cloud" transform="translate(115 255) scale(.77)"/>
+</svg>

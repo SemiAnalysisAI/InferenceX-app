@@ -4,6 +4,7 @@ import { track } from '@/lib/analytics/analytics';
 import {
   Car,
   Crosshair,
+  Donut,
   Moon,
   PencilLine,
   Pickaxe,
@@ -31,9 +32,14 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   halo: Shield,
   'orange-chicken': UtensilsCrossed,
   excalidraw: PencilLine,
+  simpsons: Donut,
 };
 
-const ZH_THEME_NAMES: Record<string, string> = { light: '浅色', dark: '深色' };
+const ZH_THEME_NAMES: Record<string, string> = {
+  light: '浅色',
+  dark: '深色',
+  simpsons: '辛普森一家',
+};
 
 const STRINGS = {
   en: {

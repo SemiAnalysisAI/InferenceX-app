@@ -6,7 +6,7 @@ import { isDarkTheme, LIGHT_THEMES } from '@/lib/themes/themes';
 
 // Pre-hydration copy of LIGHT_THEMES; a static literal so no value is spliced into script source.
 // srcset goes on first so the browser never starts a request for the plain src.
-const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=['light','excalidraw'].some((c)=>document.documentElement.classList.contains(c)),d=i.dataset,w=l?d.srcsetLight:d.srcsetDark,v=l?d.srcLight:d.srcDark;if(w)i.setAttribute('srcset',w);if(v)i.setAttribute('src',v)})()`;
+const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=['light','excalidraw','simpsons'].some((c)=>document.documentElement.classList.contains(c)),d=i.dataset,w=l?d.srcsetLight:d.srcsetDark,v=l?d.srcLight:d.srcDark;if(w)i.setAttribute('srcset',w);if(v)i.setAttribute('src',v)})()`;
 
 const subscribeClient = () => () => {};
 const getClientSnapshot = () => true;

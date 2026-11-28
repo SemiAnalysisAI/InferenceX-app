@@ -1,0 +1,590 @@
+.simpsons [role='dialog'].simpsons-rink {
+  display: block;
+  padding: 0;
+  width: min(750px, calc(100vw - 28px));
+  max-width: 750px;
+  max-height: 90dvh;
+  overflow: auto;
+  color: #292637;
+  background: #fff9e8;
+  border: 4px solid #282337;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 5px #ad84c4,
+    0 0 0 8px #282337,
+    8px 11px 0 #282337;
+  font-family: var(--font-dm-sans);
+}
+.simpsons .simpsons-rink > button:last-child {
+  top: 8px;
+  right: 10px;
+  color: #292637;
+  background: #fff7d7;
+  border: 1.5px solid #292637;
+}
+.simpsons .sp-rink-title {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background:
+    radial-gradient(#e6a02c 1px, transparent 1.6px) 0 0 / 7px 7px,
+    #ffda42;
+  border-bottom: 3px solid #292637;
+  padding: 10px 20px 9px;
+}
+.simpsons .sp-rink-title > div {
+  z-index: 1;
+}
+.simpsons .sp-rink-label,
+.simpsons .sp-track-head,
+.simpsons .sp-rink-foot,
+.simpsons .sp-track-bug {
+  font: 900 10px/1.15 var(--font-dm-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.simpsons .sp-rink-title h2 {
+  font: 700 clamp(31px, 4vw, 47px)/0.97 var(--sp-letter);
+  letter-spacing: -0.045em;
+  margin: 6px 0 2px;
+}
+.simpsons .sp-rink-title p {
+  font: 850 12px/1.15 var(--font-dm-sans);
+  color: #363044;
+}
+.simpsons .sp-rink-title img {
+  position: absolute;
+  height: 130%;
+  width: 90px;
+  object-fit: contain;
+  right: 75px;
+  top: 2px;
+  transform: rotate(9deg);
+}
+.simpsons .sp-rink-inner {
+  padding: 12px 16px 9px;
+}
+.simpsons .sp-modes,
+.simpsons .sp-hud,
+.simpsons .sp-game-actions,
+.simpsons .sp-gears,
+.simpsons .sp-race-line,
+.simpsons .sp-chapter,
+.simpsons .sp-rink-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.simpsons .sp-modes {
+  margin-bottom: 10px;
+}
+.simpsons .sp-modes button {
+  flex: 1;
+  text-align: left;
+  border: 1.5px solid #38334a;
+  border-radius: 5px;
+  background: #f4ecd8;
+  padding: 5px 8px;
+  font-weight: 900;
+  font-size: 12px;
+}
+.simpsons .sp-modes button[aria-pressed='true'] {
+  background: #293d39;
+  color: #fff9d9;
+}
+.simpsons .sp-modes small {
+  margin-right: 6px;
+  opacity: 0.75;
+  font: 700 10px monospace;
+}
+.simpsons .sp-track-head {
+  display: flex;
+  align-items: center;
+  padding: 7px 9px;
+  justify-content: space-between;
+  gap: 5px;
+  background: #343546;
+  color: #fff3b9;
+  border-radius: 6px 6px 0 0;
+  font-size: 9px;
+}
+.simpsons .sp-route-map {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 3px 6px;
+  background: #e8e6d7;
+  border-inline: 2px solid #393447;
+  gap: 4px;
+}
+.simpsons .sp-route-map::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 9%;
+  right: 9%;
+  height: 1px;
+  background: #898d84;
+}
+.simpsons .sp-route-map button {
+  position: relative;
+  background: #e8e6d7;
+  justify-self: center;
+  color: #595765;
+  font: 850 9px/1.3 var(--font-dm-sans);
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+.simpsons .sp-route-map i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 3px;
+  border: 1px solid #6c6875;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.simpsons .sp-route-map [data-current='true'] {
+  color: #263d35;
+}
+.simpsons .sp-route-map [data-current='true'] i {
+  background: #faaf38;
+}
+.simpsons .sp-route-map [data-visited='true'] i {
+  background: #68aa67;
+}
+.simpsons .sp-reactor,
+.simpsons .sp-blueprints {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 7px;
+  font: 850 11px/1.3 var(--font-dm-sans);
+}
+.simpsons .sp-reactor {
+  background: #39433f;
+  color: #e7f4b8;
+}
+.simpsons .sp-wheel-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 5px;
+}
+.simpsons .sp-pit-sound {
+  display: flex;
+  gap: 5px;
+  float: right;
+}
+.simpsons .sp-pit-sound .simpsons-dial {
+  padding: 2px;
+  height: 24px;
+  width: 24px;
+}
+.simpsons .simpsons-rink select {
+  border: 1px solid #676272;
+  background: #fffaf0;
+  color: #353144;
+  border-radius: 4px;
+}
+@media (pointer: coarse) {
+  .simpsons .sp-game-actions button,
+  .simpsons .sp-gears button {
+    min-height: 36px;
+  }
+  .simpsons .sp-modes button {
+    min-height: 32px;
+  }
+}
+.simpsons .sp-track-head b {
+  font: 700 17px/1 var(--sp-letter);
+  text-transform: none;
+  letter-spacing: 0;
+  color: #fff;
+}
+.simpsons .sp-rink-screen {
+  position: relative;
+  border: 2px solid #343546;
+  border-top: none;
+  overflow: hidden;
+}
+.simpsons .sp-rink-screen canvas {
+  display: block;
+  width: 100%;
+  height: clamp(170px, 25vh, 250px);
+  background: #bcecf1;
+  touch-action: manipulation;
+}
+.simpsons .sp-track-bug {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  border-radius: 3px;
+  color: white;
+  background: #33414b;
+  padding: 4px 5px;
+  font-size: 8px;
+  pointer-events: none;
+}
+.simpsons .sp-track-bug i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #ff9fa7;
+  border-radius: 50%;
+}
+.simpsons .sp-judge {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%) rotate(-2deg);
+  box-shadow: 3px 4px #292637;
+  border: 2px solid #292637;
+  background: #fff4cd;
+  border-radius: 5px;
+  padding: 7px 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.simpsons .sp-judge img {
+  height: 70px;
+  object-fit: contain;
+}
+.simpsons .sp-judge :is(b, small, span) {
+  display: block;
+}
+.simpsons .sp-judge b {
+  font: 700 25px/1.3 var(--sp-letter);
+}
+.simpsons .sp-hud {
+  gap: 0;
+  background: #fff3ce;
+  border: 2px solid #343546;
+  border-top: 0;
+}
+.simpsons .sp-hud div {
+  flex: 1;
+  padding: 5px 8px;
+  line-height: 1;
+  min-width: 0;
+  border-right: 1px solid #a6a08c;
+}
+.simpsons .sp-hud div:last-child {
+  border: 0;
+}
+.simpsons .sp-hud small {
+  display: block;
+  font: 900 9px/1.3 var(--font-dm-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.simpsons .sp-hud b {
+  font: 900 21px/1.2 var(--font-dm-sans);
+  font-variant-numeric: tabular-nums;
+}
+.simpsons .sp-hud span {
+  font: 700 10px/1 var(--font-dm-sans);
+  margin-left: 3px;
+}
+.simpsons .sp-chapter,
+.simpsons .sp-race-line,
+.simpsons .sp-game-actions,
+.simpsons .sp-gears,
+.simpsons .sp-lab-tray {
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+.simpsons .sp-chapter,
+.simpsons .sp-race-line,
+.simpsons .sp-gears,
+.simpsons .sp-game-actions label,
+.simpsons .sp-pit,
+.simpsons .sp-lab-tray {
+  font: 800 12px/1.3 var(--font-dm-sans);
+}
+.simpsons .sp-chapter select {
+  background: #fffef5;
+  border: 1px solid #565465;
+  padding: 3px;
+  border-radius: 3px;
+  max-width: 100%;
+}
+.simpsons .sp-chapter > span,
+.simpsons .sp-pit p,
+.simpsons .sp-how {
+  color: #514d58;
+  font-size: 11px;
+}
+.simpsons .sp-race-line {
+  justify-content: space-between;
+  background: #e6e8df;
+  border-radius: 4px;
+  padding: 5px 8px;
+  gap: 4px;
+}
+.simpsons .sp-race-line b {
+  color: #8d3a31;
+}
+.simpsons .sp-race-line b[data-met='true'] {
+  color: #145245;
+}
+.simpsons .sp-game-actions button,
+.simpsons .sp-gears button,
+.simpsons .sp-pit button,
+.simpsons .sp-lab-tray button {
+  border: 1.5px solid #373446;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font: 900 12px/1.2 var(--font-dm-sans);
+  box-shadow: 1px 2px #373446;
+  background: #fffdf4;
+  color: #292637;
+}
+.simpsons .sp-game-actions .sp-drop {
+  background: #ffcf27;
+  padding-inline: 21px;
+}
+.simpsons .sp-game-actions label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+.simpsons .sp-game-actions button:disabled,
+.simpsons .sp-pit button:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+}
+.simpsons .sp-gears button {
+  font-size: 11px;
+  padding: 3px 7px;
+  box-shadow: none;
+}
+.simpsons .sp-gears button[aria-pressed='true'] {
+  background: #65496f;
+  color: white;
+}
+.simpsons .sp-gag-status {
+  margin-left: auto;
+  color: #554267;
+}
+.simpsons .sp-pit {
+  border-block: 1px dashed #928576;
+  padding-block: 6px;
+  margin-top: 8px;
+}
+.simpsons .sp-pit summary {
+  cursor: pointer;
+}
+.simpsons .sp-pit p {
+  margin: 4px 0;
+}
+.simpsons .sp-pit button,
+.simpsons .sp-lab-tray button {
+  margin: 2px 4px 2px 0;
+  font-size: 11px;
+  padding: 4px 6px;
+}
+.simpsons .sp-lab-tray small {
+  display: block;
+}
+.simpsons .sp-rink-foot {
+  color: #655e57;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+.simpsons .sp-how {
+  margin: 6px 0 0;
+  line-height: 1.3;
+}
+.simpsons .simpsons-rink :is(button, canvas, select, input, summary):focus-visible {
+  outline: 3px solid #2459b0;
+  outline-offset: 2px;
+}
+@media (max-width: 550px) {
+  .simpsons [role='dialog'].simpsons-rink {
+    width: calc(100vw - 22px);
+    max-height: 93dvh;
+  }
+  .simpsons .sp-rink-inner {
+    padding: 8px;
+  }
+  .simpsons .sp-rink-title {
+    padding: 8px 12px;
+  }
+  .simpsons .sp-rink-title img {
+    right: 40px;
+    width: 58px;
+  }
+  .simpsons .sp-modes {
+    gap: 3px;
+    margin-bottom: 6px;
+  }
+  .simpsons .sp-modes button {
+    font-size: 10px;
+    text-align: center;
+    padding: 6px 2px;
+  }
+  .simpsons .sp-modes small {
+    display: none;
+  }
+  .simpsons .sp-hud span {
+    display: block;
+    margin-left: 0;
+  }
+  .simpsons .sp-chapter > span {
+    display: none;
+  }
+  .simpsons .sp-track-head {
+    font-size: 8px;
+    letter-spacing: 0.015em;
+  }
+  .simpsons .sp-track-head b {
+    font-size: 13px;
+  }
+  .simpsons .sp-gears,
+  .simpsons .sp-game-actions {
+    gap: 4px;
+  }
+  .simpsons .sp-game-actions label {
+    margin-left: 0;
+  }
+  .simpsons .sp-race-line,
+  .simpsons .sp-gears,
+  .simpsons .sp-chapter {
+    font-size: 10px;
+  }
+}
+.simpsons .sp-delivery {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 5px 0;
+  padding: 5px 8px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  background: #fff6cd;
+  color: #31233c;
+}
+.simpsons .sp-delivery img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+.simpsons .sp-delivery small,
+.simpsons .sp-delivery b {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.simpsons .sp-delivery small {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.simpsons .sp-delivery[data-state='paid'] {
+  background: #dff0bc;
+}
+.simpsons .sp-pass-exchange {
+  grid-column: 1/-1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 4px 8px;
+}
+.simpsons .sp-pass-exchange label {
+  display: grid;
+  gap: 3px;
+}
+.simpsons .sp-pass-exchange input {
+  font: 700 12px monospace;
+  background: #fff9da;
+  color: #252331;
+  border: 1px solid currentColor;
+  padding: 3px;
+  width: 15ch;
+}
+.simpsons .sp-pass-exchange output {
+  font-weight: 800;
+}
+.simpsons .sp-pursuit {
+  display: grid;
+  grid-template-columns: auto minmax(40px, 100px);
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 12px;
+}
+.simpsons .sp-pursuit :is(small, button) {
+  grid-column: 1/-1;
+}
+.simpsons .sp-pursuit meter {
+  width: 100%;
+}
+.simpsons .sp-rink-backdrop {
+  background: #302a34;
+  backdrop-filter: none;
+}
+.simpsons [role='dialog'].simpsons-rink {
+  animation: none;
+  overscroll-behavior: contain;
+}
+.simpsons .sp-rink-screen canvas[hidden],
+.simpsons .sp-touch-how {
+  display: none;
+}
+.simpsons .sp-rink-poster {
+  display: block;
+  width: 100%;
+  height: clamp(170px, 25vh, 250px);
+  object-fit: cover;
+  object-position: center 45%;
+}
+.simpsons .sp-simulation-tag {
+  color: #41334c;
+  background: #fff1b0;
+  padding: 2px 6px;
+  font: 800 11px/1.3 var(--font-dm-sans);
+}
+.simpsons .sp-exit-check strong {
+  width: 100%;
+}
+@media (pointer: coarse) {
+  .simpsons .sp-key-how {
+    display: none;
+  }
+  .simpsons .sp-touch-how {
+    display: inline;
+  }
+}
+@media (max-width: 550px) {
+  .simpsons
+    [role='dialog'].simpsons-rink
+    :is(button, select, summary, .sp-game-actions label, .sp-pass-exchange input) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .simpsons .sp-game-actions label,
+  .simpsons .sp-pit summary {
+    align-content: center;
+  }
+  .simpsons .sp-route-map {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .simpsons .sp-route-map button {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .simpsons .sp-rink-inner {
+    padding-bottom: 16px;
+  }
+}
